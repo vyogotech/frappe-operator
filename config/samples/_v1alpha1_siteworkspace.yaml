@@ -1,0 +1,12 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteWorkspace
+metadata:
+  labels:
+    app.kubernetes.io/name: siteworkspace
+    app.kubernetes.io/instance: siteworkspace-sample
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: frappe-operator
+  name: siteworkspace-sample
+spec:
+  # TODO(user): Add fields here
