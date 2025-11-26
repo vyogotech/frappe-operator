@@ -1,0 +1,166 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.19'
+          cache: true
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Run tests
+        run: make test
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build binaries for multiple platforms
+        run: |
+          mkdir -p dist
+          
+          # Linux AMD64
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist/frappe-operator-linux-amd64 main.go
+          
+          # Linux ARM64
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist/frappe-operator-linux-arm64 main.go
+          
+          # Darwin AMD64
+          GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist/frappe-operator-darwin-amd64 main.go
+          
+          # Darwin ARM64 (Apple Silicon)
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist/frappe-operator-darwin-arm64 main.go
+
+      - name: Generate manifests
+        run: |
+          make manifests
+          mkdir -p dist/manifests
+          cp -r config dist/manifests/
+
+      - name: Create release archives
+        run: |
+          cd dist
+          
+          # Create tarballs for each binary
+          for binary in frappe-operator-*; do
+            if [ -f "$binary" ]; then
+              tar czf "${binary}.tar.gz" "$binary"
+            fi
+          done
+          
+          # Create manifest archive
+          tar czf "manifests-${{ steps.version.outputs.VERSION }}.tar.gz" manifests/
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create Release Notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Frappe Operator ${{ steps.version.outputs.VERSION }}
+          
+          ### Docker Images
+          
+          The operator image is available at:
+          ```bash
+          ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
+          ghcr.io/${{ github.repository }}:latest
+          ```
+          
+          Pull the image:
+          ```bash
+          docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
+          ```
+          
+          ### Installation
+          
+          #### Using kubectl
+          ```bash
+          kubectl apply -f https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/manifests-${{ steps.version.outputs.VERSION }}.tar.gz
+          ```
+          
+          #### Using the binary
+          Download the appropriate binary for your platform from the assets below.
+          
+          ### Supported Platforms
+          - Linux AMD64
+          - Linux ARM64
+          - macOS AMD64
+          - macOS ARM64 (Apple Silicon)
+          
+          ### Docker Image Platforms
+          - linux/amd64
+          - linux/arm64
+          
+          EOF
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
