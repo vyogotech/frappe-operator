@@ -1,88 +1,167 @@
-# frappe-operator
+# Frappe Operator
 
-frappe-operator aims to simplify the lifecycle management of Frappe Sites on Kubernetes that are currently managed to the helm chart. 
+A Kubernetes Operator for managing Frappe Framework deployments on Kubernetes.
 
-## Description
-Operator does the following:
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/vyogo-tech/frappe-operator)](go.mod)
 
-Allows declarative way of creating and managing a site. Below CRDs are available:
+## Overview
 
-1. FrappeSite - Defines and manages a Frappe site and its apps. 
-2. SiteUser - Managed the users of the particular site and their permissions. 
-3. SiteWorkspace - Helps to create a workspace on a site declaratively. 
-4. SiteDashBoard and SiteDashBoardChart - Helps to create DashboardChart and Dashboards in a site
+Frappe Operator simplifies the lifecycle management of Frappe Sites on Kubernetes. It provides a declarative way to create and manage Frappe benches and sites using Kubernetes Custom Resources.
 
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+**Key Features:**
+- 🚀 Declarative management of Frappe benches and sites
+- 🏢 Multi-tenancy support with shared or dedicated resources
+- 📊 Auto-scaling and high availability
+- 🔒 Production-ready with TLS and security best practices
+- 🔄 Automated updates and migrations
+- 📦 Integration with MariaDB Operator and cert-manager
 
-### Running on the cluster
-1. Install Instances of Custom Resources:
+## Documentation
 
-```sh
-kubectl apply -f config/samples/
+**📚 [Complete Documentation](https://vyogo-tech.github.io/frappe-operator/)**
+
+- [Getting Started](https://vyogo-tech.github.io/frappe-operator/getting-started) - Installation and first deployment
+- [Concepts](https://vyogo-tech.github.io/frappe-operator/concepts) - Understanding benches and sites
+- [API Reference](https://vyogo-tech.github.io/frappe-operator/api-reference) - Complete CRD specification
+- [Examples](https://vyogo-tech.github.io/frappe-operator/examples) - Common deployment patterns
+- [Operations](https://vyogo-tech.github.io/frappe-operator/operations) - Production operations guide
+- [Troubleshooting](https://vyogo-tech.github.io/frappe-operator/troubleshooting) - Common issues and solutions
+
+## Quick Start
+
+### Install the Operator
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/main/config/install.yaml
 ```
 
-2. Build and push your image to the location specified by `IMG`:
+### Deploy Your First Site
 
-```sh
-make docker-build docker-push IMG=<some-registry>/frappe-operator:tag
+```bash
+kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/main/examples/minimal-bench-and-site.yaml
 ```
 
-3. Deploy the controller to the cluster with the image specified by `IMG`:
+### Check Status
 
-```sh
-make deploy IMG=<some-registry>/frappe-operator:tag
+```bash
+kubectl get frappebench,frappesite
 ```
 
-### Uninstall CRDs
-To delete the CRDs from the cluster:
+For detailed instructions, see the [Getting Started Guide](https://vyogo-tech.github.io/frappe-operator/getting-started).
 
-```sh
-make uninstall
+## Custom Resources
+
+The operator provides the following Custom Resource Definitions:
+
+### Core Resources
+
+- **FrappeBench** - Defines shared infrastructure for multiple sites
+- **FrappeSite** - Manages individual Frappe sites
+
+### Additional Resources
+
+- **SiteUser** - Manages site users and permissions
+- **SiteWorkspace** - Creates workspaces declaratively
+- **SiteDashboard** & **SiteDashboardChart** - Manages dashboards
+- **SiteBackup** - Automates site backups
+- **SiteJob** - Executes custom jobs on sites
+
+## Architecture
+
+```
+┌─────────────────────────────────────────┐
+│         FrappeBench (Shared)            │
+│  ┌──────┐  ┌───────┐  ┌──────────┐    │
+│  │NGINX │  │ Redis │  │  Common  │    │
+│  └───┬──┘  └───────┘  │  Storage │    │
+│      │                 └──────────┘    │
+└──────┼──────────────────────────────────┘
+       │
+       ├────────┬────────┬────────┐
+       │        │        │        │
+   ┌───▼──┐ ┌──▼───┐ ┌──▼───┐ ┌──▼───┐
+   │Site 1│ │Site 2│ │Site 3│ │Site N│
+   │      │ │      │ │      │ │      │
+   │ Web  │ │ Web  │ │ Web  │ │ Web  │
+   │Workers│ │Workers│ │Workers│ │Workers│
+   │  DB  │ │  DB  │ │  DB  │ │  DB  │
+   └──────┘ └──────┘ └──────┘ └──────┘
 ```
 
-### Undeploy controller
-UnDeploy the controller from the cluster:
+## Examples
 
-```sh
-make undeploy
+Browse the [`examples/`](examples/) directory for common deployment patterns:
+
+- **[minimal-bench-and-site.yaml](examples/minimal-bench-and-site.yaml)** - Quick start
+- **[production-bench.yaml](examples/production-bench.yaml)** - Production configuration
+- **[multi-tenant-bench.yaml](examples/multi-tenant-bench.yaml)** - Multi-tenant SaaS
+- **[enterprise-setup.yaml](examples/enterprise-setup.yaml)** - Enterprise deployment
+- **[high-availability-bench.yaml](examples/high-availability-bench.yaml)** - HA setup
+
+See the [Examples Documentation](https://vyogo-tech.github.io/frappe-operator/examples) for detailed explanations.
+
+## Requirements
+
+- Kubernetes 1.19+
+- kubectl configured to access your cluster
+- (Optional) MariaDB Operator for database management
+- (Optional) Ingress Controller for external access
+- (Optional) cert-manager for TLS certificates
+
+## Development
+
+### Prerequisites
+
+- Go 1.21+
+- Docker
+- kubectl
+- kind or minikube (for local testing)
+
+### Build and Run Locally
+
+```bash
+# Install CRDs
+make install
+
+# Run controller locally
+make run
+
+# Build docker image
+make docker-build IMG=<your-registry>/frappe-operator:tag
+
+# Deploy to cluster
+make deploy IMG=<your-registry>/frappe-operator:tag
+```
+
+### Testing
+
+```bash
+# Run tests
+make test
+
+# Run with coverage
+make test-coverage
 ```
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
 
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/),
-which provide a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster.
+### How to Contribute
 
-### Test It Out
-1. Install the CRDs into the cluster:
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-```sh
-make install
-```
+## Community
 
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
-
-```sh
-make run
-```
-
-**NOTE:** You can also run this in one step by running: `make install run`
-
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
-
-```sh
-make manifests
-```
-
-**NOTE:** Run `make --help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+- **Issues**: [GitHub Issues](https://github.com/vyogo-tech/frappe-operator/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/vyogo-tech/frappe-operator/discussions)
+- **Frappe Forum**: [discuss.frappe.io](https://discuss.frappe.io/)
 
 ## License
 
@@ -100,3 +179,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
+---
+
+**Built with ❤️ using [Kubebuilder](https://book.kubebuilder.io/)**

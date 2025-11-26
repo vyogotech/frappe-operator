@@ -17,25 +17,87 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// Note: Common types (NamespacedName, TLSConfig, DatabaseConfig, etc.) are defined in shared_types.go
 
 // FrappeSiteSpec defines the desired state of FrappeSite
 type FrappeSiteSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// BenchRef references the FrappeBench this site belongs to
+	// +kubebuilder:validation:Required
+	BenchRef *NamespacedName `json:"benchRef"`
 
-	// Foo is an example field of FrappeSite. Edit frappesite_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// SiteName is the Frappe site name - MUST match the domain that will receive traffic
+	// This is what Frappe uses to route requests based on HTTP Host header
+	// Example: "erp.customer.com" or "customer1.myplatform.com"
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	SiteName string `json:"siteName"`
+
+	// AdminPasswordSecretRef references the Secret containing admin password
+	// +optional
+	AdminPasswordSecretRef *corev1.SecretReference `json:"adminPasswordSecretRef,omitempty"`
+
+	// DBConfig defines database configuration for this site
+	// +optional
+	DBConfig DatabaseConfig `json:"dbConfig,omitempty"`
+
+	// Domain is the external domain for ingress
+	// MUST match siteName (defaults to siteName if not specified)
+	// +optional
+	Domain string `json:"domain,omitempty"`
+
+	// TLS configuration
+	// +optional
+	TLS TLSConfig `json:"tls,omitempty"`
+
+	// IngressClassName specifies the ingress class
+	// +optional
+	IngressClassName string `json:"ingressClassName,omitempty"`
+
+	// Ingress configuration
+	// +optional
+	Ingress *IngressConfig `json:"ingress,omitempty"`
 }
+
+// FrappeSitePhase represents the current phase
+type FrappeSitePhase string
+
+const (
+	FrappeSitePhasePending      FrappeSitePhase = "Pending"
+	FrappeSitePhaseProvisioning FrappeSitePhase = "Provisioning"
+	FrappeSitePhaseReady        FrappeSitePhase = "Ready"
+	FrappeSitePhaseFailed       FrappeSitePhase = "Failed"
+)
 
 // FrappeSiteStatus defines the observed state of FrappeSite
 type FrappeSiteStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Phase is the current phase
+	// +optional
+	Phase FrappeSitePhase `json:"phase,omitempty"`
+
+	// BenchReady indicates if the referenced bench is ready
+	// +optional
+	BenchReady bool `json:"benchReady,omitempty"`
+
+	// SiteURL is the accessible URL
+	// +optional
+	SiteURL string `json:"siteURL,omitempty"`
+
+	// DBConnectionSecret is the name of the Secret with DB credentials
+	// +optional
+	DBConnectionSecret string `json:"dbConnectionSecret,omitempty"`
+
+	// ResolvedDomain is the final domain after resolution
+	// +optional
+	ResolvedDomain string `json:"resolvedDomain,omitempty"`
+
+	// DomainSource indicates how domain was determined
+	// Values: explicit, bench-suffix, auto-detected, sitename-default
+	// +optional
+	DomainSource string `json:"domainSource,omitempty"`
 }
 
 //+kubebuilder:object:root=true

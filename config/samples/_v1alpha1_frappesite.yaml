@@ -1,12 +1,104 @@
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
 metadata:
-  labels:
-    app.kubernetes.io/name: frappesite
-    app.kubernetes.io/instance: frappesite-sample
-    app.kubernetes.io/part-of: frappe-operator
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: frappe-operator
-  name: frappesite-sample
+  name: demo-site
+  namespace: default
 spec:
-  # TODO(user): Add fields here
+  # Site configuration
+  siteName: demo.example.com
+  frappeVersion: "v15.0.0"
+  
+  # Apps to install
+  apps:
+    - name: erpnext
+      version: "v15.0.0"
+      source:
+        type: preinstalled
+  
+  # Image configuration
+  image:
+    repository: localhost/frappe/erpnext
+    tag: "v15.0.0"
+    pullPolicy: Never
+  
+  # Admin password (referenced from secret)
+  adminPasswordSecretRef:
+    name: demo-site-admin-password
+    namespace: default
+  
+  # Database configuration (shared mode - simplest for testing)
+  dbConfig:
+    mode: external
+    connectionSecretRef:
+      name: demo-site-db-external
+      namespace: default
+  
+  # DragonFly configuration (shared mode)
+  dragonflyConfig:
+    mode: external
+    connectionSecretRef:
+      name: demo-site-dragonfly-external
+      namespace: default
+  
+  # Resource configuration (starter tier)
+  replicas:
+    gunicorn: 1
+    socketio: 1
+    workerDefault: 1
+    workerLong: 1
+    workerShort: 1
+  
+  resources:
+    gunicorn:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    scheduler:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    socketio:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    workerDefault:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 400m
+        memory: 512Mi
+    workerLong:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 400m
+        memory: 512Mi
+    workerShort:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  
+  # Storage configuration
+  storageSize:
+    sites: 5Gi
+    logs: 1Gi
+  
+  # Ingress configuration (optional - can be added later)
+  # domain: demo.example.com
+  # ingressClassName: nginx
+  # tls:
+  #   enabled: false
