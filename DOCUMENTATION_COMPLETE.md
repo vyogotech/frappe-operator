@@ -157,8 +157,8 @@ In your GitHub repository settings:
 ### 2. Update Repository URLs
 
 Search and replace placeholder URLs in documentation:
-- Replace `https://github.com/vyogo-tech/frappe-operator` with your actual repo URL
-- Replace `vyogo-tech` with your GitHub organization/username
+- Replace `https://github.com/vyogotech/frappe-operator` with your actual repo URL
+- Replace `vyogotech` with your GitHub organization/username
 
 ### 3. Test Documentation Locally
 
@@ -225,10 +225,10 @@ frappe-operator/
 
 ## Documentation URLs (Once Deployed)
 
-- **Main Documentation**: `https://vyogo-tech.github.io/frappe-operator/`
-- **Getting Started**: `https://vyogo-tech.github.io/frappe-operator/getting-started`
-- **API Reference**: `https://vyogo-tech.github.io/frappe-operator/api-reference`
-- **Examples**: `https://vyogo-tech.github.io/frappe-operator/examples`
+- **Main Documentation**: `https://vyogotech.github.io/frappe-operator/`
+- **Getting Started**: `https://vyogotech.github.io/frappe-operator/getting-started`
+- **API Reference**: `https://vyogotech.github.io/frappe-operator/api-reference`
+- **Examples**: `https://vyogotech.github.io/frappe-operator/examples`
 
 The documentation is now ready for GitHub Pages deployment! 🎉
 

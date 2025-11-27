@@ -44,7 +44,7 @@ git clone https://github.com/YOUR-USERNAME/frappe-operator.git
 cd frappe-operator
 
 # Add upstream remote
-git remote add upstream https://github.com/vyogo-tech/frappe-operator.git
+git remote add upstream https://github.com/vyogotech/frappe-operator.git
 
 # Install dependencies
 go mod download
@@ -312,8 +312,8 @@ git push origin v1.0.0
 
 ## Getting Help
 
-- **Questions**: Open a [GitHub Discussion](https://github.com/vyogo-tech/frappe-operator/discussions)
-- **Bugs**: Open a [GitHub Issue](https://github.com/vyogo-tech/frappe-operator/issues)
+- **Questions**: Open a [GitHub Discussion](https://github.com/vyogotech/frappe-operator/discussions)
+- **Bugs**: Open a [GitHub Issue](https://github.com/vyogotech/frappe-operator/issues)
 - **Chat**: Join our community chat (link TBD)
 
 ## Recognition

@@ -457,7 +457,7 @@ spec:
 
 ```bash
 # Upgrade operator
-kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/v1.1.0/config/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/v1.1.0/config/install.yaml
 
 # Verify upgrade
 kubectl get deployment -n frappe-operator-system
@@ -622,7 +622,7 @@ kubectl exec -it mariadb-0 -n databases -- \
 kubectl apply -f mariadb-restore.yaml
 
 # 2. Recreate operator
-kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/main/config/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/config/install.yaml
 
 # 3. Recreate bench
 kubectl apply -f bench.yaml

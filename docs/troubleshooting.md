@@ -712,8 +712,8 @@ kubectl describe frappesite <name> > site-describe.txt
 
 ### Resources
 
-- **GitHub Issues**: [vyogo-tech/frappe-operator/issues](https://github.com/vyogo-tech/frappe-operator/issues)
-- **Documentation**: [Frappe Operator Docs](https://vyogo-tech.github.io/frappe-operator/)
+- **GitHub Issues**: [vyogotech/frappe-operator/issues](https://github.com/vyogotech/frappe-operator/issues)
+- **Documentation**: [Frappe Operator Docs](https://vyogotech.github.io/frappe-operator/)
 - **Frappe Forum**: [discuss.frappe.io](https://discuss.frappe.io/)
 
 ---
