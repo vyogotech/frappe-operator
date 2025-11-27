@@ -37,10 +37,10 @@ Get started with Frappe Operator in minutes:
 
 ```bash
 # Install the operator
-kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/main/config/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/config/install.yaml
 
 # Create a minimal bench and site
-kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/main/examples/minimal-bench-and-site.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/examples/minimal-bench-and-site.yaml
 
 # Check status
 kubectl get frappebench,frappesite
@@ -128,8 +128,8 @@ Manage dev, staging, and production environments in separate namespaces.
 
 ## Community and Support
 
-- **GitHub**: [vyogo-tech/frappe-operator](https://github.com/vyogo-tech/frappe-operator)
-- **Issues**: [GitHub Issues](https://github.com/vyogo-tech/frappe-operator/issues)
+- **GitHub**: [vyogotech/frappe-operator](https://github.com/vyogotech/frappe-operator)
+- **Issues**: [GitHub Issues](https://github.com/vyogotech/frappe-operator/issues)
 - **License**: Apache 2.0
 
 ## Next Steps

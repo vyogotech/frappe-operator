@@ -4,7 +4,7 @@ title: Frappe Operator
 description: Kubernetes Operator for managing Frappe Framework deployments
 show_downloads: true
 github:
-  repository_url: https://github.com/vyogo-tech/frappe-operator
+  repository_url: https://github.com/vyogotech/frappe-operator
   is_project_page: true
 
 # Navigation

@@ -4,7 +4,7 @@ A Kubernetes Operator for managing Frappe Framework deployments on Kubernetes.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/vyogo-tech/frappe-operator)](go.mod)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/vyogotech/frappe-operator)](go.mod)
 
 ## Overview
 
@@ -20,27 +20,27 @@ Frappe Operator simplifies the lifecycle management of Frappe Sites on Kubernete
 
 ## Documentation
 
-**📚 [Complete Documentation](https://vyogo-tech.github.io/frappe-operator/)**
+**📚 [Complete Documentation](https://vyogotech.github.io/frappe-operator/)**
 
-- [Getting Started](https://vyogo-tech.github.io/frappe-operator/getting-started) - Installation and first deployment
-- [Concepts](https://vyogo-tech.github.io/frappe-operator/concepts) - Understanding benches and sites
-- [API Reference](https://vyogo-tech.github.io/frappe-operator/api-reference) - Complete CRD specification
-- [Examples](https://vyogo-tech.github.io/frappe-operator/examples) - Common deployment patterns
-- [Operations](https://vyogo-tech.github.io/frappe-operator/operations) - Production operations guide
-- [Troubleshooting](https://vyogo-tech.github.io/frappe-operator/troubleshooting) - Common issues and solutions
+- [Getting Started](https://vyogotech.github.io/frappe-operator/getting-started) - Installation and first deployment
+- [Concepts](https://vyogotech.github.io/frappe-operator/concepts) - Understanding benches and sites
+- [API Reference](https://vyogotech.github.io/frappe-operator/api-reference) - Complete CRD specification
+- [Examples](https://vyogotech.github.io/frappe-operator/examples) - Common deployment patterns
+- [Operations](https://vyogotech.github.io/frappe-operator/operations) - Production operations guide
+- [Troubleshooting](https://vyogotech.github.io/frappe-operator/troubleshooting) - Common issues and solutions
 
 ## Quick Start
 
 ### Install the Operator
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/main/config/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/config/install.yaml
 ```
 
 ### Deploy Your First Site
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/main/examples/minimal-bench-and-site.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/examples/minimal-bench-and-site.yaml
 ```
 
 ### Check Status
@@ -49,7 +49,7 @@ kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/ma
 kubectl get frappebench,frappesite
 ```
 
-For detailed instructions, see the [Getting Started Guide](https://vyogo-tech.github.io/frappe-operator/getting-started).
+For detailed instructions, see the [Getting Started Guide](https://vyogotech.github.io/frappe-operator/getting-started).
 
 ## Custom Resources
 
@@ -100,7 +100,7 @@ Browse the [`examples/`](examples/) directory for common deployment patterns:
 - **[enterprise-setup.yaml](examples/enterprise-setup.yaml)** - Enterprise deployment
 - **[high-availability-bench.yaml](examples/high-availability-bench.yaml)** - HA setup
 
-See the [Examples Documentation](https://vyogo-tech.github.io/frappe-operator/examples) for detailed explanations.
+See the [Examples Documentation](https://vyogotech.github.io/frappe-operator/examples) for detailed explanations.
 
 ## Requirements
 
@@ -159,8 +159,8 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## Community
 
-- **Issues**: [GitHub Issues](https://github.com/vyogo-tech/frappe-operator/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/vyogo-tech/frappe-operator/discussions)
+- **Issues**: [GitHub Issues](https://github.com/vyogotech/frappe-operator/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/vyogotech/frappe-operator/discussions)
 - **Frappe Forum**: [discuss.frappe.io](https://discuss.frappe.io/)
 
 ## License

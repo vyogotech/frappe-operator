@@ -2,7 +2,7 @@
 
 Real-world deployment patterns and configuration examples for Frappe Operator.
 
-> **Note**: All example YAML files are available in the [`examples/`](https://github.com/vyogo-tech/frappe-operator/tree/main/examples) directory of the repository.
+> **Note**: All example YAML files are available in the [`examples/`](https://github.com/vyogotech/frappe-operator/tree/main/examples) directory of the repository.
 
 ## Table of Contents
 
@@ -23,13 +23,13 @@ Real-world deployment patterns and configuration examples for Frappe Operator.
 The fastest way to get started is using the minimal example:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/main/examples/minimal-bench-and-site.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/examples/minimal-bench-and-site.yaml
 ```
 
 Or clone the repository:
 
 ```bash
-git clone https://github.com/vyogo-tech/frappe-operator.git
+git clone https://github.com/vyogotech/frappe-operator.git
 cd frappe-operator/examples
 kubectl apply -f minimal-bench-and-site.yaml
 ```
@@ -730,7 +730,7 @@ All examples are available in the repository under `examples/`:
 
 ```bash
 # Clone the repository
-git clone https://github.com/vyogo-tech/frappe-operator.git
+git clone https://github.com/vyogotech/frappe-operator.git
 cd frappe-operator
 
 # Apply a specific example
@@ -740,7 +740,7 @@ kubectl apply -f examples/minimal-bench-and-site.yaml
 kubectl apply -f examples/
 
 # Apply from remote URL
-kubectl apply -f https://raw.githubusercontent.com/vyogo-tech/frappe-operator/main/examples/production-bench.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/examples/production-bench.yaml
 ```
 
 ---
@@ -787,5 +787,5 @@ kubectl delete frappebench <name>
 - **[Operations Guide](operations.md)** - Production operations and maintenance
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
 - **[API Reference](api-reference.md)** - Complete field specifications
-- **[Browse All Examples](https://github.com/vyogo-tech/frappe-operator/tree/main/examples)** - View all example files
+- **[Browse All Examples](https://github.com/vyogotech/frappe-operator/tree/main/examples)** - View all example files
 
