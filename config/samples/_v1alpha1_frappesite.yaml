@@ -1,0 +1,12 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  labels:
+    app.kubernetes.io/name: frappesite
+    app.kubernetes.io/instance: frappesite-sample
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: frappe-operator
+  name: frappesite-sample
+spec:
+  # TODO(user): Add fields here

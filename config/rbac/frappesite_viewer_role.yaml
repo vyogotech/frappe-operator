@@ -1,0 +1,27 @@
+# permissions for end users to view frappesites.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: frappesite-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: frappesite-viewer-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappesites
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappesites/status
+  verbs:
+  - get
