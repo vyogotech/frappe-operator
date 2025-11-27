@@ -3,8 +3,16 @@ name: CI
 on:
   push:
     branches: [ main, master, develop ]
+    paths-ignore:
+      - '*.md'
+      - '_config.yml'
+      - 'docs/**'
   pull_request:
     branches: [ main, master, develop ]
+    paths-ignore:
+      - '*.md'
+      - '_config.yml'
+      - 'docs/**'
 
 jobs:
   docker-build:
