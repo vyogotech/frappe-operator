@@ -369,34 +369,45 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		}
 	}
 
-	// Create the init script
-	initScript := fmt.Sprintf(`#!/bin/bash
+	// Create the init script using environment variables to prevent shell injection
+	initScript := `#!/bin/bash
 set -e
 
 cd /home/frappe/frappe-bench
 
-echo "Creating Frappe site: %s"
-echo "Domain: %s"
+echo "Creating Frappe site: $SITE_NAME"
+echo "Domain: $DOMAIN"
 
-# Run bench new-site
-bench new-site %s \
-  --db-host=%s \
-  --db-port=%s \
-  --admin-password=%s \
-  --mariadb-root-password=%s \
+# Validate environment variables exist and are not empty
+if [[ -z "$SITE_NAME" || -z "$DOMAIN" || -z "$DB_HOST" || -z "$DB_PORT" || -z "$ADMIN_PASSWORD" || -z "$DB_ROOT_PASSWORD" || -z "$BENCH_NAME" ]]; then
+    echo "ERROR: Required environment variables not set"
+    exit 1
+fi
+
+# Run bench new-site with environment variables (safer than interpolation)
+bench new-site "$SITE_NAME" \
+  --db-host="$DB_HOST" \
+  --db-port="$DB_PORT" \
+  --admin-password="$ADMIN_PASSWORD" \
+  --mariadb-root-password="$DB_ROOT_PASSWORD" \
   --no-mariadb-socket \
   --install-app=erpnext \
   --verbose
 
-echo "Site %s created successfully!"
+echo "Site $SITE_NAME created successfully!"
 
-# Update site_config.json with domain and Redis configuration
-echo "Updating site_config.json with domain and Redis: %s"
+# Update site_config.json with domain and Redis configuration using Python
+echo "Updating site_config.json with domain and Redis"
 python3 << 'PYTHON_SCRIPT'
 import json
 import os
 
-site_path = "/home/frappe/frappe-bench/sites/%s"
+# Get values from environment variables
+site_name = os.environ['SITE_NAME']
+domain = os.environ['DOMAIN']
+bench_name = os.environ['BENCH_NAME']
+
+site_path = f"/home/frappe/frappe-bench/sites/{site_name}"
 config_file = os.path.join(site_path, "site_config.json")
 
 # Read existing config
@@ -404,23 +415,23 @@ with open(config_file, 'r') as f:
     config = json.load(f)
 
 # Update with resolved domain
-config['host_name'] = "%s"
+config['host_name'] = domain
 
 # Add Redis configuration for this site
-config['redis_cache'] = "redis://%s-redis-cache:6379"
-config['redis_queue'] = "redis://%s-redis-queue:6379"
+config['redis_cache'] = f"redis://{bench_name}-redis-cache:6379"
+config['redis_queue'] = f"redis://{bench_name}-redis-queue:6379"
 
 # Write back
 with open(config_file, 'w') as f:
     json.dump(config, f, indent=2)
 
-print(f"Updated site_config.json for domain: %s")
-print(f"Redis cache: %s-redis-cache:6379")
-print(f"Redis queue: %s-redis-queue:6379")
+print(f"Updated site_config.json for domain: {domain}")
+print(f"Redis cache: {bench_name}-redis-cache:6379")
+print(f"Redis queue: {bench_name}-redis-queue:6379")
 PYTHON_SCRIPT
 
 echo "Site initialization complete!"
-`, site.Spec.SiteName, domain, site.Spec.SiteName, dbHost, dbPort, adminPassword, dbRootPassword, site.Spec.SiteName, domain, site.Spec.SiteName, domain, bench.Name, bench.Name, domain, bench.Name, bench.Name)
+`
 
 	// Get bench PVC name
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
@@ -458,6 +469,26 @@ echo "Site initialization complete!"
 								{
 									Name:  "DOMAIN",
 									Value: domain,
+								},
+								{
+									Name:  "DB_HOST",
+									Value: dbHost,
+								},
+								{
+									Name:  "DB_PORT",
+									Value: dbPort,
+								},
+								{
+									Name:  "ADMIN_PASSWORD",
+									Value: adminPassword,
+								},
+								{
+									Name:  "DB_ROOT_PASSWORD",
+									Value: dbRootPassword,
+								},
+								{
+									Name:  "BENCH_NAME",
+									Value: bench.Name,
 								},
 							},
 						},
