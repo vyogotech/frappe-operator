@@ -240,14 +240,68 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	// Create the initialization job
 	logger.Info("Creating site initialization job", "job", jobName, "domain", domain)
 
-	// Get DB configuration
-	dbHost := "mariadb.default.svc.cluster.local" // Default
-	dbRootPassword := "admin"                      // Default
+	// Get DB configuration from site spec with proper priority
+	dbHost := "mariadb.default.svc.cluster.local" // Default fallback
+	dbPort := "3306"                               // Default fallback
+	var dbRootPassword string
 
-	// Override with site-specific config if provided
-	if site.Spec.DBConfig.Mode != "" {
-		// For now, use defaults. In production, this should come from secrets
-		logger.Info("Using database config", "mode", site.Spec.DBConfig.Mode)
+	// Priority 1: Explicit host/port in DBConfig spec
+	if site.Spec.DBConfig.Host != "" {
+		dbHost = site.Spec.DBConfig.Host
+	}
+	if site.Spec.DBConfig.Port != "" {
+		dbPort = site.Spec.DBConfig.Port
+	}
+
+	// Priority 2: ConnectionSecretRef (overrides explicit host/port if provided)
+	if site.Spec.DBConfig.ConnectionSecretRef != nil {
+		dbSecret := &corev1.Secret{}
+		secretRef := site.Spec.DBConfig.ConnectionSecretRef
+		secretNS := secretRef.Namespace
+		if secretNS == "" {
+			secretNS = site.Namespace
+		}
+		
+		err := r.Get(ctx, types.NamespacedName{
+			Name:      secretRef.Name,
+			Namespace: secretNS,
+		}, dbSecret)
+		if err != nil {
+			return false, fmt.Errorf("failed to get database connection secret '%s/%s': %w", 
+				secretNS, secretRef.Name, err)
+		}
+		
+		// Extract connection details from secret (overrides spec values)
+		if host, ok := dbSecret.Data["host"]; ok && len(host) > 0 {
+			dbHost = string(host)
+		}
+		if port, ok := dbSecret.Data["port"]; ok && len(port) > 0 {
+			dbPort = string(port)
+		}
+		
+		// Root password is REQUIRED from secret
+		if rootPwd, ok := dbSecret.Data["rootPassword"]; ok && len(rootPwd) > 0 {
+			dbRootPassword = string(rootPwd)
+		} else if rootPwd, ok := dbSecret.Data["root-password"]; ok && len(rootPwd) > 0 {
+			dbRootPassword = string(rootPwd)
+		} else {
+			return false, fmt.Errorf("database connection secret '%s/%s' must contain 'rootPassword' or 'root-password' field", 
+				secretNS, secretRef.Name)
+		}
+		
+		logger.Info("Using database connection from secret", 
+			"secret", secretRef.Name,
+			"namespace", secretNS,
+			"host", dbHost,
+			"port", dbPort)
+	} else {
+		// No secret provided - SECURITY WARNING
+		logger.Error(nil, "SECURITY WARNING: No database connection secret provided. Using insecure defaults for development/testing ONLY.",
+			"site", site.Name,
+			"dbHost", dbHost,
+			"dbPort", dbPort,
+			"recommendation", "Set spec.dbConfig.connectionSecretRef in production environments")
+		dbRootPassword = "admin" // Insecure fallback for development/testing only
 	}
 
 	// Get or generate admin password
@@ -327,7 +381,7 @@ echo "Domain: %s"
 # Run bench new-site
 bench new-site %s \
   --db-host=%s \
-  --db-port=3306 \
+  --db-port=%s \
   --admin-password=%s \
   --mariadb-root-password=%s \
   --no-mariadb-socket \
@@ -366,7 +420,7 @@ print(f"Redis queue: %s-redis-queue:6379")
 PYTHON_SCRIPT
 
 echo "Site initialization complete!"
-`, site.Spec.SiteName, domain, site.Spec.SiteName, dbHost, adminPassword, dbRootPassword, site.Spec.SiteName, domain, site.Spec.SiteName, domain, bench.Name, bench.Name, domain, bench.Name, bench.Name)
+`, site.Spec.SiteName, domain, site.Spec.SiteName, dbHost, dbPort, adminPassword, dbRootPassword, site.Spec.SiteName, domain, site.Spec.SiteName, domain, bench.Name, bench.Name, domain, bench.Name, bench.Name)
 
 	// Get bench PVC name
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
