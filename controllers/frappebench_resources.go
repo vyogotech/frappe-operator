@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -91,6 +92,13 @@ func (r *FrappeBenchReconciler) createBenchPVC(ctx context.Context, bench *vyogo
 		},
 	}
 
+	// Set storage class name if available
+	if sc != nil {
+		pvc.Spec.StorageClassName = &sc.Name
+		pvc.Annotations["frappe.tech/storage-class"] = sc.Name
+		pvc.Annotations["frappe.tech/provisioner"] = sc.Provisioner
+	}
+
 	if accessMode == corev1.ReadWriteOnce {
 		pvc.Annotations["frappe.tech/fallback"] = "true"
 	}
@@ -104,33 +112,59 @@ func (r *FrappeBenchReconciler) createBenchPVC(ctx context.Context, bench *vyogo
 }
 
 func (r *FrappeBenchReconciler) chooseStorageClass(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) (*storagev1.StorageClass, error) {
+	logger := log.FromContext(ctx)
+
 	if bench.Spec.StorageClassName != "" {
 		sc := &storagev1.StorageClass{}
 		if err := r.Get(ctx, types.NamespacedName{Name: bench.Spec.StorageClassName}, sc); err != nil {
-			return nil, err
+			if errors.IsNotFound(err) {
+				return nil, fmt.Errorf("specified storage class '%s' not found in cluster. Available storage classes can be listed with 'kubectl get storageclass'", bench.Spec.StorageClassName)
+			}
+			return nil, fmt.Errorf("failed to get storage class '%s': %w", bench.Spec.StorageClassName, err)
 		}
+
+		// Validate that the storage class is ready for use
+		if sc.Provisioner == "" {
+			return nil, fmt.Errorf("storage class '%s' has no provisioner configured", bench.Spec.StorageClassName)
+		}
+
+		logger.Info("Using specified storage class", "storageClass", sc.Name, "provisioner", sc.Provisioner)
 		return sc, nil
 	}
 
+	// Get all storage classes for selection
 	list := &storagev1.StorageClassList{}
 	if err := r.List(ctx, list); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list storage classes: %w", err)
 	}
 
+	if len(list.Items) == 0 {
+		return nil, fmt.Errorf("no storage classes available in cluster. Please create a storage class or specify storageClassName in bench spec")
+	}
+
+	// Try to find default storage class
 	for _, sc := range list.Items {
 		if isDefaultStorageClass(&sc) {
+			logger.Info("Using default storage class", "storageClass", sc.Name, "provisioner", sc.Provisioner)
 			return &sc, nil
 		}
 	}
-	if len(list.Items) > 0 {
-		return &list.Items[0], nil
-	}
-	return nil, nil
+
+	// No default found, use first available with warning
+	sc := &list.Items[0]
+	logger.Info("No default storage class found, using first available",
+		"storageClass", sc.Name,
+		"provisioner", sc.Provisioner,
+		"recommendation", "Set a default storage class or specify storageClassName in bench spec")
+	return sc, nil
 }
 
 func (r *FrappeBenchReconciler) determineAccessMode(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, sc *storagev1.StorageClass) (corev1.PersistentVolumeAccessMode, error) {
+	logger := log.FromContext(ctx)
+
 	if bench.Annotations != nil {
 		if modeStr, ok := bench.Annotations["frappe.tech/storage-access-mode"]; ok {
+			logger.V(1).Info("Using existing storage access mode from annotations", "mode", modeStr)
 			return corev1.PersistentVolumeAccessMode(modeStr), nil
 		}
 	}
@@ -140,11 +174,16 @@ func (r *FrappeBenchReconciler) determineAccessMode(ctx context.Context, bench *
 		mode = corev1.ReadWriteMany
 	}
 
+	// Use patch instead of update to avoid race conditions
+	patch := client.MergeFrom(bench.DeepCopy())
 	if bench.Annotations == nil {
-		bench.Annotations = map[string]string{}
+		bench.Annotations = make(map[string]string)
 	}
 	bench.Annotations["frappe.tech/storage-access-mode"] = string(mode)
-	if err := r.Update(ctx, bench); err != nil {
+
+	logger.Info("Setting storage access mode annotation", "mode", mode, "storageClass", sc.Name)
+	if err := r.Patch(ctx, bench, patch); err != nil {
+		logger.Error(err, "Failed to patch bench with storage access mode", "mode", mode)
 		return corev1.ReadWriteOnce, err
 	}
 	return mode, nil
@@ -185,11 +224,17 @@ func (r *FrappeBenchReconciler) getBenchStorageAccessMode(bench *vyogotechv1alph
 }
 
 func (r *FrappeBenchReconciler) markStorageFallback(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+	logger := log.FromContext(ctx)
+
+	// Use patch instead of update to avoid race conditions
+	patch := client.MergeFrom(bench.DeepCopy())
 	if bench.Annotations == nil {
-		bench.Annotations = map[string]string{}
+		bench.Annotations = make(map[string]string)
 	}
 	bench.Annotations["frappe.tech/storage-fallback"] = "true"
-	return r.Update(ctx, bench)
+
+	logger.Info("Marking bench for storage fallback", "bench", bench.Name)
+	return r.Patch(ctx, bench, patch)
 }
 
 func shouldFallbackStorage(pvc *corev1.PersistentVolumeClaim, bench *vyogotechv1alpha1.FrappeBench) bool {
