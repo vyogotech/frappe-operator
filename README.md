@@ -1,171 +1,475 @@
 # Frappe Operator
 
-A Kubernetes Operator for managing Frappe Framework deployments on Kubernetes.
+A Kubernetes Operator that makes deploying and managing [Frappe](https://frappeframework.com/) and [ERPNext](https://erpnext.com/) on Kubernetes simple and declarative.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/vyogotech/frappe-operator)](go.mod)
 
-## Overview
-
-Frappe Operator simplifies the lifecycle management of Frappe Sites on Kubernetes. It provides a declarative way to create and manage Frappe benches and sites using Kubernetes Custom Resources.
-
-**Key Features:**
-- 🚀 Declarative management of Frappe benches and sites
-- 🏢 Multi-tenancy support with shared or dedicated resources
-- 📊 Auto-scaling and high availability
-- 🔒 Production-ready with TLS and security best practices
-- 🔄 Automated updates and migrations
-- 📦 Integration with MariaDB Operator and cert-manager
-
-## Documentation
-
 **📚 [Complete Documentation](https://vyogotech.github.io/frappe-operator/)**
 
-- [Getting Started](https://vyogotech.github.io/frappe-operator/getting-started) - Installation and first deployment
-- [Concepts](https://vyogotech.github.io/frappe-operator/concepts) - Understanding benches and sites
-- [API Reference](https://vyogotech.github.io/frappe-operator/api-reference) - Complete CRD specification
-- [Examples](https://vyogotech.github.io/frappe-operator/examples) - Common deployment patterns
-- [Operations](https://vyogotech.github.io/frappe-operator/operations) - Production operations guide
-- [Troubleshooting](https://vyogotech.github.io/frappe-operator/troubleshooting) - Common issues and solutions
+## What is Frappe Operator?
 
-## Quick Start
+Frappe Operator is a Kubernetes operator that automates the deployment, scaling, and management of Frappe Framework applications (including ERPNext) on Kubernetes clusters. It brings the power of Kubernetes orchestration to Frappe deployments.
 
-### Install the Operator
+### Why Do You Need This?
 
-```bash
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/config/install.yaml
-```
+**Traditional Frappe Deployment Challenges:**
+- 🔧 Complex manual setup and configuration
+- 🔄 Difficult to scale and manage multiple sites
+- 🐛 Hard to maintain consistency across environments
+- 📦 Manual updates and migrations are error-prone
+- 🏢 Multi-tenancy requires custom scripting
 
-### Deploy Your First Site
+**With Frappe Operator:**
+- ✅ **Simple Declarative Configuration** - Define your Frappe infrastructure as YAML files
+- ✅ **Automated Management** - Operator handles deployment, scaling, and updates automatically
+- ✅ **Multi-Tenancy Built-in** - Easily manage hundreds of sites on shared infrastructure
+- ✅ **Production-Ready** - High availability, auto-scaling, and security out of the box
+- ✅ **GitOps Compatible** - Manage infrastructure as code with version control
 
-```bash
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/examples/minimal-bench-and-site.yaml
-```
+## Key Features
 
-### Check Status
+- 🚀 **One-Command Deployment** - Deploy entire Frappe infrastructure with a single kubectl command
+- 🏢 **Multi-Tenancy** - Run multiple customer sites efficiently on shared infrastructure
+- 📊 **Auto-Scaling** - Automatically scale based on traffic and resource usage
+- 🔒 **Enterprise Security** - TLS, RBAC, network policies, and security best practices
+- 🔄 **Automated Updates** - Zero-downtime rolling updates and migrations
+- 💾 **Backup Management** - Automated backups with configurable retention policies
+- 🔌 **Integrations** - Works with MariaDB Operator, cert-manager, and popular ingress controllers
+- 📈 **Observability** - Built-in Prometheus metrics and logging
 
-```bash
-kubectl get frappebench,frappesite
-```
-
-For detailed instructions, see the [Getting Started Guide](https://vyogotech.github.io/frappe-operator/getting-started).
-
-## Custom Resources
-
-The operator provides the following Custom Resource Definitions:
-
-### Core Resources
-
-- **FrappeBench** - Defines shared infrastructure for multiple sites
-- **FrappeSite** - Manages individual Frappe sites
-
-### Additional Resources
-
-- **SiteUser** - Manages site users and permissions
-- **SiteWorkspace** - Creates workspaces declaratively
-- **SiteDashboard** & **SiteDashboardChart** - Manages dashboards
-- **SiteBackup** - Automates site backups
-- **SiteJob** - Executes custom jobs on sites
-
-## Architecture
-
-```
-┌─────────────────────────────────────────┐
-│         FrappeBench (Shared)            │
-│  ┌──────┐  ┌───────┐  ┌──────────┐    │
-│  │NGINX │  │ Redis │  │  Common  │    │
-│  └───┬──┘  └───────┘  │  Storage │    │
-│      │                 └──────────┘    │
-└──────┼──────────────────────────────────┘
-       │
-       ├────────┬────────┬────────┐
-       │        │        │        │
-   ┌───▼──┐ ┌──▼───┐ ┌──▼───┐ ┌──▼───┐
-   │Site 1│ │Site 2│ │Site 3│ │Site N│
-   │      │ │      │ │      │ │      │
-   │ Web  │ │ Web  │ │ Web  │ │ Web  │
-   │Workers│ │Workers│ │Workers│ │Workers│
-   │  DB  │ │  DB  │ │  DB  │ │  DB  │
-   └──────┘ └──────┘ └──────┘ └──────┘
-```
-
-## Examples
-
-Browse the [`examples/`](examples/) directory for common deployment patterns:
-
-- **[minimal-bench-and-site.yaml](examples/minimal-bench-and-site.yaml)** - Quick start
-- **[production-bench.yaml](examples/production-bench.yaml)** - Production configuration
-- **[multi-tenant-bench.yaml](examples/multi-tenant-bench.yaml)** - Multi-tenant SaaS
-- **[enterprise-setup.yaml](examples/enterprise-setup.yaml)** - Enterprise deployment
-- **[high-availability-bench.yaml](examples/high-availability-bench.yaml)** - HA setup
-
-See the [Examples Documentation](https://vyogotech.github.io/frappe-operator/examples) for detailed explanations.
-
-## Requirements
-
-- Kubernetes 1.19+
-- kubectl configured to access your cluster
-- (Optional) MariaDB Operator for database management
-- (Optional) Ingress Controller for external access
-- (Optional) cert-manager for TLS certificates
-
-## Development
+## Quick Start (5 Minutes)
 
 ### Prerequisites
 
-- Go 1.21+
-- Docker
-- kubectl
-- kind or minikube (for local testing)
+You need:
+- A Kubernetes cluster (v1.19 or newer)
+- `kubectl` installed and configured
+- Basic understanding of Kubernetes concepts
 
-### Build and Run Locally
+**Don't have a cluster?** Try one of these:
+- **Local Development**: [kind](https://kind.sigs.k8s.io/), [minikube](https://minikube.sigs.k8s.io/), or [k3d](https://k3d.io/)
+- **Cloud**: [GKE](https://cloud.google.com/kubernetes-engine), [EKS](https://aws.amazon.com/eks/), or [AKS](https://azure.microsoft.com/en-us/services/kubernetes-service/)
+- **Managed**: [Civo](https://www.civo.com/), [DigitalOcean Kubernetes](https://www.digitalocean.com/products/kubernetes/)
+
+### Step 1: Install the Operator
+
+Install Frappe Operator in your Kubernetes cluster:
 
 ```bash
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/v1.0.0/config/install.yaml
+```
+
+This installs:
+- Custom Resource Definitions (CRDs)
+- Operator deployment
+- RBAC permissions
+- Service accounts
+
+**Verify Installation:**
+
+```bash
+kubectl get pods -n frappe-operator-system
+
+# You should see the operator pod running:
+# NAME                                        READY   STATUS    RESTARTS   AGE
+# frappe-operator-controller-manager-xxxxx    2/2     Running   0          30s
+```
+
+### Step 2: Deploy Your First Frappe Site
+
+Create a file called `my-first-site.yaml`:
+
+```yaml
+---
+apiVersion: frappe.io/v1alpha1
+kind: FrappeBench
+metadata:
+  name: production-bench
+  namespace: frappe
+spec:
+  version: "version-15"
+  apps:
+    - name: frappe
+      url: https://github.com/frappe/frappe
+      branch: version-15
+    - name: erpnext
+      url: https://github.com/frappe/erpnext
+      branch: version-15
+
+---
+apiVersion: frappe.io/v1alpha1
+kind: FrappeSite
+metadata:
+  name: mycompany-site
+  namespace: frappe
+spec:
+  benchRef: production-bench
+  siteName: mycompany.example.com
+  adminPassword: "changeme-in-production"
+  database:
+    host: mariadb.default.svc.cluster.local
+    port: 3306
+    rootPassword: "your-db-root-password"
+```
+
+**Deploy it:**
+
+```bash
+# Create namespace
+kubectl create namespace frappe
+
+# Apply the configuration
+kubectl apply -f my-first-site.yaml
+```
+
+### Step 3: Watch Your Site Come Alive
+
+Monitor the deployment:
+
+```bash
+# Watch the resources being created
+kubectl get frappebench,frappesite -n frappe
+
+# Check the pods
+kubectl get pods -n frappe
+
+# View logs
+kubectl logs -n frappe -l app=frappe --tail=50 -f
+```
+
+**Wait for site to be ready** (usually 2-5 minutes):
+
+```bash
+kubectl get frappesite mycompany-site -n frappe -w
+
+# When STATUS shows "Ready", your site is up!
+```
+
+### Step 4: Access Your Site
+
+**Port Forward for Testing:**
+
+```bash
+kubectl port-forward -n frappe svc/production-bench-nginx 8080:80
+```
+
+Then open http://localhost:8080 in your browser.
+
+**Login credentials:**
+- Username: `Administrator`
+- Password: The password you set in `adminPassword`
+
+### Step 5: Access in Production
+
+For production, set up an Ingress:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mycompany-ingress
+  namespace: frappe
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - mycompany.example.com
+      secretName: mycompany-tls
+  rules:
+    - host: mycompany.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: production-bench-nginx
+                port:
+                  number: 80
+```
+
+## Understanding the Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    Kubernetes Cluster                         │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │              FrappeBench (Shared Infrastructure)     │    │
+│  │                                                       │    │
+│  │  ┌────────┐   ┌────────┐   ┌─────────────┐         │    │
+│  │  │ NGINX  │   │ Redis  │   │ Socketio    │         │    │
+│  │  │ Proxy  │   │ Cache  │   │ Server      │         │    │
+│  │  └───┬────┘   └────────┘   └─────────────┘         │    │
+│  └──────┼────────────────────────────────────────────────┘  │
+│         │                                                     │
+│         │  Routes traffic to individual sites                │
+│         │                                                     │
+│    ┌────┴─────┬────────────┬────────────┬─────────────┐     │
+│    │          │            │            │             │     │
+│  ┌─▼───────┐ ┌▼─────────┐ ┌▼─────────┐ ┌▼──────────┐      │
+│  │ Site A  │ │ Site B   │ │ Site C   │ │  Site N   │      │
+│  │         │ │          │ │          │ │           │      │
+│  │ Web     │ │ Web      │ │ Web      │ │ Web       │      │
+│  │ Workers │ │ Workers  │ │ Workers  │ │ Workers   │      │
+│  │ Jobs    │ │ Jobs     │ │ Jobs     │ │ Jobs      │      │
+│  │         │ │          │ │          │ │           │      │
+│  │ MariaDB │ │ MariaDB  │ │ MariaDB  │ │ MariaDB   │      │
+│  └─────────┘ └──────────┘ └──────────┘ └───────────┘      │
+│                                                               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Key Concepts:**
+
+1. **FrappeBench** - Shared infrastructure (NGINX, Redis, Socketio) used by multiple sites
+2. **FrappeSite** - Individual Frappe application instance with its own database
+3. **Operator** - Watches these resources and creates/manages the underlying Kubernetes objects
+
+## Common Use Cases
+
+### 1. SaaS Platform (Multi-Tenant)
+
+Deploy hundreds of customer sites on shared infrastructure:
+
+```yaml
+apiVersion: frappe.io/v1alpha1
+kind: FrappeBench
+metadata:
+  name: saas-bench
+spec:
+  version: "version-15"
+  scaling:
+    minReplicas: 3
+    maxReplicas: 20
+  apps:
+    - name: frappe
+    - name: erpnext
+---
+# Customer 1
+apiVersion: frappe.io/v1alpha1
+kind: FrappeSite
+metadata:
+  name: customer1
+spec:
+  benchRef: saas-bench
+  siteName: customer1.myerp.com
+---
+# Customer 2
+apiVersion: frappe.io/v1alpha1
+kind: FrappeSite
+metadata:
+  name: customer2
+spec:
+  benchRef: saas-bench
+  siteName: customer2.myerp.com
+# ... add more customers
+```
+
+### 2. Enterprise Deployment
+
+High-availability setup for a single organization:
+
+```yaml
+apiVersion: frappe.io/v1alpha1
+kind: FrappeBench
+metadata:
+  name: enterprise-bench
+spec:
+  version: "version-15"
+  highAvailability:
+    enabled: true
+    replicas: 3
+  resources:
+    gunicorn:
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
+  apps:
+    - name: frappe
+    - name: erpnext
+    - name: hrms
+```
+
+### 3. Development Environment
+
+Quick setup for local development:
+
+```yaml
+apiVersion: frappe.io/v1alpha1
+kind: FrappeBench
+metadata:
+  name: dev-bench
+spec:
+  version: "develop"
+  resources:
+    gunicorn:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+---
+apiVersion: frappe.io/v1alpha1
+kind: FrappeSite
+metadata:
+  name: dev-site
+spec:
+  benchRef: dev-bench
+  siteName: dev.local
+  developer_mode: true
+```
+
+## Next Steps
+
+Now that you have your first site running, explore these topics:
+
+### Learn More
+- **[Complete Documentation](https://vyogotech.github.io/frappe-operator/)** - Full guide
+- **[Concepts](https://vyogotech.github.io/frappe-operator/concepts)** - Understand benches, sites, and architecture
+- **[Examples](https://vyogotech.github.io/frappe-operator/examples)** - Production-ready deployment patterns
+
+### Operations
+- **[Backup & Restore](https://vyogotech.github.io/frappe-operator/operations#backups)** - Protect your data
+- **[Scaling](https://vyogotech.github.io/frappe-operator/operations#scaling)** - Handle growing traffic
+- **[Updates](https://vyogotech.github.io/frappe-operator/operations#updates)** - Keep your sites up to date
+- **[Monitoring](https://vyogotech.github.io/frappe-operator/operations#monitoring)** - Track performance
+
+### Advanced Topics
+- **[Custom Apps](https://vyogotech.github.io/frappe-operator/api-reference#custom-apps)** - Add your own Frappe apps
+- **[Database Options](https://vyogotech.github.io/frappe-operator/concepts#databases)** - Shared vs dedicated databases
+- **[Security](https://vyogotech.github.io/frappe-operator/operations#security)** - Harden your deployment
+
+## Custom Resources Reference
+
+The operator provides these Custom Resource Definitions:
+
+### Core Resources
+
+| Resource | Purpose | Documentation |
+|----------|---------|---------------|
+| **FrappeBench** | Shared infrastructure for sites | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#frappebench) |
+| **FrappeSite** | Individual Frappe site | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#frappesite) |
+
+### Management Resources
+
+| Resource | Purpose | Documentation |
+|----------|---------|---------------|
+| **SiteBackup** | Automated backups | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitebackup) |
+| **SiteJob** | Run bench commands | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitejob) |
+| **SiteUser** | Manage site users | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#siteuser) |
+| **SiteWorkspace** | Create workspaces | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#siteworkspace) |
+| **SiteDashboard** | Manage dashboards | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitedashboard) |
+
+## Requirements
+
+**Minimum:**
+- Kubernetes 1.19 or newer
+- kubectl installed and configured
+- 2 CPU cores and 4GB RAM available in your cluster
+
+**Recommended for Production:**
+- Kubernetes 1.24+
+- MariaDB (external or MariaDB Operator)
+- Ingress Controller (nginx-ingress, Traefik, etc.)
+- cert-manager (for TLS certificates)
+- Persistent storage with dynamic provisioning
+
+## Troubleshooting
+
+**Site not coming up?**
+
+```bash
+# Check operator logs
+kubectl logs -n frappe-operator-system deployment/frappe-operator-controller-manager
+
+# Check site events
+kubectl describe frappesite mycompany-site -n frappe
+
+# Check pod logs
+kubectl logs -n frappe -l site=mycompany-site
+```
+
+**Common Issues:**
+- Database connection failed → Check database credentials and connectivity
+- ImagePullError → Check image names and registry access
+- CrashLoopBackOff → Check pod logs for application errors
+
+See our **[Troubleshooting Guide](https://vyogotech.github.io/frappe-operator/troubleshooting)** for detailed solutions.
+
+## Development
+
+Want to contribute or customize the operator?
+
+### Setup Development Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/vyogotech/frappe-operator.git
+cd frappe-operator
+
+# Install dependencies
+go mod download
+
 # Install CRDs
 make install
 
-# Run controller locally
+# Run locally (against configured cluster)
 make run
-
-# Build docker image
-make docker-build IMG=<your-registry>/frappe-operator:tag
-
-# Deploy to cluster
-make deploy IMG=<your-registry>/frappe-operator:tag
 ```
 
-### Testing
+### Build and Test
 
 ```bash
 # Run tests
 make test
 
-# Run with coverage
-make test-coverage
+# Build Docker image
+make docker-build IMG=myregistry/frappe-operator:dev
+
+# Deploy to cluster
+make deploy IMG=myregistry/frappe-operator:dev
 ```
 
-## Contributing
+See **[Contributing Guidelines](CONTRIBUTING.md)** for more details.
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+## Community & Support
 
-### How to Contribute
+### Get Help
+- 💬 **GitHub Discussions**: [Ask questions and share ideas](https://github.com/vyogotech/frappe-operator/discussions)
+- 🐛 **GitHub Issues**: [Report bugs and request features](https://github.com/vyogotech/frappe-operator/issues)
+- 📖 **Documentation**: [Complete guides](https://vyogotech.github.io/frappe-operator/)
+- 🌐 **Frappe Forum**: [discuss.frappe.io](https://discuss.frappe.io/)
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### Contributing
 
-## Community
+We welcome contributions! Here's how you can help:
 
-- **Issues**: [GitHub Issues](https://github.com/vyogotech/frappe-operator/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/vyogotech/frappe-operator/discussions)
-- **Frappe Forum**: [discuss.frappe.io](https://discuss.frappe.io/)
+1. 🌟 **Star the project** - Show your support
+2. 🐛 **Report bugs** - Help us improve
+3. 💡 **Suggest features** - Share your ideas
+4. 📝 **Improve docs** - Help others learn
+5. 🔧 **Submit PRs** - Contribute code
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Roadmap
+
+- [ ] Horizontal Pod Autoscaling (HPA) support
+- [ ] Built-in monitoring dashboards
+- [ ] Automated migration testing
+- [ ] Blue-green deployment support
+- [ ] Multi-cluster federation
+- [ ] Helm chart support
 
 ## License
 
-Copyright 2023 Vyogo Technologies.
+Copyright 2024 Vyogo Technologies.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -181,4 +485,6 @@ limitations under the License.
 
 ---
 
-**Built with ❤️ using [Kubebuilder](https://book.kubebuilder.io/)**
+**Built with ❤️ by [Vyogo Technologies](https://vyogo.tech) using [Kubebuilder](https://book.kubebuilder.io/)**
+
+⭐ If you find this project useful, please consider giving it a star!
