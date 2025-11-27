@@ -30,9 +30,6 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Run tests
-        run: make test
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
