@@ -1,0 +1,119 @@
+---
+# FPM-Based Frappe Bench
+# Uses Frappe Package Manager to install apps from repositories
+# Perfect for enterprise environments without Git access
+
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: fpm-bench
+  namespace: default
+  labels:
+    deployment-type: fpm
+    environment: production
+spec:
+  frappeVersion: "version-15"
+  
+  # Apps installed from FPM repositories
+  apps:
+    - name: frappe
+      source: image  # frappe is pre-installed in the base image
+    
+    - name: erpnext
+      source: fpm
+      org: frappe
+      version: "15.0.0"
+    
+    - name: hrms
+      source: fpm
+      org: frappe
+      version: "15.0.0"
+  
+  # FPM repository configuration
+  fpmConfig:
+    repositories:
+      # Private company repository (highest priority)
+      - name: company-private
+        url: https://fpm.company.com
+        priority: 10
+        authSecretRef:
+          name: fpm-credentials
+      
+      # Frappe community repository (fallback)
+      - name: frappe-community
+        url: https://fpm.frappe.io
+        priority: 50
+    
+    # Default repository for publishing
+    defaultRepo: company-private
+  
+  # Disable Git for enterprise security
+  gitConfig:
+    enabled: false
+  
+  # Container image configuration
+  imageConfig:
+    repository: frappe/erpnext
+    tag: v15.90.1
+    pullPolicy: IfNotPresent
+  
+  # Component replicas
+  componentReplicas:
+    gunicorn: 2
+    socketio: 1
+    workerDefault: 2
+    workerLong: 1
+    workerShort: 1
+  
+  # Resource limits
+  componentResources:
+    gunicorn:
+      requests: {cpu: "500m", memory: "1Gi"}
+      limits: {cpu: "2", memory: "4Gi"}
+    workerDefault:
+      requests: {cpu: "500m", memory: "1Gi"}
+      limits: {cpu: "2", memory: "4Gi"}
+  
+  # Redis configuration
+  redisConfig:
+    type: redis
+    image: redis:7-alpine
+    maxMemory: "4gb"
+  
+  # Domain configuration
+  domainConfig:
+    suffix: ".mycompany.com"
+    autoDetect: false
+
+---
+# Secret for FPM authentication
+# Create this manually before deploying the bench
+# kubectl create secret generic fpm-credentials \
+#   --from-literal=username=admin \
+#   --from-literal=password=your-secure-password
+
+---
+# Usage:
+# 
+# 1. Create FPM credentials secret:
+#    kubectl create secret generic fpm-credentials \
+#      --from-literal=username=admin \
+#      --from-literal=password=changeme
+#
+# 2. Deploy the bench:
+#    kubectl apply -f fpm-bench.yaml
+#
+# 3. Check status:
+#    kubectl get frappebench fpm-bench
+#    kubectl get pods -l bench=fpm-bench
+#
+# 4. View installed apps:
+#    kubectl describe frappebench fpm-bench
+#
+# Benefits:
+# - No Git access required (enterprise security)
+# - Reproducible deployments (exact versions)
+# - Faster deployment (no git clone needed)
+# - Private package repository support
+# - Version-specific installations
+

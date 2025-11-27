@@ -1,0 +1,186 @@
+---
+# Hybrid Frappe Bench
+# Demonstrates all three app installation methods:
+# 1. Pre-built in container image
+# 2. FPM packages from repository
+# 3. Git repositories (when Git is enabled)
+
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: hybrid-bench
+  namespace: default
+  labels:
+    deployment-type: hybrid
+    environment: development
+spec:
+  frappeVersion: "version-15"
+  
+  # Hybrid app sources
+  apps:
+    # 1. Pre-built in image (fastest startup)
+    - name: frappe
+      source: image
+    
+    # 2. From FPM repository (versioned packages)
+    - name: erpnext
+      source: fpm
+      org: frappe
+      version: "15.0.0"
+    
+    - name: hrms
+      source: fpm
+      org: frappe
+      version: "15.0.0"
+    
+    # 3. From Git (development/custom apps)
+    # Only installed if Git is enabled
+    - name: custom_app
+      source: git
+      gitUrl: https://github.com/mycompany/custom_app.git
+      gitBranch: main
+    
+    - name: another_custom_app
+      source: git
+      gitUrl: https://github.com/mycompany/another_custom_app.git
+      gitBranch: develop
+  
+  # FPM repository configuration
+  fpmConfig:
+    repositories:
+      - name: company-repo
+        url: https://fpm.company.com
+        priority: 10
+        authSecretRef:
+          name: fpm-auth
+      
+      - name: frappe-community
+        url: https://fpm.frappe.io
+        priority: 50
+    
+    defaultRepo: company-repo
+  
+  # Git configuration
+  # Override operator default to allow Git for this bench
+  gitConfig:
+    enabled: true  # Allow Git for custom apps
+  
+  # Use image with frappe pre-installed
+  imageConfig:
+    repository: myregistry.com/frappe-base
+    tag: v15.0.0
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - name: registry-credentials
+  
+  # Component configuration
+  componentReplicas:
+    gunicorn: 2
+    socketio: 1
+    workerDefault: 2
+    workerLong: 1
+    workerShort: 1
+  
+  componentResources:
+    gunicorn:
+      requests: {cpu: "500m", memory: "1Gi"}
+      limits: {cpu: "2", memory: "4Gi"}
+    nginx:
+      requests: {cpu: "200m", memory: "256Mi"}
+      limits: {cpu: "1", memory: "512Mi"}
+    workerDefault:
+      requests: {cpu: "500m", memory: "1Gi"}
+      limits: {cpu: "2", memory: "4Gi"}
+  
+  redisConfig:
+    type: redis
+    image: redis:7-alpine
+    maxMemory: "4gb"
+    resources:
+      requests: {cpu: "500m", memory: "1Gi"}
+      limits: {cpu: "2", memory: "4Gi"}
+  
+  domainConfig:
+    suffix: ".dev.local"
+    autoDetect: false
+
+---
+# Prerequisites:
+#
+# 1. Create FPM authentication secret:
+#    kubectl create secret generic fpm-auth \
+#      --from-literal=username=admin \
+#      --from-literal=password=changeme
+#
+# 2. Create registry credentials (if using private registry):
+#    kubectl create secret docker-registry registry-credentials \
+#      --docker-server=myregistry.com \
+#      --docker-username=user \
+#      --docker-password=pass
+#
+# 3. Ensure Git access is available (for git-based apps)
+
+---
+# Usage:
+#
+# Deploy:
+#   kubectl apply -f hybrid-bench.yaml
+#
+# Check status:
+#   kubectl get frappebench hybrid-bench
+#   kubectl describe frappebench hybrid-bench
+#
+# View logs:
+#   kubectl logs -l bench=hybrid-bench
+#
+# App installation process:
+#   1. Verify 'frappe' is in container image
+#   2. Install 'erpnext' and 'hrms' from FPM repositories
+#   3. Clone 'custom_app' and 'another_custom_app' from Git
+#   4. Build production assets
+#   5. Generate apps.txt
+#
+# Benefits:
+# - Flexibility: Multiple app sources
+# - Speed: Pre-built common apps in image
+# - Versioning: FPM packages for controlled deployments
+# - Development: Git for custom/in-development apps
+# - Enterprise: Can disable Git when needed
+
+---
+# Deployment Scenarios:
+#
+# Development Environment:
+#   - Git enabled for rapid iteration
+#   - FPM for stable dependencies
+#   - Image for base framework
+#
+# Staging Environment:
+#   - Git enabled for testing custom apps
+#   - FPM for main applications
+#   - Same versions as production
+#
+# Production Environment:
+#   - Git disabled (security)
+#   - FPM only (reproducible)
+#   - Or all pre-built in image (fastest)
+
+---
+# Migration from Image-Only to Hybrid:
+#
+# Before (image-only):
+#   appsJSON: '["erpnext", "hrms"]'
+#   # Apps baked into image
+#
+# After (hybrid):
+#   apps:
+#     - name: erpnext
+#       source: fpm
+#       org: frappe
+#       version: "15.0.0"
+#     - name: hrms
+#       source: fpm
+#       org: frappe
+#       version: "15.0.0"
+#   # Apps installed dynamically
+
