@@ -5,6 +5,8 @@ A Kubernetes Operator that makes deploying and managing [Frappe](https://frappef
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/vyogotech/frappe-operator)](go.mod)
+[![Release](https://img.shields.io/github/v/release/vyogotech/frappe-operator)](https://github.com/vyogotech/frappe-operator/releases/latest)
+[![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](RELEASE_NOTES_v1.0.0.md)
 
 **📚 [Complete Documentation](https://vyogotech.github.io/frappe-operator/)**
 
@@ -60,7 +62,7 @@ You need:
 Install Frappe Operator in your Kubernetes cluster:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/v1.0.0/config/install.yaml
+kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/download/v1.0.0/install.yaml
 ```
 
 This installs:
