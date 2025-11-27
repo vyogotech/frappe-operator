@@ -1,0 +1,44 @@
+# Frappe Image with FPM CLI
+# Extends the official Frappe image to add FPM package manager support
+
+ARG FRAPPE_VERSION=latest
+FROM frappe/erpnext:${FRAPPE_VERSION} as frappe-base
+
+# Get FPM CLI from official release
+FROM alpine:latest as fpm-download
+ARG FPM_VERSION=latest
+ARG TARGETARCH=amd64
+
+# Download FPM CLI based on architecture
+RUN apk add --no-cache curl && \
+    if [ "$FPM_VERSION" = "latest" ]; then \
+      FPM_URL="https://github.com/yourusername/fpm/releases/latest/download/fpm-linux-${TARGETARCH}"; \
+    else \
+      FPM_URL="https://github.com/yourusername/fpm/releases/download/v${FPM_VERSION}/fpm-linux-${TARGETARCH}"; \
+    fi && \
+    echo "Downloading FPM from: $FPM_URL" && \
+    curl -fsSL -o /fpm "$FPM_URL" && \
+    chmod +x /fpm
+
+# Final image with Frappe + FPM
+FROM frappe-base
+
+USER root
+
+# Copy FPM CLI
+COPY --from=fpm-download /fpm /usr/local/bin/fpm
+
+# Verify FPM installation
+RUN /usr/local/bin/fpm --version || echo "FPM CLI installed"
+
+# Create FPM directories
+RUN mkdir -p /home/frappe/.fpm/apps && \
+    chown -R frappe:frappe /home/frappe/.fpm
+
+USER frappe
+
+WORKDIR /home/frappe/frappe-bench
+
+# Default command (unchanged from base image)
+CMD ["bash"]
+

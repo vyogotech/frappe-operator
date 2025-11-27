@@ -32,6 +32,8 @@ Frappe Operator is a Kubernetes operator that automates the deployment, scaling,
 
 - 🚀 **One-Command Deployment** - Deploy entire Frappe infrastructure with a single kubectl command
 - 🏢 **Multi-Tenancy** - Run multiple customer sites efficiently on shared infrastructure
+- 📦 **Hybrid App Installation** - Install apps from FPM packages, Git repositories, or pre-built images
+- 🔐 **Enterprise Git Control** - Disable Git access cluster-wide for security compliance
 - 📊 **Auto-Scaling** - Automatically scale based on traffic and resource usage
 - 🔒 **Enterprise Security** - TLS, RBAC, network policies, and security best practices
 - 🔄 **Automated Updates** - Zero-downtime rolling updates and migrations
@@ -325,6 +327,206 @@ spec:
   developer_mode: true
 ```
 
+## Hybrid App Installation (New!)
+
+Frappe Operator v2.0 introduces flexible app installation with three sources:
+
+### 1. FPM Packages (Recommended for Enterprise)
+
+Install apps from versioned package repositories:
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: enterprise-bench
+spec:
+  frappeVersion: "version-15"
+  
+  # Apps from FPM repositories
+  apps:
+    - name: erpnext
+      source: fpm
+      org: frappe
+      version: "15.0.0"
+    - name: hrms
+      source: fpm
+      org: frappe
+      version: "15.0.0"
+  
+  # FPM repository configuration
+  fpmConfig:
+    repositories:
+      - name: company-private
+        url: https://fpm.company.com
+        priority: 10
+        authSecretRef:
+          name: fpm-credentials
+      - name: frappe-community
+        url: https://fpm.frappe.io
+        priority: 50
+  
+  # Disable Git for enterprise security
+  gitConfig:
+    enabled: false
+```
+
+**Benefits:**
+- ✅ Reproducible deployments with exact versions
+- ✅ No Git access required (security compliance)
+- ✅ Faster deployment (pre-packaged apps)
+- ✅ Private package repositories
+- ✅ Audit trail for all app versions
+
+### 2. Git Repositories (Development)
+
+Clone apps directly from Git:
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: dev-bench
+spec:
+  frappeVersion: "version-15"
+  
+  apps:
+    - name: custom_app
+      source: git
+      gitUrl: https://github.com/company/custom_app.git
+      gitBranch: develop
+  
+  # Enable Git for development
+  gitConfig:
+    enabled: true
+```
+
+### 3. Pre-built Images (Fastest)
+
+Use container images with apps pre-installed:
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: fast-bench
+spec:
+  frappeVersion: "version-15"
+  
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image
+  
+  imageConfig:
+    repository: myregistry.com/frappe-custom
+    tag: v1.0.0
+```
+
+### 4. Hybrid Approach (Best of All Worlds)
+
+Combine all three methods:
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: hybrid-bench
+spec:
+  frappeVersion: "version-15"
+  
+  apps:
+    # Base framework in image (fastest)
+    - name: frappe
+      source: image
+    
+    # Stable apps from FPM (versioned)
+    - name: erpnext
+      source: fpm
+      org: frappe
+      version: "15.0.0"
+    
+    # Development apps from Git
+    - name: custom_app
+      source: git
+      gitUrl: https://github.com/company/custom_app.git
+      gitBranch: main
+  
+  gitConfig:
+    enabled: true  # Allow Git for custom apps
+```
+
+**See [FPM_MIGRATION.md](FPM_MIGRATION.md) for complete migration guide.**
+
+## Enterprise Features
+
+### Git Access Control
+
+Disable Git cluster-wide for security compliance:
+
+```yaml
+# config/manager/operator-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frappe-operator-config
+  namespace: frappe-operator-system
+data:
+  gitEnabled: "false"  # Disable Git by default
+```
+
+Individual benches can override:
+
+```yaml
+spec:
+  gitConfig:
+    enabled: true  # Override for this bench only
+```
+
+### Private Package Repositories
+
+Configure authentication for private FPM repositories:
+
+```bash
+kubectl create secret generic fpm-credentials \
+  --from-literal=username=admin \
+  --from-literal=password=changeme
+```
+
+```yaml
+spec:
+  fpmConfig:
+    repositories:
+      - name: company-private
+        url: https://fpm.company.com
+        priority: 10
+        authSecretRef:
+          name: fpm-credentials
+```
+
+### Air-Gapped Deployments
+
+Run completely offline with internal FPM repository:
+
+```yaml
+spec:
+  apps:
+    - name: erpnext
+      source: fpm
+      org: frappe
+      version: "15.0.0"
+  
+  fpmConfig:
+    repositories:
+      - name: internal
+        url: http://fpm.internal.company.com
+        priority: 10
+  
+  gitConfig:
+    enabled: false  # No external access
+```
+
 ## Next Steps
 
 Now that you have your first site running, explore these topics:
@@ -460,12 +662,25 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap
 
+**v2.0 (Current) ✅**
+- [x] Hybrid app installation (FPM, Git, Image)
+- [x] Enterprise Git disable feature
+- [x] FPM repository management
+- [x] Private package repository support
+- [x] Air-gapped deployment support
+
+**v2.1 (Next)**
 - [ ] Horizontal Pod Autoscaling (HPA) support
 - [ ] Built-in monitoring dashboards
 - [ ] Automated migration testing
+- [ ] Enhanced FrappeBench resource creation
+- [ ] Complete bench component lifecycle management
+
+**Future**
 - [ ] Blue-green deployment support
 - [ ] Multi-cluster federation
 - [ ] Helm chart support
+- [ ] GitOps integration (ArgoCD/Flux)
 
 ## License
 

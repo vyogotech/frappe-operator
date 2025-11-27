@@ -89,6 +89,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&controllers.FrappeBenchReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "FrappeBench")
+		os.Exit(1)
+	}
 	if err = (&controllers.FrappeSiteReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
