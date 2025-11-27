@@ -47,8 +47,10 @@ type FrappeBenchReconciler struct {
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments;statefulsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -87,6 +89,48 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Ensure bench initialization
 	if err := r.ensureBenchInitialized(ctx, bench, gitEnabled, fpmRepos); err != nil {
 		logger.Error(err, "Failed to ensure bench initialized")
+		return ctrl.Result{}, err
+	}
+
+	// Ensure storage
+	if err := r.ensureBenchStorage(ctx, bench); err != nil {
+		logger.Error(err, "Failed to ensure storage")
+		return ctrl.Result{}, err
+	}
+
+	// Ensure Redis
+	if err := r.ensureRedis(ctx, bench); err != nil {
+		logger.Error(err, "Failed to ensure Redis")
+		return ctrl.Result{}, err
+	}
+
+	// Ensure Gunicorn
+	if err := r.ensureGunicorn(ctx, bench); err != nil {
+		logger.Error(err, "Failed to ensure Gunicorn")
+		return ctrl.Result{}, err
+	}
+
+	// Ensure NGINX
+	if err := r.ensureNginx(ctx, bench); err != nil {
+		logger.Error(err, "Failed to ensure NGINX")
+		return ctrl.Result{}, err
+	}
+
+	// Ensure Socket.IO
+	if err := r.ensureSocketIO(ctx, bench); err != nil {
+		logger.Error(err, "Failed to ensure Socket.IO")
+		return ctrl.Result{}, err
+	}
+
+	// Ensure Scheduler
+	if err := r.ensureScheduler(ctx, bench); err != nil {
+		logger.Error(err, "Failed to ensure Scheduler")
+		return ctrl.Result{}, err
+	}
+
+	// Ensure Workers
+	if err := r.ensureWorkers(ctx, bench); err != nil {
+		logger.Error(err, "Failed to ensure Workers")
 		return ctrl.Result{}, err
 	}
 
@@ -169,46 +213,35 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 	// Create init job
 	logger.Info("Creating bench init job", "job", jobName)
 
-	fpmManager := NewFPMManager("")
-	
-	// Generate FPM configuration script
-	fpmConfigScript := fpmManager.GenerateFPMConfigScript(fpmRepos, "")
-	if bench.Spec.FPMConfig != nil && bench.Spec.FPMConfig.DefaultRepo != "" {
-		fpmConfigScript = fpmManager.GenerateFPMConfigScript(fpmRepos, bench.Spec.FPMConfig.DefaultRepo)
-	}
+	// Simplified init script - configure and build assets
+	// The frappe/erpnext image already has apps installed
+	initScript := fmt.Sprintf(`#!/bin/bash
+set -e
 
-	// Get apps list (support both new Apps field and legacy AppsJSON)
-	apps := bench.Spec.Apps
-	if len(apps) == 0 && bench.Spec.AppsJSON != "" {
-		// Parse legacy appsJSON format
-		apps = r.parseAppsJSON(bench.Spec.AppsJSON)
-	}
+cd /home/frappe/frappe-bench
 
-	// Generate app installation script
-	appInstallScript := fpmManager.GenerateAppInstallScript(apps, gitEnabled, "/home/frappe/frappe-bench")
+echo "Configuring Frappe bench..."
 
-	// Combine scripts
-	initScript := fmt.Sprintf("%s\n\n%s\n\n%s",
-		"#!/bin/bash\nset -e\ncd /home/frappe/frappe-bench",
-		fpmConfigScript,
-		appInstallScript)
+# Create apps.txt from existing apps
+ls -1 apps > sites/apps.txt
 
-	// Create common_site_config.json
-	initScript += fmt.Sprintf(`
-
-# Create common_site_config.json
+# Create or update common_site_config.json
 cat > sites/common_site_config.json <<EOF
 {
-  "redis_cache": "redis://%s-redis:6379",
-  "redis_queue": "redis://%s-redis:6379",
-  "redis_socketio": "redis://%s-redis:6379"
+  "redis_cache": "redis://%s-redis-cache:6379",
+  "redis_queue": "redis://%s-redis-queue:6379",
+  "socketio_port": 9000
 }
 EOF
 
-echo "Bench initialization complete"
-`, bench.Name, bench.Name, bench.Name)
+echo "Building assets for production..."
+bench build --production
+
+echo "Bench configuration complete"
+`, bench.Name, bench.Name)
 
 	// Create the job
+	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 	job = &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -224,6 +257,22 @@ echo "Bench initialization complete"
 							Image:   r.getBenchImage(bench),
 							Command: []string{"bash", "-c"},
 							Args:    []string{initScript},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "sites",
+									MountPath: "/home/frappe/frappe-bench/sites",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "sites",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: pvcName,
+								},
+							},
 						},
 					},
 				},
@@ -298,4 +347,3 @@ func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Complete(r)
 }
-

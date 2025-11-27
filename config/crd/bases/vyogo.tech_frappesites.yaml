@@ -15,33 +15,243 @@ spec:
     singular: frappesite
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.siteName
+      name: Site Name
+      type: string
+    - jsonPath: .spec.benchRef.name
+      name: Bench
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.resolvedDomain
+      name: Domain
+      type: string
+    - jsonPath: .status.ready
+      name: Ready
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: FrappeSite is the Schema for the frappesites API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              of an object.'
             type: string
           kind:
             description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              object represents.'
             type: string
           metadata:
             type: object
           spec:
             description: FrappeSiteSpec defines the desired state of FrappeSite
             properties:
-              foo:
-                description: Foo is an example field of FrappeSite. Edit frappesite_types.go
-                  to remove/update
+              benchRef:
+                description: BenchRef references the FrappeBench this site belongs to
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                required:
+                - name
+                type: object
+              siteName:
+                description: SiteName is the Frappe site name
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                 type: string
+              adminPasswordSecretRef:
+                description: AdminPasswordSecretRef references the Secret containing admin password
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                type: object
+              dbConfig:
+                description: DBConfig defines database configuration for this site
+                properties:
+                  mode:
+                    type: string
+                  storageSize:
+                    type: string
+                  resources:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  connectionSecretRef:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
+              domain:
+                description: Domain is the external domain for ingress
+                type: string
+              tls:
+                description: TLS configuration
+                properties:
+                  enabled:
+                    type: boolean
+                  secretName:
+                    type: string
+                  issuer:
+                    type: string
+                type: object
+              ingressClassName:
+                description: IngressClassName specifies the ingress class
+                type: string
+              ingress:
+                description: Ingress configuration
+                properties:
+                  enabled:
+                    type: boolean
+                  className:
+                    type: string
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  tls:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
+            required:
+            - benchRef
+            - siteName
             type: object
           status:
             description: FrappeSiteStatus defines the observed state of FrappeSite
+            properties:
+              phase:
+                description: Phase is the current phase
+                type: string
+              benchReady:
+                description: BenchReady indicates if the referenced bench is ready
+                type: boolean
+              siteURL:
+                description: SiteURL is the accessible URL
+                type: string
+              dbConnectionSecret:
+                description: DBConnectionSecret is the name of the Secret with DB credentials
+                type: string
+              resolvedDomain:
+                description: ResolvedDomain is the final domain after resolution
+                type: string
+              domainSource:
+                description: DomainSource indicates how domain was determined
+                type: string
+              ready:
+                description: Ready indicates if the site is ready
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+
+          spec:
+            description: FrappeSiteSpec defines the desired state of FrappeSite
+            properties:
+              benchRef:
+                description: BenchRef references the FrappeBench this site belongs to
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                required:
+                - name
+                type: object
+              siteName:
+                description: SiteName is the Frappe site name
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                type: string
+              adminPasswordSecretRef:
+                description: AdminPasswordSecretRef references the Secret containing admin password
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                type: object
+              dbConfig:
+                description: DBConfig defines database configuration for this site
+                properties:
+                  mode:
+                    type: string
+                  storageSize:
+                    type: string
+                  resources:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  connectionSecretRef:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
+              domain:
+                description: Domain is the external domain for ingress
+                type: string
+              tls:
+                description: TLS configuration
+                properties:
+                  enabled:
+                    type: boolean
+                  secretName:
+                    type: string
+                  issuer:
+                    type: string
+                type: object
+              ingressClassName:
+                description: IngressClassName specifies the ingress class
+                type: string
+              ingress:
+                description: Ingress configuration
+                properties:
+                  enabled:
+                    type: boolean
+                  className:
+                    type: string
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  tls:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
+            required:
+            - benchRef
+            - siteName
+            type: object
+          status:
+            description: FrappeSiteStatus defines the observed state of FrappeSite
+            properties:
+              phase:
+                description: Phase is the current phase
+                type: string
+              benchReady:
+                description: BenchReady indicates if the referenced bench is ready
+                type: boolean
+              siteURL:
+                description: SiteURL is the accessible URL
+                type: string
+              dbConnectionSecret:
+                description: DBConnectionSecret is the name of the Secret with DB credentials
+                type: string
+              resolvedDomain:
+                description: ResolvedDomain is the final domain after resolution
+                type: string
+              domainSource:
+                description: DomainSource indicates how domain was determined
+                type: string
+              ready:
+                description: Ready indicates if the site is ready
+                type: boolean
             type: object
         type: object
     served: true

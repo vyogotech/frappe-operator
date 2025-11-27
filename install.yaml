@@ -1,0 +1,2299 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: frappebenches.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: FrappeBench
+    listKind: FrappeBenchList
+    plural: frappebenches
+    singular: frappebench
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.installedApps
+      name: Apps
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: FrappeBench is the Schema for the frappebenches API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: FrappeBenchSpec defines the desired state of FrappeBench
+            properties:
+              appsJSON:
+                description: AppsJSON is deprecated, use Apps instead JSON array of
+                  app names (e.g., '["erpnext", "hrms"]')
+                type: string
+              apps:
+                description: Apps to install with their sources Supports FPM packages,
+                  Git repositories, and pre-built images
+                items:
+                  description: AppSource defines where an app comes from and how to
+                    install it
+                  properties:
+                    gitBranch:
+                      description: GitBranch for git source (e.g., "version-15") Optional,
+                        defaults to repository default branch
+                      type: string
+                    gitUrl:
+                      description: GitURL for git source (e.g., "https://github.com/frappe/erpnext")
+                        Required when source is "git"
+                      type: string
+                    name:
+                      description: Name of the app (e.g., "erpnext", "hrms")
+                      type: string
+                    org:
+                      description: Org is the organization for FPM packages (e.g.,
+                        "frappe") Required when source is "fpm"
+                      type: string
+                    source:
+                      description: 'Source type: fpm, git, or image fpm: Install from
+                        FPM package repository git: Install from Git repository (requires
+                        Git enabled) image: App is pre-installed in container image'
+                      enum:
+                      - fpm
+                      - git
+                      - image
+                      type: string
+                    version:
+                      description: Version for FPM packages (e.g., "1.0.0") Required
+                        when source is "fpm"
+                      type: string
+                  required:
+                  - name
+                  - source
+                  type: object
+                type: array
+              componentReplicas:
+                description: ComponentReplicas defines replica counts for each component
+                properties:
+                  gunicorn:
+                    default: 1
+                    description: Gunicorn replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  nginx:
+                    default: 1
+                    description: Nginx replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  socketio:
+                    default: 1
+                    description: Socketio replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  workerDefault:
+                    default: 1
+                    description: WorkerDefault replicas
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  workerLong:
+                    default: 1
+                    description: WorkerLong replicas
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  workerShort:
+                    default: 1
+                    description: WorkerShort replicas
+                    format: int32
+                    minimum: 0
+                    type: integer
+                type: object
+              componentResources:
+                description: ComponentResources defines resource requirements for each
+                  component
+                properties:
+                  gunicorn:
+                    description: Gunicorn resources
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  nginx:
+                    description: Nginx resources
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  scheduler:
+                    description: Scheduler resources
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  socketio:
+                    description: Socketio resources
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  workerDefault:
+                    description: WorkerDefault resources
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  workerLong:
+                    description: WorkerLong resources
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  workerShort:
+                    description: WorkerShort resources
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                type: object
+              domainConfig:
+                description: DomainConfig defines default domain behavior for sites
+                  on this bench
+                properties:
+                  autoDetect:
+                    default: true
+                    description: AutoDetect enables automatic domain detection from
+                      cluster
+                    type: boolean
+                  ingressControllerRef:
+                    description: IngressControllerRef references the Ingress Controller
+                      service
+                    properties:
+                      name:
+                        description: Name of the resource
+                        type: string
+                      namespace:
+                        description: Namespace of the resource
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  suffix:
+                    description: Suffix to append to site names (e.g., ".myplatform.com")
+                    type: string
+                type: object
+              fpmConfig:
+                description: FPMConfig for FPM repository configuration Merged with
+                  operator-level FPM configuration
+                properties:
+                  defaultRepo:
+                    description: DefaultRepo for publishing packages (optional)
+                    type: string
+                  repositories:
+                    description: Repositories to add to FPM configuration These are
+                      added to any operator-level default repositories
+                    items:
+                      description: FPMRepository defines an FPM package repository
+                      properties:
+                        authSecretRef:
+                          description: 'AuthSecretRef references a secret with FPM
+                            authentication credentials Secret should contain keys:
+                            username, password'
+                          properties:
+                            name:
+                              description: name is unique within a namespace to reference
+                                a secret resource.
+                              type: string
+                            namespace:
+                              description: namespace defines the space within which
+                                the secret name must be unique.
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        name:
+                          description: Name of the repository (e.g., "company-private",
+                            "frappe-community")
+                          type: string
+                        priority:
+                          default: 50
+                          description: 'Priority for repository search order (lower
+                            number = higher priority) Default: 50'
+                          type: integer
+                        url:
+                          description: URL of the repository (e.g., "https://fpm.company.com")
+                          type: string
+                      required:
+                      - name
+                      - url
+                      type: object
+                    type: array
+                type: object
+              frappeVersion:
+                description: FrappeVersion specifies the Frappe framework version
+                type: string
+              gitConfig:
+                description: GitConfig controls Git-based app installation Overrides
+                  operator-level Git configuration
+                properties:
+                  enabled:
+                    description: 'Enabled controls whether Git-based app installation
+                      is allowed Set to false in enterprise environments without Git
+                      access If not specified, uses operator-level default'
+                    type: boolean
+                type: object
+              imageConfig:
+                description: ImageConfig defines the container image configuration
+                properties:
+                  pullPolicy:
+                    description: PullPolicy is the image pull policy
+                    enum:
+                    - Always
+                    - Never
+                    - IfNotPresent
+                    type: string
+                  pullSecrets:
+                    description: PullSecrets for private registries
+                    items:
+                      description: LocalObjectReference contains enough information
+                        to let you locate the referenced object inside the same namespace.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    type: array
+                  repository:
+                    description: Repository is the base image repository
+                    type: string
+                  tag:
+                    description: Tag is the image tag
+                    type: string
+                type: object
+              redisConfig:
+                description: RedisConfig defines Redis/Dragonfly configuration
+                properties:
+                  connectionSecretRef:
+                    description: ConnectionSecretRef for external Redis
+                    properties:
+                      name:
+                        description: name is unique within a namespace to reference
+                          a secret resource.
+                        type: string
+                      namespace:
+                        description: namespace defines the space within which the
+                          secret name must be unique.
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  image:
+                    description: Image is the Redis/Dragonfly container image
+                    type: string
+                  maxMemory:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: MaxMemory sets maximum memory for cache eviction
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  resources:
+                    description: Resources for Redis/Dragonfly
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  storageSize:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: StorageSize for persistent storage
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  type:
+                    description: 'Type: redis or dragonfly'
+                    enum:
+                    - redis
+                    - dragonfly
+                    type: string
+                required:
+                - type
+                type: object
+            required:
+            - frappeVersion
+            type: object
+          status:
+            description: FrappeBenchStatus defines the observed state of FrappeBench
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the bench's state
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource. --- This struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              fpmRepositories:
+                description: FPMRepositories lists the configured FPM repositories
+                items:
+                  type: string
+                type: array
+              gitEnabled:
+                description: GitEnabled indicates whether Git is enabled for this
+                  bench
+                type: boolean
+              installedApps:
+                description: InstalledApps lists the apps that have been successfully
+                  installed
+                items:
+                  type: string
+                type: array
+              observedGeneration:
+                description: ObservedGeneration reflects the generation of the most
+                  recently observed FrappeBench
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current phase of the bench
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: frappesites.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: FrappeSite
+    listKind: FrappeSiteList
+    plural: frappesites
+    singular: frappesite
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.siteName
+      name: Site Name
+      type: string
+    - jsonPath: .spec.benchRef.name
+      name: Bench
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.resolvedDomain
+      name: Domain
+      type: string
+    - jsonPath: .status.ready
+      name: Ready
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: FrappeSite is the Schema for the frappesites API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object.'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents.'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: FrappeSiteSpec defines the desired state of FrappeSite
+            properties:
+              benchRef:
+                description: BenchRef references the FrappeBench this site belongs to
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                required:
+                - name
+                type: object
+              siteName:
+                description: SiteName is the Frappe site name
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                type: string
+              adminPasswordSecretRef:
+                description: AdminPasswordSecretRef references the Secret containing admin password
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                type: object
+              dbConfig:
+                description: DBConfig defines database configuration for this site
+                properties:
+                  mode:
+                    type: string
+                  storageSize:
+                    type: string
+                  resources:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  connectionSecretRef:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
+              domain:
+                description: Domain is the external domain for ingress
+                type: string
+              tls:
+                description: TLS configuration
+                properties:
+                  enabled:
+                    type: boolean
+                  secretName:
+                    type: string
+                  issuer:
+                    type: string
+                type: object
+              ingressClassName:
+                description: IngressClassName specifies the ingress class
+                type: string
+              ingress:
+                description: Ingress configuration
+                properties:
+                  enabled:
+                    type: boolean
+                  className:
+                    type: string
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  tls:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
+            required:
+            - benchRef
+            - siteName
+            type: object
+          status:
+            description: FrappeSiteStatus defines the observed state of FrappeSite
+            properties:
+              phase:
+                description: Phase is the current phase
+                type: string
+              benchReady:
+                description: BenchReady indicates if the referenced bench is ready
+                type: boolean
+              siteURL:
+                description: SiteURL is the accessible URL
+                type: string
+              dbConnectionSecret:
+                description: DBConnectionSecret is the name of the Secret with DB credentials
+                type: string
+              resolvedDomain:
+                description: ResolvedDomain is the final domain after resolution
+                type: string
+              domainSource:
+                description: DomainSource indicates how domain was determined
+                type: string
+              ready:
+                description: Ready indicates if the site is ready
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+
+          spec:
+            description: FrappeSiteSpec defines the desired state of FrappeSite
+            properties:
+              benchRef:
+                description: BenchRef references the FrappeBench this site belongs to
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                required:
+                - name
+                type: object
+              siteName:
+                description: SiteName is the Frappe site name
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                type: string
+              adminPasswordSecretRef:
+                description: AdminPasswordSecretRef references the Secret containing admin password
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                type: object
+              dbConfig:
+                description: DBConfig defines database configuration for this site
+                properties:
+                  mode:
+                    type: string
+                  storageSize:
+                    type: string
+                  resources:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  connectionSecretRef:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
+              domain:
+                description: Domain is the external domain for ingress
+                type: string
+              tls:
+                description: TLS configuration
+                properties:
+                  enabled:
+                    type: boolean
+                  secretName:
+                    type: string
+                  issuer:
+                    type: string
+                type: object
+              ingressClassName:
+                description: IngressClassName specifies the ingress class
+                type: string
+              ingress:
+                description: Ingress configuration
+                properties:
+                  enabled:
+                    type: boolean
+                  className:
+                    type: string
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  tls:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
+            required:
+            - benchRef
+            - siteName
+            type: object
+          status:
+            description: FrappeSiteStatus defines the observed state of FrappeSite
+            properties:
+              phase:
+                description: Phase is the current phase
+                type: string
+              benchReady:
+                description: BenchReady indicates if the referenced bench is ready
+                type: boolean
+              siteURL:
+                description: SiteURL is the accessible URL
+                type: string
+              dbConnectionSecret:
+                description: DBConnectionSecret is the name of the Secret with DB credentials
+                type: string
+              resolvedDomain:
+                description: ResolvedDomain is the final domain after resolution
+                type: string
+              domainSource:
+                description: DomainSource indicates how domain was determined
+                type: string
+              ready:
+                description: Ready indicates if the site is ready
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: frappeworkpaces.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: FrappeWorkpace
+    listKind: FrappeWorkpaceList
+    plural: frappeworkpaces
+    singular: frappeworkpace
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: FrappeWorkpace is the Schema for the frappeworkpaces API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: FrappeWorkpaceSpec defines the desired state of FrappeWorkpace
+            properties:
+              foo:
+                description: Foo is an example field of FrappeWorkpace. Edit frappeworkpace_types.go
+                  to remove/update
+                type: string
+            type: object
+          status:
+            description: FrappeWorkpaceStatus defines the observed state of FrappeWorkpace
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: sitebackups.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteBackup
+    listKind: SiteBackupList
+    plural: sitebackups
+    singular: sitebackup
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SiteBackup is the Schema for the sitebackups API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteBackupSpec defines the desired state of SiteBackup
+            properties:
+              foo:
+                description: Foo is an example field of SiteBackup. Edit sitebackup_types.go
+                  to remove/update
+                type: string
+            type: object
+          status:
+            description: SiteBackupStatus defines the observed state of SiteBackup
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: sitedashboardcharts.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteDashboardChart
+    listKind: SiteDashboardChartList
+    plural: sitedashboardcharts
+    singular: sitedashboardchart
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SiteDashboardChart is the Schema for the sitedashboardcharts
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteDashboardChartSpec defines the desired state of SiteDashboardChart
+            properties:
+              foo:
+                description: Foo is an example field of SiteDashboardChart. Edit sitedashboardchart_types.go
+                  to remove/update
+                type: string
+            type: object
+          status:
+            description: SiteDashboardChartStatus defines the observed state of SiteDashboardChart
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: sitedashboards.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteDashboard
+    listKind: SiteDashboardList
+    plural: sitedashboards
+    singular: sitedashboard
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SiteDashboard is the Schema for the sitedashboards API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteDashboardSpec defines the desired state of SiteDashboard
+            properties:
+              foo:
+                description: Foo is an example field of SiteDashboard. Edit sitedashboard_types.go
+                  to remove/update
+                type: string
+            type: object
+          status:
+            description: SiteDashboardStatus defines the observed state of SiteDashboard
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: sitejobs.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteJob
+    listKind: SiteJobList
+    plural: sitejobs
+    singular: sitejob
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SiteJob is the Schema for the sitejobs API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteJobSpec defines the desired state of SiteJob
+            properties:
+              foo:
+                description: Foo is an example field of SiteJob. Edit sitejob_types.go
+                  to remove/update
+                type: string
+            type: object
+          status:
+            description: SiteJobStatus defines the observed state of SiteJob
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: siteusers.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteUser
+    listKind: SiteUserList
+    plural: siteusers
+    singular: siteuser
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SiteUser is the Schema for the siteusers API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteUserSpec defines the desired state of SiteUser
+            properties:
+              foo:
+                description: Foo is an example field of SiteUser. Edit siteuser_types.go
+                  to remove/update
+                type: string
+            type: object
+          status:
+            description: SiteUserStatus defines the observed state of SiteUser
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: siteworkspaces.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteWorkspace
+    listKind: SiteWorkspaceList
+    plural: siteworkspaces
+    singular: siteworkspace
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SiteWorkspace is the Schema for the siteworkspaces API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteWorkspaceSpec defines the desired state of SiteWorkspace
+            properties:
+              foo:
+                description: Foo is an example field of SiteWorkspace. Edit siteworkspace_types.go
+                  to remove/update
+                type: string
+            type: object
+          status:
+            description: SiteWorkspaceStatus defines the observed state of SiteWorkspace
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: metrics-reader
+    app.kubernetes.io/component: kube-rbac-proxy
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: metrics-reader
+rules:
+- nonResourceURLs:
+  - "/metrics"
+  verbs:
+  - get
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: proxy-role
+    app.kubernetes.io/component: kube-rbac-proxy
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: proxy-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrolebinding
+    app.kubernetes.io/instance: proxy-rolebinding
+    app.kubernetes.io/component: kube-rbac-proxy
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: proxy-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: proxy-role
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: system
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: service
+    app.kubernetes.io/instance: controller-manager-metrics-service
+    app.kubernetes.io/component: kube-rbac-proxy
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: controller-manager-metrics-service
+  namespace: system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: https
+  selector:
+    control-plane: controller-manager
+# permissions for end users to edit frappesites.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: frappesite-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: frappesite-editor-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappesites
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappesites/status
+  verbs:
+  - get
+# permissions for end users to view frappesites.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: frappesite-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: frappesite-viewer-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappesites
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappesites/status
+  verbs:
+  - get
+# permissions for end users to edit frappeworkpaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: frappeworkpace-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: frappeworkpace-editor-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappeworkpaces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappeworkpaces/status
+  verbs:
+  - get
+# permissions for end users to view frappeworkpaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: frappeworkpace-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: frappeworkpace-viewer-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappeworkpaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappeworkpaces/status
+  verbs:
+  - get
+resources:
+# All RBAC will be applied under this service account in
+# the deployment namespace. You may comment out this resource
+# if your manager will use a service account that exists at
+# runtime. Be sure to update RoleBinding and ClusterRoleBinding
+# subjects if changing service account names.
+- service_account.yaml
+- role.yaml
+- role_binding.yaml
+- leader_election_role.yaml
+- leader_election_role_binding.yaml
+# Comment the following 4 lines if you want to disable
+# the auth proxy (https://github.com/brancz/kube-rbac-proxy)
+# which protects your /metrics endpoint.
+- auth_proxy_service.yaml
+- auth_proxy_role.yaml
+- auth_proxy_role_binding.yaml
+- auth_proxy_client_clusterrole.yaml
+# permissions to do leader election.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/name: role
+    app.kubernetes.io/instance: leader-election-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: leader-election-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: rolebinding
+    app.kubernetes.io/instance: leader-election-rolebinding
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: leader-election-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappesites
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappesites/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappesites/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappeworkpaces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappeworkpaces/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappeworkpaces/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitebackups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitebackups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitebackups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboardcharts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboardcharts/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboardcharts/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboards
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboards/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboards/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitejobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitejobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitejobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteusers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteusers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteusers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteworkspaces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteworkspaces/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteworkspaces/status
+  verbs:
+  - get
+  - patch
+  - update
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrolebinding
+    app.kubernetes.io/instance: manager-rolebinding
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: manager-role
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: system
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/name: serviceaccount
+    app.kubernetes.io/instance: controller-manager
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: controller-manager
+  namespace: system
+# permissions for end users to edit sitebackups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: sitebackup-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: sitebackup-editor-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitebackups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitebackups/status
+  verbs:
+  - get
+# permissions for end users to view sitebackups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: sitebackup-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: sitebackup-viewer-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitebackups
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitebackups/status
+  verbs:
+  - get
+# permissions for end users to edit sitedashboards.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: sitedashboard-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: sitedashboard-editor-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboards
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboards/status
+  verbs:
+  - get
+# permissions for end users to view sitedashboards.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: sitedashboard-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: sitedashboard-viewer-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboards
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboards/status
+  verbs:
+  - get
+# permissions for end users to edit sitedashboardcharts.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: sitedashboardchart-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: sitedashboardchart-editor-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboardcharts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboardcharts/status
+  verbs:
+  - get
+# permissions for end users to view sitedashboardcharts.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: sitedashboardchart-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: sitedashboardchart-viewer-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboardcharts
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboardcharts/status
+  verbs:
+  - get
+# permissions for end users to edit sitejobs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: sitejob-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: sitejob-editor-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitejobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitejobs/status
+  verbs:
+  - get
+# permissions for end users to view sitejobs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: sitejob-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: sitejob-viewer-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitejobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitejobs/status
+  verbs:
+  - get
+# permissions for end users to edit siteusers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: siteuser-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: siteuser-editor-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteusers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteusers/status
+  verbs:
+  - get
+# permissions for end users to view siteusers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: siteuser-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: siteuser-viewer-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteusers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteusers/status
+  verbs:
+  - get
+# permissions for end users to edit siteworkspaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: siteworkspace-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: siteworkspace-editor-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteworkspaces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteworkspaces/status
+  verbs:
+  - get
+# permissions for end users to view siteworkspaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: siteworkspace-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: siteworkspace-viewer-role
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteworkspaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteworkspaces/status
+  verbs:
+  - get
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: namespace
+    app.kubernetes.io/instance: system
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: deployment
+    app.kubernetes.io/instance: controller-manager
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: controller-manager
+    spec:
+      # TODO(user): Uncomment the following code to configure the nodeAffinity expression
+      # according to the platforms which are supported by your solution.
+      # It is considered best practice to support multiple architectures. You can
+      # build your manager image using the makefile target docker-buildx.
+      # affinity:
+      #   nodeAffinity:
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #       nodeSelectorTerms:
+      #         - matchExpressions:
+      #           - key: kubernetes.io/arch
+      #             operator: In
+      #             values:
+      #               - amd64
+      #               - arm64
+      #               - ppc64le
+      #               - s390x
+      #           - key: kubernetes.io/os
+      #             operator: In
+      #             values:
+      #               - linux
+      securityContext:
+        runAsNonRoot: true
+        # TODO(user): For common cases that do not require escalating privileges
+        # it is recommended to ensure that all your Pods/Containers are restrictive.
+        # More info: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
+        # Please uncomment the following code if your project does NOT have to work on old Kubernetes
+        # versions < 1.19 or on vendors versions which do NOT support this field by default (i.e. Openshift < 4.11 ).
+        # seccompProfile:
+        #   type: RuntimeDefault
+      containers:
+      - command:
+        - /manager
+        args:
+        - --leader-elect
+        image: ghcr.io/vyogotech/frappe-operator:v1.0.0
+        imagePullPolicy: Never
+        name: manager
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - "ALL"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        # TODO(user): Configure the resources accordingly based on the project requirements.
+        # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+      serviceAccountName: controller-manager
+      terminationGracePeriodSeconds: 10
+

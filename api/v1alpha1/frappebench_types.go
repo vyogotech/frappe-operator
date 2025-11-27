@@ -36,6 +36,10 @@ type FrappeBenchSpec struct {
 	// +optional
 	RedisConfig *RedisConfig `json:"redisConfig,omitempty"`
 
+	// StorageClassName allows overriding the storage class for bench PVC
+	// +optional
+	StorageClassName string `json:"storageClassName,omitempty"`
+
 	// DomainConfig defines default domain behavior for sites on this bench
 	// +optional
 	DomainConfig *DomainConfig `json:"domainConfig,omitempty"`
