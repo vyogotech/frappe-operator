@@ -70,7 +70,8 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: controller:latest
+        image: localhost/frappe-operator:v2.1.0
+        imagePullPolicy: Never
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
@@ -100,3 +101,4 @@ spec:
             memory: 64Mi
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
+
