@@ -79,120 +79,34 @@ spec:
                 properties:
                   mode:
                     type: string
+                    enum:
+                      - shared
+                      - dedicated
+                      - external
+                  host:
+                    description: Host is the database hostname or IP
+                    type: string
+                  port:
+                    description: Port is the database port (default 3306)
+                    type: string
                   storageSize:
                     type: string
                   resources:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   connectionSecretRef:
+                    description: Secret with database credentials (host, port, rootPassword)
                     type: object
-                    x-kubernetes-preserve-unknown-fields: true
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                      - name
                 type: object
-              domain:
-                description: Domain is the external domain for ingress
-                type: string
-              tls:
-                description: TLS configuration
-                properties:
-                  enabled:
-                    type: boolean
-                  secretName:
-                    type: string
-                  issuer:
-                    type: string
-                type: object
-              ingressClassName:
-                description: IngressClassName specifies the ingress class
-                type: string
-              ingress:
-                description: Ingress configuration
-                properties:
-                  enabled:
-                    type: boolean
-                  className:
-                    type: string
-                  annotations:
-                    additionalProperties:
-                      type: string
-                    type: object
-                  tls:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                type: object
-            required:
-            - benchRef
-            - siteName
-            type: object
-          status:
-            description: FrappeSiteStatus defines the observed state of FrappeSite
-            properties:
-              phase:
-                description: Phase is the current phase
-                type: string
-              benchReady:
-                description: BenchReady indicates if the referenced bench is ready
-                type: boolean
-              siteURL:
-                description: SiteURL is the accessible URL
-                type: string
-              dbConnectionSecret:
-                description: DBConnectionSecret is the name of the Secret with DB credentials
-                type: string
-              resolvedDomain:
-                description: ResolvedDomain is the final domain after resolution
-                type: string
-              domainSource:
-                description: DomainSource indicates how domain was determined
-                type: string
-              ready:
-                description: Ready indicates if the site is ready
-                type: boolean
-            type: object
-        type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
-
-          spec:
-            description: FrappeSiteSpec defines the desired state of FrappeSite
-            properties:
-              benchRef:
-                description: BenchRef references the FrappeBench this site belongs to
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
                 required:
-                - name
-                type: object
-              siteName:
-                description: SiteName is the Frappe site name
-                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
-                type: string
-              adminPasswordSecretRef:
-                description: AdminPasswordSecretRef references the Secret containing admin password
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                type: object
-              dbConfig:
-                description: DBConfig defines database configuration for this site
-                properties:
-                  mode:
-                    type: string
-                  storageSize:
-                    type: string
-                  resources:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                  connectionSecretRef:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                type: object
+                  - mode
               domain:
                 description: Domain is the external domain for ingress
                 type: string

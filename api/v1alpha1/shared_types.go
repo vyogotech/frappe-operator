@@ -22,6 +22,14 @@ type DatabaseConfig struct {
 	// +kubebuilder:validation:Required
 	Mode string `json:"mode"`
 
+	// Host is the database hostname or IP (optional, defaults based on mode)
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// Port is the database port (optional, defaults to 3306)
+	// +optional
+	Port string `json:"port,omitempty"`
+
 	// StorageSize for dedicated database mode
 	// +optional
 	StorageSize *resource.Quantity `json:"storageSize,omitempty"`
@@ -30,7 +38,8 @@ type DatabaseConfig struct {
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty"`
 
-	// ConnectionSecretRef for external database mode
+	// ConnectionSecretRef references a Secret containing database credentials
+	// Required for external mode. Expected keys: host, port, rootPassword (or root-password)
 	// +optional
 	ConnectionSecretRef *corev1.SecretReference `json:"connectionSecretRef,omitempty"`
 }
