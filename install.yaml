@@ -670,120 +670,34 @@ spec:
                 properties:
                   mode:
                     type: string
+                    enum:
+                      - shared
+                      - dedicated
+                      - external
+                  host:
+                    description: Host is the database hostname or IP
+                    type: string
+                  port:
+                    description: Port is the database port (default 3306)
+                    type: string
                   storageSize:
                     type: string
                   resources:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   connectionSecretRef:
+                    description: Secret with database credentials (host, port, rootPassword)
                     type: object
-                    x-kubernetes-preserve-unknown-fields: true
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                      - name
                 type: object
-              domain:
-                description: Domain is the external domain for ingress
-                type: string
-              tls:
-                description: TLS configuration
-                properties:
-                  enabled:
-                    type: boolean
-                  secretName:
-                    type: string
-                  issuer:
-                    type: string
-                type: object
-              ingressClassName:
-                description: IngressClassName specifies the ingress class
-                type: string
-              ingress:
-                description: Ingress configuration
-                properties:
-                  enabled:
-                    type: boolean
-                  className:
-                    type: string
-                  annotations:
-                    additionalProperties:
-                      type: string
-                    type: object
-                  tls:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                type: object
-            required:
-            - benchRef
-            - siteName
-            type: object
-          status:
-            description: FrappeSiteStatus defines the observed state of FrappeSite
-            properties:
-              phase:
-                description: Phase is the current phase
-                type: string
-              benchReady:
-                description: BenchReady indicates if the referenced bench is ready
-                type: boolean
-              siteURL:
-                description: SiteURL is the accessible URL
-                type: string
-              dbConnectionSecret:
-                description: DBConnectionSecret is the name of the Secret with DB credentials
-                type: string
-              resolvedDomain:
-                description: ResolvedDomain is the final domain after resolution
-                type: string
-              domainSource:
-                description: DomainSource indicates how domain was determined
-                type: string
-              ready:
-                description: Ready indicates if the site is ready
-                type: boolean
-            type: object
-        type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
-
-          spec:
-            description: FrappeSiteSpec defines the desired state of FrappeSite
-            properties:
-              benchRef:
-                description: BenchRef references the FrappeBench this site belongs to
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
                 required:
-                - name
-                type: object
-              siteName:
-                description: SiteName is the Frappe site name
-                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
-                type: string
-              adminPasswordSecretRef:
-                description: AdminPasswordSecretRef references the Secret containing admin password
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                type: object
-              dbConfig:
-                description: DBConfig defines database configuration for this site
-                properties:
-                  mode:
-                    type: string
-                  storageSize:
-                    type: string
-                  resources:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                  connectionSecretRef:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-                type: object
+                  - mode
               domain:
                 description: Domain is the external domain for ingress
                 type: string
@@ -1485,62 +1399,7 @@ metadata:
   creationTimestamp: null
   name: manager-role
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
+# Core resources
 - apiGroups:
   - ""
   resources:
@@ -1567,6 +1426,34 @@ rules:
   - patch
   - update
   - watch
+# Apps resources
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+# Batch resources
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+# Networking resources
 - apiGroups:
   - networking.k8s.io
   resources:
@@ -1579,35 +1466,20 @@ rules:
   - patch
   - update
   - watch
+# Storage classes (read-only access)
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+# Frappe CRDs - Core resources
 - apiGroups:
   - vyogo.tech
   resources:
   - frappebenches
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - frappebenches/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - frappebenches/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
   - frappesites
   verbs:
   - create
@@ -1617,179 +1489,34 @@ rules:
   - patch
   - update
   - watch
+# Frappe CRDs - Finalizers
 - apiGroups:
   - vyogo.tech
   resources:
+  - frappebenches/finalizers
   - frappesites/finalizers
   verbs:
   - update
+# Frappe CRDs - Status subresource
 - apiGroups:
   - vyogo.tech
   resources:
+  - frappebenches/status
   - frappesites/status
   verbs:
   - get
   - patch
   - update
+# Extended Frappe CRDs - Additional resources
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappeworkpaces
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - frappeworkpaces/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - frappeworkpaces/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
+  - frappeworkspaces
   - sitebackups
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - sitebackups/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - sitebackups/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
   - sitedashboardcharts
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - sitedashboardcharts/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - sitedashboardcharts/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
   - sitedashboards
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - sitedashboards/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - sitedashboards/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
   - sitejobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - sitejobs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - sitejobs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
   - siteusers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - siteusers/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - siteusers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
   - siteworkspaces
   verbs:
   - create
@@ -1799,15 +1526,29 @@ rules:
   - patch
   - update
   - watch
+# Extended Frappe CRDs - Finalizers
 - apiGroups:
   - vyogo.tech
   resources:
+  - frappeworkspaces/finalizers
+  - sitebackups/finalizers
+  - sitedashboardcharts/finalizers
+  - sitedashboards/finalizers
+  - sitejobs/finalizers
+  - siteusers/finalizers
   - siteworkspaces/finalizers
   verbs:
   - update
+# Extended Frappe CRDs - Status subresource
 - apiGroups:
   - vyogo.tech
   resources:
+  - frappeworkspaces/status
+  - sitebackups/status
+  - sitedashboardcharts/status
+  - sitedashboards/status
+  - sitejobs/status
+  - siteusers/status
   - siteworkspaces/status
   verbs:
   - get
