@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -132,6 +133,12 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err := r.ensureWorkers(ctx, bench); err != nil {
 		logger.Error(err, "Failed to ensure Workers")
 		return ctrl.Result{}, err
+	}
+
+	// Update worker scaling status
+	if err := r.updateWorkerScalingStatus(ctx, bench); err != nil {
+		logger.Error(err, "Failed to update worker scaling status")
+		// Don't fail the reconciliation, just log the error
 	}
 
 	// Update status
@@ -318,6 +325,64 @@ func (r *FrappeBenchReconciler) parseAppsJSON(appsJSON string) []vyogotechv1alph
 }
 
 // updateBenchStatus updates the FrappeBench status
+// updateWorkerScalingStatus updates the status with current worker scaling information
+func (r *FrappeBenchReconciler) updateWorkerScalingStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+	logger := log.FromContext(ctx)
+	
+	if bench.Status.WorkerScaling == nil {
+		bench.Status.WorkerScaling = make(map[string]vyogotechv1alpha1.WorkerScalingStatus)
+	}
+
+	kedaAvailable := r.isKEDAAvailable(ctx)
+	workerTypes := []string{"default", "long", "short"}
+
+	for _, workerType := range workerTypes {
+		// Get the deployment
+		deployName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
+		deploy := &appsv1.Deployment{}
+		err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				continue // Worker not created yet
+			}
+			logger.Error(err, "Failed to get worker deployment", "worker", workerType)
+			continue
+		}
+
+		// Get autoscaling config
+		config := r.getWorkerAutoscalingConfig(bench, workerType)
+		config = r.fillAutoscalingDefaults(config, workerType)
+
+		// Determine mode and replicas
+		mode := "static"
+		kedaManaged := false
+		if kedaAvailable && config.Enabled != nil && *config.Enabled {
+			mode = "autoscaled"
+			kedaManaged = true
+		}
+
+		currentReplicas := int32(0)
+		if deploy.Status.Replicas > 0 {
+			currentReplicas = deploy.Status.Replicas
+		}
+
+		desiredReplicas := int32(0)
+		if deploy.Spec.Replicas != nil {
+			desiredReplicas = *deploy.Spec.Replicas
+		}
+
+		// Update status
+		bench.Status.WorkerScaling[workerType] = vyogotechv1alpha1.WorkerScalingStatus{
+			Mode:            mode,
+			CurrentReplicas: currentReplicas,
+			DesiredReplicas: desiredReplicas,
+			KEDAManaged:     kedaManaged,
+		}
+	}
+
+	return nil // Status will be updated in updateBenchStatus
+}
+
 func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, gitEnabled bool, fpmRepos []vyogotechv1alpha1.FPMRepository) error {
 	// Collect installed app names
 	installedApps := make([]string, 0, len(bench.Spec.Apps))
@@ -347,3 +412,4 @@ func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Complete(r)
 }
+
