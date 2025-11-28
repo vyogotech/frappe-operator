@@ -10,7 +10,7 @@ rules:
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappebenchs
+  - frappebenches
   - frappesites
   - frappeworkpaces
   - sitebackups
@@ -30,14 +30,14 @@ rules:
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappebenchs/finalizers
+  - frappebenches/finalizers
   - frappesites/finalizers
   verbs:
   - update
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappebenchs/status
+  - frappebenches/status
   - frappesites/status
   verbs:
   - get
@@ -91,6 +91,7 @@ rules:
   - networking.k8s.io
   resources:
   - ingresses
+  - ingressclasses
   verbs:
   - create
   - delete
@@ -106,6 +107,20 @@ rules:
   verbs:
   - get
   - list
+  - watch
+
+# Leader Election (cluster-wide)
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 
 # MariaDB Operator CRDs
