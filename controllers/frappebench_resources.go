@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -869,34 +871,66 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 
 // ensureWorkers ensures all Worker Deployments exist
 func (r *FrappeBenchReconciler) ensureWorkers(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+	logger := log.FromContext(ctx)
+
+	// Check KEDA availability once
+	kedaAvailable := r.isKEDAAvailable(ctx)
+	if !kedaAvailable {
+		logger.Info("KEDA not available, workers will use static replicas")
+	}
+
 	workers := []struct {
 		name      string
 		queue     string
-		replicas  func(*vyogotechv1alpha1.FrappeBench) int32
 		resources func(*vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements
 	}{
-		{"default", "default", r.getWorkerDefaultReplicas, r.getWorkerDefaultResources},
-		{"long", "long", r.getWorkerLongReplicas, r.getWorkerLongResources},
-		{"short", "short", r.getWorkerShortReplicas, r.getWorkerShortResources},
+		{"default", "default", r.getWorkerDefaultResources},
+		{"long", "long", r.getWorkerLongResources},
+		{"short", "short", r.getWorkerShortResources},
 	}
 
 	for _, worker := range workers {
-		if err := r.ensureWorkerDeployment(ctx, bench, worker.name, worker.queue, worker.replicas(bench), worker.resources(bench)); err != nil {
+		// Get autoscaling config for this worker
+		config := r.getWorkerAutoscalingConfig(bench, worker.name)
+		config = r.fillAutoscalingDefaults(config, worker.name)
+
+		// Determine replica count based on scaling mode
+		replicas := r.getWorkerReplicaCount(config, kedaAvailable)
+
+		// Create/update worker deployment
+		if err := r.ensureWorkerDeployment(ctx, bench, worker.name, worker.queue, replicas, worker.resources(bench), config, kedaAvailable); err != nil {
 			return err
+		}
+
+		// Create/update ScaledObject if autoscaling is enabled
+		if err := r.ensureScaledObject(ctx, bench, worker.name, config); err != nil {
+			logger.Error(err, "Failed to ensure ScaledObject", "worker", worker.name)
+			// Don't fail the reconciliation, just log the error
 		}
 	}
 
 	return nil
 }
 
-func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, workerType, queue string, replicas int32, resources corev1.ResourceRequirements) error {
+func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, workerType, queue string, replicas int32, resources corev1.ResourceRequirements, config *vyogotechv1alpha1.WorkerAutoscaling, kedaAvailable bool) error {
 	logger := log.FromContext(ctx)
 
 	deployName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
 	deploy := &appsv1.Deployment{}
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
+
+	// Determine if this worker is managed by KEDA
+	kedaManaged := kedaAvailable && config.Enabled != nil && *config.Enabled
+
 	if err == nil {
+		// Deployment exists, update it if needed
+		// Only update replicas if NOT managed by KEDA (KEDA controls replicas)
+		if !kedaManaged && *deploy.Spec.Replicas != replicas {
+			logger.Info("Updating worker replicas", "worker", workerType, "oldReplicas", *deploy.Spec.Replicas, "newReplicas", replicas)
+			deploy.Spec.Replicas = &replicas
+			return r.Update(ctx, deploy)
+		}
 		return nil
 	}
 
@@ -904,16 +938,26 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 		return err
 	}
 
-	logger.Info("Creating Worker Deployment", "deployment", deployName, "queue", queue)
+	logger.Info("Creating Worker Deployment", "deployment", deployName, "queue", queue, "replicas", replicas, "kedaManaged", kedaManaged)
 
 	image := r.getBenchImage(bench)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 
+	// Add annotations to indicate scaling mode
+	annotations := map[string]string{}
+	if kedaManaged {
+		annotations["frappe.io/scaling-mode"] = "autoscaled"
+		annotations["keda.sh/managed-by"] = "keda"
+	} else {
+		annotations["frappe.io/scaling-mode"] = "static"
+	}
+
 	deploy = &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      deployName,
-			Namespace: bench.Namespace,
-			Labels:    r.benchLabels(bench),
+			Name:        deployName,
+			Namespace:   bench.Namespace,
+			Labels:      r.benchLabels(bench),
+			Annotations: annotations,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -1180,4 +1224,294 @@ func (r *FrappeBenchReconciler) componentLabels(bench *vyogotechv1alpha1.FrappeB
 	labels := r.benchLabels(bench)
 	labels["component"] = component
 	return labels
+}
+
+// getWorkerAutoscalingConfig returns the autoscaling config for a specific worker type
+// Falls back to legacy ComponentReplicas if WorkerAutoscaling not configured
+func (r *FrappeBenchReconciler) getWorkerAutoscalingConfig(bench *vyogotechv1alpha1.FrappeBench, workerType string) *vyogotechv1alpha1.WorkerAutoscaling {
+	// Return configured autoscaling if available
+	if bench.Spec.WorkerAutoscaling != nil {
+		switch workerType {
+		case "short":
+			if bench.Spec.WorkerAutoscaling.Short != nil {
+				return bench.Spec.WorkerAutoscaling.Short
+			}
+		case "long":
+			if bench.Spec.WorkerAutoscaling.Long != nil {
+				return bench.Spec.WorkerAutoscaling.Long
+			}
+		case "default":
+			if bench.Spec.WorkerAutoscaling.Default != nil {
+				return bench.Spec.WorkerAutoscaling.Default
+			}
+		}
+	}
+
+	// Fall back to legacy ComponentReplicas
+	if bench.Spec.ComponentReplicas != nil {
+		config := &vyogotechv1alpha1.WorkerAutoscaling{
+			Enabled: boolPtr(false), // Legacy is always static
+		}
+		switch workerType {
+		case "short":
+			if bench.Spec.ComponentReplicas.WorkerShort > 0 {
+				config.StaticReplicas = int32Ptr(bench.Spec.ComponentReplicas.WorkerShort)
+			} else {
+				config.StaticReplicas = int32Ptr(2)
+			}
+		case "long":
+			if bench.Spec.ComponentReplicas.WorkerLong > 0 {
+				config.StaticReplicas = int32Ptr(bench.Spec.ComponentReplicas.WorkerLong)
+			} else {
+				config.StaticReplicas = int32Ptr(1)
+			}
+		case "default":
+			if bench.Spec.ComponentReplicas.WorkerDefault > 0 {
+				config.StaticReplicas = int32Ptr(bench.Spec.ComponentReplicas.WorkerDefault)
+			} else {
+				config.StaticReplicas = int32Ptr(1)
+			}
+		}
+		return config
+	}
+
+	// Return nil to use defaults
+	return nil
+}
+
+// getDefaultAutoscalingConfig returns opinionated defaults for each worker type
+func (r *FrappeBenchReconciler) getDefaultAutoscalingConfig(workerType string) *vyogotechv1alpha1.WorkerAutoscaling {
+	switch workerType {
+	case "short":
+		// Short jobs: scale-to-zero with aggressive scaling
+		return &vyogotechv1alpha1.WorkerAutoscaling{
+			Enabled:         boolPtr(true),
+			MinReplicas:     int32Ptr(0),
+			MaxReplicas:     int32Ptr(10),
+			QueueLength:     int32Ptr(5),
+			CooldownPeriod:  int32Ptr(60),
+			PollingInterval: int32Ptr(15),
+		}
+	case "long":
+		// Long jobs: scale-to-zero with conservative scaling
+		return &vyogotechv1alpha1.WorkerAutoscaling{
+			Enabled:         boolPtr(true),
+			MinReplicas:     int32Ptr(0),
+			MaxReplicas:     int32Ptr(5),
+			QueueLength:     int32Ptr(2),
+			CooldownPeriod:  int32Ptr(300),
+			PollingInterval: int32Ptr(30),
+		}
+	case "default":
+		// Default/scheduler: always one replica (scheduler must run)
+		return &vyogotechv1alpha1.WorkerAutoscaling{
+			Enabled:        boolPtr(false),
+			StaticReplicas: int32Ptr(1),
+		}
+	}
+	return nil
+}
+
+// fillAutoscalingDefaults fills in missing fields with defaults
+func (r *FrappeBenchReconciler) fillAutoscalingDefaults(config *vyogotechv1alpha1.WorkerAutoscaling, workerType string) *vyogotechv1alpha1.WorkerAutoscaling {
+	if config == nil {
+		return r.getDefaultAutoscalingConfig(workerType)
+	}
+
+	result := &vyogotechv1alpha1.WorkerAutoscaling{}
+	*result = *config
+
+	// Fill in defaults
+	defaults := r.getDefaultAutoscalingConfig(workerType)
+	if result.Enabled == nil {
+		result.Enabled = defaults.Enabled
+	}
+	if result.MinReplicas == nil {
+		result.MinReplicas = defaults.MinReplicas
+	}
+	if result.MaxReplicas == nil {
+		result.MaxReplicas = defaults.MaxReplicas
+	}
+	if result.StaticReplicas == nil {
+		result.StaticReplicas = defaults.StaticReplicas
+	}
+	if result.QueueLength == nil {
+		result.QueueLength = defaults.QueueLength
+	}
+	if result.CooldownPeriod == nil {
+		result.CooldownPeriod = defaults.CooldownPeriod
+	}
+	if result.PollingInterval == nil {
+		result.PollingInterval = defaults.PollingInterval
+	}
+
+	return result
+}
+
+// getWorkerReplicaCount determines the replica count based on scaling mode
+func (r *FrappeBenchReconciler) getWorkerReplicaCount(config *vyogotechv1alpha1.WorkerAutoscaling, kedaAvailable bool) int32 {
+	// If KEDA autoscaling enabled and available, use MinReplicas
+	if config.Enabled != nil && *config.Enabled && kedaAvailable {
+		if config.MinReplicas != nil {
+			return *config.MinReplicas
+		}
+		return 0 // Default to scale-to-zero
+	}
+
+	// Otherwise use static replicas
+	if config.StaticReplicas != nil {
+		return *config.StaticReplicas
+	}
+
+	// Fallback
+	return 1
+}
+
+// isKEDAAvailable checks if KEDA CRDs are installed
+func (r *FrappeBenchReconciler) isKEDAAvailable(ctx context.Context) bool {
+	// Create a minimal unstructured list to check if the resource exists
+	list := &metav1.PartialObjectMetadataList{}
+	list.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "keda.sh",
+		Version: "v1alpha1",
+		Kind:    "ScaledObject",
+	})
+
+	// Attempt to list - if this succeeds, KEDA is available
+	err := r.Client.List(ctx, list, client.Limit(1))
+
+	// NoMatchError means the CRD doesn't exist
+	if errors.IsNotFound(err) {
+		return false
+	}
+
+	// Any other error or success means KEDA is likely available
+	// We don't care about permission errors - just whether the CRD exists
+	return true
+}
+
+// ensureScaledObject creates or updates a KEDA ScaledObject for a worker
+func (r *FrappeBenchReconciler) ensureScaledObject(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, workerType string, config *vyogotechv1alpha1.WorkerAutoscaling) error {
+	logger := log.FromContext(ctx)
+
+	// Skip if KEDA is not enabled for this worker
+	if config.Enabled == nil || !*config.Enabled {
+		// Clean up any existing ScaledObject
+		return r.deleteScaledObjectIfExists(ctx, bench, workerType)
+	}
+
+	// Check if KEDA is available
+	if !r.isKEDAAvailable(ctx) {
+		logger.Info("KEDA not available, skipping ScaledObject creation", "worker", workerType)
+		return nil
+	}
+
+	scaledObjectName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
+	deploymentName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
+	queueName := fmt.Sprintf("rq:queue:%s", workerType)
+
+	// Build the ScaledObject using unstructured
+	scaledObject := &unstructured.Unstructured{}
+	scaledObject.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "keda.sh",
+		Version: "v1alpha1",
+		Kind:    "ScaledObject",
+	})
+	scaledObject.SetName(scaledObjectName)
+	scaledObject.SetNamespace(bench.Namespace)
+	scaledObject.SetLabels(r.componentLabels(bench, fmt.Sprintf("worker-%s", workerType)))
+
+	// Build spec
+	spec := map[string]interface{}{
+		"scaleTargetRef": map[string]interface{}{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"name":       deploymentName,
+		},
+		"minReplicaCount": int64(*config.MinReplicas),
+		"maxReplicaCount": int64(*config.MaxReplicas),
+		"cooldownPeriod":  int64(*config.CooldownPeriod),
+		"pollingInterval": int64(*config.PollingInterval),
+		"triggers": []interface{}{
+			map[string]interface{}{
+				"type": "redis",
+				"metadata": map[string]interface{}{
+					"address":              r.getRedisAddress(bench),
+					"listName":             queueName,
+					"listLength":           fmt.Sprintf("%d", *config.QueueLength),
+					"enableTLS":            "false",
+					"databaseIndex":        "0",
+					"activationListLength": "1",
+				},
+			},
+		},
+	}
+
+	if err := unstructured.SetNestedField(scaledObject.Object, spec, "spec"); err != nil {
+		return fmt.Errorf("failed to set ScaledObject spec: %w", err)
+	}
+
+	// Set owner reference
+	if err := controllerutil.SetControllerReference(bench, scaledObject, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set owner reference: %w", err)
+	}
+
+	// Create or update
+	existing := &unstructured.Unstructured{}
+	existing.SetGroupVersionKind(scaledObject.GroupVersionKind())
+	err := r.Get(ctx, types.NamespacedName{Name: scaledObjectName, Namespace: bench.Namespace}, existing)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Info("Creating ScaledObject", "worker", workerType, "name", scaledObjectName)
+			return r.Create(ctx, scaledObject)
+		}
+		return err
+	}
+
+	// Update existing
+	scaledObject.SetResourceVersion(existing.GetResourceVersion())
+	logger.Info("Updating ScaledObject", "worker", workerType, "name", scaledObjectName)
+	return r.Update(ctx, scaledObject)
+}
+
+// deleteScaledObjectIfExists deletes a ScaledObject if it exists
+func (r *FrappeBenchReconciler) deleteScaledObjectIfExists(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, workerType string) error {
+	logger := log.FromContext(ctx)
+
+	scaledObjectName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
+
+	scaledObject := &unstructured.Unstructured{}
+	scaledObject.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "keda.sh",
+		Version: "v1alpha1",
+		Kind:    "ScaledObject",
+	})
+
+	err := r.Get(ctx, types.NamespacedName{Name: scaledObjectName, Namespace: bench.Namespace}, scaledObject)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil // Already deleted
+		}
+		return err
+	}
+
+	logger.Info("Deleting ScaledObject", "worker", workerType, "name", scaledObjectName)
+	return r.Delete(ctx, scaledObject)
+}
+
+// getRedisAddress returns the Redis address for the bench
+func (r *FrappeBenchReconciler) getRedisAddress(bench *vyogotechv1alpha1.FrappeBench) string {
+	// TODO: If ConnectionSecretRef is set, read the secret to get the host
+	// For now, default to in-cluster Redis service with fully qualified domain name
+	// KEDA needs the full service name since it runs in a different namespace
+	return fmt.Sprintf("%s-redis-queue.%s.svc.cluster.local:6379", bench.Name, bench.Namespace)
+}
+
+// Helper functions for pointer types
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func int32Ptr(i int32) *int32 {
+	return &i
 }

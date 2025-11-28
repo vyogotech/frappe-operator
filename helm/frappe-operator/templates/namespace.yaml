@@ -6,3 +6,4 @@ metadata:
     {{- include "frappe-operator.labels" . | nindent 4 }}
     control-plane: controller-manager
 
+

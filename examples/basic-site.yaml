@@ -37,3 +37,4 @@ spec:
 # To get the admin password:
 # kubectl get secret dev-site-admin -o jsonpath='{.data.password}' | base64 -d
 
+

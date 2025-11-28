@@ -53,6 +53,27 @@ type FrappeBenchSpec struct {
 	// Overrides operator-level Git configuration
 	// +optional
 	GitConfig *GitConfig `json:"gitConfig,omitempty"`
+
+	// WorkerAutoscaling defines KEDA-based or static scaling for workers
+	// Requires KEDA 2.x+ for autoscaling features
+	// If KEDA not available, gracefully falls back to static replicas
+	// +optional
+	WorkerAutoscaling *WorkerAutoscalingConfig `json:"workerAutoscaling,omitempty"`
+}
+
+// WorkerScalingStatus reports the scaling status of a worker
+type WorkerScalingStatus struct {
+	// Mode: "autoscaled" or "static"
+	Mode string `json:"mode"`
+
+	// CurrentReplicas is the actual running replica count
+	CurrentReplicas int32 `json:"currentReplicas"`
+
+	// DesiredReplicas is the desired count
+	DesiredReplicas int32 `json:"desiredReplicas"`
+
+	// KEDAManaged indicates if KEDA ScaledObject exists
+	KEDAManaged bool `json:"kedaManaged"`
 }
 
 // FrappeBenchStatus defines the observed state of FrappeBench
@@ -80,6 +101,10 @@ type FrappeBenchStatus struct {
 	// ObservedGeneration reflects the generation of the most recently observed FrappeBench
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// WorkerScaling reports scaling mode per worker type
+	// +optional
+	WorkerScaling map[string]WorkerScalingStatus `json:"workerScaling,omitempty"`
 }
 
 //+kubebuilder:object:root=true

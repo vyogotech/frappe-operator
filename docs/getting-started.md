@@ -382,7 +382,7 @@ kubectl patch frappebench dev-bench --type=merge -p '{
 ### Scale Components
 
 ```bash
-# Scale gunicorn replicas
+# Scale gunicorn replicas manually
 kubectl patch frappebench dev-bench --type=merge -p '{
   "spec": {
     "componentReplicas": {
@@ -392,6 +392,47 @@ kubectl patch frappebench dev-bench --type=merge -p '{
   }
 }'
 ```
+
+### Enable Worker Autoscaling (NEW)
+
+For production workloads, enable KEDA-based autoscaling to automatically scale workers based on queue length:
+
+```bash
+kubectl patch frappebench dev-bench --type=merge -p '{
+  "spec": {
+    "workerAutoscaling": {
+      "short": {
+        "enabled": true,
+        "minReplicas": 0,
+        "maxReplicas": 10,
+        "queueLength": 2
+      },
+      "long": {
+        "enabled": true,
+        "minReplicas": 1,
+        "maxReplicas": 5,
+        "queueLength": 5
+      },
+      "default": {
+        "enabled": false,
+        "staticReplicas": 2
+      }
+    }
+  }
+}'
+
+# Check autoscaling status
+kubectl get scaledobjects
+kubectl get frappebench dev-bench -o jsonpath='{.status.workerScaling}' | jq
+```
+
+**Benefits:**
+- Workers scale to zero when idle (save costs)
+- Auto-scale based on actual job queue length
+- Handle traffic spikes automatically
+- Fine-tune scaling per queue type
+
+For more details, see [Worker Autoscaling](operations.md#worker-autoscaling-with-keda-recommended).
 
 ## Next Steps
 

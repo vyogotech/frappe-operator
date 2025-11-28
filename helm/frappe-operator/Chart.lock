@@ -2,5 +2,8 @@ dependencies:
 - name: mariadb-operator
   repository: https://mariadb-operator.github.io/mariadb-operator
   version: 0.34.0
-digest: sha256:6e06574d666b11f6a56761e893c1584e600775f9a7f87106152b31ebbc9d2bf2
-generated: "2025-11-28T12:56:10.670332+11:00"
+- name: keda
+  repository: https://kedacore.github.io/charts
+  version: 2.16.1
+digest: sha256:b25cdc28c420077921233a6ee9de92eb3bb79d75f5f84e3d95c10527b1a2734f
+generated: "2025-11-28T22:57:54.368931+11:00"
