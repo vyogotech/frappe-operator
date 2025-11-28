@@ -90,8 +90,8 @@ func (p *MariaDBProviderUnstructured) EnsureDatabase(ctx context.Context, site *
 		return nil, err
 	}
 
-	logger.Info("Using MariaDB instance", 
-		"mariadb", mariadbName, 
+	logger.Info("Using MariaDB instance",
+		"mariadb", mariadbName,
 		"namespace", mariadbNamespace,
 		"dbName", dbName,
 		"dbUser", dbUser)
@@ -281,7 +281,7 @@ func (p *MariaDBProviderUnstructured) findOrCreateSharedMariaDB(ctx context.Cont
 	mariadbName := "frappe-mariadb"
 	mariadb := &unstructured.Unstructured{}
 	mariadb.SetGroupVersionKind(MariaDBGVK)
-	
+
 	err := p.client.Get(ctx, types.NamespacedName{
 		Name:      mariadbName,
 		Namespace: site.Namespace,
@@ -555,15 +555,15 @@ func (p *MariaDBProviderUnstructured) isResourceReady(obj *unstructured.Unstruct
 		if !ok {
 			continue
 		}
-		
+
 		condType, _, _ := unstructured.NestedString(condMap, "type")
 		condStatus, _, _ := unstructured.NestedString(condMap, "status")
-		
+
 		if condType == "Ready" && condStatus == "True" {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -608,4 +608,3 @@ func (p *MariaDBProviderUnstructured) generatePassword(length int) string {
 	}
 	return hex.EncodeToString(bytes)
 }
-

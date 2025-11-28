@@ -109,4 +109,3 @@ type FrappeBenchList struct {
 func init() {
 	SchemeBuilder.Register(&FrappeBench{}, &FrappeBenchList{})
 }
-

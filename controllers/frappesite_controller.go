@@ -160,10 +160,10 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 
-		logger.Info("Database provisioning initiated", 
+		logger.Info("Database provisioning initiated",
 			"provider", dbInfo.Provider,
 			"dbName", dbInfo.Name)
-		
+
 		// Requeue to check readiness
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
@@ -297,8 +297,8 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	}
 
 	// Create the initialization job
-	logger.Info("Creating site initialization job", 
-		"job", jobName, 
+	logger.Info("Creating site initialization job",
+		"job", jobName,
 		"domain", domain,
 		"dbProvider", dbInfo.Provider,
 		"dbName", dbInfo.Name)
@@ -314,7 +314,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	// Get or generate admin password
 	var adminPassword string
 	var adminPasswordSecret *corev1.Secret
-	
+
 	if site.Spec.AdminPasswordSecretRef != nil {
 		// Fetch from provided secret
 		adminPasswordSecret = &corev1.Secret{}
@@ -335,15 +335,15 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 			Name:      generatedSecretName,
 			Namespace: site.Namespace,
 		}, adminPasswordSecret)
-		
+
 		if err != nil && !errors.IsNotFound(err) {
 			return false, fmt.Errorf("failed to check for generated secret: %w", err)
 		}
-		
+
 		if errors.IsNotFound(err) {
 			// Generate new random password
 			adminPassword = r.generatePassword(16)
-			
+
 			// Create secret to store it
 			adminPasswordSecret = &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -359,15 +359,15 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 					"password": []byte(adminPassword),
 				},
 			}
-			
+
 			if err := controllerutil.SetControllerReference(site, adminPasswordSecret, r.Scheme); err != nil {
 				return false, err
 			}
-			
+
 			if err := r.Create(ctx, adminPasswordSecret); err != nil {
 				return false, fmt.Errorf("failed to create admin password secret: %w", err)
 			}
-			
+
 			logger.Info("Generated admin password", "secret", generatedSecretName)
 		} else {
 			// Use existing generated password
