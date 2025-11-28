@@ -27,6 +27,12 @@ dependencies:
     condition: mariadb-operator.enabled
     tags:
       - database
+  - name: keda
+    version: "2.16.1"
+    repository: https://kedacore.github.io/charts
+    condition: keda.enabled
+    tags:
+      - autoscaling
 
 annotations:
   # Artifact Hub annotations
