@@ -42,9 +42,10 @@ Frappe Operator is a Kubernetes operator that automates the deployment, scaling,
 - 📦 **Hybrid App Installation** - Install apps from FPM packages, Git repositories, or pre-built images
 - ⚡ **Production-Ready Architecture** - Dual Redis (cache + queue), correct entry points
 - 📊 **Auto-Scaling** - Automatically scale based on traffic and resource usage
+- ⚡ **NEW: Worker Autoscaling** - KEDA-based scale-to-zero for background workers (save costs!)
 - 🔄 **Automated Updates** - Zero-downtime rolling updates and migrations
 - 💾 **Backup Management** - Automated backups with configurable retention policies
-- 🔌 **Operator Integrations** - Works with MariaDB Operator, cert-manager, and ingress controllers
+- 🔌 **Operator Integrations** - Works with MariaDB Operator, KEDA, cert-manager, and ingress controllers
 - 📈 **Observability** - Built-in Prometheus metrics and logging
 - 🌐 **Multi-Platform Support** - ARM64 and AMD64 compatible
 

@@ -91,6 +91,7 @@ kubectl apply -f site-shared-mariadb.yaml
 - `site-dedicated-mariadb.yaml` - Site with dedicated MariaDB (enterprise)
 
 ### Advanced Examples  
+- `autoscaling-bench.yaml` - **NEW**: Bench with KEDA-based worker autoscaling (scale-to-zero)
 - `hybrid-bench.yaml` - Bench with hybrid app installation
 - `fpm-bench.yaml` - Bench using FPM packages
 
@@ -102,12 +103,16 @@ kubectl apply -f site-shared-mariadb.yaml
 ### FrappeBench
 
 Key configuration options:
-- `version` - Frappe version (e.g., "v15.41.2")
+- `frappeVersion` - Frappe version (e.g., "version-15", "version-14")
 - `imageConfig` - Custom container images
 - `apps` - List of apps to install
-- `componentReplicas` - Replica counts for each component
+- `componentReplicas` - Replica counts for each component (static)
+- `workerAutoscaling` - **NEW**: KEDA-based autoscaling for background workers
+  - `short` - Short-running tasks (scale-to-zero capable)
+  - `long` - Long-running tasks (minimum replicas configurable)
+  - `default` - Default queue workers (static or autoscaled)
 - `componentResources` - CPU/memory for each component
-- `storageSize` - PVC size
+- `storageSize` - PVC size (default: 10Gi)
 - `storageClassName` - Storage class to use
 - `domainConfig` - Domain resolution settings
 
@@ -129,6 +134,7 @@ Key configuration options:
 - Use auto-generated passwords
 - Use default resource limits
 - Use local storage (RWO)
+- Enable worker autoscaling to save resources
 
 ### Production
 - Use proper domain names
@@ -136,7 +142,10 @@ Key configuration options:
 - Configure appropriate resource limits
 - Use RWX storage (NFS, EFS, etc.)
 - Enable TLS with cert-manager
-- Configure HPA for auto-scaling
+- Configure worker autoscaling for cost optimization
+  - Set appropriate `queueLength` based on workload
+  - Use `minReplicas: 0` for scale-to-zero on bursty workloads
+  - Use `minReplicas: 1+` for consistent background processing
 
 ## Troubleshooting
 
@@ -162,6 +171,25 @@ kubectl logs job/<site-name>-init
 
 # Application logs
 kubectl logs deployment/<bench-name>-gunicorn
+
+# Worker autoscaling logs
+kubectl logs deployment/<bench-name>-worker-short
+kubectl logs deployment/<bench-name>-worker-long
+```
+
+### Check Worker Autoscaling
+```bash
+# Check ScaledObjects (KEDA)
+kubectl get scaledobjects
+
+# Check worker scaling status
+kubectl get frappebench <bench-name> -o jsonpath='{.status.workerScaling}' | jq
+
+# Check HPA created by KEDA
+kubectl get hpa
+
+# Check queue length
+kubectl exec deployment/<bench-name>-redis-queue -- redis-cli LLEN "rq:queue:short"
 ```
 
 ### Common Issues
