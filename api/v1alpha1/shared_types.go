@@ -316,4 +316,3 @@ type GitConfig struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 }
-
