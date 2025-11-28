@@ -1,0 +1,207 @@
+# Default values for frappe-operator
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Operator configuration
+operator:
+  # Number of operator replicas
+  replicaCount: 1
+  
+  image:
+    repository: ghcr.io/vyogotech/frappe-operator
+    pullPolicy: IfNotPresent
+    tag: "v1.0.0"
+  
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+  
+  # Resource limits and requests
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  # Node selector
+  nodeSelector: {}
+  
+  # Tolerations
+  tolerations: []
+  
+  # Affinity rules
+  affinity: {}
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    fsGroup: 65532
+  
+  # Pod annotations
+  podAnnotations: {}
+  
+  # Service account
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+
+# Operator manager configuration
+manager:
+  # Metrics configuration
+  metrics:
+    enabled: true
+    port: 8080
+    serviceMonitor:
+      enabled: false
+      interval: 30s
+      scrapeTimeout: 10s
+  
+  # Health probe configuration
+  health:
+    port: 8081
+  
+  # Leader election
+  leaderElection:
+    enabled: true
+  
+  # Log level (debug, info, warn, error)
+  logLevel: info
+
+# Webhook configuration
+webhook:
+  enabled: false
+  port: 9443
+  certManager:
+    enabled: false
+
+# RBAC configuration
+rbac:
+  create: true
+
+# MariaDB Operator dependency
+mariadb-operator:
+  enabled: true
+  # MariaDB Operator will be installed as a subchart
+  # See: https://github.com/mariadb-operator/mariadb-operator
+  
+  # Override MariaDB Operator values if needed
+  # webhook:
+  #   enabled: false
+
+# Default MariaDB instance for Frappe sites
+mariadb:
+  # Enable creation of a default shared MariaDB instance
+  enabled: true
+  
+  # MariaDB instance name
+  name: frappe-mariadb
+  
+  # MariaDB version
+  image:
+    repository: mariadb
+    tag: "10.11"
+    pullPolicy: IfNotPresent
+  
+  # Root password - CHANGE THIS IN PRODUCTION!
+  rootPasswordSecretRef:
+    name: mariadb-root-password
+    key: password
+    # If generate is true, a secret will be auto-created
+    generate: true
+  
+  # Storage configuration
+  storage:
+    size: 50Gi
+    storageClassName: ""  # Use default storage class
+  
+  # Resource limits
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  
+  # High availability configuration
+  replicas: 1
+  
+  # Galera cluster (for HA)
+  galera:
+    enabled: false
+  
+  # Backup configuration
+  backup:
+    enabled: false
+  
+  # Additional MariaDB configuration
+  config: |
+    [mysqld]
+    character-set-client-handshake=0
+    character-set-server=utf8mb4
+    collation-server=utf8mb4_unicode_ci
+    max_connections=500
+    max_allowed_packet=256M
+    innodb_buffer_pool_size=2G
+    innodb_log_file_size=512M
+    innodb_flush_log_at_trx_commit=2
+    innodb_flush_method=O_DIRECT
+
+# Ingress controller configuration (optional)
+ingress-nginx:
+  enabled: false
+  # If you want to install NGINX Ingress Controller with the operator
+  # Set to true and configure as needed
+
+# cert-manager configuration (optional)
+cert-manager:
+  enabled: false
+  # If you want to install cert-manager with the operator
+  # Set to true for automatic TLS certificate management
+
+# Default FrappeBench example (optional)
+examples:
+  # Create a sample FrappeBench after installation
+  createBench: false
+  bench:
+    name: example-bench
+    namespace: default
+    frappeVersion: "version-15"
+    apps:
+      - name: erpnext
+        source: image
+  
+  # Create a sample FrappeSite after installation
+  createSite: false
+  site:
+    name: example-site
+    namespace: default
+    benchRef: example-bench
+    siteName: example.local
+    domain: example.local
+    ingress:
+      enabled: false
+
+# Global configuration
+global:
+  # Image pull secrets for all components
+  imagePullSecrets: []
+  
+  # Default storage class
+  storageClass: ""
+  
+  # Namespace for operator
+  operatorNamespace: frappe-operator-system
+  
+  # Monitoring and observability
+  monitoring:
+    enabled: false
+    prometheus:
+      enabled: false
+    grafana:
+      enabled: false
+

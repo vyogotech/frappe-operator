@@ -1,0 +1,32 @@
+{{- if .Values.examples.createSite -}}
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: {{ .Values.examples.site.name }}
+  namespace: {{ .Values.examples.site.namespace }}
+  labels:
+    {{- include "frappe-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: example
+spec:
+  benchRef:
+    name: {{ .Values.examples.site.benchRef }}
+    namespace: {{ .Values.examples.site.namespace }}
+  siteName: {{ .Values.examples.site.siteName | quote }}
+  domain: {{ .Values.examples.site.domain | quote }}
+  
+  # Database configuration - uses the MariaDB instance created by this chart
+  dbConfig:
+    provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: {{ .Values.mariadb.name }}
+      namespace: {{ .Release.Namespace }}
+  
+  # Ingress configuration
+  {{- if .Values.examples.site.ingress.enabled }}
+  ingress:
+    enabled: true
+  ingressClassName: nginx
+  {{- end }}
+{{- end }}
+

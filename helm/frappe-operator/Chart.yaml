@@ -1,0 +1,54 @@
+apiVersion: v2
+name: frappe-operator
+description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - frappe
+  - erpnext
+  - kubernetes
+  - operator
+  - saas
+home: https://github.com/vyogotech/frappe-operator
+sources:
+  - https://github.com/vyogotech/frappe-operator
+maintainers:
+  - name: Vyogo Technologies
+    email: support@vyogo.tech
+    url: https://vyogo.tech
+icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/main/docs/assets/icon.png
+
+# Dependencies
+dependencies:
+  - name: mariadb-operator
+    version: "0.34.0"
+    repository: https://mariadb-operator.github.io/mariadb-operator
+    condition: mariadb-operator.enabled
+    tags:
+      - database
+
+annotations:
+  # Artifact Hub annotations
+  artifacthub.io/category: database
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/operator: "true"
+  artifacthub.io/operatorCapabilities: Full Lifecycle
+  artifacthub.io/recommendations: |
+    - url: https://artifacthub.io/packages/helm/cert-manager/cert-manager
+    - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
+  artifacthub.io/changes: |
+    - kind: added
+      description: MariaDB Operator integration for secure database provisioning
+    - kind: added
+      description: Auto-generated passwords for admin and database credentials
+    - kind: added
+      description: Per-site database isolation with dedicated users
+    - kind: added
+      description: Production-ready dual Redis architecture (cache + queue)
+    - kind: added
+      description: Multi-platform support (ARM64/AMD64)
+    - kind: security
+      description: Zero hardcoded credentials - all secrets auto-generated
+

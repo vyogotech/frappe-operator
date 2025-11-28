@@ -681,7 +681,8 @@ func (r *FrappeSiteReconciler) getBenchImage(bench *vyogotechv1alpha1.FrappeBenc
 		}
 		return image
 	}
-	return "frappe/erpnext:v15.41.2"
+	// Use bench's FrappeVersion
+	return fmt.Sprintf("frappe/erpnext:%s", bench.Spec.FrappeVersion)
 }
 
 // isLocalDomain checks if a domain is a local development domain

@@ -34,14 +34,17 @@ Frappe Operator is a Kubernetes operator that automates the deployment, scaling,
 
 - 🚀 **One-Command Deployment** - Deploy entire Frappe infrastructure with a single kubectl command
 - 🏢 **Multi-Tenancy** - Run multiple customer sites efficiently on shared infrastructure
+- 🔐 **Secure Database Provisioning** - MariaDB Operator integration with auto-generated credentials
+- 🔒 **Zero Hardcoded Secrets** - All passwords auto-generated and stored in Kubernetes Secrets
+- 🗄️ **Per-Site DB Isolation** - Each site gets its own database and user for security
 - 📦 **Hybrid App Installation** - Install apps from FPM packages, Git repositories, or pre-built images
-- 🔐 **Enterprise Git Control** - Disable Git access cluster-wide for security compliance
+- ⚡ **Production-Ready Architecture** - Dual Redis (cache + queue), correct entry points
 - 📊 **Auto-Scaling** - Automatically scale based on traffic and resource usage
-- 🔒 **Enterprise Security** - TLS, RBAC, network policies, and security best practices
 - 🔄 **Automated Updates** - Zero-downtime rolling updates and migrations
 - 💾 **Backup Management** - Automated backups with configurable retention policies
-- 🔌 **Integrations** - Works with MariaDB Operator, cert-manager, and popular ingress controllers
+- 🔌 **Operator Integrations** - Works with MariaDB Operator, cert-manager, and ingress controllers
 - 📈 **Observability** - Built-in Prometheus metrics and logging
+- 🌐 **Multi-Platform Support** - ARM64 and AMD64 compatible
 
 ## Quick Start (5 Minutes)
 
@@ -108,161 +111,183 @@ kubectl wait --for=condition=Ready mariadb/frappe-mariadb --timeout=300s
 
 # You should see:
 # mariadb.k8s.mariadb.com/frappe-mariadb condition met
-# frappe-operator-controller-manager-xxxxx    2/2     Running   0          30s
 ```
 
-### Step 2: Deploy Your First Frappe Site
+### Step 4: Deploy Your First Frappe Site
 
 Create a file called `my-first-site.yaml`:
 
 ```yaml
 ---
-apiVersion: frappe.io/v1alpha1
+# Step 1: Create the shared infrastructure (Bench)
+apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
   name: production-bench
-  namespace: frappe
+  namespace: default
 spec:
-  version: "version-15"
+  frappeVersion: "version-15"
   apps:
-    - name: frappe
-      url: https://github.com/frappe/frappe
-      branch: version-15
     - name: erpnext
-      url: https://github.com/frappe/erpnext
-      branch: version-15
+      source: image  # Use pre-built image for faster deployment
 
 ---
-apiVersion: frappe.io/v1alpha1
+# Step 2: Create your site
+apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
 metadata:
   name: mycompany-site
-  namespace: frappe
+  namespace: default
 spec:
-  benchRef: production-bench
+  benchRef:
+    name: production-bench
+    namespace: default
   siteName: mycompany.example.com
-  adminPassword: "changeme-in-production"
-  database:
-    host: mariadb.default.svc.cluster.local
-    port: 3306
-    rootPassword: "your-db-root-password"
+  
+  # Database configuration - MariaDB Operator will handle provisioning
+  dbConfig:
+    provider: mariadb        # Use MariaDB
+    mode: shared             # Share MariaDB instance across sites
+    mariadbRef:
+      name: frappe-mariadb   # Reference the MariaDB we created
+      namespace: default
+  
+  # Domain and Ingress (optional for production)
+  domain: mycompany.example.com
+  ingress:
+    enabled: true
+  ingressClassName: nginx
 ```
 
 **Deploy it:**
 
 ```bash
-# Create namespace
-kubectl create namespace frappe
-
 # Apply the configuration
 kubectl apply -f my-first-site.yaml
+
+# The operator will automatically:
+# 1. Create the bench infrastructure (NGINX, Redis, workers, etc.)
+# 2. Provision a database and user via MariaDB Operator
+# 3. Generate secure admin password
+# 4. Initialize the Frappe site
+# 5. Create Ingress for external access
 ```
 
-### Step 3: Watch Your Site Come Alive
+### Step 5: Watch Your Site Come Alive
 
 Monitor the deployment:
 
 ```bash
 # Watch the resources being created
-kubectl get frappebench,frappesite -n frappe
+kubectl get frappebench,frappesite
+
+# Check detailed status
+kubectl get frappesite mycompany-site -o yaml
+
+# Check MariaDB resources (auto-created by operator)
+kubectl get database,user,grant | grep mycompany-site
 
 # Check the pods
-kubectl get pods -n frappe
+kubectl get pods
 
-# View logs
-kubectl logs -n frappe -l app=frappe --tail=50 -f
+# View initialization logs
+kubectl logs -f job/mycompany-site-init
 ```
 
-**Wait for site to be ready** (usually 2-5 minutes):
+**Wait for site to be ready** (usually 2-3 minutes):
 
 ```bash
-kubectl get frappesite mycompany-site -n frappe -w
+kubectl get frappesite mycompany-site -w
 
-# When STATUS shows "Ready", your site is up!
+# When phase shows "Ready", your site is up!
 ```
 
-### Step 4: Access Your Site
+### Step 6: Get Your Auto-Generated Credentials
 
-**Port Forward for Testing:**
+The operator automatically generates secure passwords:
 
 ```bash
-kubectl port-forward -n frappe svc/production-bench-nginx 8080:80
+# Get admin password
+kubectl get secret mycompany-site-admin -o jsonpath='{.data.password}' | base64 -d
+echo
+
+# Get database password (managed by MariaDB Operator)
+kubectl get secret mycompany-site-db-password -o jsonpath='{.data.password}' | base64 -d
+echo
+```
+
+### Step 7: Access Your Site
+
+**For Local Testing (Port Forward):**
+
+```bash
+kubectl port-forward svc/production-bench-nginx 8080:8080
 ```
 
 Then open http://localhost:8080 in your browser.
 
+**For Production (with Ingress):**
+
+Access directly at: https://mycompany.example.com
+
 **Login credentials:**
 - Username: `Administrator`
-- Password: The password you set in `adminPassword`
-
-### Step 5: Access in Production
-
-For production, set up an Ingress:
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: mycompany-ingress
-  namespace: frappe
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-spec:
-  ingressClassName: nginx
-  tls:
-    - hosts:
-        - mycompany.example.com
-      secretName: mycompany-tls
-  rules:
-    - host: mycompany.example.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: production-bench-nginx
-                port:
-                  number: 80
-```
+- Password: The auto-generated password from Step 6
 
 ## Understanding the Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    Kubernetes Cluster                         │
-│                                                               │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              FrappeBench (Shared Infrastructure)     │    │
-│  │                                                       │    │
-│  │  ┌────────┐   ┌────────┐   ┌─────────────┐         │    │
-│  │  │ NGINX  │   │ Redis  │   │ Socketio    │         │    │
-│  │  │ Proxy  │   │ Cache  │   │ Server      │         │    │
-│  │  └───┬────┘   └────────┘   └─────────────┘         │    │
-│  └──────┼────────────────────────────────────────────────┘  │
-│         │                                                     │
-│         │  Routes traffic to individual sites                │
-│         │                                                     │
-│    ┌────┴─────┬────────────┬────────────┬─────────────┐     │
-│    │          │            │            │             │     │
-│  ┌─▼───────┐ ┌▼─────────┐ ┌▼─────────┐ ┌▼──────────┐      │
-│  │ Site A  │ │ Site B   │ │ Site C   │ │  Site N   │      │
-│  │         │ │          │ │          │ │           │      │
-│  │ Web     │ │ Web      │ │ Web      │ │ Web       │      │
-│  │ Workers │ │ Workers  │ │ Workers  │ │ Workers   │      │
-│  │ Jobs    │ │ Jobs     │ │ Jobs     │ │ Jobs      │      │
-│  │         │ │          │ │          │ │           │      │
-│  │ MariaDB │ │ MariaDB  │ │ MariaDB  │ │ MariaDB   │      │
-│  └─────────┘ └──────────┘ └──────────┘ └───────────┘      │
-│                                                               │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                        Kubernetes Cluster                             │
+│                                                                       │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │             Frappe Operator v1.0.0                             │  │
+│  │    (Manages FrappeBench & FrappeSite Custom Resources)        │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                              │                                        │
+│         ┌────────────────────┼────────────────────┐                  │
+│         │                    │                    │                  │
+│         ▼                    ▼                    ▼                  │
+│  ┌─────────────────┐  ┌─────────────┐  ┌──────────────────────┐    │
+│  │  FrappeBench    │  │ FrappeSite  │  │  MariaDB Operator    │    │
+│  │  (Shared Infra) │  │ Controller  │  │  (DB Provisioning)   │    │
+│  └─────────────────┘  └─────────────┘  └──────────────────────┘    │
+│         │                    │                    │                  │
+│         │  Creates           │  Creates           │  Creates         │
+│         ▼                    ▼                    ▼                  │
+│  ┌────────────────────────────────────────────────────────────┐     │
+│  │ Kubernetes Resources                                       │     │
+│  │                                                             │     │
+│  │  NGINX ──┬── Gunicorn ───┬── site1.db ◄── Database CR     │     │
+│  │  Proxy   │   (Python)    │   (isolated) ◄── User CR       │     │
+│  │          │               │              ◄── Grant CR      │     │
+│  │  Redis   ├── Scheduler   │                                 │     │
+│  │  Cache   │   (Cron)      ├── site2.db ◄── Database CR     │     │
+│  │          │               │   (isolated) ◄── User CR       │     │
+│  │  Redis   ├── Workers     │              ◄── Grant CR      │     │
+│  │  Queue   │   (Queue)     │                                 │     │
+│  │          │               ├── siteN.db ◄── Database CR     │     │
+│  │  SocketIO├── Init Jobs   │   (isolated) ◄── User CR       │     │
+│  │          │               │              ◄── Grant CR      │     │
+│  │          └── Ingress     │                                 │     │
+│  │              (Routing)   └── Secrets (auto-generated)      │     │
+│  └────────────────────────────────────────────────────────────┘     │
+│                                                                       │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 **Key Concepts:**
 
-1. **FrappeBench** - Shared infrastructure (NGINX, Redis, Socketio) used by multiple sites
-2. **FrappeSite** - Individual Frappe application instance with its own database
-3. **Operator** - Watches these resources and creates/manages the underlying Kubernetes objects
+1. **FrappeBench** - Shared infrastructure (NGINX, Redis, Socketio, workers) used by multiple sites
+2. **FrappeSite** - Individual Frappe application instance with isolated database and auto-generated credentials
+3. **MariaDB Operator** - Provisions databases, users, and grants declaratively for each site
+4. **Operator** - Watches custom resources and orchestrates all infrastructure automatically
+
+**Security Features:**
+- ✅ No hardcoded passwords - all credentials auto-generated
+- ✅ Per-site database isolation - each site has its own DB and user
+- ✅ Secret-based credential storage - managed by Kubernetes
+- ✅ Declarative database provisioning - MariaDB Operator handles grants
 
 ## Common Use Cases
 
@@ -692,23 +717,66 @@ We welcome contributions! Here's how you can help:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+## Database Management
+
+### Secure Database Provisioning (v1.0.0+)
+
+Frappe Operator integrates with [MariaDB Operator](https://github.com/mariadb-operator/mariadb-operator) for secure, declarative database management:
+
+**Features:**
+- ✅ **Auto-Generated Credentials** - No hardcoded passwords
+- ✅ **Per-Site Isolation** - Each site gets its own database and user
+- ✅ **Declarative Provisioning** - Database, User, and Grant CRs managed automatically
+- ✅ **Multi-Database Support** - MariaDB (v1.0), PostgreSQL (planned), SQLite (planned for v16+)
+
+**Example - Shared MariaDB:**
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: my-site
+spec:
+  benchRef:
+    name: my-bench
+  siteName: my-site.example.com
+  dbConfig:
+    provider: mariadb      # Database type
+    mode: shared           # Share MariaDB instance
+    mariadbRef:
+      name: frappe-mariadb # Existing MariaDB instance
+      namespace: default
+```
+
+The operator automatically:
+1. Creates a Database CR with unique name
+2. Creates a User CR with auto-generated password
+3. Creates a Grant CR with required privileges
+4. Stores credentials in Kubernetes Secret
+5. Configures site with database connection
+
+**See [examples/](examples/) for more database configuration patterns.**
+
 ## Roadmap
 
-**v2.0 (Current) ✅**
+**v1.0.0 (Current) ✅**
+- [x] MariaDB Operator integration for secure DB provisioning
+- [x] Auto-generated passwords for admin and database
+- [x] Per-site database isolation
+- [x] Production-ready architecture (dual Redis, correct entry points)
+- [x] Multi-platform support (ARM64/AMD64)
+- [x] Dynamic storage access mode detection
 - [x] Hybrid app installation (FPM, Git, Image)
 - [x] Enterprise Git disable feature
-- [x] FPM repository management
-- [x] Private package repository support
-- [x] Air-gapped deployment support
 
-**v2.1 (Next)**
+**v1.1 (Next)**
+- [ ] PostgreSQL provider for database provisioning
+- [ ] SQLite provider for Frappe v16+ sites
 - [ ] Horizontal Pod Autoscaling (HPA) support
 - [ ] Built-in monitoring dashboards
 - [ ] Automated migration testing
-- [ ] Enhanced FrappeBench resource creation
-- [ ] Complete bench component lifecycle management
 
-**Future**
+**v1.2+**
+- [ ] Dedicated database mode (one MariaDB per site)
 - [ ] Blue-green deployment support
 - [ ] Multi-cluster federation
 - [ ] Helm chart support
