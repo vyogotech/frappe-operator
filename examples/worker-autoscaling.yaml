@@ -1,0 +1,172 @@
+# Example: FrappeBench with KEDA-based Worker Autoscaling
+#
+# This example demonstrates the hybrid worker scaling approach where users can:
+# 1. Enable KEDA autoscaling (scale-to-zero) for specific worker types
+# 2. Use static replicas for workers that should always run
+# 3. Mix both approaches in the same bench
+#
+# Prerequisites:
+# - KEDA 2.x+ installed in the cluster (optional, gracefully falls back to static)
+# - Redis configured for job queues
+
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: production-bench
+  namespace: frappe
+spec:
+  # Bench image
+  image: frappe/erpnext:v15.0.0
+
+  # Apps to install
+  apps:
+    - name: erpnext
+      url: https://github.com/frappe/erpnext
+      branch: version-15
+
+  # Redis configuration (required for worker queues)
+  redisConfig:
+    type: redis
+    image: redis:7-alpine
+
+  # Worker Autoscaling Configuration
+  # Each worker type can be independently configured
+  workerAutoscaling:
+    # Short workers: Handle quick tasks, scale-to-zero when idle
+    short:
+      enabled: true              # Enable KEDA autoscaling
+      minReplicas: 0             # Scale to zero when no jobs
+      maxReplicas: 10            # Scale up to 10 replicas under load
+      queueLength: 5             # Trigger scaling at 5 jobs per replica
+      cooldownPeriod: 60         # Wait 60s before scaling down
+      pollingInterval: 15        # Check queue every 15s
+
+    # Long workers: Handle heavy tasks, conservative scaling
+    long:
+      enabled: true
+      minReplicas: 0             # Scale to zero when idle
+      maxReplicas: 5             # Max 5 replicas
+      queueLength: 2             # Trigger at 2 jobs per replica
+      cooldownPeriod: 300        # Wait 5 minutes before scaling down
+      pollingInterval: 30        # Check queue every 30s
+
+    # Default/Scheduler worker: Always running (scheduler must run continuously)
+    default:
+      enabled: false             # Disable autoscaling
+      staticReplicas: 1          # Always keep 1 replica running
+
+  # Resource limits for workers
+  componentResources:
+    workerShort:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2
+        memory: 4Gi
+    workerLong:
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 4
+        memory: 8Gi
+    workerDefault:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+
+---
+# Example: Static replicas only (no KEDA, or KEDA not installed)
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: development-bench
+  namespace: frappe
+spec:
+  image: frappe/erpnext:v15.0.0
+
+  apps:
+    - name: erpnext
+      url: https://github.com/frappe/erpnext
+      branch: version-15
+
+  redisConfig:
+    type: redis
+
+  # All workers use static replicas (no autoscaling)
+  workerAutoscaling:
+    short:
+      enabled: false
+      staticReplicas: 2
+    long:
+      enabled: false
+      staticReplicas: 1
+    default:
+      enabled: false
+      staticReplicas: 1
+
+---
+# Example: Legacy configuration (backward compatible)
+# Using the deprecated ComponentReplicas field
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: legacy-bench
+  namespace: frappe
+spec:
+  image: frappe/erpnext:v15.0.0
+
+  apps:
+    - name: erpnext
+      url: https://github.com/frappe/erpnext
+      branch: version-15
+
+  redisConfig:
+    type: redis
+
+  # Legacy configuration (DEPRECATED but still supported)
+  # These values are automatically converted to static replicas
+  componentReplicas:
+    workerShort: 2
+    workerLong: 1
+    workerDefault: 1
+    gunicorn: 2
+    nginx: 1
+    socketio: 1
+
+---
+# Example: Mixed mode - some autoscaled, some static
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: hybrid-bench
+  namespace: frappe
+spec:
+  image: frappe/erpnext:v15.0.0
+
+  apps:
+    - name: erpnext
+      url: https://github.com/frappe/erpnext
+      branch: version-15
+
+  redisConfig:
+    type: redis
+
+  # Mixed configuration: short jobs autoscale, others static
+  workerAutoscaling:
+    short:
+      enabled: true              # Autoscale short workers
+      minReplicas: 0
+      maxReplicas: 10
+      queueLength: 5
+    long:
+      enabled: false             # Static long workers
+      staticReplicas: 2
+    default:
+      enabled: false             # Static scheduler worker
+      staticReplicas: 1

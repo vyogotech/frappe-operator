@@ -13,6 +13,7 @@ IMAGE_REPO="${IMAGE_REPO:-ghcr.io/vyogotech/frappe-operator}"
 IMAGE_TAG="${IMAGE_TAG:-v1.0.0}"
 INSTALL_MARIADB_CRDS="${INSTALL_MARIADB_CRDS:-true}"
 INSTALL_INGRESS="${INSTALL_INGRESS:-false}"
+INSTALL_KEDA="${INSTALL_KEDA:-true}"
 
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Frappe Operator Installation Script${NC}"
@@ -93,7 +94,39 @@ if [ "$INSTALL_INGRESS" = "true" ]; then
     echo ""
 fi
 
-# Step 3: Install Frappe Operator via Helm
+# Step 3: Install KEDA (optional but recommended for worker autoscaling)
+if [ "$INSTALL_KEDA" = "true" ]; then
+    echo -e "${YELLOW}Step 3: Installing KEDA (Kubernetes Event Driven Autoscaler)...${NC}"
+    
+    if kubectl get namespace keda &> /dev/null; then
+        echo -e "${YELLOW}⚠ KEDA namespace already exists, checking installation...${NC}"
+        if kubectl get deployment keda-operator -n keda &> /dev/null; then
+            echo -e "${GREEN}✓ KEDA is already installed${NC}"
+        else
+            echo -e "${YELLOW}⚠ KEDA namespace exists but operator not found, reinstalling...${NC}"
+            kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
+        fi
+    else
+        echo "Installing KEDA v2.16.1..."
+        kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
+        
+        echo "Waiting for KEDA operator to be ready..."
+        kubectl wait --namespace keda \
+            --for=condition=ready pod \
+            --selector=app=keda-operator \
+            --timeout=300s || echo -e "${YELLOW}⚠ KEDA operator may still be starting...${NC}"
+        
+        echo -e "${GREEN}✓ KEDA installed${NC}"
+        echo -e "${GREEN}  Workers can now use autoscaling with scale-to-zero capability${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}Step 3: KEDA installation skipped${NC}"
+    echo -e "${YELLOW}  Note: Workers will use static replica counts without KEDA${NC}"
+    echo ""
+fi
+
+# Step 4: Install Frappe Operator via Helm
 echo -e "${YELLOW}Step 3: Installing Frappe Operator...${NC}"
 
 # Check if chart directory exists (for local install)
@@ -114,6 +147,7 @@ if helm upgrade --install frappe-operator "$CHART_PATH" \
     --create-namespace \
     --set mariadb-operator.enabled=true \
     --set mariadb.enabled=false \
+    --set keda.enabled=false \
     --set operator.image.repository="$IMAGE_REPO" \
     --set operator.image.tag="$IMAGE_TAG" \
     --timeout=10m >/dev/null 2>&1; then
@@ -131,8 +165,8 @@ else
 fi
 echo ""
 
-# Step 4: Wait for operator to be ready
-echo -e "${YELLOW}Step 4: Waiting for operator to be ready...${NC}"
+# Step 5: Wait for operator to be ready
+echo -e "${YELLOW}Step 5: Waiting for operator to be ready...${NC}"
 
 # Wait for operator pod
 if kubectl wait --namespace "$NAMESPACE" \
@@ -148,8 +182,8 @@ fi
 sleep 5
 echo ""
 
-# Step 5: Verify installation
-echo -e "${YELLOW}Step 5: Verifying installation...${NC}"
+# Step 6: Verify installation
+echo -e "${YELLOW}Step 6: Verifying installation...${NC}"
 
 # Check CRDs
 if kubectl get crd frappebenches.vyogo.tech &> /dev/null; then
@@ -178,6 +212,22 @@ else
     echo -e "${YELLOW}⚠ MariaDB Operator CRDs not found${NC}"
 fi
 
+# Check KEDA (if enabled)
+if [ "$INSTALL_KEDA" = "true" ]; then
+    if kubectl get crd scaledobjects.keda.sh &> /dev/null; then
+        echo -e "${GREEN}✓ KEDA CRDs installed${NC}"
+        
+        if kubectl get pod -n keda -l app=keda-operator | grep -q Running; then
+            echo -e "${GREEN}✓ KEDA Operator is running${NC}"
+            echo -e "${GREEN}  Workers can use autoscaling features${NC}"
+        else
+            echo -e "${YELLOW}⚠ KEDA Operator pods may still be starting...${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ KEDA CRDs not found${NC}"
+    fi
+fi
+
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Installation Complete!${NC}"
@@ -185,7 +235,7 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo ""
 echo "Next steps:"
 echo ""
-echo "1. Create a FrappeBench:"
+echo "1. Create a FrappeBench with worker autoscaling:"
 echo "   kubectl apply -f - <<EOF"
 echo "   apiVersion: vyogo.tech/v1alpha1"
 echo "   kind: FrappeBench"
@@ -193,10 +243,25 @@ echo "   metadata:"
 echo "     name: my-bench"
 echo "     namespace: default"
 echo "   spec:"
-echo "     frappeVersion: \"latest\""
+echo "     frappeVersion: \"version-15\""
 echo "     apps:"
 echo "       - name: erpnext"
 echo "         source: image"
+echo "     redisConfig:"
+echo "       type: redis"
+echo "     # Worker autoscaling (requires KEDA)"
+echo "     workerAutoscaling:"
+echo "       short:"
+echo "         enabled: true"
+echo "         minReplicas: 0"
+echo "         maxReplicas: 10"
+echo "       long:"
+echo "         enabled: true"
+echo "         minReplicas: 0"
+echo "         maxReplicas: 5"
+echo "       default:"
+echo "         enabled: false"
+echo "         staticReplicas: 1"
 echo "   EOF"
 echo ""
 echo "2. Create a FrappeSite:"
@@ -218,6 +283,16 @@ echo "     domain: site1.local"
 echo "   EOF"
 echo ""
 echo "3. Check operator logs:"
-echo "   kubectl logs -n $NAMESPACE -l control-plane=controller-manager"
+echo "   kubectl logs -n $NAMESPACE -l control-plane=controller-manager -f"
 echo ""
-echo "For more information, see: https://github.com/vyogotech/frappe-operator"
+echo "4. Check worker scaling status:"
+echo "   kubectl get frappebench my-bench -o jsonpath='{.status.workerScaling}' | jq"
+echo ""
+if [ "$INSTALL_KEDA" = "true" ]; then
+    echo "5. Check KEDA ScaledObjects:"
+    echo "   kubectl get scaledobjects -n default"
+    echo ""
+fi
+echo "For more information, see:"
+echo "  - GitHub: https://github.com/vyogotech/frappe-operator"
+echo "  - Worker Autoscaling: examples/worker-autoscaling.yaml"

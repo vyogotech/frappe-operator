@@ -27,6 +27,12 @@ dependencies:
     condition: mariadb-operator.enabled
     tags:
       - database
+  - name: keda
+    version: "2.16.1"
+    repository: https://kedacore.github.io/charts
+    condition: keda.enabled
+    tags:
+      - autoscaling
 
 annotations:
   # Artifact Hub annotations
@@ -51,4 +57,5 @@ annotations:
       description: Multi-platform support (ARM64/AMD64)
     - kind: security
       description: Zero hardcoded credentials - all secrets auto-generated
+
 
