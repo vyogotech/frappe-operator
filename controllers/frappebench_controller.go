@@ -52,6 +52,9 @@ type FrappeBenchReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=deployments;statefulsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
+//+kubebuilder:rbac:groups=keda.sh,resources=scaledobjects,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=keda.sh,resources=scaledobjects/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=keda.sh,resources=scaledobjects/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -328,7 +331,7 @@ func (r *FrappeBenchReconciler) parseAppsJSON(appsJSON string) []vyogotechv1alph
 // updateWorkerScalingStatus updates the status with current worker scaling information
 func (r *FrappeBenchReconciler) updateWorkerScalingStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
 	logger := log.FromContext(ctx)
-	
+
 	if bench.Status.WorkerScaling == nil {
 		bench.Status.WorkerScaling = make(map[string]vyogotechv1alpha1.WorkerScalingStatus)
 	}
@@ -412,4 +415,3 @@ func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Complete(r)
 }
-

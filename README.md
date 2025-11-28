@@ -17,6 +17,7 @@ Frappe Operator is a Kubernetes operator that automates the deployment, scaling,
 ### Why Do You Need This?
 
 **Traditional Frappe Deployment Challenges:**
+
 - 🔧 Complex manual setup and configuration
 - 🔄 Difficult to scale and manage multiple sites
 - 🐛 Hard to maintain consistency across environments
@@ -24,6 +25,7 @@ Frappe Operator is a Kubernetes operator that automates the deployment, scaling,
 - 🏢 Multi-tenancy requires custom scripting
 
 **With Frappe Operator:**
+
 - ✅ **Simple Declarative Configuration** - Define your Frappe infrastructure as YAML files
 - ✅ **Automated Management** - Operator handles deployment, scaling, and updates automatically
 - ✅ **Multi-Tenancy Built-in** - Easily manage hundreds of sites on shared infrastructure
@@ -51,12 +53,14 @@ Frappe Operator is a Kubernetes operator that automates the deployment, scaling,
 ### Prerequisites
 
 You need:
+
 - A Kubernetes cluster (v1.19 or newer)
 - `kubectl` installed and configured
 - `helm` installed (for automated installation)
 - Basic understanding of Kubernetes concepts
 
 **Don't have a cluster?** Try one of these:
+
 - **Local Development**: [kind](https://kind.sigs.k8s.io/), [minikube](https://minikube.sigs.k8s.io/), or [k3d](https://k3d.io/)
 - **Cloud**: [GKE](https://cloud.google.com/kubernetes-engine), [EKS](https://aws.amazon.com/eks/), or [AKS](https://azure.microsoft.com/en-us/services/kubernetes-service/)
 - **Managed**: [Civo](https://www.civo.com/), [DigitalOcean Kubernetes](https://www.digitalocean.com/products/kubernetes/)
@@ -76,6 +80,7 @@ curl -fsSL https://raw.githubusercontent.com/vyogotech/frappe-operator/main/inst
 ```
 
 The script automatically:
+
 - Installs MariaDB Operator CRDs
 - Installs Frappe Operator via Helm
 - Waits for all components to be ready
@@ -94,6 +99,7 @@ kubectl apply --server-side -k "github.com/mariadb-operator/mariadb-operator/con
 #### Step 2: Install Frappe Operator
 
 **Using Helm (Recommended):**
+
 ```bash
 helm repo add frappe-operator https://vyogotech.github.io/frappe-operator
 helm install frappe-operator frappe-operator/frappe-operator \
@@ -102,6 +108,7 @@ helm install frappe-operator frappe-operator/frappe-operator \
 ```
 
 **Using kubectl:**
+
 ```bash
 kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/download/v1.0.0/install.yaml
 ```
@@ -143,7 +150,7 @@ spec:
   frappeVersion: "version-15"
   apps:
     - name: erpnext
-      source: image  # Use pre-built image for faster deployment
+      source: image # Use pre-built image for faster deployment
 
 ---
 # Step 2: Create your site
@@ -157,15 +164,15 @@ spec:
     name: production-bench
     namespace: default
   siteName: mycompany.example.com
-  
+
   # Database configuration - MariaDB Operator will handle provisioning
   dbConfig:
-    provider: mariadb        # Use MariaDB
-    mode: shared             # Share MariaDB instance across sites
+    provider: mariadb # Use MariaDB
+    mode: shared # Share MariaDB instance across sites
     mariadbRef:
-      name: frappe-mariadb   # Reference the MariaDB we created
+      name: frappe-mariadb # Reference the MariaDB we created
       namespace: default
-  
+
   # Domain and Ingress (optional for production)
   domain: mycompany.example.com
   ingress:
@@ -245,6 +252,7 @@ Then open http://localhost:8080 in your browser.
 Access directly at: https://mycompany.example.com
 
 **Login credentials:**
+
 - Username: `Administrator`
 - Password: The auto-generated password from Step 6
 
@@ -298,6 +306,7 @@ Access directly at: https://mycompany.example.com
 4. **Operator** - Watches custom resources and orchestrates all infrastructure automatically
 
 **Security Features:**
+
 - ✅ No hardcoded passwords - all credentials auto-generated
 - ✅ Per-site database isolation - each site has its own DB and user
 - ✅ Secret-based credential storage - managed by Kubernetes
@@ -413,7 +422,7 @@ metadata:
   name: enterprise-bench
 spec:
   frappeVersion: "version-15"
-  
+
   # Apps from FPM repositories
   apps:
     - name: erpnext
@@ -424,7 +433,7 @@ spec:
       source: fpm
       org: frappe
       version: "15.0.0"
-  
+
   # FPM repository configuration
   fpmConfig:
     repositories:
@@ -436,13 +445,14 @@ spec:
       - name: frappe-community
         url: https://fpm.frappe.io
         priority: 50
-  
+
   # Disable Git for enterprise security
   gitConfig:
     enabled: false
 ```
 
 **Benefits:**
+
 - ✅ Reproducible deployments with exact versions
 - ✅ No Git access required (security compliance)
 - ✅ Faster deployment (pre-packaged apps)
@@ -460,13 +470,13 @@ metadata:
   name: dev-bench
 spec:
   frappeVersion: "version-15"
-  
+
   apps:
     - name: custom_app
       source: git
       gitUrl: https://github.com/company/custom_app.git
       gitBranch: develop
-  
+
   # Enable Git for development
   gitConfig:
     enabled: true
@@ -483,13 +493,13 @@ metadata:
   name: fast-bench
 spec:
   frappeVersion: "version-15"
-  
+
   apps:
     - name: frappe
       source: image
     - name: erpnext
       source: image
-  
+
   imageConfig:
     repository: myregistry.com/frappe-custom
     tag: v1.0.0
@@ -506,26 +516,26 @@ metadata:
   name: hybrid-bench
 spec:
   frappeVersion: "version-15"
-  
+
   apps:
     # Base framework in image (fastest)
     - name: frappe
       source: image
-    
+
     # Stable apps from FPM (versioned)
     - name: erpnext
       source: fpm
       org: frappe
       version: "15.0.0"
-    
+
     # Development apps from Git
     - name: custom_app
       source: git
       gitUrl: https://github.com/company/custom_app.git
       gitBranch: main
-  
+
   gitConfig:
-    enabled: true  # Allow Git for custom apps
+    enabled: true # Allow Git for custom apps
 ```
 
 **See [FPM_MIGRATION.md](FPM_MIGRATION.md) for complete migration guide.**
@@ -544,7 +554,7 @@ metadata:
   name: frappe-operator-config
   namespace: frappe-operator-system
 data:
-  gitEnabled: "false"  # Disable Git by default
+  gitEnabled: "false" # Disable Git by default
 ```
 
 Individual benches can override:
@@ -552,7 +562,7 @@ Individual benches can override:
 ```yaml
 spec:
   gitConfig:
-    enabled: true  # Override for this bench only
+    enabled: true # Override for this bench only
 ```
 
 ### Private Package Repositories
@@ -587,15 +597,15 @@ spec:
       source: fpm
       org: frappe
       version: "15.0.0"
-  
+
   fpmConfig:
     repositories:
       - name: internal
         url: http://fpm.internal.company.com
         priority: 10
-  
+
   gitConfig:
-    enabled: false  # No external access
+    enabled: false # No external access
 ```
 
 ## Next Steps
@@ -603,17 +613,20 @@ spec:
 Now that you have your first site running, explore these topics:
 
 ### Learn More
+
 - **[Complete Documentation](https://vyogotech.github.io/frappe-operator/)** - Full guide
 - **[Concepts](https://vyogotech.github.io/frappe-operator/concepts)** - Understand benches, sites, and architecture
 - **[Examples](https://vyogotech.github.io/frappe-operator/examples)** - Production-ready deployment patterns
 
 ### Operations
+
 - **[Backup & Restore](https://vyogotech.github.io/frappe-operator/operations#backups)** - Protect your data
 - **[Scaling](https://vyogotech.github.io/frappe-operator/operations#scaling)** - Handle growing traffic
 - **[Updates](https://vyogotech.github.io/frappe-operator/operations#updates)** - Keep your sites up to date
 - **[Monitoring](https://vyogotech.github.io/frappe-operator/operations#monitoring)** - Track performance
 
 ### Advanced Topics
+
 - **[Custom Apps](https://vyogotech.github.io/frappe-operator/api-reference#custom-apps)** - Add your own Frappe apps
 - **[Database Options](https://vyogotech.github.io/frappe-operator/concepts#databases)** - Shared vs dedicated databases
 - **[Security](https://vyogotech.github.io/frappe-operator/operations#security)** - Harden your deployment
@@ -624,29 +637,31 @@ The operator provides these Custom Resource Definitions:
 
 ### Core Resources
 
-| Resource | Purpose | Documentation |
-|----------|---------|---------------|
+| Resource        | Purpose                         | Documentation                                                                 |
+| --------------- | ------------------------------- | ----------------------------------------------------------------------------- |
 | **FrappeBench** | Shared infrastructure for sites | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#frappebench) |
-| **FrappeSite** | Individual Frappe site | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#frappesite) |
+| **FrappeSite**  | Individual Frappe site          | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#frappesite)  |
 
 ### Management Resources
 
-| Resource | Purpose | Documentation |
-|----------|---------|---------------|
-| **SiteBackup** | Automated backups | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitebackup) |
-| **SiteJob** | Run bench commands | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitejob) |
-| **SiteUser** | Manage site users | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#siteuser) |
-| **SiteWorkspace** | Create workspaces | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#siteworkspace) |
-| **SiteDashboard** | Manage dashboards | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitedashboard) |
+| Resource          | Purpose            | Documentation                                                                   |
+| ----------------- | ------------------ | ------------------------------------------------------------------------------- |
+| **SiteBackup**    | Automated backups  | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitebackup)    |
+| **SiteJob**       | Run bench commands | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitejob)       |
+| **SiteUser**      | Manage site users  | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#siteuser)      |
+| **SiteWorkspace** | Create workspaces  | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#siteworkspace) |
+| **SiteDashboard** | Manage dashboards  | [Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitedashboard) |
 
 ## Requirements
 
 **Minimum:**
+
 - Kubernetes 1.19 or newer
 - kubectl installed and configured
 - 2 CPU cores and 4GB RAM available in your cluster
 
 **Recommended for Production:**
+
 - Kubernetes 1.24+
 - MariaDB (external or MariaDB Operator)
 - Ingress Controller (nginx-ingress, Traefik, etc.)
@@ -669,6 +684,7 @@ kubectl logs -n frappe -l site=mycompany-site
 ```
 
 **Common Issues:**
+
 - Database connection failed → Check database credentials and connectivity
 - ImagePullError → Check image names and registry access
 - CrashLoopBackOff → Check pod logs for application errors
@@ -714,6 +730,7 @@ See **[Contributing Guidelines](CONTRIBUTING.md)** for more details.
 ## Community & Support
 
 ### Get Help
+
 - 💬 **GitHub Discussions**: [Ask questions and share ideas](https://github.com/vyogotech/frappe-operator/discussions)
 - 🐛 **GitHub Issues**: [Report bugs and request features](https://github.com/vyogotech/frappe-operator/issues)
 - 📖 **Documentation**: [Complete guides](https://vyogotech.github.io/frappe-operator/)
@@ -738,12 +755,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 Frappe Operator integrates with [MariaDB Operator](https://github.com/mariadb-operator/mariadb-operator) for secure, declarative database management:
 
 **Features:**
+
 - ✅ **Auto-Generated Credentials** - No hardcoded passwords
 - ✅ **Per-Site Isolation** - Each site gets its own database and user
 - ✅ **Declarative Provisioning** - Database, User, and Grant CRs managed automatically
 - ✅ **Multi-Database Support** - MariaDB (v1.0), PostgreSQL (planned), SQLite (planned for v16+)
 
 **Example - Shared MariaDB:**
+
 ```yaml
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
@@ -754,14 +773,15 @@ spec:
     name: my-bench
   siteName: my-site.example.com
   dbConfig:
-    provider: mariadb      # Database type
-    mode: shared           # Share MariaDB instance
+    provider: mariadb # Database type
+    mode: shared # Share MariaDB instance
     mariadbRef:
       name: frappe-mariadb # Existing MariaDB instance
       namespace: default
 ```
 
 The operator automatically:
+
 1. Creates a Database CR with unique name
 2. Creates a User CR with auto-generated password
 3. Creates a Grant CR with required privileges
@@ -773,6 +793,7 @@ The operator automatically:
 ## Roadmap
 
 **v1.0.0 (Current) ✅**
+
 - [x] MariaDB Operator integration for secure DB provisioning
 - [x] Auto-generated passwords for admin and database
 - [x] Per-site database isolation
@@ -783,6 +804,7 @@ The operator automatically:
 - [x] Enterprise Git disable feature
 
 **v1.1 (Next)**
+
 - [ ] PostgreSQL provider for database provisioning
 - [ ] SQLite provider for Frappe v16+ sites
 - [ ] Horizontal Pod Autoscaling (HPA) support
@@ -790,6 +812,7 @@ The operator automatically:
 - [ ] Automated migration testing
 
 **v1.2+**
+
 - [ ] Dedicated database mode (one MariaDB per site)
 - [ ] Blue-green deployment support
 - [ ] Multi-cluster federation

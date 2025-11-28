@@ -15,12 +15,14 @@ The implementation provides a **hybrid scaling approach** where users have full 
 ### Key Components
 
 1. **CRD Updates** (`api/v1alpha1/`)
+
    - `WorkerAutoscaling`: Configuration for a single worker's scaling behavior
    - `WorkerAutoscalingConfig`: Per-worker-type configuration (short, long, default)
    - `WorkerScalingStatus`: Reports current scaling mode and replica counts
    - Backward compatible with deprecated `ComponentReplicas` fields
 
 2. **Controller Logic** (`controllers/`)
+
    - Helper functions for configuration resolution and defaults
    - KEDA availability detection
    - ScaledObject creation/management using Unstructured resources
@@ -36,10 +38,8 @@ The implementation provides a **hybrid scaling approach** where users have full 
 
 - **Short**: Quick tasks (e.g., email, notifications)
   - Default: Scale-to-zero, max 10 replicas, aggressive scaling
-  
 - **Long**: Heavy tasks (e.g., reports, imports)
   - Default: Scale-to-zero, max 5 replicas, conservative scaling
-  
 - **Default/Scheduler**: Scheduled tasks
   - Default: Static 1 replica (scheduler must always run)
 
@@ -93,7 +93,7 @@ The `WorkerScaling` status field reports per-worker information:
 status:
   workerScaling:
     short:
-      mode: autoscaled          # "autoscaled" or "static"
+      mode: autoscaled # "autoscaled" or "static"
       currentReplicas: 3
       desiredReplicas: 5
       kedaManaged: true
@@ -112,7 +112,9 @@ status:
 ## Files Modified
 
 ### API Types
+
 - `api/v1alpha1/shared_types.go`
+
   - Added `WorkerAutoscaling` struct (7 fields)
   - Added `WorkerAutoscalingConfig` struct
   - Deprecated worker replica fields in `ComponentReplicas`
@@ -123,7 +125,9 @@ status:
   - Added `WorkerScaling` map to `FrappeBenchStatus`
 
 ### Controllers
+
 - `controllers/frappebench_resources.go`
+
   - `getWorkerAutoscalingConfig()`: Config resolution with legacy fallback
   - `getDefaultAutoscalingConfig()`: Opinionated defaults per worker type
   - `fillAutoscalingDefaults()`: Fill missing config fields
@@ -140,17 +144,20 @@ status:
   - Updated reconciliation loop to call ScaledObject management
 
 ### RBAC
+
 - `config/rbac/role.yaml`
   - Added permissions for `keda.sh` API group
   - Added `scaledobjects`, `scaledobjects/finalizers`, `scaledobjects/status`
 
 ### Documentation
+
 - `examples/worker-autoscaling.yaml`
   - Multiple examples: KEDA, static, legacy, mixed mode
 
 ## Configuration Examples
 
 ### KEDA Autoscaling (Scale-to-Zero)
+
 ```yaml
 workerAutoscaling:
   short:
@@ -163,6 +170,7 @@ workerAutoscaling:
 ```
 
 ### Static Replicas
+
 ```yaml
 workerAutoscaling:
   short:
@@ -171,21 +179,23 @@ workerAutoscaling:
 ```
 
 ### Mixed Mode
+
 ```yaml
 workerAutoscaling:
   short:
-    enabled: true      # Autoscale
+    enabled: true # Autoscale
     minReplicas: 0
     maxReplicas: 10
   long:
-    enabled: false     # Static
+    enabled: false # Static
     staticReplicas: 2
   default:
-    enabled: false     # Static
+    enabled: false # Static
     staticReplicas: 1
 ```
 
 ### Legacy (Backward Compatible)
+
 ```yaml
 componentReplicas:
   workerShort: 2
@@ -198,7 +208,7 @@ componentReplicas:
 If no configuration is provided, the operator uses these defaults:
 
 | Worker Type | Enabled | Min | Max | Queue Length | Cooldown | Polling |
-|-------------|---------|-----|-----|--------------|----------|---------|
+| ----------- | ------- | --- | --- | ------------ | -------- | ------- |
 | short       | true    | 0   | 10  | 5            | 60s      | 15s     |
 | long        | true    | 0   | 5   | 2            | 300s     | 30s     |
 | default     | false   | -   | -   | -            | -        | -       |
@@ -208,18 +218,21 @@ Default worker always uses `staticReplicas: 1` since the scheduler must run cont
 ## Behavior
 
 ### With KEDA Installed
+
 - Workers configured with `enabled: true` will autoscale based on queue depth
 - ScaledObjects are created/updated for autoscaled workers
 - Deployments are annotated with `keda.sh/managed-by: keda`
 - Operator does not update replica count (KEDA controls it)
 
 ### Without KEDA
+
 - All workers use `staticReplicas` regardless of `enabled` setting
 - No ScaledObjects are created
 - Deployments are annotated with `frappe.io/scaling-mode: static`
 - Operator manages replica count directly
 
 ### Mode Transitions
+
 - **KEDA Disabled → Enabled**: ScaledObject created, operator stops managing replicas
 - **KEDA Enabled → Disabled**: ScaledObject deleted, operator resumes managing replicas
 - **KEDA Uninstalled**: Automatic fallback to static replicas
@@ -231,8 +244,8 @@ Deployments are annotated to indicate scaling mode:
 ```yaml
 metadata:
   annotations:
-    frappe.io/scaling-mode: "autoscaled"  # or "static"
-    keda.sh/managed-by: "keda"            # only when autoscaled
+    frappe.io/scaling-mode: "autoscaled" # or "static"
+    keda.sh/managed-by: "keda" # only when autoscaled
 ```
 
 ## Migration Path
@@ -240,7 +253,6 @@ metadata:
 1. **Existing Users**: No changes required
    - Legacy `ComponentReplicas` continues to work
    - Automatically converted to static replicas
-   
 2. **New Features**: Opt-in
    - Users can add `WorkerAutoscaling` to enable KEDA
    - Can migrate gradually (one worker type at a time)
@@ -265,8 +277,8 @@ metadata:
 
 1. **Redis Address**: Currently assumes in-cluster Redis service
    - TODO: Read ConnectionSecretRef for external Redis
-   
 2. **KEDA Detection**: Simple CRD existence check
+
    - Could be enhanced with version checking
 
 3. **Metrics**: No Prometheus metrics yet

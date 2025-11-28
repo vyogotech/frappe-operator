@@ -26,8 +26,8 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -872,7 +872,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 // ensureWorkers ensures all Worker Deployments exist
 func (r *FrappeBenchReconciler) ensureWorkers(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
 	logger := log.FromContext(ctx)
-	
+
 	// Check KEDA availability once
 	kedaAvailable := r.isKEDAAvailable(ctx)
 	if !kedaAvailable {
@@ -919,7 +919,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 	deploy := &appsv1.Deployment{}
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
-	
+
 	// Determine if this worker is managed by KEDA
 	kedaManaged := kedaAvailable && config.Enabled != nil && *config.Enabled
 
@@ -1376,15 +1376,15 @@ func (r *FrappeBenchReconciler) isKEDAAvailable(ctx context.Context) bool {
 		Version: "v1alpha1",
 		Kind:    "ScaledObject",
 	})
-	
+
 	// Attempt to list - if this succeeds, KEDA is available
 	err := r.Client.List(ctx, list, client.Limit(1))
-	
+
 	// NoMatchError means the CRD doesn't exist
 	if errors.IsNotFound(err) {
 		return false
 	}
-	
+
 	// Any other error or success means KEDA is likely available
 	// We don't care about permission errors - just whether the CRD exists
 	return true
@@ -1428,19 +1428,19 @@ func (r *FrappeBenchReconciler) ensureScaledObject(ctx context.Context, bench *v
 			"kind":       "Deployment",
 			"name":       deploymentName,
 		},
-		"minReplicaCount":  int(*config.MinReplicas),
-		"maxReplicaCount":  int(*config.MaxReplicas),
-		"cooldownPeriod":   int(*config.CooldownPeriod),
-		"pollingInterval":  int(*config.PollingInterval),
+		"minReplicaCount": int64(*config.MinReplicas),
+		"maxReplicaCount": int64(*config.MaxReplicas),
+		"cooldownPeriod":  int64(*config.CooldownPeriod),
+		"pollingInterval": int64(*config.PollingInterval),
 		"triggers": []map[string]interface{}{
 			{
 				"type": "redis",
 				"metadata": map[string]string{
-					"address":             r.getRedisAddress(bench),
-					"listName":            queueName,
-					"listLength":          fmt.Sprintf("%d", *config.QueueLength),
-					"enableTLS":           "false",
-					"databaseIndex":       "0",
+					"address":              r.getRedisAddress(bench),
+					"listName":             queueName,
+					"listLength":           fmt.Sprintf("%d", *config.QueueLength),
+					"enableTLS":            "false",
+					"databaseIndex":        "0",
 					"activationListLength": "1",
 				},
 			},
@@ -1515,5 +1515,3 @@ func boolPtr(b bool) *bool {
 func int32Ptr(i int32) *int32 {
 	return &i
 }
-
-
