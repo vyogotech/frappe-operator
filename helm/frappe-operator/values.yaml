@@ -118,14 +118,14 @@ mariadb:
     size: 50Gi
     storageClassName: ""  # Use default storage class
   
-  # Resource limits
+  # Resource limits (reduced for development/minikube compatibility)
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: 2000m
-      memory: 4Gi
+      cpu: 500m
+      memory: 512Mi
   
   # High availability configuration
   replicas: 1
@@ -138,16 +138,16 @@ mariadb:
   backup:
     enabled: false
   
-  # Additional MariaDB configuration
+  # Additional MariaDB configuration (optimized for resource-constrained environments)
   config: |
     [mysqld]
     character-set-client-handshake=0
     character-set-server=utf8mb4
     collation-server=utf8mb4_unicode_ci
-    max_connections=500
-    max_allowed_packet=256M
-    innodb_buffer_pool_size=2G
-    innodb_log_file_size=512M
+    max_connections=200
+    max_allowed_packet=64M
+    innodb_buffer_pool_size=256M
+    innodb_log_file_size=64M
     innodb_flush_log_at_trx_commit=2
     innodb_flush_method=O_DIRECT
 
