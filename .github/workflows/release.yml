@@ -20,12 +20,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.19'
-          cache: true
-
       - name: Get version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
@@ -62,46 +56,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build binaries for multiple platforms
+      - name: Generate consolidated install manifest
         run: |
           mkdir -p dist
-          
-          # Linux AMD64
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist/frappe-operator-linux-amd64 main.go
-          
-          # Linux ARM64
-          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist/frappe-operator-linux-arm64 main.go
-          
-          # Darwin AMD64
-          GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist/frappe-operator-darwin-amd64 main.go
-          
-          # Darwin ARM64 (Apple Silicon)
-          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist/frappe-operator-darwin-arm64 main.go
-
-      - name: Generate manifests
-        run: |
           make manifests
-          mkdir -p dist/manifests
-          cp -r config dist/manifests/
-
-      - name: Create release archives
-        run: |
-          cd dist
-          
-          # Create tarballs for each binary
-          for binary in frappe-operator-*; do
-            if [ -f "$binary" ]; then
-              tar czf "${binary}.tar.gz" "$binary"
-            fi
-          done
+          # Create consolidated install.yaml
+          cat config/crd/bases/*.yaml > dist/install.yaml
+          echo "---" >> dist/install.yaml
+          cat config/rbac/*.yaml >> dist/install.yaml
+          echo "---" >> dist/install.yaml  
+          cat config/manager/manager.yaml >> dist/install.yaml
           
           # Create manifest archive
-          tar czf "manifests-${{ steps.version.outputs.VERSION }}.tar.gz" manifests/
+          tar czf dist/manifests-${{ steps.version.outputs.VERSION }}.tar.gz -C config .
 
       - name: Generate checksums
         run: |
           cd dist
-          sha256sum *.tar.gz > SHA256SUMS
+          sha256sum *.tar.gz install.yaml > SHA256SUMS
           cat SHA256SUMS
 
       - name: Create Release Notes
@@ -125,19 +97,15 @@ jobs:
           
           ### Installation
           
-          #### Using kubectl
+          #### Quick Install
           ```bash
-          kubectl apply -f https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/manifests-${{ steps.version.outputs.VERSION }}.tar.gz
+          kubectl apply -f https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/install.yaml
           ```
           
-          #### Using the binary
-          Download the appropriate binary for your platform from the assets below.
-          
-          ### Supported Platforms
-          - Linux AMD64
-          - Linux ARM64
-          - macOS AMD64
-          - macOS ARM64 (Apple Silicon)
+          #### Using Helm
+          ```bash
+          helm install frappe-operator oci://ghcr.io/${{ github.repository }}/helm/frappe-operator --version ${{ steps.version.outputs.VERSION }}
+          ```
           
           ### Docker Image Platforms
           - linux/amd64
@@ -152,6 +120,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
+            dist/install.yaml
             dist/*.tar.gz
             dist/SHA256SUMS
           body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
