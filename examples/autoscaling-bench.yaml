@@ -1,0 +1,64 @@
+# Frappe Bench with Worker Autoscaling
+# This example shows how to configure KEDA-based autoscaling for background workers
+
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: autoscaling-bench
+  namespace: default
+spec:
+  frappeVersion: "version-15"
+  
+  # Apps to install
+  apps:
+    - name: erpnext
+      source: image  # Use pre-built image (fastest)
+  
+  # Redis configuration for queue management
+  redisConfig:
+    type: redis
+  
+  # Worker autoscaling configuration (requires KEDA)
+  workerAutoscaling:
+    # Short queue workers - scale to zero when idle
+    short:
+      enabled: true
+      minReplicas: 0        # Scale to zero when no jobs
+      maxReplicas: 10       # Maximum concurrent workers
+      queueLength: 2        # Scale up when queue has 2+ jobs per worker
+      pollingInterval: 10   # Check queue every 10 seconds
+      cooldownPeriod: 30    # Wait 30s before scaling down
+    
+    # Long queue workers - always have at least 1 worker
+    long:
+      enabled: true
+      minReplicas: 1        # Keep at least 1 worker running
+      maxReplicas: 5        # Maximum concurrent workers
+      queueLength: 5        # Scale up when queue has 5+ jobs per worker
+      pollingInterval: 30   # Check queue every 30 seconds
+      cooldownPeriod: 60    # Wait 60s before scaling down
+    
+    # Default queue workers - static replica count
+    default:
+      enabled: false        # Use static replicas instead of autoscaling
+      staticReplicas: 2     # Always maintain 2 workers
+
+---
+# Example FrappeSite using the autoscaling bench
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: autoscaling-site
+  namespace: default
+spec:
+  benchRef:
+    name: autoscaling-bench
+    namespace: default
+  siteName: autoscaling.local
+  dbConfig:
+    provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: default
+  domain: autoscaling.local

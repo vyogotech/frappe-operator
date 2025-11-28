@@ -349,9 +349,85 @@ kubectl patch frappebench prod-bench --type=merge -p '{
 kubectl get pods -l bench=prod-bench
 ```
 
-### Horizontal Pod Autoscaling
+### Worker Autoscaling with KEDA (Recommended)
 
-Enable HPA for automatic scaling:
+**NEW in v1.1.0**: KEDA-based autoscaling for background workers with scale-to-zero capability.
+
+#### Prerequisites
+
+Install KEDA (done automatically by `install.sh`):
+
+```bash
+kubectl apply -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
+```
+
+#### Configure Worker Autoscaling
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: prod-bench
+  namespace: production
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: erpnext
+      source: image
+  
+  # Worker autoscaling configuration
+  workerAutoscaling:
+    # Short-running tasks - scale to zero when idle
+    short:
+      enabled: true
+      minReplicas: 0        # Scale to zero to save resources
+      maxReplicas: 10       # Scale up to 10 workers under load
+      queueLength: 2        # Trigger: queue length per worker
+      pollingInterval: 10   # Check queue every 10 seconds
+      cooldownPeriod: 30    # Wait 30s before scaling down
+    
+    # Long-running tasks - maintain minimum workers
+    long:
+      enabled: true
+      minReplicas: 1        # Always have 1 worker available
+      maxReplicas: 5
+      queueLength: 5
+      pollingInterval: 30
+      cooldownPeriod: 60
+    
+    # Default queue - static replicas (no autoscaling)
+    default:
+      enabled: false
+      staticReplicas: 2
+```
+
+#### Monitor Autoscaling
+
+```bash
+# Check ScaledObjects
+kubectl get scaledobjects -n production
+
+# Check worker scaling status
+kubectl get frappebench prod-bench -o jsonpath='{.status.workerScaling}' | jq
+
+# Check KEDA HPA
+kubectl get hpa -n production
+
+# View queue lengths
+kubectl exec deployment/prod-bench-redis-queue -- redis-cli LLEN "rq:queue:short"
+kubectl exec deployment/prod-bench-redis-queue -- redis-cli LLEN "rq:queue:long"
+```
+
+#### Autoscaling Benefits
+
+- **Cost Savings**: Workers scale to zero when idle
+- **Auto-scaling**: Automatically handle traffic spikes
+- **Queue-based**: Scales based on actual job queue length
+- **Configurable**: Fine-tune scaling behavior per queue
+
+### Horizontal Pod Autoscaling (HPA)
+
+Enable CPU/memory-based HPA for web components:
 
 ```yaml
 apiVersion: autoscaling/v2
@@ -387,6 +463,8 @@ spec:
         value: 50
         periodSeconds: 60
 ```
+
+> **Note**: For workers, use KEDA autoscaling (above) instead of HPA for queue-based scaling.
 
 ### Vertical Scaling
 
