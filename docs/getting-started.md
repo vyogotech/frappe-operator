@@ -13,9 +13,13 @@ Before you begin, ensure you have:
 - **kubectl** configured to access your cluster
 - **At least 4GB RAM** available in your cluster
 
+### Required Dependencies (v1.0.0+)
+
+- **MariaDB Operator** - For secure, declarative database provisioning
+  - Install from: https://github.com/mariadb-operator/mariadb-operator
+
 ### Optional Dependencies
 
-- **MariaDB Operator** - For managed database instances
 - **Ingress Controller** - For external access (nginx, traefik)
 - **cert-manager** - For automatic TLS certificate management
 

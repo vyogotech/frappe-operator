@@ -1,14 +1,57 @@
----
+{{- if .Values.rbac.create -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  name: {{ include "frappe-operator.fullname" . }}-manager-role
+  labels:
+    {{- include "frappe-operator.labels" . | nindent 4 }}
 rules:
+# Frappe CRDs
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenchs
+  - frappesites
+  - frappeworkpaces
+  - sitebackups
+  - sitedashboards
+  - sitedashboardcharts
+  - sitejobs
+  - siteusers
+  - siteworkspaces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenchs/finalizers
+  - frappesites/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenchs/status
+  - frappesites/status
+  verbs:
+  - get
+  - patch
+  - update
+
+# Core Kubernetes resources
 - apiGroups:
   - ""
   resources:
   - configmaps
+  - events
   - persistentvolumeclaims
+  - pods
   - secrets
   - services
   verbs:
@@ -64,63 +107,15 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - frappebenches
-  - frappesites
-  - frappeworkpaces
-  - sitebackups
-  - sitedashboardcharts
-  - sitedashboards
-  - sitejobs
-  - siteusers
-  - siteworkspaces
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - frappebenches/finalizers
-  - frappesites/finalizers
-  - frappeworkpaces/finalizers
-  - sitebackups/finalizers
-  - sitedashboardcharts/finalizers
-  - sitedashboards/finalizers
-  - sitejobs/finalizers
-  - siteusers/finalizers
-  - siteworkspaces/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - frappebenches/status
-  - frappesites/status
-  - frappeworkpaces/status
-  - sitebackups/status
-  - sitedashboardcharts/status
-  - sitedashboards/status
-  - sitejobs/status
-  - siteusers/status
-  - siteworkspaces/status
-  verbs:
-  - get
-  - patch
-  - update
+
+# MariaDB Operator CRDs
 - apiGroups:
   - k8s.mariadb.com
   resources:
-  - databases
-  - grants
   - mariadbs
+  - databases
   - users
+  - grants
   verbs:
   - create
   - delete
@@ -129,3 +124,14 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - k8s.mariadb.com
+  resources:
+  - mariadbs/status
+  - databases/status
+  - users/status
+  - grants/status
+  verbs:
+  - get
+{{- end }}
+

@@ -33,7 +33,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	"github.com/vyogotech/frappe-operator/controllers"
 	//+kubebuilder:scaffold:imports
@@ -48,9 +47,6 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
-	
-	// Add MariaDB Operator schemes
-	utilruntime.Must(mariadbv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

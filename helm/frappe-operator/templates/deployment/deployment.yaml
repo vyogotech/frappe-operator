@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "frappe-operator.fullname" . }}-controller-manager
+  namespace: {{ include "frappe-operator.namespace" . }}
+  labels:
+    {{- include "frappe-operator.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.operator.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "frappe-operator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.operator.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "frappe-operator.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.operator.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "frappe-operator.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.operator.securityContext | nindent 8 }}
+      containers:
+      - name: manager
+        image: "{{ .Values.operator.image.repository }}:{{ .Values.operator.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+        command:
+        - /manager
+        args:
+        - --leader-elect={{ .Values.manager.leaderElection.enabled }}
+        - --metrics-bind-address=:{{ .Values.manager.metrics.port }}
+        - --health-probe-bind-address=:{{ .Values.manager.health.port }}
+        - --zap-log-level={{ .Values.manager.logLevel }}
+        ports:
+        - containerPort: {{ .Values.manager.metrics.port }}
+          name: metrics
+          protocol: TCP
+        - containerPort: {{ .Values.manager.health.port }}
+          name: health
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          {{- toYaml .Values.operator.resources | nindent 12 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- with .Values.operator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operator.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+

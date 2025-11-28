@@ -1,0 +1,133 @@
+🎉 Frappe Operator v{{ .Chart.AppVersion }} has been successfully installed!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 INSTALLATION SUMMARY:
+
+Operator Namespace: {{ include "frappe-operator.namespace" . }}
+Release Name: {{ .Release.Name }}
+Chart Version: {{ .Chart.Version }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ WHAT WAS INSTALLED:
+
+{{- if index .Values "mariadb-operator" "enabled" }}
+  ✓ MariaDB Operator (for database provisioning)
+{{- end }}
+{{- if .Values.mariadb.enabled }}
+  ✓ MariaDB instance: {{ .Values.mariadb.name }} ({{ .Release.Namespace }})
+{{- end }}
+  ✓ Frappe Operator CRDs
+  ✓ Frappe Operator Controller
+  ✓ RBAC permissions
+
+{{- if .Values.examples.createBench }}
+  ✓ Example FrappeBench: {{ .Values.examples.bench.name }}
+{{- end }}
+{{- if .Values.examples.createSite }}
+  ✓ Example FrappeSite: {{ .Values.examples.site.name }}
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 GETTING STARTED:
+
+1. Verify operator is running:
+   
+   kubectl get pods -n {{ include "frappe-operator.namespace" . }}
+
+2. Check installed CRDs:
+   
+   kubectl get crds | grep vyogo.tech
+
+{{- if .Values.mariadb.enabled }}
+
+3. Verify MariaDB is ready:
+   
+   kubectl get mariadb {{ .Values.mariadb.name }} -n {{ .Release.Namespace }}
+   kubectl wait --for=condition=Ready mariadb/{{ .Values.mariadb.name }} -n {{ .Release.Namespace }} --timeout=300s
+{{- end }}
+
+4. Deploy your first Frappe site:
+
+   Create a file named my-site.yaml:
+   
+   ---
+   apiVersion: vyogo.tech/v1alpha1
+   kind: FrappeBench
+   metadata:
+     name: my-bench
+     namespace: default
+   spec:
+     frappeVersion: "version-15"
+     apps:
+       - name: erpnext
+         source: image
+   ---
+   apiVersion: vyogo.tech/v1alpha1
+   kind: FrappeSite
+   metadata:
+     name: my-site
+     namespace: default
+   spec:
+     benchRef:
+       name: my-bench
+       namespace: default
+     siteName: my-site.example.com
+     dbConfig:
+       provider: mariadb
+       mode: shared
+       mariadbRef:
+         name: {{ .Values.mariadb.name }}
+         namespace: {{ .Release.Namespace }}
+     domain: my-site.example.com
+     ingress:
+       enabled: true
+     ingressClassName: nginx
+
+   Then apply:
+   
+   kubectl apply -f my-site.yaml
+
+5. Monitor deployment:
+   
+   kubectl get frappebench,frappesite -w
+
+6. Get auto-generated admin password:
+   
+   kubectl get secret my-site-admin -o jsonpath='{.data.password}' | base64 -d
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTATION:
+
+• Full Documentation: https://vyogotech.github.io/frappe-operator/
+• Examples: https://github.com/vyogotech/frappe-operator/tree/main/examples
+• GitHub: https://github.com/vyogotech/frappe-operator
+• Issues: https://github.com/vyogotech/frappe-operator/issues
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔐 SECURITY FEATURES (v1.0.0):
+
+• ✅ Zero hardcoded passwords - all credentials auto-generated
+• ✅ Per-site database isolation via MariaDB Operator
+• ✅ Kubernetes Secrets for credential storage
+• ✅ Declarative database provisioning with RBAC
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 TIP: To access your site locally, use port-forward:
+
+   kubectl port-forward svc/my-bench-nginx 8080:8080
+   
+   Then open http://localhost:8080 in your browser.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Thank you for using Frappe Operator! ⭐
+If you find it useful, please give us a star on GitHub!
+
+Built with ❤️ by Vyogo Technologies
+
