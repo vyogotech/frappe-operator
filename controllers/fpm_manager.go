@@ -228,4 +228,3 @@ func (m *FPMManager) GenerateAppInstallScript(apps []vyogotechv1alpha1.AppSource
 
 	return script.String()
 }
-

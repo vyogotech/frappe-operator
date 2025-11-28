@@ -86,4 +86,3 @@ func (p *PostgresProvider) Cleanup(ctx context.Context, site *vyogotechv1alpha1.
 //    - Requires Frappe v14+ with PostgreSQL support enabled
 //    - Some apps may not be fully compatible
 //    - Test compatibility before production use
-
