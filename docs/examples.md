@@ -13,6 +13,7 @@ Real-world deployment patterns and configuration examples for Frappe Operator.
 - [Enterprise Setup](#enterprise-setup)
 - [Custom Domains](#custom-domains)
 - [High Availability](#high-availability)
+- [Worker Autoscaling](#worker-autoscaling) **⚡ NEW**
 - [Resource Scaling](#resource-scaling)
 - [Using Example Files](#using-example-files)
 
@@ -601,6 +602,178 @@ spec:
 
 ---
 
+## Worker Autoscaling
+
+### KEDA-Based Autoscaling with Scale-to-Zero
+
+**⚡ NEW in v1.1.0**: Automatically scale background workers based on Redis queue length, with scale-to-zero support for cost savings.
+
+#### Prerequisites
+
+KEDA is automatically installed by `install.sh`. For manual installation:
+
+```bash
+kubectl apply -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
+```
+
+#### Production Setup with Autoscaling
+
+```yaml
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: autoscaling-bench
+  namespace: production
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: erpnext
+      source: image
+    - name: hrms
+      source: image
+  
+  redisConfig:
+    type: redis
+  
+  # Worker autoscaling configuration
+  workerAutoscaling:
+    # Short queue - scale to zero when idle
+    short:
+      enabled: true
+      minReplicas: 0        # Scale to zero to save costs
+      maxReplicas: 10       # Scale up to 10 workers under load
+      queueLength: 2        # Trigger: 2 jobs per worker
+      pollingInterval: 10   # Check queue every 10 seconds
+      cooldownPeriod: 30    # Wait 30s before scaling down
+    
+    # Long queue - maintain minimum workers
+    long:
+      enabled: true
+      minReplicas: 1        # Always have 1 worker available
+      maxReplicas: 5        # Maximum 5 workers
+      queueLength: 5        # Trigger: 5 jobs per worker
+      pollingInterval: 30   # Check queue every 30 seconds
+      cooldownPeriod: 60    # Wait 60s before scaling down
+    
+    # Default queue - static replicas (no autoscaling)
+    default:
+      enabled: false        # Disable autoscaling
+      staticReplicas: 2     # Always maintain 2 workers
+  
+  # Resources for autoscaled workers
+  componentResources:
+    workerShort:
+      requests: {cpu: "500m", memory: "1Gi"}
+      limits: {cpu: "1", memory: "2Gi"}
+    workerLong:
+      requests: {cpu: "1", memory: "2Gi"}
+      limits: {cpu: "2", memory: "4Gi"}
+    workerDefault:
+      requests: {cpu: "500m", memory: "1Gi"}
+      limits: {cpu: "1", memory: "2Gi"}
+
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: autoscaling-site
+  namespace: production
+spec:
+  benchRef:
+    name: autoscaling-bench
+  siteName: "app.example.com"
+  dbConfig:
+    provider: mariadb
+    mode: shared
+  domain: "app.example.com"
+```
+
+#### Development Setup with Aggressive Scale-to-Zero
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: dev-autoscaling
+  namespace: development
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: erpnext
+      source: image
+  
+  # All workers scale to zero when idle
+  workerAutoscaling:
+    short:
+      enabled: true
+      minReplicas: 0
+      maxReplicas: 3
+      queueLength: 1        # Scale up quickly
+      pollingInterval: 5    # Check frequently
+      cooldownPeriod: 10    # Scale down fast
+    long:
+      enabled: true
+      minReplicas: 0        # Also scale to zero
+      maxReplicas: 2
+      queueLength: 1
+      pollingInterval: 10
+      cooldownPeriod: 20
+    default:
+      enabled: true
+      minReplicas: 0
+      maxReplicas: 2
+      queueLength: 1
+      pollingInterval: 5
+      cooldownPeriod: 10
+```
+
+#### Monitoring Autoscaling
+
+```bash
+# Check ScaledObjects created by KEDA
+kubectl get scaledobjects -n production
+
+# Check worker scaling status
+kubectl get frappebench autoscaling-bench -o jsonpath='{.status.workerScaling}' | jq
+
+# View current HPA status (created by KEDA)
+kubectl get hpa -n production
+
+# Check queue lengths
+kubectl exec -n production deployment/autoscaling-bench-redis-queue -- \
+  redis-cli LLEN "rq:queue:short"
+
+kubectl exec -n production deployment/autoscaling-bench-redis-queue -- \
+  redis-cli LLEN "rq:queue:long"
+
+# Watch worker pods scaling
+kubectl get pods -n production -l component=worker-short -w
+```
+
+#### Benefits
+
+- 💰 **Cost Savings**: Workers scale to zero when idle (especially useful for dev/staging)
+- 📈 **Auto-scaling**: Automatically handles traffic spikes
+- 🎯 **Queue-based**: Scales based on actual job queue length, not CPU/memory
+- ⚙️ **Configurable**: Fine-tune scaling behavior per queue type
+- 🚀 **Production-ready**: Tested end-to-end in production environments
+
+#### Configuration Parameters
+
+| Parameter | Description | Default | Recommended |
+|-----------|-------------|---------|-------------|
+| `enabled` | Enable KEDA autoscaling | `false` | `true` for production |
+| `minReplicas` | Minimum workers (0 for scale-to-zero) | `1` | `0` for dev, `1+` for prod |
+| `maxReplicas` | Maximum workers | `10` | Based on load |
+| `queueLength` | Jobs per worker threshold | `5` | `2-5` for short, `5-10` for long |
+| `pollingInterval` | Queue check frequency (seconds) | `30` | `10-30` |
+| `cooldownPeriod` | Wait before scale down (seconds) | `300` | `30-60` for short, `60-300` for long |
+
+> **Note**: For traditional CPU/memory-based HPA, see the [High Availability](#high-availability) section above.
+
+---
+
 ## Resource Scaling
 
 ### Three-Tier Resource Configuration
@@ -715,6 +888,7 @@ All examples are available in the repository under `examples/`:
 | File | Description |
 |------|-------------|
 | `minimal-bench-and-site.yaml` | Minimal setup for quick testing |
+| `autoscaling-bench.yaml` | **⚡ NEW**: KEDA-based worker autoscaling with scale-to-zero |
 | `production-bench.yaml` | Production-ready bench configuration |
 | `production-site.yaml` | Production site with TLS |
 | `multi-tenant-bench.yaml` | Bench for multiple customer sites |
