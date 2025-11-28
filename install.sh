@@ -147,6 +147,7 @@ if helm upgrade --install frappe-operator "$CHART_PATH" \
     --create-namespace \
     --set mariadb-operator.enabled=true \
     --set mariadb.enabled=false \
+    --set keda.enabled=false \
     --set operator.image.repository="$IMAGE_REPO" \
     --set operator.image.tag="$IMAGE_TAG" \
     --timeout=10m >/dev/null 2>&1; then
