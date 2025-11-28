@@ -53,44 +53,58 @@ Frappe Operator is a Kubernetes operator that automates the deployment, scaling,
 You need:
 - A Kubernetes cluster (v1.19 or newer)
 - `kubectl` installed and configured
+- `helm` installed (for automated installation)
 - Basic understanding of Kubernetes concepts
-- **MariaDB Operator** (for database management)
 
 **Don't have a cluster?** Try one of these:
 - **Local Development**: [kind](https://kind.sigs.k8s.io/), [minikube](https://minikube.sigs.k8s.io/), or [k3d](https://k3d.io/)
 - **Cloud**: [GKE](https://cloud.google.com/kubernetes-engine), [EKS](https://aws.amazon.com/eks/), or [AKS](https://azure.microsoft.com/en-us/services/kubernetes-service/)
 - **Managed**: [Civo](https://www.civo.com/), [DigitalOcean Kubernetes](https://www.digitalocean.com/products/kubernetes/)
 
-### Step 1: Install MariaDB Operator
+### Option 1: One-Command Installation (Recommended)
 
-Frappe Operator uses [MariaDB Operator](https://github.com/mariadb-operator/mariadb-operator) for secure database provisioning:
+The easiest way to install everything:
 
 ```bash
-# Install MariaDB Operator CRDs
-kubectl apply -f https://github.com/mariadb-operator/mariadb-operator/releases/latest/download/crds.yaml
+# Download and run the installation script
+curl -fsSL https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.sh | bash
 
-# Install MariaDB Operator
-kubectl apply -f https://github.com/mariadb-operator/mariadb-operator/releases/latest/download/mariadb-operator.yaml
-
-# Verify installation
-kubectl get pods -n mariadb-operator-system
+# Or with custom options:
+export NAMESPACE=frappe-system
+export INSTALL_INGRESS=true  # Also install NGINX Ingress Controller
+curl -fsSL https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.sh | bash
 ```
 
-### Step 2: Install Frappe Operator
+The script automatically:
+- Installs MariaDB Operator CRDs
+- Installs Frappe Operator via Helm
+- Waits for all components to be ready
+- Verifies the installation
 
-Install Frappe Operator in your Kubernetes cluster:
+### Option 2: Manual Installation
 
+If you prefer manual control:
+
+#### Step 1: Install MariaDB Operator CRDs
+
+```bash
+kubectl apply --server-side -k "github.com/mariadb-operator/mariadb-operator/config/crd?ref=v0.34.0"
+```
+
+#### Step 2: Install Frappe Operator
+
+**Using Helm (Recommended):**
+```bash
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator
+helm install frappe-operator frappe-operator/frappe-operator \
+  --namespace frappe-operator-system \
+  --create-namespace
+```
+
+**Using kubectl:**
 ```bash
 kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/download/v1.0.0/install.yaml
-
-# Verify installation
-kubectl get pods -n frappe-operator-system
 ```
-
-This installs:
-- Custom Resource Definitions (CRDs) for FrappeBench and FrappeSite
-- Operator deployment with RBAC permissions
-- Service accounts and roles
 
 ### Step 3: Create a Shared MariaDB Instance
 

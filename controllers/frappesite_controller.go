@@ -53,7 +53,7 @@ type FrappeSiteReconciler struct {
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappebenches,verbs=get;list;watch
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets;services;configmaps,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop
@@ -111,7 +111,6 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Error(err, "Failed to get referenced bench", "bench", benchKey.Name)
 		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhasePending
 		site.Status.BenchReady = false
-		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
 		_ = r.Status().Update(ctx, site)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -191,7 +190,6 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err != nil {
 		logger.Error(err, "Failed to initialize site")
 		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
-		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
 		_ = r.Status().Update(ctx, site)
 		return ctrl.Result{}, err
 	}
@@ -199,13 +197,18 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if !siteReady {
 		logger.Info("Site initialization in progress", "site", site.Name)
 		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseProvisioning
-		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
 		_ = r.Status().Update(ctx, site)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	// 2. Ensure Ingress (if enabled)
-	if site.Spec.Ingress != nil && site.Spec.Ingress.Enabled != nil && *site.Spec.Ingress.Enabled {
+	// 2. Ensure Ingress (enabled by default, can be disabled)
+	createIngress := true
+	if site.Spec.Ingress != nil && site.Spec.Ingress.Enabled != nil && !*site.Spec.Ingress.Enabled {
+		createIngress = false
+		logger.Info("Ingress creation disabled by user", "site", site.Name)
+	}
+	
+	if createIngress {
 		if err := r.ensureIngress(ctx, site, bench, domain); err != nil {
 			logger.Error(err, "Failed to ensure Ingress")
 			return ctrl.Result{}, err
@@ -587,6 +590,18 @@ func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotec
 	ingressClassName := "nginx" // Default
 	if site.Spec.IngressClassName != "" {
 		ingressClassName = site.Spec.IngressClassName
+	}
+	
+	// Validate IngressClass exists and warn if missing
+	ingressClass := &networkingv1.IngressClass{}
+	if err := r.Get(ctx, types.NamespacedName{Name: ingressClassName}, ingressClass); err != nil {
+		if errors.IsNotFound(err) {
+			logger.Info("IngressClass not found - Ingress will be created but may not work until controller is installed",
+				"class", ingressClassName,
+				"hint", "Install NGINX Ingress Controller: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml")
+		} else {
+			logger.Error(err, "Failed to check IngressClass", "class", ingressClassName)
+		}
 	}
 
 	pathType := networkingv1.PathTypePrefix
