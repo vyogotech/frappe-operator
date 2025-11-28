@@ -1,6 +1,6 @@
 module github.com/vyogotech/frappe-operator
 
-go 1.25.1
+go 1.23
 
 require (
 	github.com/onsi/ginkgo/v2 v2.23.4
