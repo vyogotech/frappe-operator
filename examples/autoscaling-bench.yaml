@@ -60,5 +60,5 @@ spec:
     mode: shared
     mariadbRef:
       name: frappe-mariadb
-      namespace: default
+      namespace: frappe-operator-system
   domain: autoscaling.local
