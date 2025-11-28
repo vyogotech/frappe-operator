@@ -18,6 +18,7 @@ jobs:
   docker-build:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
+    if: "!startsWith(github.ref, 'refs/tags/')"
     permissions:
       contents: read
       packages: write
