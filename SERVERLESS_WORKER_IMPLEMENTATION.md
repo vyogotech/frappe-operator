@@ -259,19 +259,136 @@ metadata:
 
 ## Testing Checklist
 
-- [ ] Deploy bench with KEDA autoscaling enabled
-- [ ] Verify ScaledObjects are created
-- [ ] Verify workers scale to zero when idle
-- [ ] Verify workers scale up when jobs added
-- [ ] Deploy bench with static replicas
-- [ ] Verify fixed replica counts maintained
-- [ ] Deploy bench with mixed mode
-- [ ] Verify some workers autoscale, others static
+- [x] Deploy bench with KEDA autoscaling enabled
+- [x] Verify ScaledObjects are created
+- [x] Verify workers scale to zero when idle
+- [x] Verify workers scale up when jobs added
+- [x] Deploy bench with static replicas (long and default workers)
+- [x] Verify fixed replica counts maintained
+- [x] Deploy bench with mixed mode
+- [x] Verify some workers autoscale, others static
 - [ ] Deploy bench with legacy ComponentReplicas
 - [ ] Verify backward compatibility
 - [ ] Uninstall KEDA during operation
 - [ ] Verify graceful fallback to static
-- [ ] Check status reporting accuracy
+- [x] Check status reporting accuracy
+
+## Test Results (Minikube - 28 Nov 2025)
+
+### Environment
+- **Cluster**: Minikube on M1 Mac (ARM)
+- **Kubernetes**: v1.31
+- **KEDA**: v2.16.1
+- **Operator Image**: localhost/frappe-operator:dev
+
+### Test Scenario: Mixed Mode (Hybrid Scaling)
+```yaml
+workerAutoscaling:
+  short:
+    enabled: true
+    minReplicas: 0
+    maxReplicas: 3
+    queueLength: 2
+    cooldownPeriod: 30
+    pollingInterval: 10
+  long:
+    enabled: false
+    staticReplicas: 1
+  default:
+    enabled: false
+    staticReplicas: 1
+```
+
+### Observed Behavior
+
+#### ✅ ScaledObject Creation
+- ScaledObject `test-autoscaling-worker-short` created successfully
+- Status: `READY: True, ACTIVE: False`
+- Correctly configured Redis trigger targeting `rq:queue:short`
+- Uses FQDN: `test-autoscaling-redis-queue.frappe-test.svc.cluster.local:6379`
+
+#### ✅ Scale-to-Zero
+- Short worker deployment started at 0/0 replicas
+- No pods running when queue is empty
+- KEDA correctly reports Active: False
+
+#### ✅ Scale-Up
+Timeline:
+- **t=0s**: Queue empty, replicas=0
+- **t=0s**: Added 5 jobs to queue
+- **t=5s**: Scaled to 1 replica (first pod starting)
+- **t=10s**: 1 pod ready
+- **t=20s**: Scaled to 3 replicas (max reached)
+- **t=25s**: All 3 pods ready
+
+Scaling was responsive and reached maxReplicas (3) as expected based on queueLength threshold of 2.
+
+#### ✅ Scale-Down
+Timeline:
+- **t=0s**: Queue cleared (DEL rq:queue:short)
+- **t=0-30s**: Replicas remained at 3 (cooldown period)
+- **t=35s**: Scaled to 0 replicas
+- **t=35s+**: 0 pods running
+
+Scale-down occurred ~5 seconds after the 30-second cooldown period, which is expected given the 10-second pollingInterval.
+
+#### ✅ Static Workers
+- Long worker: Maintained 1/1 replicas throughout test
+- Default worker: Maintained 1/1 replicas throughout test
+- No ScaledObjects created for static workers
+
+#### ✅ Status Reporting
+```yaml
+status:
+  workerScaling:
+    short:
+      mode: autoscaled
+      currentReplicas: 0
+      desiredReplicas: 0
+      kedaManaged: true
+    long:
+      mode: static
+      currentReplicas: 1
+      desiredReplicas: 1
+      kedaManaged: false
+    default:
+      mode: static
+      currentReplicas: 1
+      desiredReplicas: 1
+      kedaManaged: false
+```
+
+All fields accurately reflected the actual state of the workers.
+
+### Issues Encountered and Fixed
+
+1. **Type Conversion Panic**: Initial deployment failed with "cannot deep copy int"
+   - **Fix**: Changed `int()` to `int64()` for numeric fields in unstructured ScaledObject spec
+   
+2. **Slice Type Panic**: Second attempt failed with "cannot deep copy []map[string]interface{}"
+   - **Fix**: Changed triggers to `[]interface{}` and metadata to `map[string]interface{}`
+
+3. **Redis DNS Resolution**: KEDA couldn't resolve `{bench-name}-redis-queue`
+   - **Fix**: Used fully qualified domain name (FQDN) for cross-namespace access
+
+### Conclusions
+
+✅ **All Core Features Working**:
+- KEDA autoscaling with scale-to-zero
+- Static replica management
+- Mixed mode (hybrid scaling)
+- Status reporting
+- ScaledObject lifecycle management
+
+✅ **Performance**: 
+- Scale-up latency: ~5-10 seconds to first pod
+- Scale-down respects cooldown period accurately
+- Polling interval effective at 10 seconds
+
+✅ **Reliability**:
+- No crashes or reconciliation errors
+- ScaledObjects properly owned by FrappeBench
+- Graceful handling of empty queues
 
 ## Known Limitations
 
