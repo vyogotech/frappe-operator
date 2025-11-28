@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ .Values.global.operatorNamespace }}
-  labels:
-    {{- include "frappe-operator.labels" . | nindent 4 }}
-    control-plane: controller-manager
-
-
