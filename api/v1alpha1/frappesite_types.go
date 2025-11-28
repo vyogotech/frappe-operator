@@ -82,11 +82,23 @@ type FrappeSiteStatus struct {
 	// +optional
 	BenchReady bool `json:"benchReady,omitempty"`
 
+	// DatabaseReady indicates if the database is provisioned and ready
+	// +optional
+	DatabaseReady bool `json:"databaseReady,omitempty"`
+
+	// DatabaseName is the actual database name created
+	// +optional
+	DatabaseName string `json:"databaseName,omitempty"`
+
+	// DatabaseCredentialsSecret is the name of the Secret with site-specific DB credentials
+	// +optional
+	DatabaseCredentialsSecret string `json:"databaseCredentialsSecret,omitempty"`
+
 	// SiteURL is the accessible URL
 	// +optional
 	SiteURL string `json:"siteURL,omitempty"`
 
-	// DBConnectionSecret is the name of the Secret with DB credentials
+	// DBConnectionSecret is the name of the Secret with DB credentials (legacy)
 	// +optional
 	DBConnectionSecret string `json:"dbConnectionSecret,omitempty"`
 

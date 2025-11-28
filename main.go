@@ -30,7 +30,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	"github.com/vyogotech/frappe-operator/controllers"
 	//+kubebuilder:scaffold:imports
@@ -45,6 +48,9 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	
+	// Add MariaDB Operator schemes
+	utilruntime.Must(mariadbv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -66,12 +72,12 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "bd4753fa.vyogo.tech",
+		Scheme:                  scheme,
+		Metrics:                 metricsserver.Options{BindAddress: metricsAddr},
+		WebhookServer:           webhook.NewServer(webhook.Options{Port: 9443}),
+		HealthProbeBindAddress:  probeAddr,
+		LeaderElection:          enableLeaderElection,
+		LeaderElectionID:        "bd4753fa.vyogo.tech",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

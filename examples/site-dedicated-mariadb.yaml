@@ -1,0 +1,45 @@
+# Example: Frappe site with dedicated MariaDB instance
+# Use this for enterprise/isolated deployments
+
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: enterprise-site
+  namespace: default
+spec:
+  benchRef:
+    name: shared-bench  # Can still share the bench
+  
+  siteName: enterprise.example.com
+  
+  # Database configuration - dedicated mode
+  dbConfig:
+    provider: mariadb
+    mode: dedicated
+    # Operator will create a dedicated MariaDB instance named: enterprise-site-mariadb
+    storageSize: 100Gi
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+  
+  # Ingress configuration
+  ingress:
+    enabled: true
+    className: nginx
+  
+  # TLS configuration
+  tls:
+    enabled: true
+    issuer: letsencrypt-prod
+
+# The operator will automatically create:
+# 1. MariaDB CR: enterprise-site-mariadb
+# 2. Database CR: enterprise-site-db
+# 3. User CR: enterprise-site-user
+# 4. Grant CR: enterprise-site-grant
+# 5. Secrets for root password and user password
+

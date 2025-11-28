@@ -1,0 +1,60 @@
+# Shared MariaDB Instance for multiple Frappe sites
+# This is created once and shared across multiple sites for cost efficiency
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: frappe-mariadb-root
+  namespace: default
+type: Opaque
+stringData:
+  password: "CHANGE-ME-STRONG-PASSWORD"  # Change this to a strong password
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: frappe-mariadb
+  namespace: default
+spec:
+  # Root password for MariaDB admin access
+  rootPasswordSecretKeyRef:
+    name: frappe-mariadb-root
+    key: password
+  
+  # MariaDB version - Frappe requires 10.6+
+  image: mariadb:10.11
+  
+  # Storage configuration
+  storage:
+    size: 50Gi
+    # storageClassName: fast-ssd  # Optional: specify storage class
+  
+  # Resource allocation
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  
+  # High availability with 3 replicas (optional)
+  replicas: 1  # Use 3 for HA in production
+  
+  # Connection settings
+  port: 3306
+  
+  # my.cnf configuration
+  myCnf: |
+    [mariadb]
+    bind-address=*
+    default_storage_engine=InnoDB
+    innodb_file_per_table=1
+    max_allowed_packet=256M
+    character-set-client-handshake=FALSE
+    character-set-server=utf8mb4
+    collation-server=utf8mb4_unicode_ci
+    
+    [client]
+    default-character-set=utf8mb4
+

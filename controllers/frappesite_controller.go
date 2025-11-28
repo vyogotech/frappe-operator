@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	"github.com/vyogotech/frappe-operator/controllers/database"
 )
 
 const frappeSiteFinalizer = "vyogo.tech/site-finalizer"
@@ -127,8 +128,66 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	site.Status.ResolvedDomain = domain
 	site.Status.DomainSource = domainSource
 
-	// 1. Ensure site is initialized (bench new-site creates DB and user automatically)
-	siteReady, err := r.ensureSiteInitialized(ctx, site, bench, domain)
+	// 0. Provision database using database provider
+	dbProvider, err := database.NewProvider(site.Spec.DBConfig.Provider, r.Client, r.Scheme)
+	if err != nil {
+		logger.Error(err, "Failed to create database provider")
+		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
+		_ = r.Status().Update(ctx, site)
+		return ctrl.Result{}, err
+	}
+
+	// Check if database is ready
+	dbReady, err := dbProvider.IsReady(ctx, site)
+	if err != nil {
+		logger.Error(err, "Failed to check database readiness")
+		site.Status.DatabaseReady = false
+		_ = r.Status().Update(ctx, site)
+		return ctrl.Result{}, err
+	}
+
+	if !dbReady {
+		logger.Info("Database not ready, provisioning...")
+		site.Status.DatabaseReady = false
+		_ = r.Status().Update(ctx, site)
+
+		// Ensure database resources are created
+		dbInfo, err := dbProvider.EnsureDatabase(ctx, site)
+		if err != nil {
+			logger.Error(err, "Failed to ensure database")
+			site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
+			_ = r.Status().Update(ctx, site)
+			return ctrl.Result{}, err
+		}
+
+		logger.Info("Database provisioning initiated", 
+			"provider", dbInfo.Provider,
+			"dbName", dbInfo.Name)
+		
+		// Requeue to check readiness
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	// Database is ready - get credentials
+	site.Status.DatabaseReady = true
+	dbInfo, err := dbProvider.EnsureDatabase(ctx, site)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	dbCreds, err := dbProvider.GetCredentials(ctx, site)
+	if err != nil {
+		logger.Error(err, "Failed to get database credentials")
+		return ctrl.Result{}, err
+	}
+
+	// Update status with database info
+	site.Status.DatabaseName = dbInfo.Name
+	site.Status.DatabaseCredentialsSecret = dbCreds.SecretName
+	_ = r.Status().Update(ctx, site)
+
+	// 1. Ensure site is initialized with database credentials
+	siteReady, err := r.ensureSiteInitialized(ctx, site, bench, domain, dbInfo, dbCreds)
 	if err != nil {
 		logger.Error(err, "Failed to initialize site")
 		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
@@ -212,7 +271,7 @@ func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotec
 }
 
 // ensureSiteInitialized creates a Job to run bench new-site
-func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string) (bool, error) {
+func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	jobName := fmt.Sprintf("%s-init", site.Name)
@@ -238,71 +297,19 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	}
 
 	// Create the initialization job
-	logger.Info("Creating site initialization job", "job", jobName, "domain", domain)
+	logger.Info("Creating site initialization job", 
+		"job", jobName, 
+		"domain", domain,
+		"dbProvider", dbInfo.Provider,
+		"dbName", dbInfo.Name)
 
-	// Get DB configuration from site spec with proper priority
-	dbHost := "mariadb.default.svc.cluster.local" // Default fallback
-	dbPort := "3306"                               // Default fallback
-	var dbRootPassword string
-
-	// Priority 1: Explicit host/port in DBConfig spec
-	if site.Spec.DBConfig.Host != "" {
-		dbHost = site.Spec.DBConfig.Host
-	}
-	if site.Spec.DBConfig.Port != "" {
-		dbPort = site.Spec.DBConfig.Port
-	}
-
-	// Priority 2: ConnectionSecretRef (overrides explicit host/port if provided)
-	if site.Spec.DBConfig.ConnectionSecretRef != nil {
-		dbSecret := &corev1.Secret{}
-		secretRef := site.Spec.DBConfig.ConnectionSecretRef
-		secretNS := secretRef.Namespace
-		if secretNS == "" {
-			secretNS = site.Namespace
-		}
-		
-		err := r.Get(ctx, types.NamespacedName{
-			Name:      secretRef.Name,
-			Namespace: secretNS,
-		}, dbSecret)
-		if err != nil {
-			return false, fmt.Errorf("failed to get database connection secret '%s/%s': %w", 
-				secretNS, secretRef.Name, err)
-		}
-		
-		// Extract connection details from secret (overrides spec values)
-		if host, ok := dbSecret.Data["host"]; ok && len(host) > 0 {
-			dbHost = string(host)
-		}
-		if port, ok := dbSecret.Data["port"]; ok && len(port) > 0 {
-			dbPort = string(port)
-		}
-		
-		// Root password is REQUIRED from secret
-		if rootPwd, ok := dbSecret.Data["rootPassword"]; ok && len(rootPwd) > 0 {
-			dbRootPassword = string(rootPwd)
-		} else if rootPwd, ok := dbSecret.Data["root-password"]; ok && len(rootPwd) > 0 {
-			dbRootPassword = string(rootPwd)
-		} else {
-			return false, fmt.Errorf("database connection secret '%s/%s' must contain 'rootPassword' or 'root-password' field", 
-				secretNS, secretRef.Name)
-		}
-		
-		logger.Info("Using database connection from secret", 
-			"secret", secretRef.Name,
-			"namespace", secretNS,
-			"host", dbHost,
-			"port", dbPort)
-	} else {
-		// No secret provided - SECURITY WARNING
-		logger.Error(nil, "SECURITY WARNING: No database connection secret provided. Using insecure defaults for development/testing ONLY.",
-			"site", site.Name,
-			"dbHost", dbHost,
-			"dbPort", dbPort,
-			"recommendation", "Set spec.dbConfig.connectionSecretRef in production environments")
-		dbRootPassword = "admin" // Insecure fallback for development/testing only
-	}
+	// Database credentials are provided by the database provider (secure, no hardcoded values)
+	dbHost := dbInfo.Host
+	dbPort := dbInfo.Port
+	dbName := dbInfo.Name
+	dbUser := dbCreds.Username
+	dbPassword := dbCreds.Password
+	dbProvider := dbInfo.Provider
 
 	// Get or generate admin password
 	var adminPassword string
@@ -379,20 +386,45 @@ echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
 
 # Validate environment variables exist and are not empty
-if [[ -z "$SITE_NAME" || -z "$DOMAIN" || -z "$DB_HOST" || -z "$DB_PORT" || -z "$ADMIN_PASSWORD" || -z "$DB_ROOT_PASSWORD" || -z "$BENCH_NAME" ]]; then
+if [[ -z "$SITE_NAME" || -z "$DOMAIN" || -z "$ADMIN_PASSWORD" || -z "$BENCH_NAME" || -z "$DB_PROVIDER" ]]; then
     echo "ERROR: Required environment variables not set"
     exit 1
 fi
 
-# Run bench new-site with environment variables (safer than interpolation)
-bench new-site "$SITE_NAME" \
-  --db-host="$DB_HOST" \
-  --db-port="$DB_PORT" \
-  --admin-password="$ADMIN_PASSWORD" \
-  --mariadb-root-password="$DB_ROOT_PASSWORD" \
-  --no-mariadb-socket \
-  --install-app=erpnext \
-  --verbose
+# Run bench new-site with provider-specific database configuration
+if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
+    # For MariaDB and PostgreSQL: use pre-provisioned database with dedicated credentials
+    if [[ -z "$DB_HOST" || -z "$DB_PORT" || -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
+        echo "ERROR: Database connection variables not set for $DB_PROVIDER"
+        exit 1
+    fi
+
+    echo "Creating site with $DB_PROVIDER database (pre-provisioned)"
+    bench new-site "$SITE_NAME" \
+      --db-type="$DB_PROVIDER" \
+      --db-name="$DB_NAME" \
+      --db-host="$DB_HOST" \
+      --db-port="$DB_PORT" \
+      --db-user="$DB_USER" \
+      --db-password="$DB_PASSWORD" \
+      --no-setup-db \
+      --admin-password="$ADMIN_PASSWORD" \
+      --install-app=erpnext \
+      --verbose
+
+elif [[ "$DB_PROVIDER" == "sqlite" ]]; then
+    # For SQLite: file-based database, no external connection needed
+    echo "Creating site with SQLite database (file-based)"
+    bench new-site "$SITE_NAME" \
+      --db-type=sqlite \
+      --admin-password="$ADMIN_PASSWORD" \
+      --install-app=erpnext \
+      --verbose
+
+else
+    echo "ERROR: Unsupported database provider: $DB_PROVIDER"
+    exit 1
+fi
 
 echo "Site $SITE_NAME created successfully!"
 
@@ -471,6 +503,10 @@ echo "Site initialization complete!"
 									Value: domain,
 								},
 								{
+									Name:  "DB_PROVIDER",
+									Value: dbProvider,
+								},
+								{
 									Name:  "DB_HOST",
 									Value: dbHost,
 								},
@@ -479,12 +515,20 @@ echo "Site initialization complete!"
 									Value: dbPort,
 								},
 								{
-									Name:  "ADMIN_PASSWORD",
-									Value: adminPassword,
+									Name:  "DB_NAME",
+									Value: dbName,
 								},
 								{
-									Name:  "DB_ROOT_PASSWORD",
-									Value: dbRootPassword,
+									Name:  "DB_USER",
+									Value: dbUser,
+								},
+								{
+									Name:  "DB_PASSWORD",
+									Value: dbPassword,
+								},
+								{
+									Name:  "ADMIN_PASSWORD",
+									Value: adminPassword,
 								},
 								{
 									Name:  "BENCH_NAME",

@@ -1,0 +1,39 @@
+# Basic Frappe Site for development/testing
+# Prerequisites: 
+# 1. Create shared MariaDB instance (see mariadb-shared-instance.yaml)
+# 2. Create FrappeBench (see basic-bench.yaml)
+
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: dev-site
+  namespace: default
+spec:
+  benchRef:
+    name: dev-bench
+  
+  # Site domain - for local testing use .localhost
+  siteName: dev.localhost
+  
+  # Database configuration
+  dbConfig:
+    provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: default
+  
+  # Ingress (optional for local development)
+  ingress:
+    enabled: true
+    className: nginx
+
+# The operator will automatically:
+# 1. Create database and user via MariaDB Operator
+# 2. Generate admin password (stored in dev-site-admin Secret)
+# 3. Initialize the Frappe site
+# 4. Create Ingress for access
+
+# To get the admin password:
+# kubectl get secret dev-site-admin -o jsonpath='{.data.password}' | base64 -d
+
