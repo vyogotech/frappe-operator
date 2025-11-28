@@ -52,3 +52,4 @@ annotations:
     - kind: security
       description: Zero hardcoded credentials - all secrets auto-generated
 
+

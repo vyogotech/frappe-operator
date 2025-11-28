@@ -1181,3 +1181,4 @@ func (r *FrappeBenchReconciler) componentLabels(bench *vyogotechv1alpha1.FrappeB
 	labels["component"] = component
 	return labels
 }
+

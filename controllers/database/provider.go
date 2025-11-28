@@ -72,3 +72,4 @@ func NewProvider(providerType string, client client.Client, scheme *runtime.Sche
 		return nil, fmt.Errorf("unsupported database provider: %s (supported: mariadb, postgres, sqlite)", providerType)
 	}
 }
+

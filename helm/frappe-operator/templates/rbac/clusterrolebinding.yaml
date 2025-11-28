@@ -15,3 +15,4 @@ subjects:
   namespace: {{ include "frappe-operator.namespace" . }}
 {{- end }}
 
+
