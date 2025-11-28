@@ -67,3 +67,4 @@ Operator namespace
 {{- .Values.global.operatorNamespace | default "frappe-operator-system" }}
 {{- end }}
 
+

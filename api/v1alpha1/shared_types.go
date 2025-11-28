@@ -161,19 +161,22 @@ type ComponentReplicas struct {
 	// +kubebuilder:default=1
 	Socketio int32 `json:"socketio,omitempty"`
 
-	// WorkerDefault replicas
+	// WorkerDefault replicas (DEPRECATED: use WorkerAutoscaling instead)
+	// Kept for backward compatibility
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	WorkerDefault int32 `json:"workerDefault,omitempty"`
 
-	// WorkerLong replicas
+	// WorkerLong replicas (DEPRECATED: use WorkerAutoscaling instead)
+	// Kept for backward compatibility
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	WorkerLong int32 `json:"workerLong,omitempty"`
 
-	// WorkerShort replicas
+	// WorkerShort replicas (DEPRECATED: use WorkerAutoscaling instead)
+	// Kept for backward compatibility
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
@@ -315,4 +318,68 @@ type GitConfig struct {
 	// If not specified, uses operator-level default
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// WorkerAutoscaling defines scaling configuration for a worker type
+// Supports both KEDA-based autoscaling and static replica counts
+type WorkerAutoscaling struct {
+	// Enabled controls whether KEDA autoscaling is active
+	// If false or KEDA not installed, uses StaticReplicas
+	// +optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// StaticReplicas for non-autoscaled workers
+	// Used when Enabled=false OR KEDA not available
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=1
+	StaticReplicas *int32 `json:"staticReplicas,omitempty"`
+
+	// MinReplicas for KEDA (can be 0 for true serverless)
+	// Only used when Enabled=true AND KEDA available
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+
+	// MaxReplicas for KEDA
+	// Only used when Enabled=true AND KEDA available
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=10
+	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
+
+	// QueueLength triggers scaling when queue depth exceeds this value
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=5
+	QueueLength *int32 `json:"queueLength,omitempty"`
+
+	// CooldownPeriod in seconds before scaling down
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=60
+	CooldownPeriod *int32 `json:"cooldownPeriod,omitempty"`
+
+	// PollingInterval in seconds for checking queue depth
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=30
+	PollingInterval *int32 `json:"pollingInterval,omitempty"`
+}
+
+// WorkerAutoscalingConfig defines scaling per worker type
+type WorkerAutoscalingConfig struct {
+	// Short worker scaling configuration
+	// +optional
+	Short *WorkerAutoscaling `json:"short,omitempty"`
+
+	// Long worker scaling configuration
+	// +optional
+	Long *WorkerAutoscaling `json:"long,omitempty"`
+
+	// Default worker scaling configuration
+	// +optional
+	Default *WorkerAutoscaling `json:"default,omitempty"`
 }
