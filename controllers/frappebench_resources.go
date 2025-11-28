@@ -1432,10 +1432,10 @@ func (r *FrappeBenchReconciler) ensureScaledObject(ctx context.Context, bench *v
 		"maxReplicaCount": int64(*config.MaxReplicas),
 		"cooldownPeriod":  int64(*config.CooldownPeriod),
 		"pollingInterval": int64(*config.PollingInterval),
-		"triggers": []map[string]interface{}{
-			{
+		"triggers": []interface{}{
+			map[string]interface{}{
 				"type": "redis",
-				"metadata": map[string]string{
+				"metadata": map[string]interface{}{
 					"address":              r.getRedisAddress(bench),
 					"listName":             queueName,
 					"listLength":           fmt.Sprintf("%d", *config.QueueLength),
@@ -1502,9 +1502,9 @@ func (r *FrappeBenchReconciler) deleteScaledObjectIfExists(ctx context.Context, 
 // getRedisAddress returns the Redis address for the bench
 func (r *FrappeBenchReconciler) getRedisAddress(bench *vyogotechv1alpha1.FrappeBench) string {
 	// TODO: If ConnectionSecretRef is set, read the secret to get the host
-	// For now, default to in-cluster Redis service
-	// External Redis would need the secret read to get host:port
-	return fmt.Sprintf("%s-redis:6379", bench.Name)
+	// For now, default to in-cluster Redis service with fully qualified domain name
+	// KEDA needs the full service name since it runs in a different namespace
+	return fmt.Sprintf("%s-redis-queue.%s.svc.cluster.local:6379", bench.Name, bench.Namespace)
 }
 
 // Helper functions for pointer types
