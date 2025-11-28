@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frappe-operator-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "frappe-operator.labels" . | nindent 4 }}
+data:
+  # Default domain suffix for auto-detected sites
+  # Override per-bench or per-site as needed
+  defaultDomainSuffix: {{ .Values.operatorConfig.defaultDomainSuffix | quote }}
+  
+  # Ingress controller service to detect domain from
+  ingressControllerService: {{ .Values.operatorConfig.ingressControllerService | quote }}
+  ingressControllerNamespace: {{ .Values.operatorConfig.ingressControllerNamespace | quote }}
+  
+  # Git configuration
+  # Set to "false" to disable Git-based app installation (enterprise mode)
+  # Individual benches can override this setting
+  gitEnabled: {{ .Values.operatorConfig.gitEnabled | quote }}
+  
+  # FPM CLI path in container
+  fpmCliPath: {{ .Values.operatorConfig.fpmCliPath | quote }}
+  
+  # FPM default repositories (JSON array)
+  # These repositories are available to all benches
+  # Benches can add additional repositories in their spec
+  fpmRepositories: |
+{{- .Values.operatorConfig.fpmRepositories | nindent 4 }}

@@ -97,6 +97,36 @@ keda:
   enabled: true
   # KEDA will be installed as a subchart for worker autoscaling
   # See: https://keda.sh/
+
+# Operator runtime configuration
+operatorConfig:
+  # Default domain suffix for auto-detected sites
+  # Override per-bench or per-site as needed
+  defaultDomainSuffix: ".myplatform.com"
+  
+  # Ingress controller service to detect domain from
+  ingressControllerService: "ingress-nginx-controller"
+  ingressControllerNamespace: "ingress-nginx"
+  
+  # Git configuration
+  # Set to "false" to disable Git-based app installation (enterprise mode)
+  # Individual benches can override this setting
+  gitEnabled: "false"
+  
+  # FPM CLI path in container
+  fpmCliPath: "/usr/local/bin/fpm"
+  
+  # FPM default repositories (JSON array)
+  # These repositories are available to all benches
+  # Benches can add additional repositories in their spec
+  fpmRepositories: |
+    [
+      {
+        "name": "frappe-community",
+        "url": "https://fpm.frappe.io",
+        "priority": 100
+      }
+    ]
   
   # Override KEDA values if needed
   # resources:
