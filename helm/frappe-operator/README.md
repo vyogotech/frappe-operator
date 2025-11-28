@@ -15,17 +15,37 @@ A Helm chart for deploying the Frappe Operator with all required dependencies on
 - Kubernetes 1.19+
 - Helm 3.0+
 - At least 4GB RAM available in cluster
+- **NGINX Ingress Controller** (optional, but recommended for site access via Ingress)
 
 ## Installation
 
-### Quick Start
+### Quick Start (One Command)
 
-Install with default configuration (includes MariaDB Operator and shared MariaDB instance):
+The Helm chart automatically installs MariaDB Operator CRDs via a pre-install hook:
 
 ```bash
 helm install frappe-operator oci://ghcr.io/vyogotech/charts/frappe-operator \
   --namespace frappe-operator-system \
   --create-namespace
+```
+
+**What gets installed:**
+- Frappe Operator and all CRDs
+- MariaDB Operator and its CRDs (automatic via hook)
+- A shared MariaDB instance (optional, enabled by default)
+
+### Optional: Install NGINX Ingress Controller
+
+If you want sites to be accessible via Ingress (recommended for production):
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+# Wait for Ingress controller to be ready
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s
 ```
 
 ### Install from Source
@@ -277,11 +297,61 @@ kubectl get pods -l app.kubernetes.io/instance=frappe-mariadb
 
 ### CRDs Not Installing
 
-CRDs are installed automatically from the `crds/` directory. If they're missing:
+MariaDB Operator CRDs are installed automatically via a pre-install hook. If installation fails:
 
 ```bash
-# Manually install CRDs
-kubectl apply -f crds/
+# Check the CRD installer job logs
+kubectl logs -n frappe-operator-system -l app.kubernetes.io/component=crd-installer
+
+# Manual CRD installation
+kubectl apply --server-side -k "github.com/mariadb-operator/mariadb-operator/config/crd?ref=v0.34.0"
+
+# Verify CRDs are installed
+kubectl get crd | grep mariadb
+```
+
+### Ingress Not Working
+
+Ingress is created automatically for all FrappeSites by default. If it's not working:
+
+**1. Check if Ingress was created:**
+```bash
+kubectl get ingress -n <namespace>
+```
+
+**2. Verify NGINX Ingress Controller is installed:**
+```bash
+kubectl get pods -n ingress-nginx
+```
+
+If not installed, install it:
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+```
+
+**3. Disable Ingress creation (if not needed):**
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: my-site
+spec:
+  # ... other fields ...
+  ingress:
+    enabled: false  # Explicitly disable Ingress
+```
+
+### Operator Logs Show Leader Election Errors
+
+Fixed in v1.0.0+ via automatic RBAC configuration. If you still see errors:
+
+```bash
+# Verify Role and RoleBinding exist
+kubectl get role -n frappe-operator-system | grep leader-election
+kubectl get rolebinding -n frappe-operator-system | grep leader-election
+
+# Check if leases are working
+kubectl get leases -n frappe-operator-system
 ```
 
 ## Values Reference

@@ -976,42 +976,42 @@ func (r *FrappeBenchReconciler) getRedisImage(bench *vyogotechv1alpha1.FrappeBen
 }
 
 func (r *FrappeBenchReconciler) getGunicornReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil && bench.Spec.ComponentReplicas.Gunicorn > 0 {
+	if bench.Spec.ComponentReplicas != nil {
 		return bench.Spec.ComponentReplicas.Gunicorn
 	}
-	return 2
+	return 1
 }
 
 func (r *FrappeBenchReconciler) getNginxReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil && bench.Spec.ComponentReplicas.Nginx > 0 {
+	if bench.Spec.ComponentReplicas != nil {
 		return bench.Spec.ComponentReplicas.Nginx
 	}
-	return 2
+	return 1
 }
 
 func (r *FrappeBenchReconciler) getSocketIOReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil && bench.Spec.ComponentReplicas.Socketio > 0 {
+	if bench.Spec.ComponentReplicas != nil {
 		return bench.Spec.ComponentReplicas.Socketio
 	}
 	return 1
 }
 
 func (r *FrappeBenchReconciler) getWorkerDefaultReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil && bench.Spec.ComponentReplicas.WorkerDefault > 0 {
+	if bench.Spec.ComponentReplicas != nil {
 		return bench.Spec.ComponentReplicas.WorkerDefault
 	}
-	return 2
+	return 1
 }
 
 func (r *FrappeBenchReconciler) getWorkerLongReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil && bench.Spec.ComponentReplicas.WorkerLong > 0 {
+	if bench.Spec.ComponentReplicas != nil {
 		return bench.Spec.ComponentReplicas.WorkerLong
 	}
 	return 1
 }
 
 func (r *FrappeBenchReconciler) getWorkerShortReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil && bench.Spec.ComponentReplicas.WorkerShort > 0 {
+	if bench.Spec.ComponentReplicas != nil {
 		return bench.Spec.ComponentReplicas.WorkerShort
 	}
 	return 1
