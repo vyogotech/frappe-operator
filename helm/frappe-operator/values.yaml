@@ -92,6 +92,22 @@ mariadb-operator:
   # webhook:
   #   enabled: false
 
+# KEDA (Kubernetes Event Driven Autoscaler) dependency
+keda:
+  enabled: true
+  # KEDA will be installed as a subchart for worker autoscaling
+  # See: https://keda.sh/
+  
+  # Override KEDA values if needed
+  # resources:
+  #   operator:
+  #     limits:
+  #       cpu: 1
+  #       memory: 1000Mi
+  #     requests:
+  #       cpu: 100m
+  #       memory: 100Mi
+
 # Default MariaDB instance for Frappe sites
 mariadb:
   # Enable creation of a default shared MariaDB instance
