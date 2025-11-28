@@ -1,0 +1,31 @@
+# Basic Frappe Bench for development/testing
+
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: dev-bench
+  namespace: default
+spec:
+  version: "v15.41.2"
+  
+  # Apps to install
+  apps:
+    - name: erpnext
+      source:
+        type: image  # Use pre-built image (fastest)
+  
+  # Component replicas (minimal for development)
+  componentReplicas:
+    gunicorn: 1
+    scheduler: 1
+    workers:
+      default: 1
+      short: 1
+      long: 1
+  
+  # Storage size
+  storageSize: "5Gi"
+  
+  # Optional: Specify storage class
+  # storageClassName: standard
+

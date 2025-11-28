@@ -84,7 +84,7 @@ func (r *FrappeBenchReconciler) createBenchPVC(ctx context.Context, bench *vyogo
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				accessMode,
 			},
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: storageSize,
 				},

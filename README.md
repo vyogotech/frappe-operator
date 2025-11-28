@@ -51,33 +51,63 @@ You need:
 - A Kubernetes cluster (v1.19 or newer)
 - `kubectl` installed and configured
 - Basic understanding of Kubernetes concepts
+- **MariaDB Operator** (for database management)
 
 **Don't have a cluster?** Try one of these:
 - **Local Development**: [kind](https://kind.sigs.k8s.io/), [minikube](https://minikube.sigs.k8s.io/), or [k3d](https://k3d.io/)
 - **Cloud**: [GKE](https://cloud.google.com/kubernetes-engine), [EKS](https://aws.amazon.com/eks/), or [AKS](https://azure.microsoft.com/en-us/services/kubernetes-service/)
 - **Managed**: [Civo](https://www.civo.com/), [DigitalOcean Kubernetes](https://www.digitalocean.com/products/kubernetes/)
 
-### Step 1: Install the Operator
+### Step 1: Install MariaDB Operator
+
+Frappe Operator uses [MariaDB Operator](https://github.com/mariadb-operator/mariadb-operator) for secure database provisioning:
+
+```bash
+# Install MariaDB Operator CRDs
+kubectl apply -f https://github.com/mariadb-operator/mariadb-operator/releases/latest/download/crds.yaml
+
+# Install MariaDB Operator
+kubectl apply -f https://github.com/mariadb-operator/mariadb-operator/releases/latest/download/mariadb-operator.yaml
+
+# Verify installation
+kubectl get pods -n mariadb-operator-system
+```
+
+### Step 2: Install Frappe Operator
 
 Install Frappe Operator in your Kubernetes cluster:
 
 ```bash
 kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/download/v1.0.0/install.yaml
+
+# Verify installation
+kubectl get pods -n frappe-operator-system
 ```
 
 This installs:
-- Custom Resource Definitions (CRDs)
-- Operator deployment
-- RBAC permissions
-- Service accounts
+- Custom Resource Definitions (CRDs) for FrappeBench and FrappeSite
+- Operator deployment with RBAC permissions
+- Service accounts and roles
 
-**Verify Installation:**
+### Step 3: Create a Shared MariaDB Instance
+
+For cost-effective multi-tenancy, create a shared MariaDB instance:
 
 ```bash
-kubectl get pods -n frappe-operator-system
+# Download example configuration
+curl -O https://raw.githubusercontent.com/vyogotech/frappe-operator/main/examples/mariadb-shared-instance.yaml
 
-# You should see the operator pod running:
-# NAME                                        READY   STATUS    RESTARTS   AGE
+# IMPORTANT: Edit the file and change the default password!
+# Edit mariadb-shared-instance.yaml and update the password
+
+# Apply the configuration
+kubectl apply -f mariadb-shared-instance.yaml
+
+# Wait for MariaDB to be ready
+kubectl wait --for=condition=Ready mariadb/frappe-mariadb --timeout=300s
+
+# You should see:
+# mariadb.k8s.mariadb.com/frappe-mariadb condition met
 # frappe-operator-controller-manager-xxxxx    2/2     Running   0          30s
 ```
 

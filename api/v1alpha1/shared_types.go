@@ -17,18 +17,27 @@ type ResourceRequirements struct {
 
 // DatabaseConfig defines database configuration for a Frappe site
 type DatabaseConfig struct {
-	// Mode: shared, dedicated, or external
-	// +kubebuilder:validation:Enum=shared;dedicated;external
-	// +kubebuilder:validation:Required
-	Mode string `json:"mode"`
-
-	// Host is the database hostname or IP (optional, defaults based on mode)
+	// Provider: mariadb, postgres, sqlite
+	// +kubebuilder:validation:Enum=mariadb;postgres;sqlite
+	// +kubebuilder:default=mariadb
 	// +optional
-	Host string `json:"host,omitempty"`
+	Provider string `json:"provider,omitempty"`
 
-	// Port is the database port (optional, defaults to 3306)
+	// Mode: shared (one DB instance, multiple site databases) or dedicated (one DB instance per site)
+	// +kubebuilder:validation:Enum=shared;dedicated
+	// +kubebuilder:default=shared
 	// +optional
-	Port string `json:"port,omitempty"`
+	Mode string `json:"mode,omitempty"`
+
+	// MariaDBRef references an existing MariaDB CR (for shared/dedicated modes)
+	// If not specified in shared mode, operator uses/creates a default MariaDB instance
+	// If not specified in dedicated mode, operator creates a per-site MariaDB instance
+	// +optional
+	MariaDBRef *NamespacedName `json:"mariadbRef,omitempty"`
+
+	// PostgresRef references an existing PostgreSQL cluster (future)
+	// +optional
+	PostgresRef *NamespacedName `json:"postgresRef,omitempty"`
 
 	// StorageSize for dedicated database mode
 	// +optional
@@ -38,8 +47,15 @@ type DatabaseConfig struct {
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty"`
 
-	// ConnectionSecretRef references a Secret containing database credentials
-	// Required for external mode. Expected keys: host, port, rootPassword (or root-password)
+	// Host is the database hostname (legacy, for backward compatibility)
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// Port is the database port (legacy, for backward compatibility)
+	// +optional
+	Port string `json:"port,omitempty"`
+
+	// ConnectionSecretRef references a Secret containing database credentials (legacy)
 	// +optional
 	ConnectionSecretRef *corev1.SecretReference `json:"connectionSecretRef,omitempty"`
 }

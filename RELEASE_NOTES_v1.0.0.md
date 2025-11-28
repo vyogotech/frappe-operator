@@ -272,3 +272,4 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 **Full Changelog**: https://github.com/vyogotech/frappe-operator/commits/v1.0.0
 
+

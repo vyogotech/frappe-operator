@@ -5,7 +5,62 @@ metadata:
   creationTimestamp: null
   name: manager-role
 rules:
-# Core resources
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -32,34 +87,6 @@ rules:
   - patch
   - update
   - watch
-# Apps resources
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-# Batch resources
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-# Networking resources
 - apiGroups:
   - networking.k8s.io
   resources:
@@ -72,7 +99,6 @@ rules:
   - patch
   - update
   - watch
-# Storage classes (read-only access)
 - apiGroups:
   - storage.k8s.io
   resources:
@@ -81,11 +107,35 @@ rules:
   - get
   - list
   - watch
-# Frappe CRDs - Core resources
 - apiGroups:
   - vyogo.tech
   resources:
   - frappebenches
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
   - frappesites
   verbs:
   - create
@@ -95,34 +145,179 @@ rules:
   - patch
   - update
   - watch
-# Frappe CRDs - Finalizers
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappebenches/finalizers
   - frappesites/finalizers
   verbs:
   - update
-# Frappe CRDs - Status subresource
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappebenches/status
   - frappesites/status
   verbs:
   - get
   - patch
   - update
-# Extended Frappe CRDs - Additional resources
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappeworkspaces
+  - frappeworkpaces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappeworkpaces/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappeworkpaces/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
   - sitebackups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitebackups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitebackups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
   - sitedashboardcharts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboardcharts/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboardcharts/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
   - sitedashboards
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboards/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitedashboards/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
   - sitejobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitejobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitejobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
   - siteusers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteusers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - siteusers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
   - siteworkspaces
   verbs:
   - create
@@ -132,29 +327,15 @@ rules:
   - patch
   - update
   - watch
-# Extended Frappe CRDs - Finalizers
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappeworkspaces/finalizers
-  - sitebackups/finalizers
-  - sitedashboardcharts/finalizers
-  - sitedashboards/finalizers
-  - sitejobs/finalizers
-  - siteusers/finalizers
   - siteworkspaces/finalizers
   verbs:
   - update
-# Extended Frappe CRDs - Status subresource
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappeworkspaces/status
-  - sitebackups/status
-  - sitedashboardcharts/status
-  - sitedashboards/status
-  - sitejobs/status
-  - siteusers/status
   - siteworkspaces/status
   verbs:
   - get
