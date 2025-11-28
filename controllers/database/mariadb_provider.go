@@ -25,35 +25,59 @@ import (
 	"regexp"
 	"strings"
 
-	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// MariaDBProvider implements database provisioning using MariaDB Operator
-type MariaDBProvider struct {
+// MariaDB Operator GVKs
+var (
+	MariaDBGVK = schema.GroupVersionKind{
+		Group:   "k8s.mariadb.com",
+		Version: "v1alpha1",
+		Kind:    "MariaDB",
+	}
+	DatabaseGVK = schema.GroupVersionKind{
+		Group:   "k8s.mariadb.com",
+		Version: "v1alpha1",
+		Kind:    "Database",
+	}
+	UserGVK = schema.GroupVersionKind{
+		Group:   "k8s.mariadb.com",
+		Version: "v1alpha1",
+		Kind:    "User",
+	}
+	GrantGVK = schema.GroupVersionKind{
+		Group:   "k8s.mariadb.com",
+		Version: "v1alpha1",
+		Kind:    "Grant",
+	}
+)
+
+// MariaDBProviderUnstructured implements database provisioning using unstructured objects
+type MariaDBProviderUnstructured struct {
 	client client.Client
 	scheme *runtime.Scheme
 }
 
-// NewMariaDBProvider creates a new MariaDB provider
+// NewMariaDBProvider creates a new MariaDB provider using unstructured objects
 func NewMariaDBProvider(client client.Client, scheme *runtime.Scheme) Provider {
-	return &MariaDBProvider{
+	return &MariaDBProviderUnstructured{
 		client: client,
 		scheme: scheme,
 	}
 }
 
 // EnsureDatabase ensures database, user, and grant CRs exist
-func (p *MariaDBProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseInfo, error) {
+func (p *MariaDBProviderUnstructured) EnsureDatabase(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseInfo, error) {
 	logger := log.FromContext(ctx)
 
 	// Generate database and user names
@@ -103,11 +127,12 @@ func (p *MariaDBProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1a
 }
 
 // IsReady checks if all database resources are ready
-func (p *MariaDBProvider) IsReady(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (bool, error) {
+func (p *MariaDBProviderUnstructured) IsReady(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	// Check Database CR
-	database := &mariadbv1alpha1.Database{}
+	database := &unstructured.Unstructured{}
+	database.SetGroupVersionKind(DatabaseGVK)
 	dbKey := types.NamespacedName{
 		Name:      fmt.Sprintf("%s-db", site.Name),
 		Namespace: site.Namespace,
@@ -119,13 +144,14 @@ func (p *MariaDBProvider) IsReady(ctx context.Context, site *vyogotechv1alpha1.F
 		return false, err
 	}
 
-	if !p.isDatabaseReady(database) {
-		logger.Info("Database not ready yet", "database", database.Name)
+	if !p.isResourceReady(database) {
+		logger.Info("Database not ready yet", "database", database.GetName())
 		return false, nil
 	}
 
 	// Check User CR
-	user := &mariadbv1alpha1.User{}
+	user := &unstructured.Unstructured{}
+	user.SetGroupVersionKind(UserGVK)
 	userKey := types.NamespacedName{
 		Name:      fmt.Sprintf("%s-user", site.Name),
 		Namespace: site.Namespace,
@@ -137,13 +163,14 @@ func (p *MariaDBProvider) IsReady(ctx context.Context, site *vyogotechv1alpha1.F
 		return false, err
 	}
 
-	if !p.isUserReady(user) {
-		logger.Info("User not ready yet", "user", user.Name)
+	if !p.isResourceReady(user) {
+		logger.Info("User not ready yet", "user", user.GetName())
 		return false, nil
 	}
 
 	// Check Grant CR
-	grant := &mariadbv1alpha1.Grant{}
+	grant := &unstructured.Unstructured{}
+	grant.SetGroupVersionKind(GrantGVK)
 	grantKey := types.NamespacedName{
 		Name:      fmt.Sprintf("%s-grant", site.Name),
 		Namespace: site.Namespace,
@@ -155,8 +182,8 @@ func (p *MariaDBProvider) IsReady(ctx context.Context, site *vyogotechv1alpha1.F
 		return false, err
 	}
 
-	if !p.isGrantReady(grant) {
-		logger.Info("Grant not ready yet", "grant", grant.Name)
+	if !p.isResourceReady(grant) {
+		logger.Info("Grant not ready yet", "grant", grant.GetName())
 		return false, nil
 	}
 
@@ -165,9 +192,10 @@ func (p *MariaDBProvider) IsReady(ctx context.Context, site *vyogotechv1alpha1.F
 }
 
 // GetCredentials retrieves database credentials from the User's password secret
-func (p *MariaDBProvider) GetCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseCredentials, error) {
+func (p *MariaDBProviderUnstructured) GetCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseCredentials, error) {
 	// Get the User CR to find password secret
-	user := &mariadbv1alpha1.User{}
+	user := &unstructured.Unstructured{}
+	user.SetGroupVersionKind(UserGVK)
 	userKey := types.NamespacedName{
 		Name:      fmt.Sprintf("%s-user", site.Name),
 		Namespace: site.Namespace,
@@ -176,42 +204,54 @@ func (p *MariaDBProvider) GetCredentials(ctx context.Context, site *vyogotechv1a
 		return nil, fmt.Errorf("failed to get User CR: %w", err)
 	}
 
-	if user.Spec.PasswordSecretKeyRef == nil {
-		return nil, fmt.Errorf("user has no password secret reference")
+	// Extract username from spec
+	dbUser, _, err := unstructured.NestedString(user.Object, "spec", "name")
+	if err != nil || dbUser == "" {
+		return nil, fmt.Errorf("failed to get username from User CR: %w", err)
+	}
+
+	// Extract password secret reference
+	passwordSecretName, _, err := unstructured.NestedString(user.Object, "spec", "passwordSecretKeyRef", "name")
+	if err != nil || passwordSecretName == "" {
+		return nil, fmt.Errorf("failed to get password secret name from User CR: %w", err)
+	}
+
+	passwordSecretKey, _, err := unstructured.NestedString(user.Object, "spec", "passwordSecretKeyRef", "key")
+	if err != nil || passwordSecretKey == "" {
+		passwordSecretKey = "password" // Default
 	}
 
 	// Get the password from the secret
 	secret := &corev1.Secret{}
 	secretKey := types.NamespacedName{
-		Name:      user.Spec.PasswordSecretKeyRef.Name,
+		Name:      passwordSecretName,
 		Namespace: site.Namespace,
 	}
 	if err := p.client.Get(ctx, secretKey, secret); err != nil {
 		return nil, fmt.Errorf("failed to get password secret: %w", err)
 	}
 
-	password, ok := secret.Data[user.Spec.PasswordSecretKeyRef.Key]
+	password, ok := secret.Data[passwordSecretKey]
 	if !ok {
-		return nil, fmt.Errorf("password key '%s' not found in secret", user.Spec.PasswordSecretKeyRef.Key)
+		return nil, fmt.Errorf("password key '%s' not found in secret", passwordSecretKey)
 	}
 
 	return &DatabaseCredentials{
-		Username:   user.Spec.Name,
+		Username:   dbUser,
 		Password:   string(password),
 		SecretName: secret.Name,
 	}, nil
 }
 
 // Cleanup removes database resources
-func (p *MariaDBProvider) Cleanup(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
+func (p *MariaDBProviderUnstructured) Cleanup(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
 	// Resources will be automatically cleaned up via owner references
-	// This is a placeholder for any additional cleanup logic
 	return nil
 }
 
 // Helper functions
 
-func (p *MariaDBProvider) getMariaDBInstance(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
+func (p *MariaDBProviderUnstructured) getMariaDBInstance(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
 	// Check if user specified a MariaDB reference
 	if site.Spec.DBConfig.MariaDBRef != nil {
 		ns := site.Spec.DBConfig.MariaDBRef.Namespace
@@ -229,22 +269,19 @@ func (p *MariaDBProvider) getMariaDBInstance(ctx context.Context, site *vyogotec
 
 	switch mode {
 	case "shared":
-		// Look for a default shared MariaDB instance
-		// Convention: "frappe-mariadb" in the operator namespace or site namespace
 		return p.findOrCreateSharedMariaDB(ctx, site)
 	case "dedicated":
-		// Create a dedicated MariaDB instance for this site
 		return p.createDedicatedMariaDB(ctx, site)
 	default:
 		return "", "", fmt.Errorf("unsupported database mode: %s", mode)
 	}
 }
 
-func (p *MariaDBProvider) findOrCreateSharedMariaDB(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
-	// For v1.0.0, we'll require a pre-existing MariaDB instance
-	// Look for "frappe-mariadb" in the site's namespace
+func (p *MariaDBProviderUnstructured) findOrCreateSharedMariaDB(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
 	mariadbName := "frappe-mariadb"
-	mariadb := &mariadbv1alpha1.MariaDB{}
+	mariadb := &unstructured.Unstructured{}
+	mariadb.SetGroupVersionKind(MariaDBGVK)
+	
 	err := p.client.Get(ctx, types.NamespacedName{
 		Name:      mariadbName,
 		Namespace: site.Namespace,
@@ -258,15 +295,15 @@ func (p *MariaDBProvider) findOrCreateSharedMariaDB(ctx context.Context, site *v
 		return "", "", err
 	}
 
-	// MariaDB not found - return error with helpful message
 	return "", "", fmt.Errorf("shared MariaDB instance '%s' not found in namespace '%s'. Please create a MariaDB CR or specify dbConfig.mariadbRef", mariadbName, site.Namespace)
 }
 
-func (p *MariaDBProvider) createDedicatedMariaDB(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
+func (p *MariaDBProviderUnstructured) createDedicatedMariaDB(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
 	mariadbName := fmt.Sprintf("%s-mariadb", site.Name)
 
 	// Check if already exists
-	existing := &mariadbv1alpha1.MariaDB{}
+	existing := &unstructured.Unstructured{}
+	existing.SetGroupVersionKind(MariaDBGVK)
 	err := p.client.Get(ctx, types.NamespacedName{
 		Name:      mariadbName,
 		Namespace: site.Namespace,
@@ -281,9 +318,9 @@ func (p *MariaDBProvider) createDedicatedMariaDB(ctx context.Context, site *vyog
 	}
 
 	// Create dedicated MariaDB instance
-	storageSize := resource.MustParse("10Gi")
+	storageSize := "10Gi"
 	if site.Spec.DBConfig.StorageSize != nil {
-		storageSize = *site.Spec.DBConfig.StorageSize
+		storageSize = site.Spec.DBConfig.StorageSize.String()
 	}
 
 	// Generate root password
@@ -307,24 +344,26 @@ func (p *MariaDBProvider) createDedicatedMariaDB(ctx context.Context, site *vyog
 		return "", "", fmt.Errorf("failed to create root password secret: %w", err)
 	}
 
-	mariadb := &mariadbv1alpha1.MariaDB{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mariadbName,
-			Namespace: site.Namespace,
-		},
-		Spec: mariadbv1alpha1.MariaDBSpec{
-			RootPasswordSecretKeyRef: mariadbv1alpha1.GeneratedSecretKeyRef{
-				SecretKeySelector: mariadbv1alpha1.SecretKeySelector{
-					LocalObjectReference: mariadbv1alpha1.LocalObjectReference{
-						Name: rootSecretName,
-					},
-					Key: "password",
+	mariadb := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "k8s.mariadb.com/v1alpha1",
+			"kind":       "MariaDB",
+			"metadata": map[string]interface{}{
+				"name":      mariadbName,
+				"namespace": site.Namespace,
+			},
+			"spec": map[string]interface{}{
+				"rootPasswordSecretKeyRef": map[string]interface{}{
+					"name": rootSecretName,
+					"key":  "password",
 				},
+				"image": "mariadb:10.11",
+				"storage": map[string]interface{}{
+					"size": storageSize,
+				},
+				"replicas": 1,
+				"port":     3306,
 			},
-			Storage: mariadbv1alpha1.Storage{
-				Size: &storageSize,
-			},
-			Replicas: 1,
 		},
 	}
 
@@ -339,34 +378,47 @@ func (p *MariaDBProvider) createDedicatedMariaDB(ctx context.Context, site *vyog
 	return mariadbName, site.Namespace, nil
 }
 
-func (p *MariaDBProvider) ensureDatabaseCR(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, mariadbName, mariadbNamespace, dbName string) error {
-	database := &mariadbv1alpha1.Database{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-db", site.Name),
-			Namespace: site.Namespace,
+func (p *MariaDBProviderUnstructured) ensureDatabaseCR(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, mariadbName, mariadbNamespace, dbName string) error {
+	database := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "k8s.mariadb.com/v1alpha1",
+			"kind":       "Database",
+			"metadata": map[string]interface{}{
+				"name":      fmt.Sprintf("%s-db", site.Name),
+				"namespace": site.Namespace,
+			},
+			"spec": map[string]interface{}{
+				"mariaDbRef": map[string]interface{}{
+					"name":      mariadbName,
+					"namespace": mariadbNamespace,
+				},
+				"name":         dbName,
+				"characterSet": "utf8mb4",
+				"collate":      "utf8mb4_unicode_ci",
+			},
 		},
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, p.client, database, func() error {
-		database.Spec = mariadbv1alpha1.DatabaseSpec{
-			MariaDBRef: mariadbv1alpha1.MariaDBRef{
-				ObjectReference: mariadbv1alpha1.ObjectReference{
-					Name:      mariadbName,
-					Namespace: mariadbNamespace,
-				},
-			},
-			Name:         dbName,
-			CharacterSet: "utf8mb4",
-			Collate:      "utf8mb4_unicode_ci",
-		}
+	if err := controllerutil.SetControllerReference(site, database, p.scheme); err != nil {
+		return err
+	}
 
-		return controllerutil.SetControllerReference(site, database, p.scheme)
-	})
+	// Check if exists
+	existing := &unstructured.Unstructured{}
+	existing.SetGroupVersionKind(DatabaseGVK)
+	err := p.client.Get(ctx, types.NamespacedName{
+		Name:      database.GetName(),
+		Namespace: database.GetNamespace(),
+	}, existing)
+
+	if errors.IsNotFound(err) {
+		return p.client.Create(ctx, database)
+	}
 
 	return err
 }
 
-func (p *MariaDBProvider) ensureUserCR(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, mariadbName, mariadbNamespace, dbUser string) (string, error) {
+func (p *MariaDBProviderUnstructured) ensureUserCR(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, mariadbName, mariadbNamespace, dbUser string) (string, error) {
 	passwordSecretName := fmt.Sprintf("%s-db-password", site.Name)
 
 	// Create password secret if it doesn't exist
@@ -377,120 +429,147 @@ func (p *MariaDBProvider) ensureUserCR(ctx context.Context, site *vyogotechv1alp
 		},
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, p.client, passwordSecret, func() error {
-		if passwordSecret.Data == nil {
-			// Only generate password if secret doesn't exist
-			passwordSecret.StringData = map[string]string{
-				"password": p.generatePassword(16),
-			}
+	err := p.client.Get(ctx, types.NamespacedName{
+		Name:      passwordSecretName,
+		Namespace: site.Namespace,
+	}, passwordSecret)
+
+	if errors.IsNotFound(err) {
+		passwordSecret.StringData = map[string]string{
+			"password": p.generatePassword(16),
 		}
-		return controllerutil.SetControllerReference(site, passwordSecret, p.scheme)
-	})
-	if err != nil {
+		if err := controllerutil.SetControllerReference(site, passwordSecret, p.scheme); err != nil {
+			return "", err
+		}
+		if err := p.client.Create(ctx, passwordSecret); err != nil {
+			return "", err
+		}
+	} else if err != nil {
 		return "", err
 	}
 
 	// Create User CR
-	user := &mariadbv1alpha1.User{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-user", site.Name),
-			Namespace: site.Namespace,
+	user := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "k8s.mariadb.com/v1alpha1",
+			"kind":       "User",
+			"metadata": map[string]interface{}{
+				"name":      fmt.Sprintf("%s-user", site.Name),
+				"namespace": site.Namespace,
+			},
+			"spec": map[string]interface{}{
+				"mariaDbRef": map[string]interface{}{
+					"name":      mariadbName,
+					"namespace": mariadbNamespace,
+				},
+				"name": dbUser,
+				"passwordSecretKeyRef": map[string]interface{}{
+					"name": passwordSecretName,
+					"key":  "password",
+				},
+				"maxUserConnections": 100,
+			},
 		},
 	}
 
-	_, err = controllerutil.CreateOrUpdate(ctx, p.client, user, func() error{
-		user.Spec = mariadbv1alpha1.UserSpec{
-			MariaDBRef: mariadbv1alpha1.MariaDBRef{
-				ObjectReference: mariadbv1alpha1.ObjectReference{
-					Name:      mariadbName,
-					Namespace: mariadbNamespace,
-				},
-			},
-			Name: dbUser,
-			PasswordSecretKeyRef: &mariadbv1alpha1.SecretKeySelector{
-				LocalObjectReference: mariadbv1alpha1.LocalObjectReference{
-					Name: passwordSecretName,
-				},
-				Key: "password",
-			},
-			MaxUserConnections: 100,
+	if err := controllerutil.SetControllerReference(site, user, p.scheme); err != nil {
+		return "", err
+	}
+
+	// Check if exists
+	existingUser := &unstructured.Unstructured{}
+	existingUser.SetGroupVersionKind(UserGVK)
+	err = p.client.Get(ctx, types.NamespacedName{
+		Name:      user.GetName(),
+		Namespace: user.GetNamespace(),
+	}, existingUser)
+
+	if errors.IsNotFound(err) {
+		if err := p.client.Create(ctx, user); err != nil {
+			return "", err
 		}
+	} else if err != nil {
+		return "", err
+	}
 
-		return controllerutil.SetControllerReference(site, user, p.scheme)
-	})
-
-	return passwordSecretName, err
+	return passwordSecretName, nil
 }
 
-func (p *MariaDBProvider) ensureGrantCR(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, mariadbName, mariadbNamespace, dbName, dbUser string) error {
-	grant := &mariadbv1alpha1.Grant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-grant", site.Name),
-			Namespace: site.Namespace,
+func (p *MariaDBProviderUnstructured) ensureGrantCR(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, mariadbName, mariadbNamespace, dbName, dbUser string) error {
+	grant := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "k8s.mariadb.com/v1alpha1",
+			"kind":       "Grant",
+			"metadata": map[string]interface{}{
+				"name":      fmt.Sprintf("%s-grant", site.Name),
+				"namespace": site.Namespace,
+			},
+			"spec": map[string]interface{}{
+				"mariaDbRef": map[string]interface{}{
+					"name":      mariadbName,
+					"namespace": mariadbNamespace,
+				},
+				"privileges":  []string{"ALL PRIVILEGES"},
+				"database":    dbName,
+				"table":       "*",
+				"username":    dbUser,
+				"grantOption": true,
+			},
 		},
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, p.client, grant, func() error {
-		grant.Spec = mariadbv1alpha1.GrantSpec{
-			MariaDBRef: mariadbv1alpha1.MariaDBRef{
-				ObjectReference: mariadbv1alpha1.ObjectReference{
-					Name:      mariadbName,
-					Namespace: mariadbNamespace,
-				},
-			},
-			Privileges:  []string{"ALL PRIVILEGES"},
-			Database:    dbName,
-			Table:       "*",
-			Username:    dbUser,
-			GrantOption: true,
-		}
+	if err := controllerutil.SetControllerReference(site, grant, p.scheme); err != nil {
+		return err
+	}
 
-		return controllerutil.SetControllerReference(site, grant, p.scheme)
-	})
+	// Check if exists
+	existing := &unstructured.Unstructured{}
+	existing.SetGroupVersionKind(GrantGVK)
+	err := p.client.Get(ctx, types.NamespacedName{
+		Name:      grant.GetName(),
+		Namespace: grant.GetNamespace(),
+	}, existing)
+
+	if errors.IsNotFound(err) {
+		return p.client.Create(ctx, grant)
+	}
 
 	return err
 }
 
-func (p *MariaDBProvider) getMariaDBConnection(ctx context.Context, mariadbName, mariadbNamespace string) (string, string, error) {
+func (p *MariaDBProviderUnstructured) getMariaDBConnection(ctx context.Context, mariadbName, mariadbNamespace string) (string, string, error) {
 	// MariaDB Operator creates a service with the same name as the MariaDB CR
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", mariadbName, mariadbNamespace)
-	port := "3306" // Default MariaDB port
-
+	port := "3306"
 	return host, port, nil
 }
 
-func (p *MariaDBProvider) isDatabaseReady(db *mariadbv1alpha1.Database) bool {
-	for _, cond := range db.Status.Conditions {
-		if cond.Type == "Ready" && cond.Status == metav1.ConditionTrue {
+func (p *MariaDBProviderUnstructured) isResourceReady(obj *unstructured.Unstructured) bool {
+	conditions, found, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
+	if err != nil || !found {
+		return false
+	}
+
+	for _, cond := range conditions {
+		condMap, ok := cond.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		
+		condType, _, _ := unstructured.NestedString(condMap, "type")
+		condStatus, _, _ := unstructured.NestedString(condMap, "status")
+		
+		if condType == "Ready" && condStatus == "True" {
 			return true
 		}
 	}
+	
 	return false
 }
 
-func (p *MariaDBProvider) isUserReady(user *mariadbv1alpha1.User) bool {
-	for _, cond := range user.Status.Conditions {
-		if cond.Type == "Ready" && cond.Status == metav1.ConditionTrue {
-			return true
-		}
-	}
-	return false
-}
-
-func (p *MariaDBProvider) isGrantReady(grant *mariadbv1alpha1.Grant) bool {
-	for _, cond := range grant.Status.Conditions {
-		if cond.Type == "Ready" && cond.Status == metav1.ConditionTrue {
-			return true
-		}
-	}
-	return false
-}
-
-func (p *MariaDBProvider) generateDBName(site *vyogotechv1alpha1.FrappeSite) string {
-	// Generate: _<hash>_<sanitized-sitename>
+func (p *MariaDBProviderUnstructured) generateDBName(site *vyogotechv1alpha1.FrappeSite) string {
 	hash := p.hashString(site.Namespace + "/" + site.Name)[:8]
 	safeName := p.sanitizeName(site.Spec.SiteName)
-	// Limit total length to 64 characters (MySQL database name limit)
 	dbName := fmt.Sprintf("_%s_%s", hash, safeName)
 	if len(dbName) > 64 {
 		dbName = dbName[:64]
@@ -498,10 +577,8 @@ func (p *MariaDBProvider) generateDBName(site *vyogotechv1alpha1.FrappeSite) str
 	return dbName
 }
 
-func (p *MariaDBProvider) generateDBUser(site *vyogotechv1alpha1.FrappeSite) string {
-	// Generate: <sanitized-sitename>_user
+func (p *MariaDBProviderUnstructured) generateDBUser(site *vyogotechv1alpha1.FrappeSite) string {
 	safeName := p.sanitizeName(site.Name)
-	// Limit to 32 characters for MySQL username limit
 	userName := fmt.Sprintf("%s_user", safeName)
 	if len(userName) > 32 {
 		userName = userName[:32]
@@ -509,28 +586,24 @@ func (p *MariaDBProvider) generateDBUser(site *vyogotechv1alpha1.FrappeSite) str
 	return userName
 }
 
-func (p *MariaDBProvider) sanitizeName(name string) string {
-	// Remove invalid characters for database/user names
+func (p *MariaDBProviderUnstructured) sanitizeName(name string) string {
 	reg := regexp.MustCompile(`[^a-zA-Z0-9_]`)
 	sanitized := reg.ReplaceAllString(name, "_")
-	// Remove consecutive underscores
 	reg2 := regexp.MustCompile(`_{2,}`)
 	sanitized = reg2.ReplaceAllString(sanitized, "_")
-	// Trim underscores from edges
 	sanitized = strings.Trim(sanitized, "_")
 	return sanitized
 }
 
-func (p *MariaDBProvider) hashString(s string) string {
+func (p *MariaDBProviderUnstructured) hashString(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
 	return fmt.Sprintf("%x", h.Sum32())
 }
 
-func (p *MariaDBProvider) generatePassword(length int) string {
+func (p *MariaDBProviderUnstructured) generatePassword(length int) string {
 	bytes := make([]byte, length/2)
 	if _, err := rand.Read(bytes); err != nil {
-		// Fallback to timestamp-based password if random fails
 		return fmt.Sprintf("%d", metav1.Now().Unix())
 	}
 	return hex.EncodeToString(bytes)

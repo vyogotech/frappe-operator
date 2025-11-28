@@ -1,0 +1,15 @@
+{{- if .Values.examples.createBench -}}
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: {{ .Values.examples.bench.name }}
+  namespace: {{ .Values.examples.bench.namespace }}
+  labels:
+    {{- include "frappe-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: example
+spec:
+  frappeVersion: {{ .Values.examples.bench.frappeVersion | quote }}
+  apps:
+    {{- toYaml .Values.examples.bench.apps | nindent 4 }}
+{{- end }}
+

@@ -1,0 +1,84 @@
+{{- if .Values.mariadb.enabled -}}
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: {{ .Values.mariadb.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "frappe-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  # MariaDB image
+  image: {{ .Values.mariadb.image.repository }}:{{ .Values.mariadb.image.tag }}
+  imagePullPolicy: {{ .Values.mariadb.image.pullPolicy }}
+  
+  # Root password
+  rootPasswordSecretKeyRef:
+    name: {{ .Values.mariadb.rootPasswordSecretRef.name }}
+    key: {{ .Values.mariadb.rootPasswordSecretRef.key }}
+  
+  # Storage
+  storage:
+    size: {{ .Values.mariadb.storage.size }}
+    {{- if .Values.mariadb.storage.storageClassName }}
+    storageClassName: {{ .Values.mariadb.storage.storageClassName }}
+    {{- else if .Values.global.storageClass }}
+    storageClassName: {{ .Values.global.storageClass }}
+    {{- end }}
+  
+  # Replicas
+  replicas: {{ .Values.mariadb.replicas }}
+  
+  # Galera cluster configuration (if HA is enabled)
+  {{- if .Values.mariadb.galera.enabled }}
+  galera:
+    enabled: true
+    primary:
+      podIndex: 0
+    sst: mariabackup
+    replicaThreads: 1
+    recovery:
+      enabled: true
+  {{- end }}
+  
+  # Resources
+  resources:
+    {{- toYaml .Values.mariadb.resources | nindent 4 }}
+  
+  # MariaDB configuration
+  myCnf: {{ .Values.mariadb.config | quote }}
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 3306
+  
+  # Connection details
+  connection:
+    secretName: {{ .Values.mariadb.name }}-connection
+    secretTemplate:
+      key: dsn
+  
+  # Metrics (if monitoring is enabled)
+  {{- if .Values.global.monitoring.enabled }}
+  metrics:
+    enabled: true
+    exporter:
+      image: prom/mysqld-exporter:latest
+      port: 9104
+    {{- if .Values.global.monitoring.prometheus.enabled }}
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+    {{- end }}
+  {{- end }}
+  
+  # Update strategy
+  updateStrategy:
+    type: RollingUpdate
+  
+  # Pod disruption budget
+  podDisruptionBudget:
+    maxUnavailable: 1
+{{- end }}
+
