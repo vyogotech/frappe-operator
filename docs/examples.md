@@ -432,7 +432,7 @@ The Frappe Operator provides varying levels of support for external databases an
 
 #### External MariaDB/MySQL Support
 
-**Status:** ⚠️ **NOT YET IMPLEMENTED** (Planned)
+**Status:** ⚠️ **PLANNED** (Not Yet Implemented)
 
 External database support is documented in the API and examples but **not yet fully implemented** in the current version (v1.0.0).
 
