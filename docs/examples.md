@@ -432,13 +432,14 @@ The Frappe Operator provides varying levels of support for external databases an
 
 #### External MariaDB/MySQL Support
 
-**Status:** ✅ **SUPPORTED** (v1.0.0+)
+**Status:** ⚠️ **NOT YET IMPLEMENTED** (Planned)
 
-The operator supports connecting to external MariaDB or MySQL databases (e.g., AWS RDS, Azure Database for MySQL, Google Cloud SQL).
+External database support is documented in the API and examples but **not yet fully implemented** in the current version (v1.0.0).
 
-**Configuration Example:**
+**API Definition (Available but not functional):**
 
 ```yaml
+# This configuration is defined in the API but NOT fully implemented
 ---
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
@@ -451,12 +452,12 @@ spec:
   siteName: "erp.example.com"
   
   dbConfig:
-    mode: external  # Use external database
+    mode: external  # ⚠️ Not yet implemented in MariaDBProvider
     connectionSecretRef:
       name: external-db-credentials
 
 ---
-# External database credentials secret
+# External database credentials secret format
 apiVersion: v1
 kind: Secret
 metadata:
@@ -471,22 +472,57 @@ stringData:
   password: "your-secure-password-here"   # Database password
 ```
 
-**Use Cases:**
-- ✅ AWS RDS for MariaDB/MySQL
-- ✅ Azure Database for MySQL
-- ✅ Google Cloud SQL for MySQL
-- ✅ Self-managed external MariaDB/MySQL instances
-- ✅ High-availability managed database services
+**Current Status:**
+- ❌ The `mode: external` option is defined in the CRD but returns "unsupported database mode" error
+- ❌ The MariaDBProvider (`controllers/database/mariadb_provider.go:270-277`) only handles `shared` and `dedicated` modes
+- ❌ ConnectionSecretRef field exists but is not used in the implementation
+- ✅ **Workaround:** Use MariaDB Operator CRs to reference external databases (see below)
 
-**Requirements:**
-- The external database must be accessible from the Kubernetes cluster
-- The database user must have permissions to create and manage databases
-- Network connectivity must be properly configured (security groups, firewall rules)
+**Current Workaround - Using MariaDB Operator with External Database:**
 
-**Notes:**
-- The operator will use the provided database connection details
-- Database provisioning (creating database, user, grants) must be handled externally
-- The site will connect directly to the external database instance
+You can reference an external database by creating MariaDB Operator custom resources that point to your external instance:
+
+```yaml
+---
+# Create a MariaDB CR that points to external database
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: external-mariadb
+  namespace: production
+spec:
+  # Configure this to point to your external MariaDB instance
+  # (Requires MariaDB Operator configuration for external databases)
+  # See: https://github.com/mariadb-operator/mariadb-operator
+
+---
+# Reference it in your FrappeSite
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: mysite
+  namespace: production
+spec:
+  benchRef:
+    name: prod-bench
+  siteName: "erp.example.com"
+  
+  dbConfig:
+    mode: shared  # Use shared mode with mariadbRef
+    mariadbRef:
+      name: external-mariadb  # Reference your external DB
+      namespace: production
+```
+
+**Planned Use Cases (Future Release):**
+- AWS RDS for MariaDB/MySQL
+- Azure Database for MySQL
+- Google Cloud SQL for MySQL
+- Self-managed external MariaDB/MySQL instances
+- High-availability managed database services
+
+**Roadmap:**
+Direct external database support (with `mode: external`) is planned for a future release (v1.1+).
 
 ---
 
@@ -549,18 +585,59 @@ External Redis support is planned for a future release (v1.1+). When implemented
 
 ---
 
+#### Redis Architecture and Data Isolation
+
+**Important:** Redis is **shared at the bench level**, not isolated per site.
+
+**How it Works:**
+- Each `FrappeBench` creates **two Redis instances**:
+  - `{bench-name}-redis-cache` - For session storage and caching
+  - `{bench-name}-redis-queue` - For background job queues
+- **All sites on the same bench share these Redis instances**
+- Sites use the default Redis database (db 0) - no database number isolation
+- Data isolation is handled by **Frappe's key prefixes**, not separate Redis databases
+
+**Example Architecture:**
+```
+FrappeBench: saas-bench
+├── Redis Cache (shared)
+│   └── All sites: customer1, customer2, customer3
+├── Redis Queue (shared)
+│   └── All sites: customer1, customer2, customer3
+└── MariaDB
+    ├── Database: customer1_db (isolated)
+    ├── Database: customer2_db (isolated)
+    └── Database: customer3_db (isolated)
+```
+
+**Key Points:**
+- ✅ **Database:** Each site gets its own isolated MariaDB database
+- ⚠️ **Redis:** All sites on the same bench share Redis (namespaced by keys)
+- 💡 **Best Practice:** For complete isolation, use dedicated benches per customer/site
+
+**Site Configuration Generated:**
+```json
+{
+  "host_name": "customer1.example.com",
+  "redis_cache": "redis://saas-bench-redis-cache:6379",
+  "redis_queue": "redis://saas-bench-redis-queue:6379"
+}
+```
+
+---
+
 #### Summary Table
 
-| Feature | Status | Version | Use Cases |
-|---------|--------|---------|-----------|
-| **External MariaDB/MySQL** | ✅ Supported | v1.0.0+ | AWS RDS, Azure Database, Cloud SQL, Self-managed |
-| **Shared MariaDB** | ✅ Supported | v1.0.0+ | Multi-tenant, cost-effective |
-| **Dedicated MariaDB** | ✅ Supported | v1.0.0+ | Enterprise, isolated databases |
-| **In-cluster Redis** | ✅ Supported | v1.0.0+ | Default deployment, fully managed |
-| **In-cluster Dragonfly** | ✅ Supported | v1.0.0+ | High-performance alternative to Redis |
-| **External Redis** | ⚠️ Planned | Future (v1.1+) | ElastiCache, Azure Cache, Memorystore |
-| **PostgreSQL** | ⚠️ Planned | v1.1.0+ | PostgreSQL provider |
-| **SQLite** | ✅ Supported | v1.0.0+ | Frappe v16+ sites |
+| Feature | Status | Version | Isolation Level | Use Cases |
+|---------|--------|---------|----------------|-----------|
+| **External MariaDB/MySQL** | ⚠️ Planned | v1.1+ | Per-site (with workaround) | AWS RDS, Azure Database, Cloud SQL |
+| **Shared MariaDB** | ✅ Supported | v1.0.0+ | Per-site database | Multi-tenant, cost-effective |
+| **Dedicated MariaDB** | ✅ Supported | v1.0.0+ | Per-site instance | Enterprise, isolated databases |
+| **In-cluster Redis** | ✅ Supported | v1.0.0+ | **Bench-level (shared)** | Default deployment, fully managed |
+| **In-cluster Dragonfly** | ✅ Supported | v1.0.0+ | **Bench-level (shared)** | High-performance alternative |
+| **External Redis** | ⚠️ Planned | v1.1+ | TBD | ElastiCache, Azure Cache, Memorystore |
+| **PostgreSQL** | ⚠️ Planned | v1.1.0+ | Per-site database | PostgreSQL provider |
+| **SQLite** | ✅ Supported | v1.0.0+ | Per-site file | Frappe v16+ sites |
 
 ---
 
