@@ -11,6 +11,7 @@ Real-world deployment patterns and configuration examples for Frappe Operator.
 - [Production Deployment](#production-deployment)
 - [Multi-Tenant SaaS](#multi-tenant-saas)
 - [Enterprise Setup](#enterprise-setup)
+- [External Database and Redis](#external-database-and-redis) **📊 Support Status**
 - [Custom Domains](#custom-domains)
 - [High Availability](#high-availability)
 - [Worker Autoscaling](#worker-autoscaling) **⚡ NEW**
@@ -420,6 +421,146 @@ stringData:
   username: "acme_admin@acme-mysql"
   password: "YourAzureMySQLPassword"
 ```
+
+---
+
+## External Database and Redis
+
+### Support Status and Configuration
+
+The Frappe Operator provides varying levels of support for external databases and Redis instances.
+
+#### External MariaDB/MySQL Support
+
+**Status:** ✅ **SUPPORTED** (v1.0.0+)
+
+The operator supports connecting to external MariaDB or MySQL databases (e.g., AWS RDS, Azure Database for MySQL, Google Cloud SQL).
+
+**Configuration Example:**
+
+```yaml
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: external-db-site
+  namespace: production
+spec:
+  benchRef:
+    name: prod-bench
+  siteName: "erp.example.com"
+  
+  dbConfig:
+    mode: external  # Use external database
+    connectionSecretRef:
+      name: external-db-credentials
+
+---
+# External database credentials secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-db-credentials
+  namespace: production
+type: Opaque
+stringData:
+  host: "mysql.rds.amazonaws.com"        # Database hostname
+  port: "3306"                            # Database port
+  database: "erp_production"              # Database name
+  username: "frappe_user"                 # Database user
+  password: "your-secure-password-here"   # Database password
+```
+
+**Use Cases:**
+- ✅ AWS RDS for MariaDB/MySQL
+- ✅ Azure Database for MySQL
+- ✅ Google Cloud SQL for MySQL
+- ✅ Self-managed external MariaDB/MySQL instances
+- ✅ High-availability managed database services
+
+**Requirements:**
+- The external database must be accessible from the Kubernetes cluster
+- The database user must have permissions to create and manage databases
+- Network connectivity must be properly configured (security groups, firewall rules)
+
+**Notes:**
+- The operator will use the provided database connection details
+- Database provisioning (creating database, user, grants) must be handled externally
+- The site will connect directly to the external database instance
+
+---
+
+#### External Redis Support
+
+**Status:** ⚠️ **PLANNED** (Not Yet Implemented)
+
+External Redis support is defined in the API but **not yet implemented** in the current version (v1.0.0).
+
+**API Definition (Available but not functional):**
+
+```yaml
+# This configuration is defined in the API but NOT yet implemented
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: external-redis-bench
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: erpnext
+      source: image
+  
+  redisConfig:
+    type: redis
+    # ConnectionSecretRef is defined but not yet implemented
+    connectionSecretRef:
+      name: external-redis-credentials  # ⚠️ Not yet functional
+```
+
+**Current Status:**
+- ❌ The `ConnectionSecretRef` field exists in the API (`api/v1alpha1/shared_types.go:240`)
+- ❌ Implementation is marked as TODO in the codebase (`controllers/frappebench_resources.go:1504`)
+- ❌ The operator currently only supports **in-cluster Redis** deployments
+- ✅ In-cluster Redis (managed by operator) works perfectly
+
+**Current Behavior:**
+The operator automatically deploys Redis instances within the cluster for:
+- **Redis Cache** - Session storage and caching
+- **Redis Queue** - Background job queue management
+
+You can configure the in-cluster Redis with:
+```yaml
+redisConfig:
+  type: redis          # or 'dragonfly' for better performance
+  maxMemory: "4gb"     # Memory limit
+  storageSize: "10Gi"  # Persistent storage size
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "4Gi"
+```
+
+**Roadmap:**
+External Redis support is planned for a future release (v1.1+). When implemented, it will support:
+- AWS ElastiCache for Redis
+- Azure Cache for Redis
+- Google Cloud Memorystore
+- Self-managed external Redis instances
+
+---
+
+#### Summary Table
+
+| Feature | Status | Version | Use Cases |
+|---------|--------|---------|-----------|
+| **External MariaDB/MySQL** | ✅ Supported | v1.0.0+ | AWS RDS, Azure Database, Cloud SQL, Self-managed |
+| **Shared MariaDB** | ✅ Supported | v1.0.0+ | Multi-tenant, cost-effective |
+| **Dedicated MariaDB** | ✅ Supported | v1.0.0+ | Enterprise, isolated databases |
+| **In-cluster Redis** | ✅ Supported | v1.0.0+ | Default deployment, fully managed |
+| **In-cluster Dragonfly** | ✅ Supported | v1.0.0+ | High-performance alternative to Redis |
+| **External Redis** | ⚠️ Planned | Future (v1.1+) | ElastiCache, Azure Cache, Memorystore |
+| **PostgreSQL** | ⚠️ Planned | v1.1.0+ | PostgreSQL provider |
+| **SQLite** | ✅ Supported | v1.0.0+ | Frappe v16+ sites |
 
 ---
 
