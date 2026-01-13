@@ -320,6 +320,108 @@ spec:
                         type: object
                     type: object
                 type: object
+              dbConfig:
+                description: DBConfig defines default database configuration for all
+                  sites in this bench
+                properties:
+                  connectionSecretRef:
+                    description: |-
+                      ConnectionSecretRef references a Secret containing database credentials
+                      Required for 'external' provider. Secret should contain: username, password, database (optional, defaults to siteName)
+                    properties:
+                      name:
+                        description: name is unique within a namespace to reference
+                          a secret resource.
+                        type: string
+                      namespace:
+                        description: namespace defines the space within which the
+                          secret name must be unique.
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  host:
+                    description: Host is the database hostname for external connections
+                    type: string
+                  mariadbRef:
+                    description: |-
+                      MariaDBRef references an existing MariaDB CR (for shared/dedicated modes)
+                      If not specified in shared mode, operator uses/creates a default MariaDB instance
+                      If not specified in dedicated mode, operator creates a per-site MariaDB instance
+                    properties:
+                      name:
+                        description: Name of the resource
+                        type: string
+                      namespace:
+                        description: Namespace of the resource
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  mode:
+                    default: shared
+                    description: 'Mode: shared (one DB instance, multiple site databases)
+                      or dedicated (one DB instance per site)'
+                    enum:
+                    - shared
+                    - dedicated
+                    type: string
+                  port:
+                    description: Port is the database port for external connections
+                    type: string
+                  postgresRef:
+                    description: PostgresRef references an existing PostgreSQL cluster
+                      (future)
+                    properties:
+                      name:
+                        description: Name of the resource
+                        type: string
+                      namespace:
+                        description: Namespace of the resource
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  provider:
+                    default: mariadb
+                    description: 'Provider: mariadb, postgres, sqlite, external'
+                    enum:
+                    - mariadb
+                    - postgres
+                    - sqlite
+                    - external
+                    type: string
+                  resources:
+                    description: Resources for dedicated database mode
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  storageSize:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: StorageSize for dedicated database mode
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
               domainConfig:
                 description: DomainConfig defines default domain behavior for sites
                   on this bench

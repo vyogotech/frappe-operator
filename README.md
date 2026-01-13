@@ -5,8 +5,8 @@ A Kubernetes Operator that makes deploying and managing [Frappe](https://frappef
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/vyogotech/frappe-operator)](go.mod)
-[![Release](https://img.shields.io/github/v/release/vyogotech/frappe-operator)](https://github.com/vyogotech/frappe-operator/releases/latest)
-[![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](RELEASE_NOTES_v1.0.0.md)
+[![Release](https://img.shields.io/github/v/release/vyogotech/frappe-operator)](https://github.com/vyogotech/frappe-operator/releases/tag/v2.4.0)
+[![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](docs/RELEASE_NOTES_v2.4.0.md)
 
 **📚 [Complete Documentation](https://vyogotech.github.io/frappe-operator/)**
 
@@ -42,6 +42,7 @@ Frappe Operator is a Kubernetes operator that automates the deployment, scaling,
 - 📦 **Hybrid App Installation** - Install apps from FPM packages, Git repositories, or pre-built images
 - ⚡ **Production-Ready Architecture** - Dual Redis (cache + queue), correct entry points
 - 📊 **Auto-Scaling** - Automatically scale based on traffic and resource usage
+- ⚡ **NEW: External Database Support** - Connect to AWS RDS, Google Cloud SQL, or any external MariaDB/PostgreSQL
 - ⚡ **NEW: Worker Autoscaling** - KEDA-based scale-to-zero for background workers (save costs!)
 - 🔄 **Automated Updates** - Zero-downtime rolling updates and migrations
 - 💾 **Backup Management** - Automated backups with configurable retention policies

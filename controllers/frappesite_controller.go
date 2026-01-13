@@ -115,8 +115,14 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	// Check if bench is ready (has pods running)
-	// For now, we'll assume bench is ready if it exists
+	// Check if bench is ready
+	if bench.Status.Phase != "Ready" {
+		logger.Info("Referenced bench is not ready yet", "bench", bench.Name, "phase", bench.Status.Phase)
+		site.Status.BenchReady = false
+		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhasePending
+		_ = r.Status().Update(ctx, site)
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
 	site.Status.BenchReady = true
 	site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseProvisioning
 
@@ -127,8 +133,11 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	site.Status.ResolvedDomain = domain
 	site.Status.DomainSource = domainSource
 
+	// Resolve DB config (merging site and bench defaults)
+	dbConfig := r.resolveDBConfig(site, bench)
+
 	// 0. Provision database using database provider
-	dbProvider, err := database.NewProvider(site.Spec.DBConfig.Provider, r.Client, r.Scheme)
+	dbProvider, err := database.NewProvider(dbConfig, r.Client, r.Scheme)
 	if err != nil {
 		logger.Error(err, "Failed to create database provider")
 		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
@@ -207,7 +216,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		createIngress = false
 		logger.Info("Ingress creation disabled by user", "site", site.Name)
 	}
-	
+
 	if createIngress {
 		if err := r.ensureIngress(ctx, site, bench, domain); err != nil {
 			logger.Error(err, "Failed to ensure Ingress")
@@ -229,6 +238,46 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	logger.Info("FrappeSite reconciled successfully", "site", site.Name, "domain", domain)
 	return ctrl.Result{}, nil
+}
+
+// resolveDBConfig merges site-specific database configuration with bench-level defaults
+func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench) vyogotechv1alpha1.DatabaseConfig {
+	config := site.Spec.DBConfig
+
+	if bench.Spec.DBConfig == nil {
+		return config
+	}
+
+	// Use bench-level defaults for any empty fields in site config
+	if config.Provider == "" {
+		config.Provider = bench.Spec.DBConfig.Provider
+	}
+	if config.Mode == "" {
+		config.Mode = bench.Spec.DBConfig.Mode
+	}
+	if config.MariaDBRef == nil {
+		config.MariaDBRef = bench.Spec.DBConfig.MariaDBRef
+	}
+	if config.PostgresRef == nil {
+		config.PostgresRef = bench.Spec.DBConfig.PostgresRef
+	}
+	if config.Host == "" {
+		config.Host = bench.Spec.DBConfig.Host
+	}
+	if config.Port == "" {
+		config.Port = bench.Spec.DBConfig.Port
+	}
+	if config.ConnectionSecretRef == nil {
+		config.ConnectionSecretRef = bench.Spec.DBConfig.ConnectionSecretRef
+	}
+	if config.StorageSize == nil {
+		config.StorageSize = bench.Spec.DBConfig.StorageSize
+	}
+	if config.Resources == nil {
+		config.Resources = bench.Spec.DBConfig.Resources
+	}
+
+	return config
 }
 
 // resolveDomain determines the final domain for the site with priority-based resolution
@@ -403,17 +452,30 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
     fi
 
     echo "Creating site with $DB_PROVIDER database (pre-provisioned)"
-    bench new-site "$SITE_NAME" \
+    
+    # Check if bench version supports --db-user flag
+    DB_USER_FLAG=""
+    if bench new-site --help | grep -q " --db-user"; then
+        echo "Detected support for --db-user flag"
+        DB_USER_FLAG="--db-user=$DB_USER"
+    elif [[ "$DB_USER" != "$DB_NAME" ]]; then
+        echo "WARNING: Your bench version does not support --db-user. Using DB_NAME as username."
+    else
+        echo "Bench version does not support --db-user, but DB_USER matches DB_NAME. Proceeding."
+    fi
+
+    bench new-site \
       --db-type="$DB_PROVIDER" \
       --db-name="$DB_NAME" \
       --db-host="$DB_HOST" \
       --db-port="$DB_PORT" \
-      --db-user="$DB_USER" \
+      $DB_USER_FLAG \
       --db-password="$DB_PASSWORD" \
       --no-setup-db \
       --admin-password="$ADMIN_PASSWORD" \
       --install-app=erpnext \
-      --verbose
+      --verbose \
+      "$SITE_NAME"
 
 elif [[ "$DB_PROVIDER" == "sqlite" ]]; then
     # For SQLite: file-based database, no external connection needed
@@ -591,7 +653,7 @@ func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotec
 	if site.Spec.IngressClassName != "" {
 		ingressClassName = site.Spec.IngressClassName
 	}
-	
+
 	// Validate IngressClass exists and warn if missing
 	ingressClass := &networkingv1.IngressClass{}
 	if err := r.Get(ctx, types.NamespacedName{Name: ingressClassName}, ingressClass); err != nil {
@@ -733,4 +795,3 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&networkingv1.Ingress{}).
 		Complete(r)
 }
-

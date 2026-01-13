@@ -14,6 +14,7 @@ Real-world deployment patterns and configuration examples for Frappe Operator.
 - [Custom Domains](#custom-domains)
 - [High Availability](#high-availability)
 - [Worker Autoscaling](#worker-autoscaling) **⚡ NEW**
+- [External Database Support](#external-database-support) **⚡ NEW**
 - [Resource Scaling](#resource-scaling)
 - [Using Example Files](#using-example-files)
 
@@ -771,6 +772,88 @@ kubectl get pods -n production -l component=worker-short -w
 | `cooldownPeriod` | Wait before scale down (seconds) | `300` | `30-60` for short, `60-300` for long |
 
 > **Note**: For traditional CPU/memory-based HPA, see the [High Availability](#high-availability) section above.
+
+---
+
+---
+
+## External Database Support
+
+**⚡ NEW in v2.4.0**: Connect to databases managed outside of Kubernetes (e.g., AWS RDS, Managed MariaDB).
+
+### Shared External Database (RDS/Cloud SQL)
+
+Connect multiple sites to a shared external database server with default bench configurations.
+
+```yaml
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: external-db-bench
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: erpnext
+      source: image
+  # Default DB config for all sites in this bench
+  dbConfig:
+    provider: external
+    host: "mariadb.production.svc.cluster.local"
+    port: "3306"
+    connectionSecretRef:
+      name: shared-db-creds
+
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: site1-external
+spec:
+  benchRef:
+    name: external-db-bench
+  siteName: "site1.example.com"
+  # site1_db will be used by default (from siteName)
+  # Credentials will be pulled from 'shared-db-creds'
+```
+
+### Dedicated External Database per Site
+
+Each site with its own specific external host and credentials.
+
+```yaml
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: enterprise-site
+spec:
+  benchRef:
+    name: dev-bench
+  siteName: "enterprise.example.com"
+  dbConfig:
+    provider: external
+    host: "dedicated-rds-instance.aws.com"
+    port: "3306"
+    connectionSecretRef:
+      name: enterprise-db-creds
+```
+
+### Credentials Secret Format
+
+The referenced Secret should contain at least `username` and `password`. `database` is optional (defaults to site name).
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: enterprise-db-creds
+type: Opaque
+stringData:
+  username: "admin_user"
+  password: "secure_password"
+  database: "enterprise_prod" # Optional
+```
 
 ---
 
