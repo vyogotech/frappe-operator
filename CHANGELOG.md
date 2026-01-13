@@ -5,6 +5,16 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-01-13
+
+### Added
+- **OpenShift Compatibility**: Verified support for OpenShift restricted security contexts.
+- **Pod Security Policies**: Secure defaults applied across all managed resources.
+    - `runAsNonRoot: true` enabled by default.
+    - `allowPrivilegeEscalation: false` enabled by default.
+    - `seccompProfile` set to `RuntimeDefault` for all pods.
+- **Customizable SecurityContext**: Added `spec.security` to `FrappeBench` for granular security control.
+
 ## [2.4.0] - 2026-01-13
 
 ### Added

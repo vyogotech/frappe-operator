@@ -347,6 +347,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 					Labels: r.componentLabels(bench, fmt.Sprintf("redis-%s", role)),
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: r.getPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "redis",
@@ -358,7 +359,8 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 									Name:          "redis",
 								},
 							},
-							Resources: r.getRedisResources(bench),
+							Resources:       r.getRedisResources(bench),
+							SecurityContext: r.getContainerSecurityContext(bench),
 						},
 					},
 				},
@@ -460,6 +462,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 					Labels: r.componentLabels(bench, "gunicorn"),
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: r.getPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "gunicorn",
@@ -477,7 +480,8 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 									MountPath: "/home/frappe/frappe-bench/sites",
 								},
 							},
-							Resources: r.getGunicornResources(bench),
+							Resources:       r.getGunicornResources(bench),
+							SecurityContext: r.getContainerSecurityContext(bench),
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -590,6 +594,7 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 					Labels: r.componentLabels(bench, "nginx"),
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: r.getPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "nginx",
@@ -635,7 +640,8 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 									MountPath: "/home/frappe/frappe-bench/sites",
 								},
 							},
-							Resources: r.getNginxResources(bench),
+							Resources:       r.getNginxResources(bench),
+							SecurityContext: r.getContainerSecurityContext(bench),
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -747,6 +753,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 					Labels: r.componentLabels(bench, "socketio"),
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: r.getPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "socketio",
@@ -767,7 +774,8 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 									MountPath: "/home/frappe/frappe-bench/sites",
 								},
 							},
-							Resources: r.getSocketIOResources(bench),
+							Resources:       r.getSocketIOResources(bench),
+							SecurityContext: r.getContainerSecurityContext(bench),
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -830,6 +838,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 					Labels: r.componentLabels(bench, "scheduler"),
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: r.getPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "scheduler",
@@ -844,7 +853,8 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 									MountPath: "/home/frappe/frappe-bench/sites",
 								},
 							},
-							Resources: r.getSchedulerResources(bench),
+							Resources:       r.getSchedulerResources(bench),
+							SecurityContext: r.getContainerSecurityContext(bench),
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -969,6 +979,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 					Labels: r.componentLabels(bench, fmt.Sprintf("worker-%s", workerType)),
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: r.getPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "worker",
@@ -985,7 +996,8 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 									MountPath: "/home/frappe/frappe-bench/sites",
 								},
 							},
-							Resources: resources,
+							Resources:       resources,
+							SecurityContext: r.getContainerSecurityContext(bench),
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -1514,4 +1526,30 @@ func boolPtr(b bool) *bool {
 
 func int32Ptr(i int32) *int32 {
 	return &i
+}
+
+func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
+		return bench.Spec.Security.PodSecurityContext
+	}
+	return &corev1.PodSecurityContext{
+		RunAsNonRoot: boolPtr(true),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+}
+
+func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
+		return bench.Spec.Security.SecurityContext
+	}
+	return &corev1.SecurityContext{
+		AllowPrivilegeEscalation: boolPtr(false),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
+		ReadOnlyRootFilesystem: boolPtr(false), // Frappe needs to write to some local dirs
+		RunAsNonRoot:           boolPtr(true),
+	}
 }

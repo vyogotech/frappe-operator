@@ -1,7 +1,6 @@
 # Frappe Operator
 
-A Kubernetes Operator that makes deploying and managing [Frappe](https://frappeframework.com/) and [ERPNext](https://erpnext.com/) on Kubernetes simple and declarative.
-
+A Kubernetes Operator that makes deploying and managing [![Release](https://img.shields.io/badge/release-v2.5.0-green.svg)](file:///Users/varkrish/personal/1frappe_ecosystem/frappe-operator/docs/RELEASE_NOTES_v2.5.0.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/vyogotech/frappe-operator)](go.mod)
@@ -42,7 +41,9 @@ Frappe Operator is a Kubernetes operator that automates the deployment, scaling,
 - 📦 **Hybrid App Installation** - Install apps from FPM packages, Git repositories, or pre-built images
 - ⚡ **Production-Ready Architecture** - Dual Redis (cache + queue), correct entry points
 - 📊 **Auto-Scaling** - Automatically scale based on traffic and resource usage
-- ⚡ **NEW: External Database Support** - Connect to AWS RDS, Google Cloud SQL, or any external MariaDB/PostgreSQL
+- ⚡ **NEW:- 💾 **External Database Support**: Direct connection to RDS/Cloud SQL (v2.4.0).
+- 🛡️ **OpenShift Ready**: Optimized for restricted security contexts (v2.5.0).
+- 🚀 **Lightning Fast**: Optimized for speed and minimal resource usage.
 - ⚡ **NEW: Worker Autoscaling** - KEDA-based scale-to-zero for background workers (save costs!)
 - 🔄 **Automated Updates** - Zero-downtime rolling updates and migrations
 - 💾 **Backup Management** - Automated backups with configurable retention policies

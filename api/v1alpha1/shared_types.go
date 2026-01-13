@@ -5,6 +5,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+// SecurityConfig defines security context settings for pods and containers
+type SecurityConfig struct {
+	// PodSecurityContext holds pod-level security attributes and common container settings
+	// +optional
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
+	// SecurityContext holds container-level security attributes
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+}
+
 // ResourceRequirements defines compute resource requirements
 type ResourceRequirements struct {
 	// Requests describes the minimum amount of compute resources required

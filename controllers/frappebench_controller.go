@@ -268,7 +268,8 @@ echo "Bench configuration complete"
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy:   corev1.RestartPolicyNever,
+					SecurityContext: r.getPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
 							Name:    "bench-init",
@@ -281,6 +282,7 @@ echo "Bench configuration complete"
 									MountPath: "/home/frappe/frappe-bench/sites",
 								},
 							},
+							SecurityContext: r.getContainerSecurityContext(bench),
 						},
 					},
 					Volumes: []corev1.Volume{
