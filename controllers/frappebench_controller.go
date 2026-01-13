@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -90,16 +91,21 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	logger.Info("FPM repositories configured", "count", len(fpmRepos))
 
-	// Ensure bench initialization
-	if err := r.ensureBenchInitialized(ctx, bench, gitEnabled, fpmRepos); err != nil {
-		logger.Error(err, "Failed to ensure bench initialized")
-		return ctrl.Result{}, err
-	}
-
 	// Ensure storage
 	if err := r.ensureBenchStorage(ctx, bench); err != nil {
 		logger.Error(err, "Failed to ensure storage")
 		return ctrl.Result{}, err
+	}
+
+	// Ensure bench initialization
+	ready, err := r.ensureBenchInitialized(ctx, bench, gitEnabled, fpmRepos)
+	if err != nil {
+		logger.Error(err, "Failed to ensure bench initialized")
+		return ctrl.Result{}, err
+	}
+	if !ready {
+		logger.Info("Bench initialization in progress, requeueing")
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	// Ensure Redis
@@ -204,7 +210,7 @@ func (r *FrappeBenchReconciler) mergeFPMRepositories(operatorConfig *corev1.Conf
 }
 
 // ensureBenchInitialized creates a job to initialize the Frappe bench
-func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, gitEnabled bool, fpmRepos []vyogotechv1alpha1.FPMRepository) error {
+func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, gitEnabled bool, fpmRepos []vyogotechv1alpha1.FPMRepository) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	jobName := fmt.Sprintf("%s-init", bench.Name)
@@ -212,12 +218,14 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: bench.Namespace}, job)
 	if err == nil {
-		// Job already exists
-		logger.Info("Bench init job already exists", "job", jobName)
-		return nil
+		// Job exists, check status
+		if job.Status.Succeeded > 0 {
+			return true, nil
+		}
+		return false, nil
 	}
 	if !errors.IsNotFound(err) {
-		return err
+		return false, err
 	}
 
 	// Create init job
@@ -291,10 +299,10 @@ echo "Bench configuration complete"
 	}
 
 	if err := controllerutil.SetControllerReference(bench, job, r.Scheme); err != nil {
-		return err
+		return false, err
 	}
 
-	return r.Create(ctx, job)
+	return false, r.Create(ctx, job)
 }
 
 // getBenchImage returns the image to use for the bench
@@ -399,7 +407,19 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 		repoNames = append(repoNames, repo.Name)
 	}
 
-	bench.Status.Phase = "Ready"
+	if bench.Status.Phase == "" || (bench.Status.Phase != "Provisioning" && bench.Status.Phase != "Ready") {
+		bench.Status.Phase = "Provisioning"
+	}
+
+	// Only set to Ready if the init job is succeeded
+	jobName := fmt.Sprintf("%s-init", bench.Name)
+	job := &batchv1.Job{}
+	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: bench.Namespace}, job); err == nil {
+		if job.Status.Succeeded > 0 {
+			bench.Status.Phase = "Ready"
+		}
+	}
+
 	bench.Status.GitEnabled = gitEnabled
 	bench.Status.InstalledApps = installedApps
 	bench.Status.FPMRepositories = repoNames

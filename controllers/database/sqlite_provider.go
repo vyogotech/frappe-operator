@@ -81,4 +81,3 @@ func (p *SQLiteProvider) Cleanup(ctx context.Context, site *vyogotechv1alpha1.Fr
 func init() {
 	fmt.Println("SQLite provider loaded - requires Frappe v16+ (experimental)")
 }
-

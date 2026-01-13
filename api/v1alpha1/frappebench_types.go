@@ -40,6 +40,10 @@ type FrappeBenchSpec struct {
 	// +optional
 	StorageClassName string `json:"storageClassName,omitempty"`
 
+	// DBConfig defines default database configuration for all sites in this bench
+	// +optional
+	DBConfig *DatabaseConfig `json:"dbConfig,omitempty"`
+
 	// DomainConfig defines default domain behavior for sites on this bench
 	// +optional
 	DomainConfig *DomainConfig `json:"domainConfig,omitempty"`

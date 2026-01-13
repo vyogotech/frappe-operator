@@ -1,0 +1,10 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: dev-bench
+  namespace: default
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: erpnext
+      source: image

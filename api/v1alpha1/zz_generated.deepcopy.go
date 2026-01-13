@@ -300,6 +300,11 @@ func (in *FrappeBenchSpec) DeepCopyInto(out *FrappeBenchSpec) {
 		*out = new(RedisConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.DBConfig != nil {
+		in, out := &in.DBConfig, &out.DBConfig
+		*out = new(DatabaseConfig)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.DomainConfig != nil {
 		in, out := &in.DomainConfig, &out.DomainConfig
 		*out = new(DomainConfig)

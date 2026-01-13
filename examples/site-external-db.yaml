@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-db-creds
+  namespace: default
+type: Opaque
+stringData:
+  # Connection details
+  host: db.example.com
+  port: "3306"
+  database: site1_db
+  # Credentials
+  username: site1_db
+  password: secretpassword
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: external-db-site
+  namespace: default
+spec:
+  benchRef:
+    name: dev-bench
+  siteName: external.example.com
+  dbConfig:
+    provider: external
+    connectionSecretRef:
+      name: external-db-creds

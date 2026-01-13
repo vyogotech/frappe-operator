@@ -2,6 +2,7 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
+- bases/vyogo.tech_frappebenches.yaml
 - bases/vyogo.tech_frappesites.yaml
 - bases/vyogo.tech_siteusers.yaml
 - bases/vyogo.tech_frappeworkpaces.yaml

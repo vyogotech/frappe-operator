@@ -17,8 +17,8 @@ type ResourceRequirements struct {
 
 // DatabaseConfig defines database configuration for a Frappe site
 type DatabaseConfig struct {
-	// Provider: mariadb, postgres, sqlite
-	// +kubebuilder:validation:Enum=mariadb;postgres;sqlite
+	// Provider: mariadb, postgres, sqlite, external
+	// +kubebuilder:validation:Enum=mariadb;postgres;sqlite;external
 	// +kubebuilder:default=mariadb
 	// +optional
 	Provider string `json:"provider,omitempty"`
@@ -47,15 +47,16 @@ type DatabaseConfig struct {
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty"`
 
-	// Host is the database hostname (legacy, for backward compatibility)
+	// Host is the database hostname for external connections
 	// +optional
 	Host string `json:"host,omitempty"`
 
-	// Port is the database port (legacy, for backward compatibility)
+	// Port is the database port for external connections
 	// +optional
 	Port string `json:"port,omitempty"`
 
-	// ConnectionSecretRef references a Secret containing database credentials (legacy)
+	// ConnectionSecretRef references a Secret containing database credentials
+	// Required for 'external' provider. Secret should contain: username, password, database (optional, defaults to siteName)
 	// +optional
 	ConnectionSecretRef *corev1.SecretReference `json:"connectionSecretRef,omitempty"`
 }

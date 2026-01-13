@@ -56,9 +56,14 @@ type DatabaseCredentials struct {
 }
 
 // NewProvider returns the appropriate provider based on config
-func NewProvider(providerType string, client client.Client, scheme *runtime.Scheme) (Provider, error) {
+func NewProvider(config vyogotechv1alpha1.DatabaseConfig, client client.Client, scheme *runtime.Scheme) (Provider, error) {
+	providerType := config.Provider
 	if providerType == "" {
-		providerType = "mariadb" // Default provider
+		if config.ConnectionSecretRef != nil {
+			providerType = "external"
+		} else {
+			providerType = "mariadb" // Default provider
+		}
 	}
 
 	switch providerType {
@@ -68,8 +73,9 @@ func NewProvider(providerType string, client client.Client, scheme *runtime.Sche
 		return nil, fmt.Errorf("PostgreSQL provider not yet implemented - planned for v1.1.0")
 	case "sqlite":
 		return NewSQLiteProvider(client, scheme), nil
+	case "external":
+		return NewExternalProvider(client), nil
 	default:
-		return nil, fmt.Errorf("unsupported database provider: %s (supported: mariadb, postgres, sqlite)", providerType)
+		return nil, fmt.Errorf("unsupported database provider: %s (supported: mariadb, postgres, sqlite, external)", providerType)
 	}
 }
-

@@ -5,6 +5,28 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-01-13
+
+### Added
+
+#### External Database Support
+- **External Provider:** Support for using databases managed outside of the Kubernetes cluster (e.g., AWS RDS, Google Cloud SQL).
+- **Direct Connection:** Un-deprecated `Host` and `Port` fields in `DatabaseConfig` for direct external connections.
+- **Secret-based Credentials:** Added `ConnectionSecretRef` to source database credentials from existing Kubernetes Secrets.
+- **Bench-level DB Defaults:** Added `DBConfig` to `FrappeBench` for shared database architecture across multiple sites.
+- **Auto-Detection:** Automatic detection of the `external` provider when `ConnectionSecretRef` is provided.
+
+#### Operator Robustness
+- **Sequential Initialization:** `FrappeSite` now explicitly waits for `FrappeBench` to reach the `Ready` phase before attempting site initialization.
+- **Bench Readiness:** `FrappeBench` status now accurately reflects the completion of its mandatory initialization job (building assets, creating `apps.txt`).
+- **Dynamic CLI Compatibility:** Initialization scripts now dynamically detect `bench` CLI features (like `--db-user` support), ensuring compatibility with both Frappe v15 and v16 images.
+
+### Fixed
+- Fixed race conditions on shared storage during concurrent bench and site initialization.
+- Improved error handling for external database credential extraction.
+
+---
+
 ## [2.0.0] - 2024-11-27
 
 ### Added
@@ -177,6 +199,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Major Features |
 |---------|--------------|----------------|
+| 2.4.0   | 2026-01-13   | External database support, Robustness improvements, CLI compatibility |
 | 2.0.0   | 2024-11-27   | Hybrid app installation, Enterprise Git control, FPM support |
 | 1.0.0   | 2024-11-20   | Initial release, Core CRDs, Site management |
 
