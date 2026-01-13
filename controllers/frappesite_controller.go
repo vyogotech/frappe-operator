@@ -545,7 +545,8 @@ echo "Site initialization complete!"
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy:   corev1.RestartPolicyNever,
+					SecurityContext: r.getPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
 							Name:    "site-init",
@@ -558,6 +559,7 @@ echo "Site initialization complete!"
 									MountPath: "/home/frappe/frappe-bench/sites",
 								},
 							},
+							SecurityContext: r.getContainerSecurityContext(bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "SITE_NAME",
@@ -794,4 +796,30 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Owns(&networkingv1.Ingress{}).
 		Complete(r)
+}
+
+func (r *FrappeSiteReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
+		return bench.Spec.Security.PodSecurityContext
+	}
+	return &corev1.PodSecurityContext{
+		RunAsNonRoot: boolPtr(true),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+}
+
+func (r *FrappeSiteReconciler) getContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
+		return bench.Spec.Security.SecurityContext
+	}
+	return &corev1.SecurityContext{
+		AllowPrivilegeEscalation: boolPtr(false),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
+		ReadOnlyRootFilesystem: boolPtr(false),
+		RunAsNonRoot:           boolPtr(true),
+	}
 }

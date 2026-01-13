@@ -63,6 +63,10 @@ type FrappeBenchSpec struct {
 	// If KEDA not available, gracefully falls back to static replicas
 	// +optional
 	WorkerAutoscaling *WorkerAutoscalingConfig `json:"workerAutoscaling,omitempty"`
+
+	// Security defines security context settings for all pods in this bench
+	// +optional
+	Security *SecurityConfig `json:"security,omitempty"`
 }
 
 // WorkerScalingStatus reports the scaling status of a worker
