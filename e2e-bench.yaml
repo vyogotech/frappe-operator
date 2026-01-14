@@ -1,0 +1,21 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: e2e-test-bench
+  namespace: default
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: erpnext
+      source: image
+  redisConfig:
+    type: redis
+  workerAutoscaling:
+    short:
+      enabled: false
+    long:
+      enabled: false
+    default:
+      enabled: false
+      staticReplicas: 1
+  storageClassName: ocs-external-storagecluster-cephfs

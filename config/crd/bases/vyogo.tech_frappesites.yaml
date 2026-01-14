@@ -87,6 +87,10 @@ spec:
                   host:
                     description: Host is the database hostname for external connections
                     type: string
+                  image:
+                    description: Image is the database container image (for dedicated
+                      mode)
+                    type: string
                   mariadbRef:
                     description: |-
                       MariaDBRef references an existing MariaDB CR (for shared/dedicated modes)

@@ -350,9 +350,10 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 					SecurityContext: r.getPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
-							Name:  "redis",
-							Image: redisImage,
-							Args:  []string{"redis-server"},
+							Name:    "redis",
+							Image:   redisImage,
+							Command: []string{"redis-server"},
+							Args:    []string{},
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 6379,
@@ -1528,12 +1529,17 @@ func int32Ptr(i int32) *int32 {
 	return &i
 }
 
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
 func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
 	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
 		return bench.Spec.Security.PodSecurityContext
 	}
 	return &corev1.PodSecurityContext{
-		RunAsNonRoot: boolPtr(true),
+		RunAsGroup: int64Ptr(0),
+		FSGroup:    int64Ptr(0),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -1545,11 +1551,11 @@ func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1al
 		return bench.Spec.Security.SecurityContext
 	}
 	return &corev1.SecurityContext{
+		RunAsGroup:               int64Ptr(0),
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
-		ReadOnlyRootFilesystem: boolPtr(false), // Frappe needs to write to some local dirs
-		RunAsNonRoot:           boolPtr(true),
+		ReadOnlyRootFilesystem: boolPtr(false),
 	}
 }

@@ -45,6 +45,21 @@ rules:
   - update
   - watch
 - apiGroups:
+  - k8s.mariadb.com
+  resources:
+  - databases
+  - grants
+  - mariadbs
+  - users
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - keda.sh
   resources:
   - scaledobjects

@@ -55,6 +55,7 @@ type FrappeSiteReconciler struct {
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets;services;configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs;databases;users;grants,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -803,7 +804,6 @@ func (r *FrappeSiteReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.Fr
 		return bench.Spec.Security.PodSecurityContext
 	}
 	return &corev1.PodSecurityContext{
-		RunAsNonRoot: boolPtr(true),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -820,6 +820,5 @@ func (r *FrappeSiteReconciler) getContainerSecurityContext(bench *vyogotechv1alp
 			Drop: []corev1.Capability{"ALL"},
 		},
 		ReadOnlyRootFilesystem: boolPtr(false),
-		RunAsNonRoot:           boolPtr(true),
 	}
 }

@@ -1,0 +1,27 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: ocp-clean-bench
+  namespace: frappe-test
+  annotations:
+    frappe.tech/skip-bench-build: "1"
+    frappe.tech/storage-access-mode: "ReadWriteMany"
+spec:
+  frappeVersion: "v15.0.0"
+  storageClassName: "ocs-external-storagecluster-cephfs"
+  imageConfig:
+    repository: "image-registry.openshift-image-registry.svc:5000/frappe-test/erpnext"
+    tag: "ocp-v6"
+    pullPolicy: Always
+  
+  redisConfig:
+    type: redis
+    image: public.ecr.aws/docker/library/redis:7.2-alpine
+  
+  # NO SECURITY CONTEXT BLOCK - Testing Operator's OCP-safe defaults
+
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image

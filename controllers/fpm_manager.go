@@ -219,10 +219,17 @@ func (m *FPMManager) GenerateAppInstallScript(apps []vyogotechv1alpha1.AppSource
 	script.WriteString("echo 'Generating apps.txt...'\n")
 	script.WriteString("ls -1 apps/ | grep -v '__pycache__' > sites/apps.txt || echo 'frappe' > sites/apps.txt\n\n")
 
-	script.WriteString("echo 'Building production assets...'\n")
-	script.WriteString("bench build --production || {\n")
-	script.WriteString("  echo 'Warning: Asset build failed, continuing anyway'\n")
-	script.WriteString("}\n\n")
+	script.WriteString("# Detect if we should build assets (requires node_modules and npm)\n")
+	script.WriteString("if [ \"$SKIP_BENCH_BUILD\" == \"1\" ]; then\n")
+	script.WriteString("  echo 'Skipping bench build: SKIP_BENCH_BUILD=1 is set.'\n")
+	script.WriteString("elif [ -d \"apps/frappe/node_modules\" ] && command -v npm &> /dev/null; then\n")
+	script.WriteString("  echo 'Building production assets...'\n")
+	script.WriteString("  bench build --production || {\n")
+	script.WriteString("    echo 'Warning: Asset build failed, continuing anyway'\n")
+	script.WriteString("  }\n")
+	script.WriteString("else\n")
+	script.WriteString("  echo 'Skipping bench build: node_modules or npm missing. Assuming pre-built assets are present.'\n")
+	script.WriteString("fi\n\n")
 
 	script.WriteString("echo 'App installation complete'\n")
 

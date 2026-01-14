@@ -1,0 +1,15 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: ocp-restricted-site
+  namespace: frappe-test
+spec:
+  benchRef:
+    name: ocp-restricted-bench
+    namespace: frappe-test
+  siteName: test.example.com
+  domain: test.example.com
+  dbConfig:
+    mode: dedicated
+    provider: mariadb
+    image: quay.io/bitnami/mariadb:10.11

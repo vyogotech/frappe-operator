@@ -241,7 +241,9 @@ cd /home/frappe/frappe-bench
 echo "Configuring Frappe bench..."
 
 # Create apps.txt from existing apps
-ls -1 apps > sites/apps.txt
+if [ -d "apps" ]; then
+    ls -1 apps > sites/apps.txt
+fi
 
 # Create or update common_site_config.json
 cat > sites/common_site_config.json <<EOF
@@ -252,11 +254,24 @@ cat > sites/common_site_config.json <<EOF
 }
 EOF
 
-echo "Building assets for production..."
-bench build --production
+# Detect if we should build assets (requires node_modules and npm)
+if [ "$SKIP_BENCH_BUILD" == "1" ]; then
+    echo "Skipping bench build: SKIP_BENCH_BUILD=1 is set."
+elif [ -d "apps/frappe/node_modules" ] && command -v npm &> /dev/null; then
+    echo "Building assets for production..."
+    bench build --production
+else
+    echo "Skipping bench build: node_modules or npm missing. Assuming pre-built assets are present."
+fi
 
 echo "Bench configuration complete"
 `, bench.Name, bench.Name)
+
+	// detect if we should skip bench build via annotation
+	skipBuild := "0"
+	if bench.Annotations != nil && bench.Annotations["frappe.tech/skip-bench-build"] == "1" {
+		skipBuild = "1"
+	}
 
 	// Create the job
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
@@ -283,6 +298,12 @@ echo "Bench configuration complete"
 								},
 							},
 							SecurityContext: r.getContainerSecurityContext(bench),
+							Env: []corev1.EnvVar{
+								{
+									Name:  "SKIP_BENCH_BUILD",
+									Value: skipBuild,
+								},
+							},
 						},
 					},
 					Volumes: []corev1.Volume{
