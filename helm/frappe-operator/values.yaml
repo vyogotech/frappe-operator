@@ -35,10 +35,12 @@ operator:
   affinity: {}
   
   # Security context
+  # For OpenShift compatibility, runAsUser and fsGroup are not set by default
+  # OpenShift will assign appropriate values via SCC
   securityContext:
     runAsNonRoot: true
-    runAsUser: 65532
-    fsGroup: 65532
+    # runAsUser: 65532  # Uncomment for non-OpenShift clusters if needed
+    # fsGroup: 65532    # Uncomment for non-OpenShift clusters if needed
   
   # Pod annotations
   podAnnotations: {}

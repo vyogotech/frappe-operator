@@ -66,6 +66,10 @@ type DatabaseConfig struct {
 	// +optional
 	Port string `json:"port,omitempty"`
 
+	// Image is the database container image (for dedicated mode)
+	// +optional
+	Image string `json:"image,omitempty"`
+
 	// ConnectionSecretRef references a Secret containing database credentials
 	// Required for 'external' provider. Secret should contain: username, password, database (optional, defaults to siteName)
 	// +optional

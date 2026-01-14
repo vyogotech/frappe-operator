@@ -1,0 +1,34 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: ocp-prod-bench
+  namespace: frappe-test
+  annotations:
+    frappe.tech/skip-bench-build: "1"
+spec:
+  frappeVersion: "v15.0.0"
+  imageConfig:
+    repository: "image-registry.openshift-image-registry.svc:5000/frappe-test/erpnext"
+    tag: "ocp-amd64"
+  security:
+    podSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0
+      runAsNonRoot: true
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image
+  storageClassName: "ocs-external-storagecluster-cephfs"
+  redisConfig:
+    type: redis
+    image: public.ecr.aws/docker/library/redis:7.2-alpine

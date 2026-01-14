@@ -344,6 +344,12 @@ func (p *MariaDBProviderUnstructured) createDedicatedMariaDB(ctx context.Context
 		return "", "", fmt.Errorf("failed to create root password secret: %w", err)
 	}
 
+	// Determine MariaDB image
+	mariadbImage := "mariadb:10.11"
+	if site.Spec.DBConfig.Image != "" {
+		mariadbImage = site.Spec.DBConfig.Image
+	}
+
 	mariadb := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "k8s.mariadb.com/v1alpha1",
@@ -357,7 +363,7 @@ func (p *MariaDBProviderUnstructured) createDedicatedMariaDB(ctx context.Context
 					"name": rootSecretName,
 					"key":  "password",
 				},
-				"image": "mariadb:10.11",
+				"image": mariadbImage,
 				"storage": map[string]interface{}{
 					"size": storageSize,
 				},
