@@ -106,6 +106,20 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
+.PHONY: e2e-test
+e2e-test: manifests generate docker-build ## Run end-to-end tests.
+	@echo "Running E2E tests..."
+	# Create Kind cluster if it doesn't exist
+	kind get clusters | grep -q frappe-operator-e2e || kind create cluster --name frappe-operator-e2e --config .github/kind-config.yaml
+	# Deploy cert-manager for webhooks
+	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.2/cert-manager.yaml
+	kubectl wait --for=condition=available --timeout=300s deployment -n cert-manager --all
+	# Deploy operator
+	make deploy IMG=$(IMG)
+	kubectl wait --for=condition=available --timeout=300s deployment/frappe-operator-controller-manager -n frappe-operator-system
+	# Run e2e tests
+	go test ./test/e2e/... -v -ginkgo.v
+
 ##@ Build
 
 .PHONY: build
