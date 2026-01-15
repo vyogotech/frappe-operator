@@ -27,14 +27,17 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/recorder"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
@@ -45,7 +48,8 @@ const frappeSiteFinalizer = "vyogo.tech/site-finalizer"
 // FrappeSiteReconciler reconciles a FrappeSite object
 type FrappeSiteReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder recorder.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch;create;update;patch;delete
@@ -56,6 +60,7 @@ type FrappeSiteReconciler struct {
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets;services;configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs;databases;users;grants,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -76,15 +81,50 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	// Set progressing condition
+	r.setCondition(site, metav1.Condition{
+		Type:    "Progressing",
+		Status:  metav1.ConditionTrue,
+		Reason:  "Reconciling",
+		Message: "Starting site reconciliation",
+	})
+	if err := r.updateStatus(ctx, site); err != nil {
+		logger.Error(err, "Failed to update status")
+		return ctrl.Result{}, err
+	}
+
 	// Handle deletion
 	if site.GetDeletionTimestamp() != nil {
 		if controllerutil.ContainsFinalizer(site, frappeSiteFinalizer) {
 			logger.Info("Deleting site", "site", site.Name)
-			// TODO: Implement site deletion job (bench drop-site)
+			
+			// Set deletion condition
+			r.setCondition(site, metav1.Condition{
+				Type:    "Terminating",
+				Status:  metav1.ConditionTrue,
+				Reason:  "Deleting",
+				Message: "Site is being deleted",
+			})
+			
+			// Implement site deletion job
+			if err := r.deleteSite(ctx, site); err != nil {
+				logger.Error(err, "Failed to delete site")
+				r.setCondition(site, metav1.Condition{
+					Type:    "Degraded",
+					Status:  metav1.ConditionTrue,
+					Reason:  "DeletionFailed",
+					Message: fmt.Sprintf("Site deletion failed: %v", err),
+				})
+				r.Recorder.Event(site, corev1.EventTypeWarning, "DeletionFailed", "Failed to delete site")
+				return ctrl.Result{}, err
+			}
+			
 			controllerutil.RemoveFinalizer(site, frappeSiteFinalizer)
 			if err := r.Update(ctx, site); err != nil {
 				return ctrl.Result{}, err
 			}
+			
+			r.Recorder.Event(site, corev1.EventTypeNormal, "Deleted", "Site deleted successfully")
 		}
 		return ctrl.Result{}, nil
 	}
@@ -93,8 +133,22 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if site.Spec.BenchRef == nil {
 		logger.Error(nil, "BenchRef is required")
 		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
-		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
-		_ = r.Status().Update(ctx, site)
+		r.setCondition(site, metav1.Condition{
+			Type:    "Ready",
+			Status:  metav1.ConditionFalse,
+			Reason:  "ValidationFailed",
+			Message: "benchRef is required",
+		})
+		r.setCondition(site, metav1.Condition{
+			Type:    "Degraded",
+			Status:  metav1.ConditionTrue,
+			Reason:  "ValidationFailed",
+			Message: "benchRef is required",
+		})
+		r.Recorder.Event(site, corev1.EventTypeWarning, "ValidationFailed", "benchRef is required")
+		if err := r.updateStatus(ctx, site); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{}, fmt.Errorf("benchRef is required")
 	}
 
@@ -112,7 +166,15 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Error(err, "Failed to get referenced bench", "bench", benchKey.Name)
 		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhasePending
 		site.Status.BenchReady = false
-		_ = r.Status().Update(ctx, site)
+		r.setCondition(site, metav1.Condition{
+			Type:    "BenchReady",
+			Status:  metav1.ConditionFalse,
+			Reason:  "BenchNotFound",
+			Message: fmt.Sprintf("Failed to get referenced bench: %v", err),
+		})
+		if err := r.updateStatus(ctx, site); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -121,11 +183,25 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Info("Referenced bench is not ready yet", "bench", bench.Name, "phase", bench.Status.Phase)
 		site.Status.BenchReady = false
 		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhasePending
-		_ = r.Status().Update(ctx, site)
+		r.setCondition(site, metav1.Condition{
+			Type:    "BenchReady",
+			Status:  metav1.ConditionFalse,
+			Reason:  "BenchNotReady",
+			Message: fmt.Sprintf("Bench %s is not ready (phase: %s)", bench.Name, bench.Status.Phase),
+		})
+		if err := r.updateStatus(ctx, site); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 	site.Status.BenchReady = true
 	site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseProvisioning
+	r.setCondition(site, metav1.Condition{
+		Type:    "BenchReady",
+		Status:  metav1.ConditionTrue,
+		Reason:  "BenchReady",
+		Message: "Referenced bench is ready",
+	})
 
 	// Resolve the final domain for the site (with smart auto-detection)
 	domain, domainSource := r.resolveDomain(ctx, site, bench)
@@ -151,27 +227,53 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err != nil {
 		logger.Error(err, "Failed to check database readiness")
 		site.Status.DatabaseReady = false
-		_ = r.Status().Update(ctx, site)
+		r.setCondition(site, metav1.Condition{
+			Type:    "DatabaseReady",
+			Status:  metav1.ConditionFalse,
+			Reason:  "DatabaseCheckFailed",
+			Message: fmt.Sprintf("Failed to check database readiness: %v", err),
+		})
+		if err := r.updateStatus(ctx, site); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{}, err
 	}
 
 	if !dbReady {
 		logger.Info("Database not ready, provisioning...")
 		site.Status.DatabaseReady = false
-		_ = r.Status().Update(ctx, site)
+		r.setCondition(site, metav1.Condition{
+			Type:    "DatabaseReady",
+			Status:  metav1.ConditionFalse,
+			Reason:  "Provisioning",
+			Message: "Database is being provisioned",
+		})
+		if err := r.updateStatus(ctx, site); err != nil {
+			return ctrl.Result{}, err
+		}
 
 		// Ensure database resources are created
 		dbInfo, err := dbProvider.EnsureDatabase(ctx, site)
 		if err != nil {
 			logger.Error(err, "Failed to ensure database")
 			site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
-			_ = r.Status().Update(ctx, site)
+			r.setCondition(site, metav1.Condition{
+				Type:    "DatabaseReady",
+				Status:  metav1.ConditionFalse,
+				Reason:  "ProvisioningFailed",
+				Message: fmt.Sprintf("Database provisioning failed: %v", err),
+			})
+			r.Recorder.Event(site, corev1.EventTypeWarning, "DatabaseProvisioningFailed", "Failed to provision database")
+			if err := r.updateStatus(ctx, site); err != nil {
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{}, err
 		}
 
 		logger.Info("Database provisioning initiated",
 			"provider", dbInfo.Provider,
 			"dbName", dbInfo.Name)
+		r.Recorder.Event(site, corev1.EventTypeNormal, "DatabaseProvisioning", "Database provisioning initiated")
 
 		// Requeue to check readiness
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
@@ -179,6 +281,14 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Database is ready - get credentials
 	site.Status.DatabaseReady = true
+	r.setCondition(site, metav1.Condition{
+		Type:    "DatabaseReady",
+		Status:  metav1.ConditionTrue,
+		Reason:  "DatabaseReady",
+		Message: "Database is ready and accessible",
+	})
+	r.Recorder.Event(site, corev1.EventTypeNormal, "DatabaseReady", "Database is ready")
+
 	dbInfo, err := dbProvider.EnsureDatabase(ctx, site)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -193,21 +303,40 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Update status with database info
 	site.Status.DatabaseName = dbInfo.Name
 	site.Status.DatabaseCredentialsSecret = dbCreds.SecretName
-	_ = r.Status().Update(ctx, site)
+	if err := r.updateStatus(ctx, site); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// 1. Ensure site is initialized with database credentials
 	siteReady, err := r.ensureSiteInitialized(ctx, site, bench, domain, dbInfo, dbCreds)
 	if err != nil {
 		logger.Error(err, "Failed to initialize site")
 		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
-		_ = r.Status().Update(ctx, site)
+		r.setCondition(site, metav1.Condition{
+			Type:    "Ready",
+			Status:  metav1.ConditionFalse,
+			Reason:  "SiteInitializationFailed",
+			Message: fmt.Sprintf("Site initialization failed: %v", err),
+		})
+		r.Recorder.Event(site, corev1.EventTypeWarning, "SiteInitializationFailed", "Failed to initialize site")
+		if err := r.updateStatus(ctx, site); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{}, err
 	}
 
 	if !siteReady {
 		logger.Info("Site initialization in progress", "site", site.Name)
 		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseProvisioning
-		_ = r.Status().Update(ctx, site)
+		r.setCondition(site, metav1.Condition{
+			Type:    "Progressing",
+			Status:  metav1.ConditionTrue,
+			Reason:  "SiteInitializing",
+			Message: "Site initialization is in progress",
+		})
+		if err := r.updateStatus(ctx, site); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
@@ -219,26 +348,81 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if createIngress {
-		if err := r.ensureIngress(ctx, site, bench, domain); err != nil {
-			logger.Error(err, "Failed to ensure Ingress")
-			return ctrl.Result{}, err
+		// Check if we're on OpenShift and should create Routes instead
+		if r.isOpenShiftPlatform(ctx) && (site.Spec.RouteConfig == nil || site.Spec.RouteConfig.Enabled == nil || *site.Spec.RouteConfig.Enabled) {
+			if err := r.ensureRoute(ctx, site, bench, domain); err != nil {
+				logger.Error(err, "Failed to ensure Route")
+				return ctrl.Result{}, err
+			}
+		} else {
+			if err := r.ensureIngress(ctx, site, bench, domain); err != nil {
+				logger.Error(err, "Failed to ensure Ingress")
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
 	// 3. Update final status
-	site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseReady
 	site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseReady
 	site.Status.SiteURL = fmt.Sprintf("http://%s", domain)
 	if site.Spec.TLS.Enabled {
 		site.Status.SiteURL = fmt.Sprintf("https://%s", domain)
 	}
 
-	if err := r.Status().Update(ctx, site); err != nil {
+	r.setCondition(site, metav1.Condition{
+		Type:    "Ready",
+		Status:  metav1.ConditionTrue,
+		Reason:  "SiteReady",
+		Message: fmt.Sprintf("Site is ready at %s", site.Status.SiteURL),
+	})
+	r.setCondition(site, metav1.Condition{
+		Type:    "Progressing",
+		Status:  metav1.ConditionFalse,
+		Reason:  "Complete",
+		Message: "Site provisioning is complete",
+	})
+
+	if err := r.updateStatus(ctx, site); err != nil {
 		return ctrl.Result{}, err
 	}
 
+	r.Recorder.Event(site, corev1.EventTypeNormal, "Ready", fmt.Sprintf("Site is ready at %s", site.Status.SiteURL))
 	logger.Info("FrappeSite reconciled successfully", "site", site.Name, "domain", domain)
 	return ctrl.Result{}, nil
+}
+
+// setCondition sets a condition on the FrappeSite
+func (r *FrappeSiteReconciler) setCondition(site *vyogotechv1alpha1.FrappeSite, condition metav1.Condition) {
+	condition.LastTransitionTime = metav1.Now()
+	condition.ObservedGeneration = site.Generation
+
+	// Find existing condition
+	for i := range site.Status.Conditions {
+		if site.Status.Conditions[i].Type == condition.Type {
+			// Only update if something changed
+			if site.Status.Conditions[i].Status != condition.Status ||
+				site.Status.Conditions[i].Reason != condition.Reason ||
+				site.Status.Conditions[i].Message != condition.Message {
+				site.Status.Conditions[i] = condition
+			}
+			return
+		}
+	}
+
+	// Add new condition
+	site.Status.Conditions = append(site.Status.Conditions, condition)
+}
+
+// updateStatus updates the FrappeSite status with proper error handling
+func (r *FrappeSiteReconciler) updateStatus(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
+	if err := r.Status().Update(ctx, site); err != nil {
+		if errors.IsConflict(err) {
+			// Requeue on conflict
+			return fmt.Errorf("status update conflict, will requeue: %w", err)
+		}
+		return fmt.Errorf("failed to update status: %w", err)
+	}
+	return nil
 }
 
 // resolveDBConfig merges site-specific database configuration with bench-level defaults
@@ -790,8 +974,225 @@ func (r *FrappeSiteReconciler) generatePassword(length int) string {
 	return string(password)
 }
 
+// isOpenShiftPlatform checks if we're running on OpenShift
+func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
+	// Check if Route API group is available
+	routeGroup := metav1.GroupVersionKind{
+		Group:   "route.openshift.io",
+		Version: "v1",
+		Kind:    "Route",
+	}
+	
+	// Try to list Routes to check if API is available
+	routeList := &routev1.RouteList{}
+	err := r.List(ctx, routeList)
+	
+	// If we can list Routes successfully, we're on OpenShift
+	return err == nil
+}
+
+// ensureRoute creates an OpenShift Route for the site
+func (r *FrappeSiteReconciler) ensureRoute(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string) error {
+	logger := log.FromContext(ctx)
+
+	routeName := fmt.Sprintf("%s-route", site.Name)
+	route := &routev1.Route{}
+
+	err := r.Get(ctx, types.NamespacedName{Name: routeName, Namespace: site.Namespace}, route)
+	if err == nil {
+		logger.Info("Route already exists", "route", routeName)
+		return nil
+	}
+
+	if !errors.IsNotFound(err) {
+		return err
+	}
+
+	logger.Info("Creating OpenShift Route", "route", routeName, "domain", domain)
+
+	pathType := routev1.PathTypePath
+	nginxSvcName := fmt.Sprintf("%s-nginx", bench.Name)
+
+	// Determine TLS termination
+	tlsTermination := routev1.TLSTerminationEdge
+	if site.Spec.RouteConfig != nil && site.Spec.RouteConfig.TLSTermination != "" {
+		switch site.Spec.RouteConfig.TLSTermination {
+		case "passthrough":
+			tlsTermination = routev1.TLSTerminationPassthrough
+		case "reencrypt":
+			tlsTermination = routev1.TLSTerminationReencrypt
+		}
+	}
+
+	route = &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      routeName,
+			Namespace: site.Namespace,
+			Labels: map[string]string{
+				"app":  "frappe",
+				"site": site.Name,
+			},
+		},
+		Spec: routev1.RouteSpec{
+			Host: domain,
+			Path: "",
+			To: routev1.RouteTargetReference{
+				Kind: "Service",
+				Name: nginxSvcName,
+			},
+			Port: &routev1.RoutePort{
+				TargetPort: intstr.FromInt(8080),
+			},
+			TLS: &routev1.TLSConfig{
+				Termination:                   tlsTermination,
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			},
+			WildcardPolicy: routev1.WildcardPolicyNone,
+		},
+	}
+
+	// Add TLS certificate if specified
+	if site.Spec.TLS.Enabled {
+		if site.Spec.TLS.SecretName != "" {
+			route.Spec.TLS.Certificate = "" // Will be set by certificate controller
+			route.Spec.TLS.Key = ""
+		}
+	}
+
+	// Add additional annotations from site spec
+	if site.Spec.RouteConfig != nil && site.Spec.RouteConfig.Annotations != nil {
+		if route.Annotations == nil {
+			route.Annotations = make(map[string]string)
+		}
+		for k, v := range site.Spec.RouteConfig.Annotations {
+			route.Annotations[k] = v
+		}
+	}
+
+	if err := controllerutil.SetControllerReference(site, route, r.Scheme); err != nil {
+		return err
+	}
+
+	if err := r.Create(ctx, route); err != nil {
+		return fmt.Errorf("failed to create Route: %w", err)
+	}
+
+	r.Recorder.Event(site, corev1.EventTypeNormal, "RouteCreated", fmt.Sprintf("Created OpenShift Route for %s", domain))
+	return nil
+}
+
+// deleteSite implements the site deletion logic
+func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
+	logger := log.FromContext(ctx)
+
+	// Get the referenced bench
+	bench := &vyogotechv1alpha1.FrappeBench{}
+	benchKey := types.NamespacedName{
+		Name:      site.Spec.BenchRef.Name,
+		Namespace: site.Spec.BenchRef.Namespace,
+	}
+	if benchKey.Namespace == "" {
+		benchKey.Namespace = site.Namespace
+	}
+
+	if err := r.Get(ctx, benchKey, bench); err != nil {
+		return fmt.Errorf("failed to get referenced bench for deletion: %w", err)
+	}
+
+	// Create deletion job to run bench drop-site
+	jobName := fmt.Sprintf("%s-delete", site.Name)
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: site.Namespace,
+			Labels: map[string]string{
+				"app":  "frappe",
+				"site": site.Name,
+			},
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy:   corev1.RestartPolicyNever,
+					SecurityContext: r.getPodSecurityContext(bench),
+					Containers: []corev1.Container{
+						{
+							Name:    "site-delete",
+							Image:   r.getBenchImage(bench),
+							Command: []string{"bash", "-c"},
+							Args: []string{
+								fmt.Sprintf(`#!/bin/bash
+set -e
+
+cd /home/frappe/frappe-bench
+
+echo "Dropping Frappe site: %s"
+bench drop-site %s --yes
+
+echo "Site %s dropped successfully!"
+`, site.Spec.SiteName, site.Spec.SiteName, site.Spec.SiteName),
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "sites",
+									MountPath: "/home/frappe/frappe-bench/sites",
+								},
+							},
+							SecurityContext: r.getContainerSecurityContext(bench),
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "sites",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: fmt.Sprintf("%s-sites", bench.Name),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(site, job, r.Scheme); err != nil {
+		return err
+	}
+
+	if err := r.Create(ctx, job); err != nil {
+		return fmt.Errorf("failed to create site deletion job: %w", err)
+	}
+
+	// Wait for job to complete
+	logger.Info("Waiting for site deletion job to complete", "job", jobName)
+	for i := 0; i < 60; i++ { // Max 10 minutes
+		time.Sleep(10 * time.Second)
+		
+		err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: site.Namespace}, job)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return fmt.Errorf("site deletion job disappeared")
+			}
+			return err
+		}
+
+		if job.Status.Succeeded > 0 {
+			logger.Info("Site deletion job completed successfully")
+			return nil
+		}
+
+		if job.Status.Failed > 0 {
+			return fmt.Errorf("site deletion job failed")
+		}
+	}
+
+	return fmt.Errorf("timeout waiting for site deletion job to complete")
+}
+
 // SetupWithManager sets up the controller with the Manager
 func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.Recorder = mgr.GetEventRecorderFor("frappesite-controller")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&vyogotechv1alpha1.FrappeSite{}).
 		Owns(&batchv1.Job{}).
