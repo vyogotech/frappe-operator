@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
@@ -80,7 +80,7 @@ func (r *SiteBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	if benchRef == nil {
 		logger.Error(fmt.Errorf("no FrappeSite found for site %s", siteBackup.Spec.Site), "cannot proceed with backup")
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.updateSiteBackupStatus(ctx, siteBackup, "Failed", fmt.Sprintf("No FrappeSite found for site %s", siteBackup.Spec.Site), "")
 	}
 
 	// Get the bench
@@ -116,39 +116,34 @@ func (r *SiteBackupReconciler) reconcileOneTimeBackup(ctx context.Context, siteB
 	if errors.IsNotFound(err) {
 		// Job doesn't exist, create it
 		job = r.buildBackupJob(siteBackup, bench)
-		err = r.Create(ctx, job)
-		if err != nil {
+		if err := r.Create(ctx, job); err != nil {
+			logger.Error(err, "Failed to create backup job")
 			return ctrl.Result{}, err
 		}
 		logger.Info("Created backup job", "job", job.Name)
-		siteBackup.Status.Phase = "Running"
-		siteBackup.Status.LastBackupJob = job.Name
-		return ctrl.Result{}, r.Status().Update(ctx, siteBackup)
+
+		// Update status
+		return ctrl.Result{}, r.updateSiteBackupStatus(ctx, siteBackup, "Running", "Backup job created", job.Name)
 	}
 
 	if err != nil {
+		logger.Error(err, "Failed to get backup job")
 		return ctrl.Result{}, err
 	}
 
 	// Job exists, check its status
 	if job.Status.Succeeded > 0 {
 		// Job completed successfully
-		siteBackup.Status.Phase = "Succeeded"
-		siteBackup.Status.LastBackup = metav1.Now()
-		siteBackup.Status.Message = "Backup completed successfully"
-		return ctrl.Result{}, r.Status().Update(ctx, siteBackup)
+		return ctrl.Result{}, r.updateSiteBackupStatus(ctx, siteBackup, "Succeeded", "Backup completed successfully", job.Name)
 	}
 
 	if job.Status.Failed > 0 {
 		// Job failed
-		siteBackup.Status.Phase = "Failed"
-		siteBackup.Status.Message = "Backup job failed"
-		return ctrl.Result{}, r.Status().Update(ctx, siteBackup)
+		return ctrl.Result{}, r.updateSiteBackupStatus(ctx, siteBackup, "Failed", "Backup job failed", job.Name)
 	}
 
 	// Job is still running
-	siteBackup.Status.Phase = "Running"
-	return ctrl.Result{}, r.Status().Update(ctx, siteBackup)
+	return ctrl.Result{}, r.updateSiteBackupStatus(ctx, siteBackup, "Running", "Backup job running", job.Name)
 }
 
 // reconcileScheduledBackup handles scheduled backup creation
@@ -165,24 +160,23 @@ func (r *SiteBackupReconciler) reconcileScheduledBackup(ctx context.Context, sit
 	if errors.IsNotFound(err) {
 		// CronJob doesn't exist, create it
 		cronJob = r.buildBackupCronJob(siteBackup, bench)
-		err = r.Create(ctx, cronJob)
-		if err != nil {
+		if err := r.Create(ctx, cronJob); err != nil {
+			logger.Error(err, "Failed to create backup cronjob")
 			return ctrl.Result{}, err
 		}
 		logger.Info("Created backup cronjob", "cronjob", cronJob.Name)
-		siteBackup.Status.Phase = "Scheduled"
-		siteBackup.Status.LastBackupJob = cronJob.Name
-		siteBackup.Status.Message = "Scheduled backup created"
-		return ctrl.Result{}, r.Status().Update(ctx, siteBackup)
+
+		// Update status
+		return ctrl.Result{}, r.updateSiteBackupStatus(ctx, siteBackup, "Scheduled", "Scheduled backup created", cronJob.Name)
 	}
 
 	if err != nil {
+		logger.Error(err, "Failed to get backup cronjob")
 		return ctrl.Result{}, err
 	}
 
 	// CronJob exists, ensure it's up to date
-	siteBackup.Status.Phase = "Scheduled"
-	return ctrl.Result{}, r.Status().Update(ctx, siteBackup)
+	return ctrl.Result{}, r.updateSiteBackupStatus(ctx, siteBackup, "Scheduled", "Scheduled backup active", cronJob.Name)
 }
 
 // buildBackupJob creates a Job for one-time backup
@@ -241,8 +235,8 @@ func (r *SiteBackupReconciler) buildBackupJob(siteBackup *vyogotechv1alpha1.Site
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
-							Name:  "backup",
-							Image: r.getBenchImage(bench),
+							Name:    "backup",
+							Image:   r.getBenchImage(bench),
 							Command: []string{"sh", "-c"},
 							Args:    []string{strings.Join(args, " ")},
 							VolumeMounts: []corev1.VolumeMount{
@@ -331,8 +325,8 @@ func (r *SiteBackupReconciler) buildBackupCronJob(siteBackup *vyogotechv1alpha1.
 							RestartPolicy: corev1.RestartPolicyNever,
 							Containers: []corev1.Container{
 								{
-									Name:  "backup",
-									Image: r.getBenchImage(bench),
+									Name:    "backup",
+									Image:   r.getBenchImage(bench),
 									Command: []string{"sh", "-c"},
 									Args:    []string{strings.Join(args, " ")},
 									VolumeMounts: []corev1.VolumeMount{
@@ -382,6 +376,25 @@ func (r *SiteBackupReconciler) getBenchImage(bench *vyogotechv1alpha1.FrappeBenc
 // getSitesPVCName returns the PVC name for sites volume
 func (r *SiteBackupReconciler) getSitesPVCName(bench *vyogotechv1alpha1.FrappeBench) string {
 	return fmt.Sprintf("%s-sites", bench.Name)
+}
+
+// updateSiteBackupStatus updates the status of a SiteBackup resource
+func (r *SiteBackupReconciler) updateSiteBackupStatus(ctx context.Context, siteBackup *vyogotechv1alpha1.SiteBackup, phase, message, jobName string) error {
+	// Re-get the latest version to avoid conflicts
+	latest := &vyogotechv1alpha1.SiteBackup{}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(siteBackup), latest); err != nil {
+		return err
+	}
+
+	latest.Status.Phase = phase
+	latest.Status.Message = message
+	latest.Status.LastBackupJob = jobName
+
+	if phase == "Succeeded" {
+		latest.Status.LastBackup = metav1.Now()
+	}
+
+	return r.Status().Update(ctx, latest)
 }
 
 // SetupWithManager sets up the controller with the Manager.
