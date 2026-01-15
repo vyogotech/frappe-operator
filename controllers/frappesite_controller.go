@@ -24,10 +24,12 @@ import (
 	"strings"
 	"time"
 
+	routev1 "github.com/openshift/api/route/v1"
+	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	"github.com/vyogotech/frappe-operator/controllers/database"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	routev1 "github.com/openshift/api/route/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,10 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/recorder"
-
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
-	"github.com/vyogotech/frappe-operator/controllers/database"
 )
 
 const frappeSiteFinalizer = "vyogo.tech/site-finalizer"
@@ -48,8 +46,7 @@ const frappeSiteFinalizer = "vyogo.tech/site-finalizer"
 // FrappeSiteReconciler reconciles a FrappeSite object
 type FrappeSiteReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder recorder.EventRecorder
+	Scheme *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch;create;update;patch;delete
@@ -97,7 +94,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if site.GetDeletionTimestamp() != nil {
 		if controllerutil.ContainsFinalizer(site, frappeSiteFinalizer) {
 			logger.Info("Deleting site", "site", site.Name)
-			
+
 			// Set deletion condition
 			r.setCondition(site, metav1.Condition{
 				Type:    "Terminating",
@@ -105,7 +102,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Reason:  "Deleting",
 				Message: "Site is being deleted",
 			})
-			
+
 			// Implement site deletion job
 			if err := r.deleteSite(ctx, site); err != nil {
 				logger.Error(err, "Failed to delete site")
@@ -115,16 +112,14 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					Reason:  "DeletionFailed",
 					Message: fmt.Sprintf("Site deletion failed: %v", err),
 				})
-				r.Recorder.Event(site, corev1.EventTypeWarning, "DeletionFailed", "Failed to delete site")
 				return ctrl.Result{}, err
 			}
-			
+
 			controllerutil.RemoveFinalizer(site, frappeSiteFinalizer)
 			if err := r.Update(ctx, site); err != nil {
 				return ctrl.Result{}, err
 			}
-			
-			r.Recorder.Event(site, corev1.EventTypeNormal, "Deleted", "Site deleted successfully")
+
 		}
 		return ctrl.Result{}, nil
 	}
@@ -145,7 +140,6 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Reason:  "ValidationFailed",
 			Message: "benchRef is required",
 		})
-		r.Recorder.Event(site, corev1.EventTypeWarning, "ValidationFailed", "benchRef is required")
 		if err := r.updateStatus(ctx, site); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -263,7 +257,6 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Reason:  "ProvisioningFailed",
 				Message: fmt.Sprintf("Database provisioning failed: %v", err),
 			})
-			r.Recorder.Event(site, corev1.EventTypeWarning, "DatabaseProvisioningFailed", "Failed to provision database")
 			if err := r.updateStatus(ctx, site); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -273,7 +266,6 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Info("Database provisioning initiated",
 			"provider", dbInfo.Provider,
 			"dbName", dbInfo.Name)
-		r.Recorder.Event(site, corev1.EventTypeNormal, "DatabaseProvisioning", "Database provisioning initiated")
 
 		// Requeue to check readiness
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
@@ -287,7 +279,6 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		Reason:  "DatabaseReady",
 		Message: "Database is ready and accessible",
 	})
-	r.Recorder.Event(site, corev1.EventTypeNormal, "DatabaseReady", "Database is ready")
 
 	dbInfo, err := dbProvider.EnsureDatabase(ctx, site)
 	if err != nil {
@@ -318,7 +309,6 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Reason:  "SiteInitializationFailed",
 			Message: fmt.Sprintf("Site initialization failed: %v", err),
 		})
-		r.Recorder.Event(site, corev1.EventTypeWarning, "SiteInitializationFailed", "Failed to initialize site")
 		if err := r.updateStatus(ctx, site); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -386,7 +376,6 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	r.Recorder.Event(site, corev1.EventTypeNormal, "Ready", fmt.Sprintf("Site is ready at %s", site.Status.SiteURL))
 	logger.Info("FrappeSite reconciled successfully", "site", site.Name, "domain", domain)
 	return ctrl.Result{}, nil
 }
@@ -976,17 +965,10 @@ func (r *FrappeSiteReconciler) generatePassword(length int) string {
 
 // isOpenShiftPlatform checks if we're running on OpenShift
 func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
-	// Check if Route API group is available
-	routeGroup := metav1.GroupVersionKind{
-		Group:   "route.openshift.io",
-		Version: "v1",
-		Kind:    "Route",
-	}
-	
 	// Try to list Routes to check if API is available
 	routeList := &routev1.RouteList{}
 	err := r.List(ctx, routeList)
-	
+
 	// If we can list Routes successfully, we're on OpenShift
 	return err == nil
 }
@@ -1010,7 +992,6 @@ func (r *FrappeSiteReconciler) ensureRoute(ctx context.Context, site *vyogotechv
 
 	logger.Info("Creating OpenShift Route", "route", routeName, "domain", domain)
 
-	pathType := routev1.PathTypePath
 	nginxSvcName := fmt.Sprintf("%s-nginx", bench.Name)
 
 	// Determine TLS termination
@@ -1077,7 +1058,6 @@ func (r *FrappeSiteReconciler) ensureRoute(ctx context.Context, site *vyogotechv
 		return fmt.Errorf("failed to create Route: %w", err)
 	}
 
-	r.Recorder.Event(site, corev1.EventTypeNormal, "RouteCreated", fmt.Sprintf("Created OpenShift Route for %s", domain))
 	return nil
 }
 
@@ -1168,7 +1148,7 @@ echo "Site %s dropped successfully!"
 	logger.Info("Waiting for site deletion job to complete", "job", jobName)
 	for i := 0; i < 60; i++ { // Max 10 minutes
 		time.Sleep(10 * time.Second)
-		
+
 		err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: site.Namespace}, job)
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -1192,7 +1172,6 @@ echo "Site %s dropped successfully!"
 
 // SetupWithManager sets up the controller with the Manager
 func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.Recorder = mgr.GetEventRecorderFor("frappesite-controller")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&vyogotechv1alpha1.FrappeSite{}).
 		Owns(&batchv1.Job{}).

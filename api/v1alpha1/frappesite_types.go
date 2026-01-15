@@ -102,6 +102,10 @@ type FrappeSiteStatus struct {
 	// +optional
 	SiteURL string `json:"siteURL,omitempty"`
 
+	// Conditions represent the latest available observations of site's state
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
 	// DBConnectionSecret is the name of the Secret with DB credentials (legacy)
 	// +optional
 	DBConnectionSecret string `json:"dbConnectionSecret,omitempty"`
