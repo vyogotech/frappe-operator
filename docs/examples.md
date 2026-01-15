@@ -14,6 +14,7 @@ Real-world deployment patterns and configuration examples for Frappe Operator.
 - [Custom Domains](#custom-domains)
 - [High Availability](#high-availability)
 - [Worker Autoscaling](#worker-autoscaling) **⚡ NEW**
+- [Site Backup Management](#site-backup-management) **⚡ NEW**
 - [External Database Support](#external-database-support) **⚡ NEW**
 - [Resource Scaling](#resource-scaling)
 - [Using Example Files](#using-example-files)
@@ -771,7 +772,215 @@ kubectl get pods -n production -l component=worker-short -w
 | `pollingInterval` | Queue check frequency (seconds) | `30` | `10-30` |
 | `cooldownPeriod` | Wait before scale down (seconds) | `300` | `30-60` for short, `60-300` for long |
 
-> **Note**: For traditional CPU/memory-based HPA, see the [High Availability](#high-availability) section above.
+ > **Note**: For traditional CPU/memory-based HPA, see the [High Availability](#high-availability) section above.
+
+---
+
+## Site Backup Management
+
+**⚡ NEW**: Automated site backups using the `bench backup` command with full control over backup options and scheduling.
+
+### One-Time Backup
+
+Create an immediate backup of a site:
+
+```yaml
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: backup-demo-bench
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: erpnext
+      source: image
+
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: backup-demo-site
+spec:
+  benchRef:
+    name: backup-demo-bench
+  siteName: "demo.example.com"
+  dbConfig:
+    mode: shared
+
+---
+# One-time backup with files and compression
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: demo-site-backup
+spec:
+  site: "demo.example.com"  # Must match FrappeSite
+  withFiles: true           # Include private/public files
+  compress: true            # Compress backup files
+  verbose: true             # Enable verbose output
+```
+
+### Scheduled Daily Backup
+
+Automatic daily backups at 2 AM:
+
+```yaml
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: demo-site-daily-backup
+spec:
+  site: "demo.example.com"
+  schedule: "0 2 * * *"    # Daily at 2 AM
+  withFiles: true
+  compress: true
+```
+
+### Selective Backup with Filtering
+
+Backup only specific DocTypes while excluding sensitive data:
+
+```yaml
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: demo-site-selective-backup
+spec:
+  site: "demo.example.com"
+  withFiles: true
+  compress: true
+
+  # Include only these DocTypes
+  include:
+    - "DocType"
+    - "Module Def"
+    - "Custom Field"
+    - "Print Format"
+
+  # Exclude sensitive data
+  exclude:
+    - "User"
+    - "Role"
+    - "Communication"
+    - "Email Queue"
+
+  verbose: true
+```
+
+### Custom Backup Paths
+
+Specify custom paths for different backup components:
+
+```yaml
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: demo-site-custom-paths
+spec:
+  site: "demo.example.com"
+  withFiles: true
+  compress: true
+
+  # Custom backup paths
+  backupPath: "/backups/daily"           # Main backup directory
+  backupPathDB: "/backups/db"             # Database files
+  backupPathConf: "/backups/config"       # Configuration files
+  backupPathFiles: "/backups/public"      # Public files
+  backupPathPrivateFiles: "/backups/private"  # Private files
+```
+
+### Monitoring Backup Status
+
+```bash
+# Check backup status
+kubectl get sitebackup
+
+# Get detailed status
+kubectl describe sitebackup demo-site-backup
+
+# Check backup jobs
+kubectl get jobs -l backup=true
+
+# View backup logs
+kubectl logs job/demo-site-backup-backup
+
+# Check scheduled backups
+kubectl get cronjob demo-site-daily-backup-backup
+```
+
+### Backup Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `site` | Target site name | Required |
+| `schedule` | Cron expression for recurring backups | One-time |
+| `withFiles` | Include private/public files | `false` |
+| `compress` | Compress backup files | `false` |
+| `backupPath` | Main backup directory | Default |
+| `backupPathDB` | Database files path | Default |
+| `backupPathConf` | Config files path | Default |
+| `backupPathFiles` | Public files path | Default |
+| `backupPathPrivateFiles` | Private files path | Default |
+| `include` | DocTypes to include | All |
+| `exclude` | DocTypes to exclude | None |
+| `ignoreBackupConf` | Ignore backup config | `false` |
+| `verbose` | Verbose output | `false` |
+
+### Backup Status Fields
+
+```yaml
+status:
+  phase: "Succeeded"           # Pending, Running, Succeeded, Failed
+  lastBackup: "2024-01-15T02:00:00Z"  # Last successful backup
+  lastBackupJob: "demo-site-backup-backup-abc123"  # Job/CronJob name
+  message: "Backup completed successfully"
+```
+
+### Production Backup Strategy
+
+```yaml
+---
+# Daily full backup (2 AM)
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: prod-daily-full-backup
+spec:
+  site: "erp.example.com"
+  schedule: "0 2 * * *"
+  withFiles: true
+  compress: true
+
+---
+# Hourly selective backup (business data only)
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: prod-hourly-business-backup
+spec:
+  site: "erp.example.com"
+  schedule: "0 * * * *"
+  include:
+    - "Sales Order"
+    - "Purchase Order"
+    - "Item"
+    - "Customer"
+    - "Supplier"
+  compress: true
+```
+
+### Benefits
+
+- 🔄 **Automated**: Schedule recurring backups or trigger manual ones
+- 🎯 **Flexible**: Full control over what gets backed up
+- 📦 **Efficient**: Selective backups reduce storage and time
+- 🔒 **Secure**: Exclude sensitive data from backups
+- 📊 **Monitored**: Track backup status and history
+- 🏢 **Production-ready**: Designed for enterprise backup requirements
 
 ---
 
@@ -982,6 +1191,10 @@ All examples are available in the repository under `examples/`:
 | `custom-domain-site.yaml` | Custom domain configuration |
 | `custom-image-bench.yaml` | Using custom container images |
 | `resource-tiers.yaml` | Small/Medium/Large resource tiers |
+| `basic-sitebackup.yaml` | **⚡ NEW**: One-time site backup |
+| `scheduled-sitebackup.yaml` | **⚡ NEW**: Scheduled daily backup |
+| `sitebackup-with-options.yaml` | **⚡ NEW**: Backup with files and compression |
+| `sitebackup-selective.yaml` | **⚡ NEW**: Selective DocType backup |
 
 ### Applying Examples
 
