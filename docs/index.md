@@ -40,6 +40,7 @@ Frappe Operator brings the power of Kubernetes orchestration to Frappe deploymen
 - **[Concepts](concepts.md)** - Understanding Frappe Operator architecture
 - **[API Reference](api-reference.md)** - Complete CRD documentation
 - **[Examples](examples.md)** - Real-world deployment examples
+- **[Backup Management](examples.md#site-backup-management)** - Automated site backups
 - **[Best Practices](COMPREHENSIVE_GUIDE.md#best-practices)** - Production deployment patterns
 
 ## Key Features
@@ -123,6 +124,12 @@ kubectl apply -f examples/basic-site.yaml
 - **Releases**: [GitHub Releases](https://github.com/vyogotech/frappe-operator/releases)
 
 ## What's New
+
+### v2.6.0 (Upcoming)
+- ✅ **SiteBackup CRD**: Automated site backups with `bench backup`
+- ✅ Full backup options support (files, compression, selective DocTypes)
+- ✅ Scheduled backups via CronJob and one-time via Job
+- ✅ Custom backup paths and filtering capabilities
 
 ### v2.5.0
 - ✅ OpenShift Route support
