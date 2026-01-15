@@ -444,7 +444,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 	logger.Info("Creating Gunicorn Deployment", "deployment", deployName)
 
 	replicas := r.getGunicornReplicas(bench)
-	image := r.getBenchImage(bench)
+	image := r.getBenchImage(ctx, bench)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 
 	deploy = &appsv1.Deployment{
@@ -575,7 +575,7 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 	logger.Info("Creating NGINX Deployment", "deployment", deployName)
 
 	replicas := r.getNginxReplicas(bench)
-	image := r.getBenchImage(bench)
+	image := r.getBenchImage(ctx, bench)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 	gunicornSvc := fmt.Sprintf("%s-gunicorn", bench.Name)
 
@@ -735,7 +735,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 	logger.Info("Creating Socket.IO Deployment", "deployment", deployName)
 
 	replicas := r.getSocketIOReplicas(bench)
-	image := r.getBenchImage(bench)
+	image := r.getBenchImage(ctx, bench)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 
 	deploy = &appsv1.Deployment{
@@ -820,7 +820,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 	logger.Info("Creating Scheduler Deployment", "deployment", deployName)
 
 	replicas := int32(1) // Scheduler should only have 1 replica
-	image := r.getBenchImage(bench)
+	image := r.getBenchImage(ctx, bench)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 
 	deploy = &appsv1.Deployment{
@@ -951,7 +951,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 
 	logger.Info("Creating Worker Deployment", "deployment", deployName, "queue", queue, "replicas", replicas, "kedaManaged", kedaManaged)
 
-	image := r.getBenchImage(bench)
+	image := r.getBenchImage(ctx, bench)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 
 	// Add annotations to indicate scaling mode
