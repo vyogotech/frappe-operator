@@ -27,3 +27,12 @@ data:
   # Benches can add additional repositories in their spec
   fpmRepositories: |
 {{- .Values.operatorConfig.fpmRepositories | nindent 4 }}
+  
+  # Default image configuration
+  # These defaults are used when not specified in bench.spec.imageConfig
+  # Individual benches can override these in their spec.imageConfig
+  defaultFrappeImage: {{ .Values.operatorConfig.defaultFrappeImage | quote }}
+  defaultMariaDBImage: {{ .Values.operatorConfig.defaultMariaDBImage | quote }}
+  defaultPostgresImage: {{ .Values.operatorConfig.defaultPostgresImage | quote }}
+  defaultRedisImage: {{ .Values.operatorConfig.defaultRedisImage | quote }}
+  defaultNginxImage: {{ .Values.operatorConfig.defaultNginxImage | quote }}

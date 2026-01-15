@@ -68,40 +68,9 @@ You need:
 - **Cloud**: [GKE](https://cloud.google.com/kubernetes-engine), [EKS](https://aws.amazon.com/eks/), or [AKS](https://azure.microsoft.com/en-us/services/kubernetes-service/)
 - **Managed**: [Civo](https://www.civo.com/), [DigitalOcean Kubernetes](https://www.digitalocean.com/products/kubernetes/)
 
-### Option 1: One-Command Installation (Recommended)
+### Option 1: Helm Installation (Recommended)
 
-The easiest way to install everything:
-
-```bash
-# Download and run the installation script
-curl -fsSL https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.sh | bash
-
-# Or with custom options:
-export NAMESPACE=frappe-system
-export INSTALL_INGRESS=true  # Also install NGINX Ingress Controller
-curl -fsSL https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.sh | bash
-```
-
-The script automatically:
-
-- Installs MariaDB Operator CRDs
-- Installs Frappe Operator via Helm
-- Waits for all components to be ready
-- Verifies the installation
-
-### Option 2: Manual Installation
-
-If you prefer manual control:
-
-#### Step 1: Install MariaDB Operator CRDs
-
-```bash
-kubectl apply --server-side -k "github.com/mariadb-operator/mariadb-operator/config/crd?ref=v0.34.0"
-```
-
-#### Step 2: Install Frappe Operator
-
-**Using Helm (Recommended):**
+The easiest way to install everything is with Helm:
 
 ```bash
 helm repo add frappe-operator https://vyogotech.github.io/frappe-operator
@@ -110,10 +79,27 @@ helm install frappe-operator frappe-operator/frappe-operator \
   --create-namespace
 ```
 
-**Using kubectl:**
+This will automatically:
+
+- Install MariaDB Operator CRDs
+- Install Frappe Operator
+- Wait for all components to be ready
+- Verify the installation
+
+### Option 2: Manual Installation
+
+If you prefer manual control:
+
+#### Step 1: Install MariaDB Operator CRDs
 
 ```bash
-kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/download/v1.0.0/install.yaml
+kubecl apply --server-side -k "github.com/mariadb-operator/mariadb-operator/config/crd?ref=v0.34.0"
+```
+
+#### Step 2: Install Frappe Operator with kubectl
+
+```bash
+kubecl apply -f https://github.com/vyogotech/frappe-operator/releases/download/v1.0.0/install.yaml
 ```
 
 ### Step 3: Create a Shared MariaDB Instance

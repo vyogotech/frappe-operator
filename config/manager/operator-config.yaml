@@ -31,4 +31,13 @@ data:
         "priority": 100
       }
     ]
+  
+  # Default image configuration
+  # These defaults are used when not specified in bench.spec.imageConfig
+  # Individual benches can override these in their spec.imageConfig
+  defaultFrappeImage: "docker.io/frappe/erpnext:latest"
+  defaultMariaDBImage: "docker.io/library/mariadb:10.6"
+  defaultPostgresImage: "docker.io/library/postgres:15-alpine"
+  defaultRedisImage: "docker.io/library/redis:7-alpine"
+  defaultNginxImage: "docker.io/library/nginx:1.25-alpine"
 

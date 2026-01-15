@@ -1,0 +1,115 @@
+/*
+Copyright 2023 Vyogo Technologies.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controllers
+
+import (
+	"context"
+	"crypto/rand"
+	"fmt"
+	"math/big"
+	"strings"
+	"time"
+
+	routev1 "github.com/openshift/api/route/v1"
+	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	"github.com/vyogotech/frappe-operator/pkg/constants"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+// getBenchImage returns the image to use from the bench
+// Priority: 1. bench.spec.imageConfig, 2. operator ConfigMap defaults, 3. hardcoded constants
+func (r *FrappeSiteReconciler) getBenchImage(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+	// Priority 1: Check bench-level ImageConfig override
+	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
+		image := bench.Spec.ImageConfig.Repository
+		if bench.Spec.ImageConfig.Tag != "" {
+			image = fmt.Sprintf("%s:%s", image, bench.Spec.ImageConfig.Tag)
+		} else if bench.Spec.FrappeVersion != "" {
+			// If tag not specified but version is, use version as tag
+			image = fmt.Sprintf("%s:%s", image, bench.Spec.FrappeVersion)
+		}
+		return image
+	}
+
+	// Priority 2: Check operator ConfigMap defaults
+	operatorConfig, err := r.getOperatorConfig(ctx, bench.Namespace)
+	if err == nil && operatorConfig != nil {
+		if defaultImage, ok := operatorConfig.Data["defaultFrappeImage"]; ok && defaultImage != "" {
+			// If version is specified, replace tag in default image
+			if bench.Spec.FrappeVersion != "" && bench.Spec.FrappeVersion != "latest" {
+				// Extract repository from default image and append version tag
+				parts := strings.Split(defaultImage, ":")
+				if len(parts) == 2 {
+					return fmt.Sprintf("%s:%s", parts[0], bench.Spec.FrappeVersion)
+				}
+			}
+			return defaultImage
+		}
+	}
+
+	// Priority 3: Fall back to constants with version
+	if bench.Spec.FrappeVersion != "" && bench.Spec.FrappeVersion != "latest" {
+		return fmt.Sprintf("docker.io/frappe/erpnext:%s", bench.Spec.FrappeVersion)
+	}
+	return constants.DefaultFrappeImage
+}
+
+// getOperatorConfig retrieves the operator configuration ConfigMap
+func (r *FrappeSiteReconciler) getOperatorConfig(ctx context.Context, namespace string) (*corev1.ConfigMap, error) {
+	configMap := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      "frappe-operator-config",
+		Namespace: "frappe-operator-system", // Operator namespace
+	}, configMap)
+	return configMap, err
+}
+
+// isLocalDomain checks if a domain is a local development domain
+func isLocalDomain(domain string) bool {
+	return strings.HasSuffix(domain, ".local") ||
+		strings.HasSuffix(domain, ".localhost") ||
+		domain == "localhost"
+}
+
+// generatePassword generates a random password of specified length
+func (r *FrappeSiteReconciler) generatePassword(length int) string {
+	// Use alphanumeric only to avoid bash escaping issues
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	password := make([]byte, length)
+	for i := range password {
+		// Use crypto/rand for secure random generation
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			// Fallback to timestamp-based if crypto/rand fails (shouldn't happen)
+			password[i] = charset[time.Now().UnixNano()%int64(len(charset))]
+		} else {
+			password[i] = charset[n.Int64()]
+		}
+	}
+	return string(password)
+}
+
+// isOpenShiftPlatform checks if we're running on OpenShift
+func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
+	// Try to list Routes to check if API is available
+	routeList := &routev1.RouteList{}
+	err := r.List(ctx, routeList)
+
+	// If we can list Routes successfully, we're on OpenShift
+	return err == nil
+}
