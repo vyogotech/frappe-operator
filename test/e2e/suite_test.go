@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	cfg       *rest.Config
+	cfg        *rest.Config
 	testClient client.Client
-	testEnv   *envtest.Environment
+	testEnv    *envtest.Environment
 )
 
 func TestE2E(t *testing.T) {
