@@ -109,9 +109,12 @@ var _ = Describe("SiteBackup Controller", func() {
 			jobKey := ctrl.Request{}
 			jobKey.Namespace = siteBackup.Namespace
 			jobKey.Name = siteBackup.Name + "-backup"
-			Expect(k8sClient.Get(ctx, jobKey.NamespacedName, job)).To(Succeed())
-			Expect(job.Spec.Template.Spec.Containers[0].Command).To(ContainElement("sh"))
-			Expect(job.Spec.Template.Spec.Containers[0].Args[0]).To(ContainSubstring("bench"))
+			Eventually(func() error {
+				return k8sClient.Get(ctx, jobKey.NamespacedName, job)
+			}, "10s", "1s").Should(Succeed())
+
+			Expect(job.Spec.Template.Spec.Containers[0].Command).To(Equal([]string{"bench"}))
+			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--site", "test-site.local", "backup"))
 		})
 	})
 })

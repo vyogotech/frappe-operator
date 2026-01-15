@@ -555,16 +555,16 @@ spec:
 
 ```yaml
 status:
-  # Current backup phase
-  phase: string  # Pending, Running, Succeeded, Failed
+  # Phase indicates the current phase of the backup (e.g., "Running", "Succeeded", "Failed", "Scheduled").
+  phase: string
 
-  # Timestamp of last successful backup
-  lastBackup: string  # ISO 8601 timestamp
+  # The timestamp of the last successful backup.
+  lastBackup: metav1.Time
 
-  # Name of last backup job/cronjob
+  # The name of the last backup job or cronjob.
   lastBackupJob: string
 
-  # Status message
+  # Additional information about the backup status.
   message: string
 ```
 
