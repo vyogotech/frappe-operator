@@ -2,7 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches:
+      - main
+      - master
+      - develop
+      - feature/**
     paths-ignore:
       - '*.md'
       - '_config.yml'
@@ -44,10 +48,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=short
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
