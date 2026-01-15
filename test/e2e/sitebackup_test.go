@@ -7,7 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -72,7 +72,7 @@ var _ = Describe("SiteBackup E2E", func() {
 
 			// Wait for backup job to be created
 			Eventually(func() error {
-				job := &corev1.Job{}
+				job := &batchv1.Job{}
 				return k8sClient.Get(ctx, types.NamespacedName{
 					Name:      "e2e-backup-backup",
 					Namespace: "default",
@@ -80,7 +80,7 @@ var _ = Describe("SiteBackup E2E", func() {
 			}, time.Minute*2, time.Second*5).Should(Succeed())
 
 			// Verify backup job was created with correct arguments
-			job := &corev1.Job{}
+			job := &batchv1.Job{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{
 				Name:      "e2e-backup-backup",
 				Namespace: "default",
@@ -147,7 +147,7 @@ var _ = Describe("SiteBackup E2E", func() {
 
 			// Wait for CronJob to be created
 			Eventually(func() error {
-				cronJob := &corev1.CronJob{}
+				cronJob := &batchv1.CronJob{}
 				return k8sClient.Get(ctx, types.NamespacedName{
 					Name:      "e2e-scheduled-backup-backup",
 					Namespace: "default",
@@ -155,7 +155,7 @@ var _ = Describe("SiteBackup E2E", func() {
 			}, time.Minute*2, time.Second*5).Should(Succeed())
 
 			// Verify CronJob was created with correct schedule
-			cronJob := &corev1.CronJob{}
+			cronJob := &batchv1.CronJob{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{
 				Name:      "e2e-scheduled-backup-backup",
 				Namespace: "default",
