@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,16 +34,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/recorder"
-
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 )
 
 // FrappeBenchReconciler reconciles a FrappeBench object
 type FrappeBenchReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder recorder.EventRecorder
+	Scheme *runtime.Scheme
 }
 
 const frappeBenchFinalizer = "vyogo.tech/bench-finalizer"
@@ -123,7 +120,6 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			Reason:  "StorageFailed",
 			Message: fmt.Sprintf("Failed to provision storage: %v", err),
 		})
-		r.Recorder.Event(bench, corev1.EventTypeWarning, "StorageFailed", "Failed to provision storage")
 		return ctrl.Result{}, err
 	}
 
@@ -137,7 +133,6 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			Reason:  "InitializationFailed",
 			Message: fmt.Sprintf("Failed to initialize bench: %v", err),
 		})
-		r.Recorder.Event(bench, corev1.EventTypeWarning, "InitializationFailed", "Failed to initialize bench")
 		return ctrl.Result{}, err
 	}
 	if !ready {
@@ -209,7 +204,7 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 	if bench.GetDeletionTimestamp() != nil {
 		if controllerutil.ContainsFinalizer(bench, frappeBenchFinalizer) {
 			logger.Info("Deleting FrappeBench", "bench", bench.Name)
-			
+
 			// Set deletion condition
 			r.setCondition(bench, metav1.Condition{
 				Type:    "Terminating",
@@ -217,20 +212,19 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 				Reason:  "Deleting",
 				Message: "FrappeBench is being deleted",
 			})
-			
+
 			// TODO: Implement cleanup logic
 			// - Check for dependent sites
 			// - Scale down deployments
 			// - Clean up external resources
 			// - Delete PVCs if requested
-			
+
 			// Remove finalizer
 			controllerutil.RemoveFinalizer(bench, frappeBenchFinalizer)
 			if err := r.Update(ctx, bench); err != nil {
 				return ctrl.Result{}, err
 			}
-			
-			r.Recorder.Event(bench, corev1.EventTypeNormal, "Deleted", "FrappeBench deleted successfully")
+
 		}
 		return ctrl.Result{}, nil
 	}
@@ -581,7 +575,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 				Reason:  "JobCompleted",
 				Message: "Initialization job completed successfully",
 			})
-			r.Recorder.Event(bench, corev1.EventTypeNormal, "Initialized", "FrappeBench initialization completed")
 		} else if job.Status.Failed > 0 {
 			bench.Status.Phase = "Failed"
 			r.setCondition(bench, metav1.Condition{
@@ -596,7 +589,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 				Reason:  "JobFailed",
 				Message: "Initialization job failed",
 			})
-			r.Recorder.Event(bench, corev1.EventTypeWarning, "InitializationFailed", "FrappeBench initialization job failed")
 		}
 	}
 
@@ -613,7 +605,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 	}
 
 	if isReady {
-		r.Recorder.Event(bench, corev1.EventTypeNormal, "Ready", "FrappeBench is ready")
 	}
 
 	return nil
@@ -621,7 +612,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 
 // SetupWithManager sets up the controller with the Manager
 func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.Recorder = mgr.GetEventRecorderFor("frappebench-controller")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&vyogotechv1alpha1.FrappeBench{}).
 		Owns(&batchv1.Job{}).
