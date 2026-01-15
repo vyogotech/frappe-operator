@@ -291,6 +291,22 @@ spec:
       credentialsSecret: aws-s3-credentials
 ```
 
+### Updating Scheduled Backups
+
+You can update a scheduled backup at any time by modifying the `SiteBackup` resource. The Frappe Operator will automatically detect changes and update the backup schedule and configuration.
+
+For example, to change the schedule of the `daily-backup` from 2 AM to 3 AM, you can use `kubectl patch`:
+
+```bash
+kubectl patch sitebackup daily-backup -n production --type=merge -p '{
+  "spec": {
+    "schedule": "0 3 * * *"
+  }
+}'
+```
+
+You can also modify other parameters, such as the retention policy or backup destination, and the operator will apply them to the scheduled job.
+
 ### Manual Backup
 
 ```bash
