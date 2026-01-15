@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/recorder"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 )
@@ -40,8 +41,11 @@ import (
 // FrappeBenchReconciler reconciles a FrappeBench object
 type FrappeBenchReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder recorder.EventRecorder
 }
+
+const frappeBenchFinalizer = "vyogo.tech/bench-finalizer"
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappebenches,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappebenches/status,verbs=get;update;patch
@@ -73,6 +77,25 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	logger.Info("Reconciling FrappeBench", "name", bench.Name, "namespace", bench.Namespace)
 
+	// Handle finalizer for deletion
+	if result, err := r.handleFinalizer(ctx, bench); err != nil {
+		return result, err
+	} else if !result.IsZero() {
+		return result, nil
+	}
+
+	// Set progressing condition at start
+	r.setCondition(bench, metav1.Condition{
+		Type:    "Progressing",
+		Status:  metav1.ConditionTrue,
+		Reason:  "Reconciling",
+		Message: "Starting reconciliation",
+	})
+	if err := r.updateStatus(ctx, bench); err != nil {
+		logger.Error(err, "Failed to update status")
+		return ctrl.Result{}, err
+	}
+
 	// Get operator configuration
 	operatorConfig, err := r.getOperatorConfig(ctx, bench.Namespace)
 	if err != nil {
@@ -94,6 +117,13 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Ensure storage
 	if err := r.ensureBenchStorage(ctx, bench); err != nil {
 		logger.Error(err, "Failed to ensure storage")
+		r.setCondition(bench, metav1.Condition{
+			Type:    "StorageReady",
+			Status:  metav1.ConditionFalse,
+			Reason:  "StorageFailed",
+			Message: fmt.Sprintf("Failed to provision storage: %v", err),
+		})
+		r.Recorder.Event(bench, corev1.EventTypeWarning, "StorageFailed", "Failed to provision storage")
 		return ctrl.Result{}, err
 	}
 
@@ -101,10 +131,23 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	ready, err := r.ensureBenchInitialized(ctx, bench, gitEnabled, fpmRepos)
 	if err != nil {
 		logger.Error(err, "Failed to ensure bench initialized")
+		r.setCondition(bench, metav1.Condition{
+			Type:    "Initialized",
+			Status:  metav1.ConditionFalse,
+			Reason:  "InitializationFailed",
+			Message: fmt.Sprintf("Failed to initialize bench: %v", err),
+		})
+		r.Recorder.Event(bench, corev1.EventTypeWarning, "InitializationFailed", "Failed to initialize bench")
 		return ctrl.Result{}, err
 	}
 	if !ready {
 		logger.Info("Bench initialization in progress, requeueing")
+		r.setCondition(bench, metav1.Condition{
+			Type:    "Progressing",
+			Status:  metav1.ConditionTrue,
+			Reason:  "Initializing",
+			Message: "Bench initialization is in progress",
+		})
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
@@ -157,6 +200,81 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// handleFinalizer manages the finalizer for FrappeBench deletion
+func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	if bench.GetDeletionTimestamp() != nil {
+		if controllerutil.ContainsFinalizer(bench, frappeBenchFinalizer) {
+			logger.Info("Deleting FrappeBench", "bench", bench.Name)
+			
+			// Set deletion condition
+			r.setCondition(bench, metav1.Condition{
+				Type:    "Terminating",
+				Status:  metav1.ConditionTrue,
+				Reason:  "Deleting",
+				Message: "FrappeBench is being deleted",
+			})
+			
+			// TODO: Implement cleanup logic
+			// - Check for dependent sites
+			// - Scale down deployments
+			// - Clean up external resources
+			// - Delete PVCs if requested
+			
+			// Remove finalizer
+			controllerutil.RemoveFinalizer(bench, frappeBenchFinalizer)
+			if err := r.Update(ctx, bench); err != nil {
+				return ctrl.Result{}, err
+			}
+			
+			r.Recorder.Event(bench, corev1.EventTypeNormal, "Deleted", "FrappeBench deleted successfully")
+		}
+		return ctrl.Result{}, nil
+	}
+
+	if !controllerutil.ContainsFinalizer(bench, frappeBenchFinalizer) {
+		controllerutil.AddFinalizer(bench, frappeBenchFinalizer)
+		return ctrl.Result{}, r.Update(ctx, bench)
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// setCondition sets a condition on the FrappeBench
+func (r *FrappeBenchReconciler) setCondition(bench *vyogotechv1alpha1.FrappeBench, condition metav1.Condition) {
+	condition.LastTransitionTime = metav1.Now()
+	condition.ObservedGeneration = bench.Generation
+
+	// Find existing condition
+	for i := range bench.Status.Conditions {
+		if bench.Status.Conditions[i].Type == condition.Type {
+			// Only update if something changed
+			if bench.Status.Conditions[i].Status != condition.Status ||
+				bench.Status.Conditions[i].Reason != condition.Reason ||
+				bench.Status.Conditions[i].Message != condition.Message {
+				bench.Status.Conditions[i] = condition
+			}
+			return
+		}
+	}
+
+	// Add new condition
+	bench.Status.Conditions = append(bench.Status.Conditions, condition)
+}
+
+// updateStatus updates the FrappeBench status with proper error handling
+func (r *FrappeBenchReconciler) updateStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+	if err := r.Status().Update(ctx, bench); err != nil {
+		if errors.IsConflict(err) {
+			// Requeue on conflict
+			return fmt.Errorf("status update conflict, will requeue: %w", err)
+		}
+		return fmt.Errorf("failed to update status: %w", err)
+	}
+	return nil
 }
 
 // getOperatorConfig retrieves the operator-level configuration
@@ -418,6 +536,8 @@ func (r *FrappeBenchReconciler) updateWorkerScalingStatus(ctx context.Context, b
 }
 
 func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, gitEnabled bool, fpmRepos []vyogotechv1alpha1.FPMRepository) error {
+	logger := log.FromContext(ctx)
+
 	// Collect installed app names
 	installedApps := make([]string, 0, len(bench.Spec.Apps))
 	for _, app := range bench.Spec.Apps {
@@ -430,29 +550,78 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 		repoNames = append(repoNames, repo.Name)
 	}
 
+	// Determine phase and conditions
+	isReady := false
 	if bench.Status.Phase == "" || (bench.Status.Phase != "Provisioning" && bench.Status.Phase != "Ready") {
 		bench.Status.Phase = "Provisioning"
+		r.setCondition(bench, metav1.Condition{
+			Type:    "Ready",
+			Status:  metav1.ConditionFalse,
+			Reason:  "Provisioning",
+			Message: "FrappeBench is being provisioned",
+		})
 	}
 
-	// Only set to Ready if the init job is succeeded
+	// Check if init job is succeeded
 	jobName := fmt.Sprintf("%s-init", bench.Name)
 	job := &batchv1.Job{}
 	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: bench.Namespace}, job); err == nil {
 		if job.Status.Succeeded > 0 {
 			bench.Status.Phase = "Ready"
+			isReady = true
+			r.setCondition(bench, metav1.Condition{
+				Type:    "Ready",
+				Status:  metav1.ConditionTrue,
+				Reason:  "Initialized",
+				Message: "FrappeBench is ready and initialized",
+			})
+			r.setCondition(bench, metav1.Condition{
+				Type:    "Initialized",
+				Status:  metav1.ConditionTrue,
+				Reason:  "JobCompleted",
+				Message: "Initialization job completed successfully",
+			})
+			r.Recorder.Event(bench, corev1.EventTypeNormal, "Initialized", "FrappeBench initialization completed")
+		} else if job.Status.Failed > 0 {
+			bench.Status.Phase = "Failed"
+			r.setCondition(bench, metav1.Condition{
+				Type:    "Ready",
+				Status:  metav1.ConditionFalse,
+				Reason:  "InitializationFailed",
+				Message: "Initialization job failed",
+			})
+			r.setCondition(bench, metav1.Condition{
+				Type:    "Degraded",
+				Status:  metav1.ConditionTrue,
+				Reason:  "JobFailed",
+				Message: "Initialization job failed",
+			})
+			r.Recorder.Event(bench, corev1.EventTypeWarning, "InitializationFailed", "FrappeBench initialization job failed")
 		}
 	}
 
+	// Update status fields
 	bench.Status.GitEnabled = gitEnabled
 	bench.Status.InstalledApps = installedApps
 	bench.Status.FPMRepositories = repoNames
 	bench.Status.ObservedGeneration = bench.Generation
 
-	return r.Status().Update(ctx, bench)
+	// Update status with proper error handling
+	if err := r.updateStatus(ctx, bench); err != nil {
+		logger.Error(err, "Failed to update bench status")
+		return err
+	}
+
+	if isReady {
+		r.Recorder.Event(bench, corev1.EventTypeNormal, "Ready", "FrappeBench is ready")
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager
 func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.Recorder = mgr.GetEventRecorderFor("frappebench-controller")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&vyogotechv1alpha1.FrappeBench{}).
 		Owns(&batchv1.Job{}).

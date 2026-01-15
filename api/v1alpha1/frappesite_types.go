@@ -60,6 +60,10 @@ type FrappeSiteSpec struct {
 	// Ingress configuration
 	// +optional
 	Ingress *IngressConfig `json:"ingress,omitempty"`
+
+	// Route configuration for OpenShift platforms
+	// +optional
+	RouteConfig *RouteConfig `json:"routeConfig,omitempty"`
 }
 
 // FrappeSitePhase represents the current phase
