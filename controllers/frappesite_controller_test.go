@@ -266,10 +266,11 @@ var _ = Describe("FrappeSite Controller", func() {
 			site.SetDeletionTimestamp(&now)
 			Expect(fakeClient.Create(ctx, site)).To(Succeed())
 
-			// Refresh site to get latest state
-			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, site)).To(Succeed())
+			// Get fresh site object from client to avoid ResourceVersion issues
+			freshSite := &vyogotechv1alpha1.FrappeSite{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, freshSite)).To(Succeed())
 
-			err := reconciler.deleteSite(ctx, site)
+			err := reconciler.deleteSite(ctx, freshSite)
 			Expect(err).To(HaveOccurred()) // Returns error to trigger requeue
 			Expect(err.Error()).To(ContainSubstring("site deletion job created"))
 
@@ -295,9 +296,6 @@ var _ = Describe("FrappeSite Controller", func() {
 			site.SetDeletionTimestamp(&now)
 			Expect(fakeClient.Create(ctx, site)).To(Succeed())
 
-			// Refresh site to get latest state
-			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, site)).To(Succeed())
-
 			// Create deletion job first, then update status
 			job := &batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
@@ -311,7 +309,11 @@ var _ = Describe("FrappeSite Controller", func() {
 			job.Status.Succeeded = 1
 			Expect(fakeClient.Status().Update(ctx, job)).To(Succeed())
 
-			err := reconciler.deleteSite(ctx, site)
+			// Get fresh site object from client
+			freshSite := &vyogotechv1alpha1.FrappeSite{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, freshSite)).To(Succeed())
+
+			err := reconciler.deleteSite(ctx, freshSite)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify job was deleted
@@ -332,9 +334,6 @@ var _ = Describe("FrappeSite Controller", func() {
 			site.SetDeletionTimestamp(&now)
 			Expect(fakeClient.Create(ctx, site)).To(Succeed())
 
-			// Refresh site to get latest state
-			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, site)).To(Succeed())
-
 			// Create deletion job first, then update status
 			job := &batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
@@ -348,7 +347,11 @@ var _ = Describe("FrappeSite Controller", func() {
 			job.Status.Active = 1
 			Expect(fakeClient.Status().Update(ctx, job)).To(Succeed())
 
-			err := reconciler.deleteSite(ctx, site)
+			// Get fresh site object from client
+			freshSite := &vyogotechv1alpha1.FrappeSite{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, freshSite)).To(Succeed())
+
+			err := reconciler.deleteSite(ctx, freshSite)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("site deletion job is still running"))
 		})
@@ -363,9 +366,6 @@ var _ = Describe("FrappeSite Controller", func() {
 			site.SetDeletionTimestamp(&now)
 			Expect(fakeClient.Create(ctx, site)).To(Succeed())
 
-			// Refresh site to get latest state
-			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, site)).To(Succeed())
-
 			// Create deletion job first, then update status
 			job := &batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
@@ -379,7 +379,11 @@ var _ = Describe("FrappeSite Controller", func() {
 			job.Status.Failed = 1
 			Expect(fakeClient.Status().Update(ctx, job)).To(Succeed())
 
-			err := reconciler.deleteSite(ctx, site)
+			// Get fresh site object from client
+			freshSite := &vyogotechv1alpha1.FrappeSite{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, freshSite)).To(Succeed())
+
+			err := reconciler.deleteSite(ctx, freshSite)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("site deletion job failed"))
 		})
