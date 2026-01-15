@@ -969,9 +969,14 @@ echo "Site %[1]s dropped successfully!"
 			},
 		}
 
+		// Set controller reference - use site directly as it should have UID set
+		// Clear ResourceVersion on job before SetControllerReference to avoid fake client issues
+		job.ResourceVersion = ""
 		if err := controllerutil.SetControllerReference(site, job, r.Scheme); err != nil {
 			return err
 		}
+		// Clear ResourceVersion again after SetControllerReference (in case it was set)
+		job.ResourceVersion = ""
 
 		if err := r.Create(ctx, job); err != nil {
 			return fmt.Errorf("failed to create site deletion job: %w", err)
