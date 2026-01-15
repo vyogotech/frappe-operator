@@ -25,17 +25,82 @@ import (
 
 // SiteBackupSpec defines the desired state of SiteBackup
 type SiteBackupSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Site is the name of the Frappe site to backup
+	// +kubebuilder:validation:Required
+	Site string `json:"site"`
 
-	// Foo is an example field of SiteBackup. Edit sitebackup_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Schedule is a cron expression for scheduled backups (e.g., "0 2 * * *")
+	// If empty, performs a one-time backup
+	// +optional
+	Schedule string `json:"schedule,omitempty"`
+
+	// WithFiles includes private and public files in the backup
+	// +optional
+	// +kubebuilder:default=false
+	WithFiles bool `json:"withFiles,omitempty"`
+
+	// Compress compresses the backup files
+	// +optional
+	// +kubebuilder:default=false
+	Compress bool `json:"compress,omitempty"`
+
+	// BackupPath specifies the path to save the backup files
+	// If empty, uses the default site backup location
+	// +optional
+	BackupPath string `json:"backupPath,omitempty"`
+
+	// BackupPathDB specifies the path to save the database file
+	// +optional
+	BackupPathDB string `json:"backupPathDB,omitempty"`
+
+	// BackupPathConf specifies the path to save the config file
+	// +optional
+	BackupPathConf string `json:"backupPathConf,omitempty"`
+
+	// BackupPathFiles specifies the path to save the public file
+	// +optional
+	BackupPathFiles string `json:"backupPathFiles,omitempty"`
+
+	// BackupPathPrivateFiles specifies the path to save the private file
+	// +optional
+	BackupPathPrivateFiles string `json:"backupPathPrivateFiles,omitempty"`
+
+	// Exclude specifies the DocTypes to not backup, separated by commas
+	// +optional
+	Exclude []string `json:"exclude,omitempty"`
+
+	// Include specifies the DocTypes to backup, separated by commas
+	// +optional
+	Include []string `json:"include,omitempty"`
+
+	// IgnoreBackupConf ignores excludes/includes set in config
+	// +optional
+	// +kubebuilder:default=false
+	IgnoreBackupConf bool `json:"ignoreBackupConf,omitempty"`
+
+	// Verbose adds verbosity to the backup process
+	// +optional
+	// +kubebuilder:default=false
+	Verbose bool `json:"verbose,omitempty"`
 }
 
 // SiteBackupStatus defines the observed state of SiteBackup
 type SiteBackupStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Phase indicates the current phase of the backup
+	// +optional
+	Phase string `json:"phase,omitempty"`
+
+	// LastBackup is the timestamp of the last successful backup
+	// +optional
+	LastBackup metav1.Time `json:"lastBackup,omitempty"`
+
+	// LastBackupJob is the name of the last backup job or cronjob
+	// +optional
+	LastBackupJob string `json:"lastBackupJob,omitempty"`
+
+	// Message provides additional information about the backup status
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 //+kubebuilder:object:root=true

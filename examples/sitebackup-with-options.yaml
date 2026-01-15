@@ -1,0 +1,57 @@
+# SiteBackup with options - One-time backup with files, compression, and selective data
+# Prerequisites:
+# 1. Create FrappeSite (see basic-site.yaml)
+
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: dev-site-full-backup
+  namespace: default
+spec:
+  # Site to backup
+  site: dev.localhost
+
+  # Include private and public files in backup
+  withFiles: true
+
+  # Compress the backup files
+  compress: true
+
+  # Custom backup path (optional)
+  # backupPath: "/custom/backup/path"
+
+  # Separate paths for different components (optional)
+  # backupPathDB: "/backups/db"
+  # backupPathConf: "/backups/conf"
+  # backupPathFiles: "/backups/files"
+  # backupPathPrivateFiles: "/backups/private-files"
+
+  # Exclude specific DocTypes from backup (optional)
+  # exclude:
+  #   - "User"
+  #   - "Role"
+
+  # Include only specific DocTypes (optional)
+  # include:
+  #   - "DocType"
+  #   - "Module Def"
+
+  # Ignore backup configuration excludes/includes
+  # ignoreBackupConf: false
+
+  # Enable verbose output
+  # verbose: false
+
+# The operator will automatically:
+# 1. Create a Job that runs 'bench --site dev.localhost backup --with-files --compress'
+# 2. Mount the sites volume for backup access
+# 3. Include all site files and database in compressed backup
+# 4. Update status when backup completes
+
+# This creates a complete backup including:
+# - Database dump
+# - Private files (attachments, etc.)
+# - Public files
+# All compressed into tar.gz format
+
+# For selective backups, use include/exclude to backup only specific DocTypes
