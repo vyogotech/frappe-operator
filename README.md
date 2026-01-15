@@ -73,7 +73,7 @@ You need:
 The easiest way to install everything is with Helm:
 
 ```bash
-helm repo add frappe-operator https://vyogotech.github.io/frappe-operator
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
 helm install frappe-operator frappe-operator/frappe-operator \
   --namespace frappe-operator-system \
   --create-namespace
