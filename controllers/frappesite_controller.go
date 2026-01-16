@@ -781,9 +781,6 @@ else
     goto_update_config=0
 fi
 
-	exit 1
-fi
-
 # Dynamically build the --install-app argument
 INSTALL_APP_ARG=""
 if [[ -n "$APPS_TO_INSTALL" ]]; then
@@ -836,6 +833,10 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
     else
         echo "Skipping new-site; will update site_config.json only."
     fi
+else
+    echo "ERROR: Unsupported DB provider: $DB_PROVIDER"
+    exit 1
+fi
 
 echo "Site $SITE_NAME created successfully!"
 
@@ -1002,21 +1003,63 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 		if err != nil {
 			return fmt.Errorf("failed to get MariaDB root credentials: %w", err)
 		}
+
+		// Create deletion secret with root credentials  
+		deletionSecretName := fmt.Sprintf("%s-deletion-secret", site.Name)
+		deletionSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      deletionSecretName,
+				Namespace: site.Namespace,
+				Labels: map[string]string{
+					"app":  "frappe",
+					"site": site.Name,
+				},
+			},
+			Type: corev1.SecretTypeOpaque,
+			Data: map[string][]byte{
+				"db_root_user":     []byte(rootUser),
+				"db_root_password": []byte(rootPassword),
+				"site_name":        []byte(site.Spec.SiteName),
+			},
+		}
 		
-		// Use root credentials to drop the site and database
-		// Site users no longer have DROP DATABASE privilege for security
-		deleteScript := fmt.Sprintf(`#!/bin/bash
+		if err := controllerutil.SetControllerReference(site, deletionSecret, r.Scheme); err != nil {
+			return err
+		}
+		
+		if err := r.Create(ctx, deletionSecret); err != nil {
+			if !errors.IsAlreadyExists(err) {
+				return fmt.Errorf("failed to create deletion secret: %w", err)
+			}
+			// Update existing secret with current credentials
+			var existing corev1.Secret
+			if err := r.Get(ctx, types.NamespacedName{Name: deletionSecretName, Namespace: site.Namespace}, &existing); err != nil {
+				return fmt.Errorf("failed to get existing deletion secret: %w", err)
+			}
+			existing.Data = deletionSecret.Data
+			if err := r.Update(ctx, &existing); err != nil {
+				return fmt.Errorf("failed to update deletion secret: %w", err)
+			}
+		}
+		
+		// Use root credentials from secret volume (not environment variables)
+		deleteScript := `#!/bin/bash
 set -e
 cd /home/frappe/frappe-bench
 
-echo "Dropping Frappe site: %[1]s"
-echo "Using MariaDB root credentials for secure deletion"
+# Read credentials from mounted secret files
+DB_ROOT_USER=$(cat /run/secrets/db_root_user)
+DB_ROOT_PASSWORD=$(cat /run/secrets/db_root_password)
+SITE_NAME=$(cat /run/secrets/site_name)
+
+echo "Dropping Frappe site: $SITE_NAME"
+echo "Using MariaDB root credentials from secret volume for secure deletion"
 
 # Use root credentials to drop the site (site user cannot drop database)
-bench drop-site %[1]s --force --db-root-username "$DB_ROOT_USER" --db-root-password "$DB_ROOT_PASSWORD" --no-backup
+bench drop-site "$SITE_NAME" --force --db-root-username "$DB_ROOT_USER" --db-root-password "$DB_ROOT_PASSWORD" --no-backup
 
-echo "Site %[1]s dropped successfully!"
-`, site.Spec.SiteName)
+echo "Site $SITE_NAME dropped successfully!"
+`
 
 		job = &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1038,23 +1081,19 @@ echo "Site %[1]s dropped successfully!"
 								Image:   r.getBenchImage(ctx, bench),
 								Command: []string{"bash", "-c"},
 								Args:    []string{deleteScript},
-								Env: []corev1.EnvVar{
-									{
-										Name:  "DB_ROOT_USER",
-										Value: rootUser,
-									},
-									{
-										Name:  "DB_ROOT_PASSWORD",
-										Value: rootPassword,
-									},
-								},
 								VolumeMounts: []corev1.VolumeMount{
 									{
 										Name:      "sites",
 										MountPath: "/home/frappe/frappe-bench/sites",
 									},
+									{
+										Name:      "deletion-secret",
+										MountPath: "/run/secrets",
+										ReadOnly:  true,
+									},
 								},
 								SecurityContext: r.getContainerSecurityContext(bench),
+								Env:              []corev1.EnvVar{}, // No environment variables for sensitive data
 							},
 						},
 						Volumes: []corev1.Volume{
@@ -1063,6 +1102,15 @@ echo "Site %[1]s dropped successfully!"
 								VolumeSource: corev1.VolumeSource{
 									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 										ClaimName: fmt.Sprintf("%s-sites", bench.Name),
+									},
+								},
+							},
+							{
+								Name: "deletion-secret",
+								VolumeSource: corev1.VolumeSource{
+									Secret: &corev1.SecretVolumeSource{
+										SecretName:  deletionSecretName,
+										DefaultMode: int32Ptr(0400), // Read-only for security
 									},
 								},
 							},
