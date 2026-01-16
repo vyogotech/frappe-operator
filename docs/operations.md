@@ -291,6 +291,22 @@ spec:
       credentialsSecret: aws-s3-credentials
 ```
 
+### Updating Scheduled Backups
+
+You can update a scheduled backup at any time by modifying the `SiteBackup` resource. The Frappe Operator will automatically detect changes and update the backup schedule and configuration.
+
+For example, to change the schedule of the `daily-backup` from 2 AM to 3 AM, you can use `kubectl patch`:
+
+```bash
+kubectl patch sitebackup daily-backup -n production --type=merge -p '{
+  "spec": {
+    "schedule": "0 3 * * *"
+  }
+}'
+```
+
+You can also modify other parameters, such as the retention policy or backup destination, and the operator will apply them to the scheduled job.
+
 ### Manual Backup
 
 ```bash
@@ -545,6 +561,76 @@ kubectl get deployment -n frappe-operator-system
 
 ## Security
 
+### Security Context Configuration
+
+The operator provides flexible security context configuration with three levels of priority:
+
+#### Default OpenShift Compatibility
+
+Out of the box, the operator uses OpenShift-compatible defaults:
+- `runAsUser: 1001` (OpenShift arbitrary UID standard)
+- `runAsGroup: 0` (root group for OpenShift compatibility)
+- `fsGroup: 0` (root group for filesystem permissions)
+
+No configuration needed for OpenShift deployments!
+
+#### Cluster-Wide Custom Defaults
+
+Set environment variables in the operator deployment for organization-wide policies:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frappe-operator-controller-manager
+  namespace: frappe-operator-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        image: vyogo.tech/frappe-operator:latest
+        env:
+        - name: FRAPPE_DEFAULT_UID
+          value: "2000"        # All benches default to UID 2000
+        - name: FRAPPE_DEFAULT_GID
+          value: "2000"
+        - name: FRAPPE_DEFAULT_FSGROUP
+          value: "2000"
+```
+
+#### Per-Bench Security Override
+
+Override security context for specific benches:
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: compliance-bench
+spec:
+  security:
+    podSecurityContext:
+      runAsUser: 5000      # Custom UID for compliance
+      runAsGroup: 5000
+      fsGroup: 5000
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      runAsUser: 5000
+      runAsGroup: 5000
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      readOnlyRootFilesystem: false
+  apps:
+    - name: erpnext
+```
+
+**Priority:** `spec.security` → Environment Variables → Hardcoded Defaults (1001/0/0)
+
+See [SECURITY_CONTEXT_FIX.md](../SECURITY_CONTEXT_FIX.md) for detailed configuration examples.
+
 ### Network Policies
 
 Restrict network access:
@@ -582,6 +668,8 @@ spec:
 
 ### Pod Security Standards
 
+The operator is compatible with the `restricted` Pod Security Standard:
+
 ```yaml
 apiVersion: v1
 kind: Namespace
@@ -592,6 +680,13 @@ metadata:
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
 ```
+
+All managed pods comply with:
+- Non-root user execution
+- Privilege escalation prevented
+- All capabilities dropped
+- Seccomp runtime default profile
+- OpenShift restricted SCC compatible
 
 ### Secrets Management
 

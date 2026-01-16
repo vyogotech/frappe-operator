@@ -505,7 +505,7 @@ spec:
 **API Group:** `vyogo.tech/v1alpha1`  
 **Kind:** `SiteBackup`
 
-Manages site backups.
+Creates automated backups of Frappe sites using the `bench backup` command.
 
 ### Spec
 
@@ -516,25 +516,121 @@ metadata:
   name: <backup-name>
   namespace: <namespace>
 spec:
-  # Required: Reference to FrappeSite
-  siteRef:
-    name: string
-    namespace: string
-  
-  # Optional: Backup schedule (cron format)
+  # Required: Site to backup (must match existing FrappeSite)
+  site: string
+
+  # Optional: Cron schedule for recurring backups (e.g., "0 2 * * *")
+  # If empty, creates one-time backup
   schedule: string
-  
-  # Optional: Backup retention
-  retention:
-    days: int32
-    count: int32
-  
-  # Optional: Backup destination
-  destination:
-    type: string  # s3, gcs, azure, pvc
-    config:
-      # Destination-specific configuration
+
+  # Optional: Include private and public files in backup
+  withFiles: bool  # default: false
+
+  # Optional: Compress backup files
+  compress: bool  # default: false
+
+  # Optional: Custom backup path for all files
+  backupPath: string
+
+  # Optional: Separate backup paths for specific components
+  backupPathDB: string
+  backupPathConf: string
+  backupPathFiles: string
+  backupPathPrivateFiles: string
+
+  # Optional: DocType filtering (comma-separated lists)
+  exclude:  # DocTypes to exclude from backup
+    - string
+  include:  # DocTypes to include in backup
+    - string
+
+  # Optional: Backup configuration
+  ignoreBackupConf: bool  # default: false
+
+  # Optional: Enable verbose backup output
+  verbose: bool  # default: false
 ```
+
+### Status
+
+```yaml
+status:
+  # Phase indicates the current phase of the backup (e.g., "Running", "Succeeded", "Failed", "Scheduled").
+  phase: string
+
+  # The timestamp of the last successful backup.
+  lastBackup: metav1.Time
+
+  # The name of the last backup job or cronjob.
+  lastBackupJob: string
+
+  # Additional information about the backup status.
+  message: string
+```
+
+### Field Details
+
+#### `site` (required)
+- **Type:** `string`
+- **Description:** Name of the Frappe site to backup
+- **Validation:** Must match an existing FrappeSite resource
+
+#### `schedule` (optional)
+- **Type:** `string`
+- **Description:** Cron expression for scheduled backups
+- **Examples:**
+  - `"0 2 * * *"` - Daily at 2 AM
+  - `"0 */4 * * *"` - Every 4 hours
+  - Empty string - One-time backup only
+
+#### Backup Options
+
+##### `withFiles` (optional)
+- **Type:** `bool`
+- **Default:** `false`
+- **Description:** Include private and public files in backup
+- **Maps to:** `bench backup --with-files`
+
+##### `compress` (optional)
+- **Type:** `bool`
+- **Default:** `false`
+- **Description:** Compress backup files
+- **Maps to:** `bench backup --compress`
+
+##### Custom Paths (optional)
+- **`backupPath`**: Main backup path (all files)
+- **`backupPathDB`**: Database file path
+- **`backupPathConf`**: Configuration file path
+- **`backupPathFiles`**: Public files path
+- **`backupPathPrivateFiles`**: Private files path
+
+##### DocType Filtering
+
+###### `exclude` (optional)
+- **Type:** `[]string`
+- **Description:** DocTypes to exclude from backup
+- **Example:** `["User", "Role", "Communication"]`
+- **Maps to:** `bench backup --exclude "User,Role,Communication"`
+
+###### `include` (optional)
+- **Type:** `[]string`
+- **Description:** DocTypes to include in backup (all others excluded)
+- **Example:** `["DocType", "Module Def", "Custom Field"]`
+- **Maps to:** `bench backup --include "DocType,Module Def,Custom Field"`
+
+##### Configuration Flags
+
+###### `ignoreBackupConf` (optional)
+- **Type:** `bool`
+- **Default:** `false`
+- **Description:** Ignore backup configuration excludes/includes
+- **Maps to:** `bench backup --ignore-backup-conf`
+
+###### `verbose` (optional)
+- **Type:** `bool`
+- **Default:** `false`
+- **Description:** Enable verbose backup output
+- **Maps to:** `bench backup --verbose`
 
 ---
 

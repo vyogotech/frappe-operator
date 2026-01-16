@@ -60,6 +60,10 @@ type FrappeSiteSpec struct {
 	// Ingress configuration
 	// +optional
 	Ingress *IngressConfig `json:"ingress,omitempty"`
+
+	// Route configuration for OpenShift platforms
+	// +optional
+	RouteConfig *RouteConfig `json:"routeConfig,omitempty"`
 }
 
 // FrappeSitePhase represents the current phase
@@ -97,6 +101,10 @@ type FrappeSiteStatus struct {
 	// SiteURL is the accessible URL
 	// +optional
 	SiteURL string `json:"siteURL,omitempty"`
+
+	// Conditions represent the latest available observations of site's state
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// DBConnectionSecret is the name of the Secret with DB credentials (legacy)
 	// +optional

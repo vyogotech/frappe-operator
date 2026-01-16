@@ -1,0 +1,38 @@
+# SiteBackup with selective data - Backup only specific DocTypes
+# Prerequisites:
+# 1. Create FrappeSite (see basic-site.yaml)
+
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: dev-site-selective-backup
+  namespace: default
+spec:
+  # Site to backup
+  site: dev.localhost
+
+  # Include only specific DocTypes in the backup
+  include:
+    - "DocType"
+    - "Module Def"
+    - "Custom Field"
+
+  # Exclude sensitive or unnecessary DocTypes
+  exclude:
+    - "User"
+    - "Role"
+    - "Communication"
+
+  # Enable verbose output for detailed logging
+  verbose: true
+
+# The operator will automatically:
+# 1. Create a Job that runs 'bench --site dev.localhost backup --include DocType,Module Def,Custom Field --exclude User,Role,Communication --verbose'
+# 2. Mount the sites volume for backup access
+# 3. Backup only the specified DocTypes
+# 4. Update status when backup completes
+
+# This creates a selective backup containing only:
+# - Core framework DocTypes (DocType, Module Def)
+# - Custom fields
+# Excluding user data and communications for security/compliance

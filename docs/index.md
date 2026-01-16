@@ -1,145 +1,150 @@
-# Frappe Operator
+---
+layout: default
+title: Frappe Operator Documentation
+nav_order: 1
+description: "Complete guide for deploying and managing Frappe Framework applications on Kubernetes"
+permalink: /
+---
 
-A Kubernetes Operator for managing Frappe Framework deployments on Kubernetes.
+# Frappe Operator Documentation
+
+Welcome to the comprehensive documentation for the **Frappe Operator** - a Kubernetes operator that automates the deployment, scaling, and management of Frappe Framework applications (including ERPNext) on Kubernetes clusters.
 
 ## What is Frappe Operator?
 
-Frappe Operator simplifies the lifecycle management of Frappe Sites on Kubernetes that are currently managed by Helm charts. It provides a declarative way to create and manage Frappe benches and sites using Kubernetes Custom Resources.
+Frappe Operator brings the power of Kubernetes orchestration to Frappe deployments, making it easy to:
 
-## Features
+- 🚀 **Deploy** Frappe applications with a single command
+- 📈 **Scale** automatically based on traffic and resource usage
+- 🏢 **Manage** multiple sites efficiently on shared infrastructure
+- 🔄 **Update** with zero-downtime rolling updates
+- 🔐 **Secure** with auto-generated credentials and RBAC
 
-- **Declarative Management**: Define Frappe benches and sites using Kubernetes manifests
-- **Multi-Tenancy**: Support for multiple sites sharing a single bench infrastructure
-- **Flexible Database Options**: Shared, dedicated, or external database configurations
-- **Auto-Scaling**: Built-in support for Horizontal Pod Autoscaling
-- **Production-Ready**: TLS, ingress management, and resource optimization
-- **Operator Integration**: Works with MariaDB Operator and cert-manager
-- **Component Management**: Automatic management of all Frappe components (gunicorn, workers, scheduler, socketio)
+## Quick Navigation
 
-## Custom Resource Definitions
+### 📘 Comprehensive Guide
 
-### Core Resources
+- **[Complete Reference Guide](COMPREHENSIVE_GUIDE.md)** - Everything you need to know in one place
 
-1. **FrappeBench** - Defines and manages a Frappe bench with shared infrastructure
-2. **FrappeSite** - Defines and manages individual Frappe sites
+### For Platform Operators
 
-### Additional Resources
+- **[Installation Guide](getting-started.md)** - Get started in 5 minutes
+- **[Configuration Guide](COMPREHENSIVE_GUIDE.md#configuration)** - Configure operator defaults
+- **[Image Configuration](COMPREHENSIVE_GUIDE.md#image-configuration)** - Set up custom registries
+- **[Operations Guide](operations.md)** - Day-to-day operations and maintenance
+- **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
 
-3. **SiteUser** - Manages users of a particular site and their permissions
-4. **SiteWorkspace** - Creates workspaces on a site declaratively
-5. **SiteDashboard** & **SiteDashboardChart** - Creates dashboards and dashboard charts
-6. **SiteBackup** - Manages site backups
-7. **SiteJob** - Executes custom jobs on sites
+### For Developers
+
+- **[Getting Started](getting-started.md)** - Quick start guide
+- **[Concepts](concepts.md)** - Understanding Frappe Operator architecture
+- **[API Reference](api-reference.md)** - Complete CRD documentation
+- **[Examples](examples.md)** - Real-world deployment examples
+- **[Backup Management](examples.md#site-backup-management)** - Automated site backups
+- **[Best Practices](COMPREHENSIVE_GUIDE.md#best-practices)** - Production deployment patterns
+
+## Key Features
+
+### 🎯 Core Capabilities
+
+- **Declarative Configuration** - Define infrastructure as YAML
+- **Multi-Tenancy** - Run hundreds of sites on shared infrastructure
+- **Auto-Scaling** - Scale workers based on queue length (KEDA integration)
+- **Database Management** - Automatic MariaDB/PostgreSQL provisioning
+- **External Database Support** - Connect to RDS, Cloud SQL, or any external DB
+- **OpenShift Ready** - Optimized for restricted security contexts
+- **GitOps Compatible** - Manage infrastructure as code
+
+### 🔧 Advanced Features
+
+- **Hybrid App Installation** - Install from FPM packages, Git, or images
+- **Worker Autoscaling** - Scale-to-zero for cost optimization
+- **Backup Management** - Automated backups with retention policies
+- **Observability** - Built-in Prometheus metrics and logging
+- **Multi-Platform** - ARM64 and AMD64 compatible
 
 ## Quick Start
 
-Get started with Frappe Operator in minutes:
-
 ```bash
-# Install the operator
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/config/install.yaml
+# Install operator
+curl -fsSL https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.sh | bash
 
-# Create a minimal bench and site
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/examples/minimal-bench-and-site.yaml
+# Create a bench
+kubectl apply -f examples/basic-bench.yaml
 
-# Check status
-kubectl get frappebench,frappesite
+# Create a site
+kubectl apply -f examples/basic-site.yaml
 ```
-
-## Architecture
-
-The Frappe Operator follows the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) and uses controllers to manage the lifecycle of Frappe deployments:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   Frappe Operator                       │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌────────────┐         ┌────────────┐                │
-│  │FrappeBench │◄────────┤FrappeSite  │                │
-│  │Controller  │         │Controller  │                │
-│  └─────┬──────┘         └─────┬──────┘                │
-│        │                      │                        │
-│        ▼                      ▼                        │
-│  ┌─────────────────────────────────────┐              │
-│  │   Kubernetes Resources              │              │
-│  │  • Deployments                      │              │
-│  │  • Services                         │              │
-│  │  • Ingresses                        │              │
-│  │  • Jobs (Init, Migrate, Backup)     │              │
-│  │  • ConfigMaps & Secrets             │              │
-│  │  • PersistentVolumeClaims           │              │
-│  └─────────────────────────────────────┘              │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-           │                           │
-           ▼                           ▼
-    ┌──────────┐              ┌─────────────┐
-    │ MariaDB  │              │   Redis/    │
-    │ Operator │              │ DragonFly   │
-    └──────────┘              └─────────────┘
-```
-
-## Use Cases
-
-### 1. **Development Environment**
-Quick setup for local development and testing with minimal resource requirements.
-
-### 2. **SaaS Platform**
-Multi-tenant deployment where multiple customer sites share bench infrastructure for efficiency.
-
-### 3. **Enterprise Deployment**
-High-availability production deployment with dedicated resources and auto-scaling.
-
-### 4. **Multi-Environment Setup**
-Manage dev, staging, and production environments in separate namespaces.
-
-## Why Use Frappe Operator?
-
-### Before (Helm Charts)
-- Manual configuration management
-- Complex upgrade procedures
-- Limited automation
-- Difficult multi-tenancy
-
-### After (Frappe Operator)
-- Declarative configuration
-- Automated lifecycle management
-- Built-in multi-tenancy
-- Self-healing capabilities
-- GitOps-ready
 
 ## Documentation Structure
 
-- **[Getting Started](getting-started.md)** - Installation and first deployment
-- **[Concepts](concepts.md)** - Understanding benches, sites, and architecture
-- **[API Reference](api-reference.md)** - Complete CRD specification
-- **[Examples](examples.md)** - Common deployment patterns
-- **[Operations](operations.md)** - Day-2 operations guide
-- **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
+### 📚 Getting Started
+- [Installation](getting-started.md) - Step-by-step installation guide
+- [Quick Start](getting-started.md#quick-start) - Deploy your first bench and site
+- [Prerequisites](getting-started.md#prerequisites) - What you need before starting
 
-## Requirements
+### 🏗️ Architecture & Concepts
+- [Concepts](concepts.md) - Understanding how Frappe Operator works
+- [Architecture Overview](concepts.md#architecture) - Component interactions
+- [Resource Model](concepts.md#resource-model) - CRDs and their relationships
 
-- Kubernetes 1.19+
-- kubectl configured to access your cluster
-- (Optional) MariaDB Operator for database management
-- (Optional) Ingress Controller for external access
-- (Optional) cert-manager for TLS certificates
+### ⚙️ Configuration & Operations
+- [Operations Guide](operations.md) - Day-to-day operations
+- [Image Configuration](operations.md#image-configuration) - Custom registries and images
+- [Database Configuration](operations.md#database-configuration) - DB setup and management
+- [Scaling Configuration](operations.md#scaling) - Auto-scaling setup
 
-## Community and Support
+### 📖 API Reference
+- [API Reference](api-reference.md) - Complete CRD documentation
+- [FrappeBench Spec](api-reference.md#frappebench) - Bench configuration options
+- [FrappeSite Spec](api-reference.md#frappesite) - Site configuration options
+
+### 💡 Examples
+- [Examples](examples.md) - Real-world deployment scenarios
+- [Basic Deployment](examples.md#basic-deployment) - Simple bench and site
+- [Production Deployment](examples.md#production-deployment) - High-availability setup
+- [OpenShift Deployment](examples.md#openshift-deployment) - OpenShift-specific examples
+
+### 🔧 Troubleshooting
+- [Troubleshooting Guide](troubleshooting.md) - Common issues and solutions
+- [Debugging](troubleshooting.md#debugging) - How to debug issues
+- [Logs and Metrics](troubleshooting.md#logs-and-metrics) - Observability tools
+
+## Version Information
+
+- **Current Version**: v2.5.0
+- **Kubernetes**: 1.19+
+- **Go Version**: 1.24+
+- **License**: Apache 2.0
+
+## Support & Community
 
 - **GitHub**: [vyogotech/frappe-operator](https://github.com/vyogotech/frappe-operator)
 - **Issues**: [GitHub Issues](https://github.com/vyogotech/frappe-operator/issues)
-- **License**: Apache 2.0
+- **Releases**: [GitHub Releases](https://github.com/vyogotech/frappe-operator/releases)
 
-## Next Steps
+## What's New
 
-1. [Install and configure the operator](getting-started.md#installation)
-2. [Deploy your first site](getting-started.md#deploying-your-first-site)
-3. [Explore deployment patterns](examples.md)
-4. [Learn about production best practices](operations.md)
+### v2.6.0 (Upcoming)
+- ✅ **SiteBackup CRD**: Automated site backups with `bench backup`
+- ✅ Full backup options support (files, compression, selective DocTypes)
+- ✅ Scheduled backups via CronJob and one-time via Job
+- ✅ Custom backup paths and filtering capabilities
+
+### v2.5.0
+- ✅ OpenShift Route support
+- ✅ Configurable image defaults via ConfigMap
+- ✅ Enhanced Conditions and Events
+- ✅ Improved finalizer cleanup logic
+- ✅ Exponential backoff for retries
+
+### v2.4.0
+- ✅ External database support (RDS, Cloud SQL)
+- ✅ Production-ready features
+- ✅ Enhanced security contexts
+
+See [Release Notes](RELEASE_NOTES_v2.5.0.md) for complete changelog.
 
 ---
 
-*Frappe Operator is maintained by Vyogo Technologies and the community.*
-
+**Ready to get started?** Head to the [Installation Guide](getting-started.md)!

@@ -1,0 +1,26 @@
+# Scheduled SiteBackup - Daily backup at 2 AM
+# Prerequisites:
+# 1. Create FrappeSite (see basic-site.yaml)
+
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: dev-site-daily-backup
+  namespace: default
+spec:
+  # Site to backup
+  site: dev.localhost
+
+  # Cron schedule: daily at 2 AM
+  schedule: "0 2 * * *"
+
+# The operator will automatically:
+# 1. Create a CronJob that runs daily backups
+# 2. Each backup creates a Job with 'bench --site dev.localhost backup'
+# 3. Mount the sites volume for backup access
+# 4. Update status to "Scheduled"
+
+# To check scheduled backups:
+# kubectl get sitebackup dev-site-daily-backup
+# kubectl get cronjob dev-site-daily-backup-backup
+# kubectl get jobs -l backup=true,site=dev.localhost
