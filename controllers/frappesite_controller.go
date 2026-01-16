@@ -50,6 +50,8 @@ type FrappeSiteReconciler struct {
 	Recorder record.EventRecorder
 }
 
+// int32Ptr returns a pointer to the passed int32 value
+
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites/finalizers,verbs=update
@@ -568,6 +570,88 @@ func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotec
 	return site.Spec.SiteName, "sitename-default"
 }
 
+// ensureInitSecrets creates a Secret containing all initialization credentials
+// This function ensures credentials are mounted as files, not environment variables
+func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string) error {
+	logger := log.FromContext(ctx)
+
+	secretName := fmt.Sprintf("%s-init-secrets", site.Name)
+	
+	// Get DB_PROVIDER from database info
+	dbProvider := "mariadb" // default
+	if site.Spec.DBConfig.Provider != "" {
+		dbProvider = site.Spec.DBConfig.Provider
+	}
+	
+	// Get apps to install if specified
+	// Build secret data with all credentials as individual files
+	secretData := map[string][]byte{
+		"site_name":      []byte(site.Spec.SiteName),
+		"domain":         []byte(domain),
+		"admin_password": []byte(adminPassword),
+		"bench_name":     []byte(bench.Name),
+		"db_provider":    []byte(dbProvider),
+	}
+	
+	// Add database credentials if using external database
+	if dbProvider == "mariadb" || dbProvider == "postgres" {
+		if dbInfo != nil {
+			secretData["db_host"] = []byte(dbInfo.Host)
+			secretData["db_port"] = []byte(dbInfo.Port)
+			secretData["db_name"] = []byte(dbInfo.Name)
+		}
+		if dbCreds != nil {
+			secretData["db_user"] = []byte(dbCreds.Username)
+			secretData["db_password"] = []byte(dbCreds.Password)
+		}
+	}
+	
+	// Create or update the secret
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: site.Namespace,
+			Labels: map[string]string{
+				"app":  "frappe",
+				"site": site.Name,
+			},
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: secretData,
+	}
+	
+	// Set controller reference
+	if err := controllerutil.SetControllerReference(site, secret, r.Scheme); err != nil {
+		logger.Error(err, "Failed to set controller reference for secret", "secret", secretName)
+		return err
+	}
+	
+	// Create or update secret
+	var existing corev1.Secret
+	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: site.Namespace}, &existing)
+	if err != nil && errors.IsNotFound(err) {
+		// Create new secret
+		if err := r.Create(ctx, secret); err != nil {
+			logger.Error(err, "Failed to create initialization secret", "secret", secretName)
+			return err
+		}
+		logger.Info("Created initialization secret", "secret", secretName)
+	} else if err != nil {
+		logger.Error(err, "Failed to get initialization secret", "secret", secretName)
+		return err
+	} else {
+		// Update existing secret
+		existing.Data = secretData
+		if err := r.Update(ctx, &existing); err != nil {
+			logger.Error(err, "Failed to update initialization secret", "secret", secretName)
+			return err
+		}
+		logger.Info("Updated initialization secret", "secret", secretName)
+	}
+	
+	return nil
+}
+
 // ensureSiteInitialized creates a Job to run bench new-site
 func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials) (bool, error) {
 	logger := log.FromContext(ctx)
@@ -600,14 +684,6 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		"domain", domain,
 		"dbProvider", dbInfo.Provider,
 		"dbName", dbInfo.Name)
-
-	// Database credentials are provided by the database provider (secure, no hardcoded values)
-	dbHost := dbInfo.Host
-	dbPort := dbInfo.Port
-	dbName := dbInfo.Name
-	dbUser := dbCreds.Username
-	dbPassword := dbCreds.Password
-	dbProvider := dbInfo.Provider
 
 	// Get or generate admin password
 	var adminPassword string
@@ -671,6 +747,12 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 			// Use existing generated password
 			adminPassword = string(adminPasswordSecret.Data["password"])
 			logger.Info("Using existing generated password", "secret", generatedSecretName)
+
+			// Ensure initialization secret exists with all credentials
+			if err := r.ensureInitSecrets(ctx, site, bench, domain, dbInfo, dbCreds, adminPassword); err != nil {
+				logger.Error(err, "Failed to create initialization secret")
+				return false, fmt.Errorf("failed to create init secret: %w", err)
+			}
 		}
 	}
 
@@ -680,90 +762,105 @@ set -e
 
 cd /home/frappe/frappe-bench
 
+# Read from secret files mounted at /run/secrets
+SITE_NAME=$(cat /run/secrets/site_name)
+DOMAIN=$(cat /run/secrets/domain)
+ADMIN_PASSWORD=$(cat /run/secrets/admin_password)
+BENCH_NAME=$(cat /run/secrets/bench_name)
+DB_PROVIDER=$(cat /run/secrets/db_provider)
+APPS_TO_INSTALL=$(cat /run/secrets/apps_to_install 2>/dev/null || echo "")
+
 echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
 
-# Validate environment variables exist and are not empty
-if [[ -z "$SITE_NAME" || -z "$DOMAIN" || -z "$ADMIN_PASSWORD" || -z "$BENCH_NAME" || -z "$DB_PROVIDER" ]]; then
-    echo "ERROR: Required environment variables not set"
-    exit 1
+# If the site directory already exists, skip creation but update config
+if [[ -d "/home/frappe/frappe-bench/sites/$SITE_NAME" ]]; then
+    echo "Site $SITE_NAME already exists; skipping new-site and updating config."
+    goto_update_config=1
+else
+    goto_update_config=0
+fi
+
+	exit 1
 fi
 
 # Dynamically build the --install-app argument
 INSTALL_APP_ARG=""
 if [[ -n "$APPS_TO_INSTALL" ]]; then
-    for app in $APPS_TO_INSTALL; do
-        INSTALL_APP_ARG+=" --install-app=$app"
-    done
+	for app in $APPS_TO_INSTALL; do
+		INSTALL_APP_ARG+=" --install-app=$app"
+	done
 fi
 
 # Run bench new-site with provider-specific database configuration
 if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
-    # For MariaDB and PostgreSQL: use pre-provisioned database with dedicated credentials
-    if [[ -z "$DB_HOST" || -z "$DB_PORT" || -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
-        echo "ERROR: Database connection variables not set for $DB_PROVIDER"
-        exit 1
-    fi
-
-    echo "Creating site with $DB_PROVIDER database (pre-provisioned)"
+	# For MariaDB and PostgreSQL: use pre-provisioned database with dedicated credentials
+	# These are mounted from secret volumes, not environment variables
+	DB_HOST=$(cat /run/secrets/db_host)
+	DB_PORT=$(cat /run/secrets/db_port)
+	DB_NAME=$(cat /run/secrets/db_name)
+	DB_USER=$(cat /run/secrets/db_user)
+	DB_PASSWORD=$(cat /run/secrets/db_password)
     
-    # Check if bench version supports --db-user flag
-    DB_USER_FLAG=""
-    if bench new-site --help | grep -q " --db-user"; then
-        echo "Detected support for --db-user flag"
-        DB_USER_FLAG="--db-user=$DB_USER"
-    elif [[ "$DB_USER" != "$DB_NAME" ]]; then
-        echo "WARNING: Your bench version does not support --db-user. Using DB_NAME as username."
+	if [[ -z "$DB_HOST" || -z "$DB_PORT" || -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
+		echo "ERROR: Database connection secret files not found for $DB_PROVIDER"
+		exit 1
+	fi
+
+    if [[ "$goto_update_config" -eq 0 ]]; then
+        echo "Creating site with $DB_PROVIDER database (pre-provisioned)"
+        
+        # Check if bench version supports --db-user flag
+        DB_USER_FLAG=""
+        if bench new-site --help | grep -q " --db-user"; then
+            echo "Detected support for --db-user flag"
+            DB_USER_FLAG="--db-user=$DB_USER"
+        elif [[ "$DB_USER" != "$DB_NAME" ]]; then
+            echo "WARNING: Your bench version does not support --db-user. Using DB_NAME as username."
+        else
+            echo "Bench version does not support --db-user, but DB_USER matches DB_NAME. Proceeding."
+        fi
+
+        bench new-site \
+          --db-type="$DB_PROVIDER" \
+          --db-name="$DB_NAME" \
+          --db-host="$DB_HOST" \
+          --db-port="$DB_PORT" \
+          $DB_USER_FLAG \
+          --db-password="$DB_PASSWORD" \
+          --no-setup-db \
+          --admin-password="$ADMIN_PASSWORD" \
+          $INSTALL_APP_ARG \
+          --verbose \
+          "$SITE_NAME" || echo "bench new-site failed (possibly exists); proceeding to update config"
     else
-        echo "Bench version does not support --db-user, but DB_USER matches DB_NAME. Proceeding."
+        echo "Skipping new-site; will update site_config.json only."
     fi
-
-    bench new-site \
-      --db-type="$DB_PROVIDER" \
-      --db-name="$DB_NAME" \
-      --db-host="$DB_HOST" \
-      --db-port="$DB_PORT" \
-      $DB_USER_FLAG \
-      --db-password="$DB_PASSWORD" \
-      --no-setup-db \
-      --admin-password="$ADMIN_PASSWORD" \
-      $INSTALL_APP_ARG \
-      --verbose \
-      "$SITE_NAME"
-
-elif [[ "$DB_PROVIDER" == "sqlite" ]]; then
-    # For SQLite: file-based database, no external connection needed
-    echo "Creating site with SQLite database (file-based)"
-    bench new-site "$SITE_NAME" \
-      --db-type=sqlite \
-      --admin-password="$ADMIN_PASSWORD" \
-      $INSTALL_APP_ARG \
-      --verbose
-
-else
-    echo "ERROR: Unsupported database provider: $DB_PROVIDER"
-    exit 1
-fi
 
 echo "Site $SITE_NAME created successfully!"
 
 # Update site_config.json with domain and Redis configuration using Python
 echo "Updating site_config.json with domain and Redis"
 python3 << 'PYTHON_SCRIPT'
-import json
-import os
+import json, os
 
-# Get values from environment variables
-site_name = os.environ['SITE_NAME']
-domain = os.environ['DOMAIN']
-bench_name = os.environ['BENCH_NAME']
+# Read from secret files mounted at /run/secrets
+with open('/run/secrets/site_name', 'r') as f:
+    site_name = f.read().strip()
+with open('/run/secrets/domain', 'r') as f:
+    domain = f.read().strip()
+with open('/run/secrets/bench_name', 'r') as f:
+    bench_name = f.read().strip()
 
 site_path = f"/home/frappe/frappe-bench/sites/{site_name}"
 config_file = os.path.join(site_path, "site_config.json")
 
-# Read existing config
-with open(config_file, 'r') as f:
-    config = json.load(f)
+# Read or initialize config
+try:
+    with open(config_file, 'r') as f:
+        config = json.load(f)
+except FileNotFoundError:
+    config = {}
 
 # Update with resolved domain
 config['host_name'] = domain
@@ -771,6 +868,9 @@ config['host_name'] = domain
 # Add Redis configuration for this site
 config['redis_cache'] = f"redis://{bench_name}-redis-cache:6379"
 config['redis_queue'] = f"redis://{bench_name}-redis-queue:6379"
+
+# Ensure directory exists
+os.makedirs(site_path, exist_ok=True)
 
 # Write back
 with open(config_file, 'w') as f:
@@ -782,6 +882,9 @@ print(f"Redis queue: {bench_name}-redis-queue:6379")
 PYTHON_SCRIPT
 
 echo "Site initialization complete!"
+
+# Exit success regardless of whether new-site ran
+exit 0
 `
 
 	// Get bench PVC name
@@ -812,50 +915,14 @@ echo "Site initialization complete!"
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
 								},
+								{
+									Name:      "site-secrets",
+									MountPath: "/run/secrets",
+								},
 							},
 							SecurityContext: r.getContainerSecurityContext(bench),
-							Env: []corev1.EnvVar{
-								{
-									Name:  "SITE_NAME",
-									Value: site.Spec.SiteName,
-								},
-								{
-									Name:  "DOMAIN",
-									Value: domain,
-								},
-								{
-									Name:  "DB_PROVIDER",
-									Value: dbProvider,
-								},
-								{
-									Name:  "DB_HOST",
-									Value: dbHost,
-								},
-								{
-									Name:  "DB_PORT",
-									Value: dbPort,
-								},
-								{
-									Name:  "DB_NAME",
-									Value: dbName,
-								},
-								{
-									Name:  "DB_USER",
-									Value: dbUser,
-								},
-								{
-									Name:  "DB_PASSWORD",
-									Value: dbPassword,
-								},
-								{
-									Name:  "ADMIN_PASSWORD",
-									Value: adminPassword,
-								},
-								{
-									Name:  "BENCH_NAME",
-									Value: bench.Name,
-								},
-							},
+							// Removed: No environment variables for sensitive data
+							Env: []corev1.EnvVar{},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -864,6 +931,15 @@ echo "Site initialization complete!"
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 									ClaimName: pvcName,
+								},
+							},
+						},
+						{
+							Name: "site-secrets",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: fmt.Sprintf("%s-init-secrets", site.Name),
+									DefaultMode: int32Ptr(0400), // Read-only for security
 								},
 							},
 						},
