@@ -472,6 +472,85 @@ spec:
       name: postgres-credentials
 ```
 
+### Database Security and Privilege Model
+
+The Frappe Operator implements a **principle of least privilege** security model for database access to protect production data.
+
+#### Privilege Separation
+
+There are **two distinct sets of database credentials** with different privilege levels:
+
+1. **Site User Credentials** (Limited Privileges)
+   - Used by running application pods (gunicorn, workers, scheduler, socketio)
+   - Stored in site-specific secret: `{site-name}-db-password`
+   - Can perform table-level operations only
+   - **Cannot drop databases or users** (protection against accidental data loss)
+
+2. **MariaDB Root Credentials** (Administrative Privileges)
+   - Used only in deletion jobs (never in runtime pods)
+   - Stored in: `{site-name}-mariadb-root` (dedicated mode) or MariaDB CR's root secret (shared mode)
+   - Can perform database-level operations including DROP DATABASE
+   - **Never exposed to application containers**
+
+#### Site User Privileges
+
+Site users are granted these privileges (via MariaDB Operator Grant CR):
+
+| Privilege | Purpose | Risk Level |
+|-----------|---------|------------|
+| `SELECT`, `INSERT`, `UPDATE`, `DELETE` | Basic data operations | Low |
+| `CREATE`, `ALTER`, `INDEX` | Schema management (migrations, DocType creation) | Low |
+| `DROP` (table-level only) | Remove tables during migrations | Medium |
+| `REFERENCES` | Foreign key constraints | Low |
+| `CREATE TEMPORARY TABLES`, `LOCK TABLES` | Complex queries and transactions | Low |
+| `EXECUTE` | Stored procedures and functions | Low |
+| `CREATE VIEW`, `SHOW VIEW` | View management | Low |
+| `CREATE ROUTINE`, `ALTER ROUTINE` | Function management | Low |
+| `EVENT`, `TRIGGER` | Event and trigger management | Low |
+
+**Site users CANNOT:**
+- Drop databases (`DROP DATABASE`) - prevents accidental site destruction
+- Drop users (`DROP USER`) - prevents credential tampering  
+- Grant privileges to others (`GRANT OPTION` is false) - prevents privilege escalation
+
+#### Security Rationale
+
+This design protects against several scenarios:
+
+1. **Developer Access**: If a developer gains pod access (via `kubectl exec`), they can query data but cannot accidentally drop the entire database
+2. **Compromised Credentials**: If site credentials leak, attackers can modify data but cannot destroy the database
+3. **Application Bugs**: Bugs in Frappe code or custom apps cannot execute `DROP DATABASE` commands
+4. **Audit Trail**: Database deletions only occur through operator-managed jobs with proper logging
+
+#### Site Deletion Process
+
+When a FrappeSite resource is deleted:
+
+1. Operator creates a deletion job
+2. Job retrieves **MariaDB root credentials** (not site user credentials)
+3. Runs `bench drop-site --db-root-username root --db-root-password <password>`
+4. Drops database, user, and site files
+5. Job completes and site is removed
+
+This ensures only authorized Kubernetes operations can delete sites, not application code or developers.
+
+#### Credential Storage
+
+All credentials are stored as Kubernetes Secrets:
+
+```bash
+# View available secrets (values are base64-encoded)
+kubectl get secrets -n <namespace>
+
+# Site user credentials (used by runtime pods)
+kubectl get secret <site-name>-db-password -o jsonpath='{.data.password}' | base64 -d
+
+# Root credentials (dedicated mode only, used by deletion jobs)
+kubectl get secret <site-name>-mariadb-root -o jsonpath='{.data.password}' | base64 -d
+```
+
+**Important:** Never mount root credentials in application pods. Root credentials should only be used in operator-managed jobs.
+
 ---
 
 ## Scaling and Performance
@@ -875,6 +954,67 @@ kubectl get mariadb -n default
 kubectl run db-test --image=mariadb:10.6 --rm -it --restart=Never -- \
   mysql -h <db-host> -u <user> -p<password>
 ```
+
+#### Site Deletion Failures
+
+**Symptoms:**
+- Site deletion job fails with password prompt
+- Error: "MySQL root password: Aborted!"
+- Site resource stuck in deletion
+
+**Root Cause:**
+Site deletion requires MariaDB root credentials to drop the database. Site users have limited privileges and cannot drop databases (security feature).
+
+**Debugging:**
+```bash
+# Check if deletion job exists
+kubectl get job <site-name>-delete -n <namespace>
+
+# View deletion job logs
+kubectl logs job/<site-name>-delete -n <namespace>
+
+# Verify root secret exists (dedicated mode)
+kubectl get secret <site-name>-mariadb-root -n <namespace>
+
+# For shared mode, check MariaDB CR's root secret
+kubectl get mariadb <mariadb-name> -n <namespace> -o jsonpath='{.spec.rootPasswordSecretKeyRef}'
+```
+
+**Solutions:**
+
+1. **Missing Root Secret**: If root secret is missing, recreate it or use MariaDB operator to regenerate:
+   ```bash
+   # For dedicated mode MariaDB instances
+   kubectl get mariadb <site-name>-mariadb -o yaml
+   # Check rootPasswordSecretKeyRef field
+   ```
+
+2. **Manual Cleanup** (if deletion job continues to fail):
+   ```bash
+   # Drop database manually
+   kubectl exec -it <mariadb-pod> -- mysql -u root -p<password> \
+     -e "DROP DATABASE IF EXISTS <database-name>;"
+   
+   # Drop user manually
+   kubectl exec -it <mariadb-pod> -- mysql -u root -p<password> \
+     -e "DROP USER IF EXISTS '<username>'@'%';"
+   
+   # Remove finalizer from site resource
+   kubectl patch frappesite <site-name> -n <namespace> \
+     --type json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+   ```
+
+3. **Verify Privileges**: Confirm site user doesn't have DROP DATABASE privilege (expected):
+   ```bash
+   kubectl exec -it <mariadb-pod> -- mysql -u root -p<password> \
+     -e "SHOW GRANTS FOR '<site-username>'@'%';"
+   # Should NOT see "DROP" in database-level grants
+   ```
+
+**Prevention:**
+- Ensure MariaDB Operator CRDs are installed: `kubectl get crd mariadbs.k8s.mariadb.com`
+- Don't manually modify database secrets
+- Let operator manage database lifecycle
 
 ### Debugging Tips
 

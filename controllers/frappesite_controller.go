@@ -30,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -906,6 +908,7 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 	}
 
 	// Create deletion job to run bench drop-site
+	// Site user now has minimal privileges (cannot drop database) - use root credentials
 	jobName := fmt.Sprintf("%s-delete", site.Name)
 	job := &batchv1.Job{}
 
@@ -917,11 +920,25 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 
 		// Job doesn't exist, create it
 		logger.Info("Creating site deletion job", "job", jobName)
+		
+		// Get MariaDB root credentials for deletion (site user has limited privileges)
+		rootUser, rootPassword, err := r.getMariaDBRootCredentials(ctx, site)
+		if err != nil {
+			return fmt.Errorf("failed to get MariaDB root credentials: %w", err)
+		}
+		
+		// Use root credentials to drop the site and database
+		// Site users no longer have DROP DATABASE privilege for security
 		deleteScript := fmt.Sprintf(`#!/bin/bash
 set -e
 cd /home/frappe/frappe-bench
+
 echo "Dropping Frappe site: %[1]s"
-bench drop-site %[1]s --force
+echo "Using MariaDB root credentials for secure deletion"
+
+# Use root credentials to drop the site (site user cannot drop database)
+bench drop-site %[1]s --force --db-root-username "$DB_ROOT_USER" --db-root-password "$DB_ROOT_PASSWORD" --no-backup
+
 echo "Site %[1]s dropped successfully!"
 `, site.Spec.SiteName)
 
@@ -945,6 +962,16 @@ echo "Site %[1]s dropped successfully!"
 								Image:   r.getBenchImage(ctx, bench),
 								Command: []string{"bash", "-c"},
 								Args:    []string{deleteScript},
+								Env: []corev1.EnvVar{
+									{
+										Name:  "DB_ROOT_USER",
+										Value: rootUser,
+									},
+									{
+										Name:  "DB_ROOT_PASSWORD",
+										Value: rootPassword,
+									},
+								},
 								VolumeMounts: []corev1.VolumeMount{
 									{
 										Name:      "sites",
@@ -1017,6 +1044,87 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Owns(&networkingv1.Ingress{}).
 		Complete(r)
+}
+
+// getMariaDBRootCredentials retrieves MariaDB root credentials for site deletion
+// Returns (username, password, error). Only use these credentials in deletion jobs.
+func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
+	logger := log.FromContext(ctx)
+
+	// For dedicated mode, root secret is {site-name}-mariadb-root
+	if site.Spec.DBConfig.Mode == "dedicated" {
+		secretName := fmt.Sprintf("%s-mariadb-root", site.Name)
+		secret := &corev1.Secret{}
+		err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: site.Namespace}, secret)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get dedicated MariaDB root secret %s: %w", secretName, err)
+		}
+		password, ok := secret.Data["password"]
+		if !ok {
+			return "", "", fmt.Errorf("password key not found in secret %s", secretName)
+		}
+		return "root", string(password), nil
+	}
+
+	// For shared mode, need to get MariaDB CR and read its rootPasswordSecretKeyRef
+	if site.Spec.DBConfig.Mode == "shared" {
+		// Get the MariaDB instance name from site spec
+		mariadbName := site.Spec.DBConfig.MariaDBRef.Name
+		mariadbNamespace := site.Spec.DBConfig.MariaDBRef.Namespace
+		if mariadbNamespace == "" {
+			mariadbNamespace = site.Namespace
+		}
+
+		// Get MariaDB CR using unstructured client
+		mariadbCR := &unstructured.Unstructured{}
+		mariadbCR.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "k8s.mariadb.com",
+			Version: "v1alpha1",
+			Kind:    "MariaDB",
+		})
+		err := r.Get(ctx, types.NamespacedName{Name: mariadbName, Namespace: mariadbNamespace}, mariadbCR)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get MariaDB CR %s/%s: %w", mariadbNamespace, mariadbName, err)
+		}
+
+		// Extract rootPasswordSecretKeyRef from spec
+		spec, found, err := unstructured.NestedMap(mariadbCR.Object, "spec")
+		if err != nil || !found {
+			return "", "", fmt.Errorf("failed to get spec from MariaDB CR: %w", err)
+		}
+
+		rootPasswordRef, found, err := unstructured.NestedMap(spec, "rootPasswordSecretKeyRef")
+		if err != nil || !found {
+			return "", "", fmt.Errorf("rootPasswordSecretKeyRef not found in MariaDB spec: %w", err)
+		}
+
+		rootSecretName, found, err := unstructured.NestedString(rootPasswordRef, "name")
+		if err != nil || !found {
+			return "", "", fmt.Errorf("secret name not found in rootPasswordSecretKeyRef: %w", err)
+		}
+
+		rootSecretKey, found, err := unstructured.NestedString(rootPasswordRef, "key")
+		if err != nil || !found {
+			// Default key is "password" if not specified
+			rootSecretKey = "password"
+			logger.Info("Using default key 'password' for root secret")
+		}
+
+		// Get the root password secret
+		secret := &corev1.Secret{}
+		err = r.Get(ctx, types.NamespacedName{Name: rootSecretName, Namespace: mariadbNamespace}, secret)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get MariaDB root secret %s: %w", rootSecretName, err)
+		}
+
+		password, ok := secret.Data[rootSecretKey]
+		if !ok {
+			return "", "", fmt.Errorf("key %s not found in secret %s", rootSecretKey, rootSecretName)
+		}
+		return "root", string(password), nil
+	}
+
+	return "", "", fmt.Errorf("unsupported database mode: %s", site.Spec.DBConfig.Mode)
 }
 
 func (r *FrappeSiteReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
