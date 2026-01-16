@@ -1537,9 +1537,14 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.F
 	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
 		return bench.Spec.Security.PodSecurityContext
 	}
+	// Default to 1001 (OpenShift standard) but allow override via environment
+	defaultUID := getDefaultUID()
+	defaultGID := getDefaultGID()
+	defaultFSGroup := getDefaultFSGroup()
 	return &corev1.PodSecurityContext{
-		RunAsGroup: int64Ptr(0),
-		FSGroup:    int64Ptr(0),
+		RunAsUser:  &defaultUID,
+		RunAsGroup: &defaultGID,
+		FSGroup:    &defaultFSGroup,
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -1550,8 +1555,12 @@ func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1al
 	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
 		return bench.Spec.Security.SecurityContext
 	}
+	// Default to 1001 (OpenShift standard) but allow override via environment
+	defaultUID := getDefaultUID()
+	defaultGID := getDefaultGID()
 	return &corev1.SecurityContext{
-		RunAsGroup:               int64Ptr(0),
+		RunAsUser:                &defaultUID,
+		RunAsGroup:               &defaultGID,
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},

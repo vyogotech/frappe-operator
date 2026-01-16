@@ -1,0 +1,60 @@
+# Local Minikube Test with Fixed ERPNext Image
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: local-test-bench
+  namespace: frappe-test
+spec:
+  frappeVersion: "v15"
+  
+  imageConfig:
+    repository: "localhost/erpnext-fixed"
+    tag: "v15-uid1001"
+    pullPolicy: Never
+  
+  security:
+    podSecurityContext:
+      runAsUser: 1001
+      runAsGroup: 0
+      fsGroup: 0
+    securityContext:
+      runAsUser: 1001
+      runAsGroup: 0
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+  
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image
+  
+  componentReplicas:
+    gunicorn: 1
+    workerDefault: 1
+    workerShort: 1
+    workerLong: 0
+  
+  redisConfig:
+    type: redis
+    image: docker.io/redis:7-alpine
+  
+  storageClassName: "standard"
+
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: test-site
+  namespace: frappe-test
+spec:
+  benchRef:
+    name: local-test-bench
+  
+  siteName: test.local
+  
+  dbConfig:
+    mode: dedicated
+    provider: mariadb
+    image: docker.io/mariadb:10.11
