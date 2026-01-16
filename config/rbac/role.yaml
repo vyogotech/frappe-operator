@@ -20,6 +20,13 @@ rules:
   - update
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
   - apps
   resources:
   - deployments
@@ -35,6 +42,7 @@ rules:
 - apiGroups:
   - batch
   resources:
+  - cronjobs
   - jobs
   verbs:
   - create
@@ -90,6 +98,18 @@ rules:
   resources:
   - ingressclasses
   - ingresses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
   verbs:
   - create
   - delete

@@ -1,0 +1,23 @@
+# Basic SiteBackup - One-time backup
+# Prerequisites:
+# 1. Create FrappeSite (see basic-site.yaml)
+
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: dev-site-backup
+  namespace: default
+spec:
+  # Site to backup (must match an existing FrappeSite)
+  site: dev.localhost
+
+# The operator will automatically:
+# 1. Create a Job that runs 'bench --site dev.localhost backup'
+# 2. Mount the sites volume for backup access
+# 3. Update status when backup completes
+
+# To check backup status:
+# kubectl get sitebackup dev-site-backup
+# kubectl get job dev-site-backup-backup
+
+# Backup files will be stored in the site's private/backups directory

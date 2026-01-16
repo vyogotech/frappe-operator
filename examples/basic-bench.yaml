@@ -28,5 +28,14 @@ spec:
   
   # Optional: Specify storage class
   # storageClassName: standard
+  
+  # Security context is automatically set to OpenShift-compatible defaults:
+  # runAsUser: 1001, runAsGroup: 0, fsGroup: 0
+  # Override only if your container uses different UID/GID:
+  # security:
+  #   podSecurityContext:
+  #     runAsUser: 1001
+  #     runAsGroup: 0
+  #     fsGroup: 0
 
 

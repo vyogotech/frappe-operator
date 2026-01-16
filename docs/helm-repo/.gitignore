@@ -1,0 +1,5 @@
+# Ignore packaged chart archives
+*.tgz
+
+# Keep index.yaml
+!index.yaml

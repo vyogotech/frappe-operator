@@ -399,3 +399,30 @@ type WorkerAutoscalingConfig struct {
 	// +optional
 	Default *WorkerAutoscaling `json:"default,omitempty"`
 }
+
+// RouteConfig defines OpenShift Route configuration for a site
+type RouteConfig struct {
+	// Enabled controls whether Route should be created (defaults to true on OpenShift)
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Host overrides the auto-generated hostname for the Route
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// TLSTermination defines TLS termination type
+	// +kubebuilder:validation:Enum=edge;passthrough;reencrypt
+	// +kubebuilder:default=edge
+	// +optional
+	TLSTermination string `json:"tlsTermination,omitempty"`
+
+	// WildcardPolicy controls wildcard route behavior
+	// +kubebuilder:validation:Enum=none;subdomain
+	// +kubebuilder:default=none
+	// +optional
+	WildcardPolicy string `json:"wildcardPolicy,omitempty"`
+
+	// Annotations to add to the Route
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+}

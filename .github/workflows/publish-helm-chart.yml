@@ -1,0 +1,96 @@
+name: Publish Helm Chart
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'helm/**'
+      - '.github/workflows/publish-helm-chart.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Chart version (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine chart version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            # Remove 'v' prefix if present
+            VERSION=${VERSION#v}
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Extract version from Chart.yaml or use git tag
+            VERSION=$(grep '^version:' helm/frappe-operator/Chart.yaml | awk '{print $2}' | tr -d '"')
+            if [ -z "$VERSION" ]; then
+              VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "1.0.0")
+            fi
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Chart version: $VERSION"
+
+      - name: Package Helm chart
+        run: |
+          mkdir -p docs/helm-repo
+          helm package helm/frappe-operator \
+            --destination docs/helm-repo \
+            --version "${{ steps.version.outputs.version }}" \
+            --app-version "${{ steps.version.outputs.version }}"
+
+      - name: Generate Helm repository index
+        run: |
+          helm repo index docs/helm-repo \
+            --url "https://vyogotech.github.io/frappe-operator/helm-repo" \
+            --merge docs/helm-repo/index.yaml 2>/dev/null || \
+          helm repo index docs/helm-repo \
+            --url "https://vyogotech.github.io/frappe-operator/helm-repo"
+
+      - name: Commit and push changes
+        run: |
+          git add docs/helm-repo/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: publish Helm chart v${{ steps.version.outputs.version }}"
+            git push
+          fi
+
+      - name: Verify chart package
+        run: |
+          if [ ! -f "docs/helm-repo/${{ steps.version.outputs.version }}.tgz" ] && [ ! -f "docs/helm-repo/frappe-operator-${{ steps.version.outputs.version }}.tgz" ]; then
+            echo "Chart package not found, listing files:"
+            ls -la docs/helm-repo/
+            exit 1
+          fi
+          echo "✅ Chart packaged successfully"
