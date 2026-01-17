@@ -576,13 +576,13 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 	logger := log.FromContext(ctx)
 
 	secretName := fmt.Sprintf("%s-init-secrets", site.Name)
-	
+
 	// Get DB_PROVIDER from database info
 	dbProvider := "mariadb" // default
 	if site.Spec.DBConfig.Provider != "" {
 		dbProvider = site.Spec.DBConfig.Provider
 	}
-	
+
 	// Get apps to install if specified
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
@@ -592,7 +592,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		"bench_name":     []byte(bench.Name),
 		"db_provider":    []byte(dbProvider),
 	}
-	
+
 	// Add database credentials if using external database
 	if dbProvider == "mariadb" || dbProvider == "postgres" {
 		if dbInfo != nil {
@@ -605,7 +605,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 			secretData["db_password"] = []byte(dbCreds.Password)
 		}
 	}
-	
+
 	// Create or update the secret
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -619,13 +619,13 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		Type: corev1.SecretTypeOpaque,
 		Data: secretData,
 	}
-	
+
 	// Set controller reference
 	if err := controllerutil.SetControllerReference(site, secret, r.Scheme); err != nil {
 		logger.Error(err, "Failed to set controller reference for secret", "secret", secretName)
 		return err
 	}
-	
+
 	// Create or update secret
 	var existing corev1.Secret
 	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: site.Namespace}, &existing)
@@ -648,7 +648,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		}
 		logger.Info("Updated initialization secret", "secret", secretName)
 	}
-	
+
 	return nil
 }
 
@@ -939,7 +939,7 @@ exit 0
 							Name: "site-secrets",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: fmt.Sprintf("%s-init-secrets", site.Name),
+									SecretName:  fmt.Sprintf("%s-init-secrets", site.Name),
 									DefaultMode: int32Ptr(0400), // Read-only for security
 								},
 							},
@@ -997,14 +997,14 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 
 		// Job doesn't exist, create it
 		logger.Info("Creating site deletion job", "job", jobName)
-		
+
 		// Get MariaDB root credentials for deletion (site user has limited privileges)
 		rootUser, rootPassword, err := r.getMariaDBRootCredentials(ctx, site)
 		if err != nil {
 			return fmt.Errorf("failed to get MariaDB root credentials: %w", err)
 		}
 
-		// Create deletion secret with root credentials  
+		// Create deletion secret with root credentials
 		deletionSecretName := fmt.Sprintf("%s-deletion-secret", site.Name)
 		deletionSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1022,11 +1022,11 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 				"site_name":        []byte(site.Spec.SiteName),
 			},
 		}
-		
+
 		if err := controllerutil.SetControllerReference(site, deletionSecret, r.Scheme); err != nil {
 			return err
 		}
-		
+
 		if err := r.Create(ctx, deletionSecret); err != nil {
 			if !errors.IsAlreadyExists(err) {
 				return fmt.Errorf("failed to create deletion secret: %w", err)
@@ -1041,7 +1041,7 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 				return fmt.Errorf("failed to update deletion secret: %w", err)
 			}
 		}
-		
+
 		// Use root credentials from secret volume (not environment variables)
 		deleteScript := `#!/bin/bash
 set -e
@@ -1093,7 +1093,7 @@ echo "Site $SITE_NAME dropped successfully!"
 									},
 								},
 								SecurityContext: r.getContainerSecurityContext(bench),
-								Env:              []corev1.EnvVar{}, // No environment variables for sensitive data
+								Env:             []corev1.EnvVar{}, // No environment variables for sensitive data
 							},
 						},
 						Volumes: []corev1.Volume{

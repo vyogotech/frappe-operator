@@ -354,7 +354,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 							Image:   redisImage,
 							Command: []string{"redis-server"},
 							// Disable RDB/AOF persistence to avoid stop-writes-on-bgsave-error in ephemeral environments
-							Args:    []string{"--save", "", "--appendonly", "no", "--stop-writes-on-bgsave-error", "no"},
+							Args: []string{"--save", "", "--appendonly", "no", "--stop-writes-on-bgsave-error", "no"},
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 6379,

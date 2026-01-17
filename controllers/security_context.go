@@ -174,7 +174,3 @@ func mergeContainerSecurityContext(target, defaults *corev1.SecurityContext) {
 		target.Capabilities = defaults.Capabilities.DeepCopy()
 	}
 }
-
-func int64Ptr(v int64) *int64 {
-	return &v
-}
