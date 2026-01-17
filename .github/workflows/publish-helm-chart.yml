@@ -60,6 +60,9 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 Chart version: $VERSION"
 
+      - name: Update Helm dependencies
+        run: helm dependency update helm/frappe-operator/
+
       - name: Package Helm chart
         run: |
           mkdir -p docs/helm-repo

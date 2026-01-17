@@ -5,7 +5,9 @@ A Kubernetes Operator that makes deploying and managing [![Release](https://img.
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/vyogotech/frappe-operator)](go.mod)
 [![Release](https://img.shields.io/github/v/release/vyogotech/frappe-operator)](https://github.com/vyogotech/frappe-operator/releases/tag/v2.4.0)
-[![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](docs/RELEASE_NOTES_v2.4.0.md)
+[![User Preview](https://img.shields.io/badge/Status-User%20Preview-yellow.svg)](#status)
+
+> ⚠️ **Status: User Preview** - This project is currently in user preview and NOT ready for production. We're actively seeking feedback from early adopters to improve stability, performance, and usability before the v1.0 release. Please try it out, report issues, and share your feedback!
 
 **📚 [Complete Documentation](https://vyogotech.github.io/frappe-operator/)**
 
@@ -39,7 +41,7 @@ Frappe Operator is a Kubernetes operator that automates the deployment, scaling,
 - 🔒 **Zero Hardcoded Secrets** - All passwords auto-generated and stored in Kubernetes Secrets
 - 🗄️ **Per-Site DB Isolation** - Each site gets its own database and user for security
 - 📦 **Hybrid App Installation** - Install apps from FPM packages, Git repositories, or pre-built images
-- ⚡ **Production-Ready Architecture** - Dual Redis (cache + queue), correct entry points
+- ⚡ **Scalable Architecture** - Dual Redis (cache + queue), correct entry points
 - 📊 **Auto-Scaling** - Automatically scale based on traffic and resource usage
 - ⚡ **NEW:- 💾 **External Database Support**: Direct connection to RDS/Cloud SQL (v2.4.0).
 - 🛡️ **OpenShift Ready**: Optimized for restricted security contexts (v2.5.0).
