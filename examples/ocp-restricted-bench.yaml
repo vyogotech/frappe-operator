@@ -18,12 +18,15 @@ spec:
     type: redis
     image: public.ecr.aws/docker/library/redis:7.2-alpine
   
-  # Security Context - Relaxed for OCP automatic non-root handling
+  # Security Context - OpenShift compatible (UID 1001, GID 0)
+  # Matches the default operator behavior but shown explicitly for reference
   security:
     podSecurityContext:
-      runAsGroup: 0
-      fsGroup: 0
+      runAsUser: 1001  # OpenShift arbitrary UID standard
+      runAsGroup: 0    # Root group for arbitrary UID support
+      fsGroup: 0       # Root group for filesystem permissions
     securityContext:
+      runAsUser: 1001
       runAsGroup: 0
       allowPrivilegeEscalation: false
       capabilities:

@@ -1,0 +1,132 @@
+# Kind Cluster Test with Ingress
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: test-bench
+  namespace: frappe-test
+spec:
+  frappeVersion: "v15"
+  
+  imageConfig:
+    repository: "localhost/erpnext-fixed"
+    tag: "v15-uid1001"
+    pullPolicy: Never
+  
+  security:
+    podSecurityContext:
+      runAsUser: 1001
+      runAsGroup: 0
+      fsGroup: 0
+    securityContext:
+      runAsUser: 1001
+      runAsGroup: 0
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+  
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image
+  
+  componentReplicas:
+    gunicorn: 1
+    workerDefault: 0
+    workerShort: 0
+    workerLong: 0
+  
+  redisConfig:
+    type: redis
+    image: docker.io/redis:7-alpine
+  
+  storageClassName: "standard"
+
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: test-site-v2
+  namespace: frappe-test
+spec:
+  benchRef:
+    name: test-bench
+  
+  siteName: test-v2.local
+  
+  # External database mode for simpler testing
+  dbConfig:
+    provider: mariadb
+    mode: dedicated
+    host: mariadb.frappe-test.svc.cluster.local
+    port: "3306"
+    connectionSecretRef:
+      name: mariadb-root
+  
+  # Ingress configuration
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mariadb-root
+  namespace: frappe-test
+type: Opaque
+stringData:
+  username: "root"
+  password: "changeme123"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+  namespace: frappe-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      containers:
+      - name: mariadb
+        image: docker.io/mariadb:10.11
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "changeme123"
+        - name: MYSQL_CHARACTER_SET_SERVER
+          value: "utf8mb4"
+        - name: MYSQL_COLLATION_SERVER
+          value: "utf8mb4_unicode_ci"
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: data
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+  namespace: frappe-test
+spec:
+  selector:
+    app: mariadb
+  ports:
+  - port: 3306
+    targetPort: 3306
+    name: mysql
