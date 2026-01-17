@@ -117,6 +117,8 @@ docs/.buildinfo
 
 # Helm (if used)
 charts/*/charts/
+# Allow helm chart dependencies but exclude other tgz files
+!helm/frappe-operator/charts/*.tgz
 *.tgz
 
 # Local operator testing

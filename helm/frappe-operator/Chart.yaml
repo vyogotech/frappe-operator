@@ -15,7 +15,7 @@ sources:
   - https://github.com/vyogotech/frappe-operator
 maintainers:
   - name: Vyogo Technologies
-    email: support@vyogo.tech
+    email: dev@vyogo.tech
     url: https://vyogo.tech
 icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/main/docs/assets/icon.png
 
