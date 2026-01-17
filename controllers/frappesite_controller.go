@@ -30,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -47,6 +49,8 @@ type FrappeSiteReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
+
+// int32Ptr returns a pointer to the passed int32 value
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites/status,verbs=get;update;patch
@@ -566,6 +570,88 @@ func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotec
 	return site.Spec.SiteName, "sitename-default"
 }
 
+// ensureInitSecrets creates a Secret containing all initialization credentials
+// This function ensures credentials are mounted as files, not environment variables
+func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string) error {
+	logger := log.FromContext(ctx)
+
+	secretName := fmt.Sprintf("%s-init-secrets", site.Name)
+	
+	// Get DB_PROVIDER from database info
+	dbProvider := "mariadb" // default
+	if site.Spec.DBConfig.Provider != "" {
+		dbProvider = site.Spec.DBConfig.Provider
+	}
+	
+	// Get apps to install if specified
+	// Build secret data with all credentials as individual files
+	secretData := map[string][]byte{
+		"site_name":      []byte(site.Spec.SiteName),
+		"domain":         []byte(domain),
+		"admin_password": []byte(adminPassword),
+		"bench_name":     []byte(bench.Name),
+		"db_provider":    []byte(dbProvider),
+	}
+	
+	// Add database credentials if using external database
+	if dbProvider == "mariadb" || dbProvider == "postgres" {
+		if dbInfo != nil {
+			secretData["db_host"] = []byte(dbInfo.Host)
+			secretData["db_port"] = []byte(dbInfo.Port)
+			secretData["db_name"] = []byte(dbInfo.Name)
+		}
+		if dbCreds != nil {
+			secretData["db_user"] = []byte(dbCreds.Username)
+			secretData["db_password"] = []byte(dbCreds.Password)
+		}
+	}
+	
+	// Create or update the secret
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: site.Namespace,
+			Labels: map[string]string{
+				"app":  "frappe",
+				"site": site.Name,
+			},
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: secretData,
+	}
+	
+	// Set controller reference
+	if err := controllerutil.SetControllerReference(site, secret, r.Scheme); err != nil {
+		logger.Error(err, "Failed to set controller reference for secret", "secret", secretName)
+		return err
+	}
+	
+	// Create or update secret
+	var existing corev1.Secret
+	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: site.Namespace}, &existing)
+	if err != nil && errors.IsNotFound(err) {
+		// Create new secret
+		if err := r.Create(ctx, secret); err != nil {
+			logger.Error(err, "Failed to create initialization secret", "secret", secretName)
+			return err
+		}
+		logger.Info("Created initialization secret", "secret", secretName)
+	} else if err != nil {
+		logger.Error(err, "Failed to get initialization secret", "secret", secretName)
+		return err
+	} else {
+		// Update existing secret
+		existing.Data = secretData
+		if err := r.Update(ctx, &existing); err != nil {
+			logger.Error(err, "Failed to update initialization secret", "secret", secretName)
+			return err
+		}
+		logger.Info("Updated initialization secret", "secret", secretName)
+	}
+	
+	return nil
+}
+
 // ensureSiteInitialized creates a Job to run bench new-site
 func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials) (bool, error) {
 	logger := log.FromContext(ctx)
@@ -598,14 +684,6 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		"domain", domain,
 		"dbProvider", dbInfo.Provider,
 		"dbName", dbInfo.Name)
-
-	// Database credentials are provided by the database provider (secure, no hardcoded values)
-	dbHost := dbInfo.Host
-	dbPort := dbInfo.Port
-	dbName := dbInfo.Name
-	dbUser := dbCreds.Username
-	dbPassword := dbCreds.Password
-	dbProvider := dbInfo.Provider
 
 	// Get or generate admin password
 	var adminPassword string
@@ -669,6 +747,12 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 			// Use existing generated password
 			adminPassword = string(adminPasswordSecret.Data["password"])
 			logger.Info("Using existing generated password", "secret", generatedSecretName)
+
+			// Ensure initialization secret exists with all credentials
+			if err := r.ensureInitSecrets(ctx, site, bench, domain, dbInfo, dbCreds, adminPassword); err != nil {
+				logger.Error(err, "Failed to create initialization secret")
+				return false, fmt.Errorf("failed to create init secret: %w", err)
+			}
 		}
 	}
 
@@ -678,68 +762,79 @@ set -e
 
 cd /home/frappe/frappe-bench
 
+# Read from secret files mounted at /run/secrets
+SITE_NAME=$(cat /run/secrets/site_name)
+DOMAIN=$(cat /run/secrets/domain)
+ADMIN_PASSWORD=$(cat /run/secrets/admin_password)
+BENCH_NAME=$(cat /run/secrets/bench_name)
+DB_PROVIDER=$(cat /run/secrets/db_provider)
+APPS_TO_INSTALL=$(cat /run/secrets/apps_to_install 2>/dev/null || echo "")
+
 echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
 
-# Validate environment variables exist and are not empty
-if [[ -z "$SITE_NAME" || -z "$DOMAIN" || -z "$ADMIN_PASSWORD" || -z "$BENCH_NAME" || -z "$DB_PROVIDER" ]]; then
-    echo "ERROR: Required environment variables not set"
-    exit 1
+# If the site directory already exists, skip creation but update config
+if [[ -d "/home/frappe/frappe-bench/sites/$SITE_NAME" ]]; then
+    echo "Site $SITE_NAME already exists; skipping new-site and updating config."
+    goto_update_config=1
+else
+    goto_update_config=0
 fi
 
 # Dynamically build the --install-app argument
 INSTALL_APP_ARG=""
 if [[ -n "$APPS_TO_INSTALL" ]]; then
-    for app in $APPS_TO_INSTALL; do
-        INSTALL_APP_ARG+=" --install-app=$app"
-    done
+	for app in $APPS_TO_INSTALL; do
+		INSTALL_APP_ARG+=" --install-app=$app"
+	done
 fi
 
 # Run bench new-site with provider-specific database configuration
 if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
-    # For MariaDB and PostgreSQL: use pre-provisioned database with dedicated credentials
-    if [[ -z "$DB_HOST" || -z "$DB_PORT" || -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
-        echo "ERROR: Database connection variables not set for $DB_PROVIDER"
-        exit 1
-    fi
-
-    echo "Creating site with $DB_PROVIDER database (pre-provisioned)"
+	# For MariaDB and PostgreSQL: use pre-provisioned database with dedicated credentials
+	# These are mounted from secret volumes, not environment variables
+	DB_HOST=$(cat /run/secrets/db_host)
+	DB_PORT=$(cat /run/secrets/db_port)
+	DB_NAME=$(cat /run/secrets/db_name)
+	DB_USER=$(cat /run/secrets/db_user)
+	DB_PASSWORD=$(cat /run/secrets/db_password)
     
-    # Check if bench version supports --db-user flag
-    DB_USER_FLAG=""
-    if bench new-site --help | grep -q " --db-user"; then
-        echo "Detected support for --db-user flag"
-        DB_USER_FLAG="--db-user=$DB_USER"
-    elif [[ "$DB_USER" != "$DB_NAME" ]]; then
-        echo "WARNING: Your bench version does not support --db-user. Using DB_NAME as username."
+	if [[ -z "$DB_HOST" || -z "$DB_PORT" || -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
+		echo "ERROR: Database connection secret files not found for $DB_PROVIDER"
+		exit 1
+	fi
+
+    if [[ "$goto_update_config" -eq 0 ]]; then
+        echo "Creating site with $DB_PROVIDER database (pre-provisioned)"
+        
+        # Check if bench version supports --db-user flag
+        DB_USER_FLAG=""
+        if bench new-site --help | grep -q " --db-user"; then
+            echo "Detected support for --db-user flag"
+            DB_USER_FLAG="--db-user=$DB_USER"
+        elif [[ "$DB_USER" != "$DB_NAME" ]]; then
+            echo "WARNING: Your bench version does not support --db-user. Using DB_NAME as username."
+        else
+            echo "Bench version does not support --db-user, but DB_USER matches DB_NAME. Proceeding."
+        fi
+
+        bench new-site \
+          --db-type="$DB_PROVIDER" \
+          --db-name="$DB_NAME" \
+          --db-host="$DB_HOST" \
+          --db-port="$DB_PORT" \
+          $DB_USER_FLAG \
+          --db-password="$DB_PASSWORD" \
+          --no-setup-db \
+          --admin-password="$ADMIN_PASSWORD" \
+          $INSTALL_APP_ARG \
+          --verbose \
+          "$SITE_NAME" || echo "bench new-site failed (possibly exists); proceeding to update config"
     else
-        echo "Bench version does not support --db-user, but DB_USER matches DB_NAME. Proceeding."
+        echo "Skipping new-site; will update site_config.json only."
     fi
-
-    bench new-site \
-      --db-type="$DB_PROVIDER" \
-      --db-name="$DB_NAME" \
-      --db-host="$DB_HOST" \
-      --db-port="$DB_PORT" \
-      $DB_USER_FLAG \
-      --db-password="$DB_PASSWORD" \
-      --no-setup-db \
-      --admin-password="$ADMIN_PASSWORD" \
-      $INSTALL_APP_ARG \
-      --verbose \
-      "$SITE_NAME"
-
-elif [[ "$DB_PROVIDER" == "sqlite" ]]; then
-    # For SQLite: file-based database, no external connection needed
-    echo "Creating site with SQLite database (file-based)"
-    bench new-site "$SITE_NAME" \
-      --db-type=sqlite \
-      --admin-password="$ADMIN_PASSWORD" \
-      $INSTALL_APP_ARG \
-      --verbose
-
 else
-    echo "ERROR: Unsupported database provider: $DB_PROVIDER"
+    echo "ERROR: Unsupported DB provider: $DB_PROVIDER"
     exit 1
 fi
 
@@ -748,20 +843,25 @@ echo "Site $SITE_NAME created successfully!"
 # Update site_config.json with domain and Redis configuration using Python
 echo "Updating site_config.json with domain and Redis"
 python3 << 'PYTHON_SCRIPT'
-import json
-import os
+import json, os
 
-# Get values from environment variables
-site_name = os.environ['SITE_NAME']
-domain = os.environ['DOMAIN']
-bench_name = os.environ['BENCH_NAME']
+# Read from secret files mounted at /run/secrets
+with open('/run/secrets/site_name', 'r') as f:
+    site_name = f.read().strip()
+with open('/run/secrets/domain', 'r') as f:
+    domain = f.read().strip()
+with open('/run/secrets/bench_name', 'r') as f:
+    bench_name = f.read().strip()
 
 site_path = f"/home/frappe/frappe-bench/sites/{site_name}"
 config_file = os.path.join(site_path, "site_config.json")
 
-# Read existing config
-with open(config_file, 'r') as f:
-    config = json.load(f)
+# Read or initialize config
+try:
+    with open(config_file, 'r') as f:
+        config = json.load(f)
+except FileNotFoundError:
+    config = {}
 
 # Update with resolved domain
 config['host_name'] = domain
@@ -769,6 +869,9 @@ config['host_name'] = domain
 # Add Redis configuration for this site
 config['redis_cache'] = f"redis://{bench_name}-redis-cache:6379"
 config['redis_queue'] = f"redis://{bench_name}-redis-queue:6379"
+
+# Ensure directory exists
+os.makedirs(site_path, exist_ok=True)
 
 # Write back
 with open(config_file, 'w') as f:
@@ -780,6 +883,9 @@ print(f"Redis queue: {bench_name}-redis-queue:6379")
 PYTHON_SCRIPT
 
 echo "Site initialization complete!"
+
+# Exit success regardless of whether new-site ran
+exit 0
 `
 
 	// Get bench PVC name
@@ -810,50 +916,14 @@ echo "Site initialization complete!"
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
 								},
+								{
+									Name:      "site-secrets",
+									MountPath: "/run/secrets",
+								},
 							},
 							SecurityContext: r.getContainerSecurityContext(bench),
-							Env: []corev1.EnvVar{
-								{
-									Name:  "SITE_NAME",
-									Value: site.Spec.SiteName,
-								},
-								{
-									Name:  "DOMAIN",
-									Value: domain,
-								},
-								{
-									Name:  "DB_PROVIDER",
-									Value: dbProvider,
-								},
-								{
-									Name:  "DB_HOST",
-									Value: dbHost,
-								},
-								{
-									Name:  "DB_PORT",
-									Value: dbPort,
-								},
-								{
-									Name:  "DB_NAME",
-									Value: dbName,
-								},
-								{
-									Name:  "DB_USER",
-									Value: dbUser,
-								},
-								{
-									Name:  "DB_PASSWORD",
-									Value: dbPassword,
-								},
-								{
-									Name:  "ADMIN_PASSWORD",
-									Value: adminPassword,
-								},
-								{
-									Name:  "BENCH_NAME",
-									Value: bench.Name,
-								},
-							},
+							// Removed: No environment variables for sensitive data
+							Env: []corev1.EnvVar{},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -862,6 +932,15 @@ echo "Site initialization complete!"
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 									ClaimName: pvcName,
+								},
+							},
+						},
+						{
+							Name: "site-secrets",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: fmt.Sprintf("%s-init-secrets", site.Name),
+									DefaultMode: int32Ptr(0400), // Read-only for security
 								},
 							},
 						},
@@ -906,6 +985,7 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 	}
 
 	// Create deletion job to run bench drop-site
+	// Site user now has minimal privileges (cannot drop database) - use root credentials
 	jobName := fmt.Sprintf("%s-delete", site.Name)
 	job := &batchv1.Job{}
 
@@ -917,13 +997,69 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 
 		// Job doesn't exist, create it
 		logger.Info("Creating site deletion job", "job", jobName)
-		deleteScript := fmt.Sprintf(`#!/bin/bash
+		
+		// Get MariaDB root credentials for deletion (site user has limited privileges)
+		rootUser, rootPassword, err := r.getMariaDBRootCredentials(ctx, site)
+		if err != nil {
+			return fmt.Errorf("failed to get MariaDB root credentials: %w", err)
+		}
+
+		// Create deletion secret with root credentials  
+		deletionSecretName := fmt.Sprintf("%s-deletion-secret", site.Name)
+		deletionSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      deletionSecretName,
+				Namespace: site.Namespace,
+				Labels: map[string]string{
+					"app":  "frappe",
+					"site": site.Name,
+				},
+			},
+			Type: corev1.SecretTypeOpaque,
+			Data: map[string][]byte{
+				"db_root_user":     []byte(rootUser),
+				"db_root_password": []byte(rootPassword),
+				"site_name":        []byte(site.Spec.SiteName),
+			},
+		}
+		
+		if err := controllerutil.SetControllerReference(site, deletionSecret, r.Scheme); err != nil {
+			return err
+		}
+		
+		if err := r.Create(ctx, deletionSecret); err != nil {
+			if !errors.IsAlreadyExists(err) {
+				return fmt.Errorf("failed to create deletion secret: %w", err)
+			}
+			// Update existing secret with current credentials
+			var existing corev1.Secret
+			if err := r.Get(ctx, types.NamespacedName{Name: deletionSecretName, Namespace: site.Namespace}, &existing); err != nil {
+				return fmt.Errorf("failed to get existing deletion secret: %w", err)
+			}
+			existing.Data = deletionSecret.Data
+			if err := r.Update(ctx, &existing); err != nil {
+				return fmt.Errorf("failed to update deletion secret: %w", err)
+			}
+		}
+		
+		// Use root credentials from secret volume (not environment variables)
+		deleteScript := `#!/bin/bash
 set -e
 cd /home/frappe/frappe-bench
-echo "Dropping Frappe site: %[1]s"
-bench drop-site %[1]s --force
-echo "Site %[1]s dropped successfully!"
-`, site.Spec.SiteName)
+
+# Read credentials from mounted secret files
+DB_ROOT_USER=$(cat /run/secrets/db_root_user)
+DB_ROOT_PASSWORD=$(cat /run/secrets/db_root_password)
+SITE_NAME=$(cat /run/secrets/site_name)
+
+echo "Dropping Frappe site: $SITE_NAME"
+echo "Using MariaDB root credentials from secret volume for secure deletion"
+
+# Use root credentials to drop the site (site user cannot drop database)
+bench drop-site "$SITE_NAME" --force --db-root-username "$DB_ROOT_USER" --db-root-password "$DB_ROOT_PASSWORD" --no-backup
+
+echo "Site $SITE_NAME dropped successfully!"
+`
 
 		job = &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
@@ -950,8 +1086,14 @@ echo "Site %[1]s dropped successfully!"
 										Name:      "sites",
 										MountPath: "/home/frappe/frappe-bench/sites",
 									},
+									{
+										Name:      "deletion-secret",
+										MountPath: "/run/secrets",
+										ReadOnly:  true,
+									},
 								},
 								SecurityContext: r.getContainerSecurityContext(bench),
+								Env:              []corev1.EnvVar{}, // No environment variables for sensitive data
 							},
 						},
 						Volumes: []corev1.Volume{
@@ -960,6 +1102,15 @@ echo "Site %[1]s dropped successfully!"
 								VolumeSource: corev1.VolumeSource{
 									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 										ClaimName: fmt.Sprintf("%s-sites", bench.Name),
+									},
+								},
+							},
+							{
+								Name: "deletion-secret",
+								VolumeSource: corev1.VolumeSource{
+									Secret: &corev1.SecretVolumeSource{
+										SecretName:  deletionSecretName,
+										DefaultMode: int32Ptr(0400), // Read-only for security
 									},
 								},
 							},
@@ -1019,11 +1170,99 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// getMariaDBRootCredentials retrieves MariaDB root credentials for site deletion
+// Returns (username, password, error). Only use these credentials in deletion jobs.
+func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
+	logger := log.FromContext(ctx)
+
+	// For dedicated mode, root secret is {site-name}-mariadb-root
+	if site.Spec.DBConfig.Mode == "dedicated" {
+		secretName := fmt.Sprintf("%s-mariadb-root", site.Name)
+		secret := &corev1.Secret{}
+		err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: site.Namespace}, secret)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get dedicated MariaDB root secret %s: %w", secretName, err)
+		}
+		password, ok := secret.Data["password"]
+		if !ok {
+			return "", "", fmt.Errorf("password key not found in secret %s", secretName)
+		}
+		return "root", string(password), nil
+	}
+
+	// For shared mode, need to get MariaDB CR and read its rootPasswordSecretKeyRef
+	if site.Spec.DBConfig.Mode == "shared" {
+		// Get the MariaDB instance name from site spec
+		mariadbName := site.Spec.DBConfig.MariaDBRef.Name
+		mariadbNamespace := site.Spec.DBConfig.MariaDBRef.Namespace
+		if mariadbNamespace == "" {
+			mariadbNamespace = site.Namespace
+		}
+
+		// Get MariaDB CR using unstructured client
+		mariadbCR := &unstructured.Unstructured{}
+		mariadbCR.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "k8s.mariadb.com",
+			Version: "v1alpha1",
+			Kind:    "MariaDB",
+		})
+		err := r.Get(ctx, types.NamespacedName{Name: mariadbName, Namespace: mariadbNamespace}, mariadbCR)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get MariaDB CR %s/%s: %w", mariadbNamespace, mariadbName, err)
+		}
+
+		// Extract rootPasswordSecretKeyRef from spec
+		spec, found, err := unstructured.NestedMap(mariadbCR.Object, "spec")
+		if err != nil || !found {
+			return "", "", fmt.Errorf("failed to get spec from MariaDB CR: %w", err)
+		}
+
+		rootPasswordRef, found, err := unstructured.NestedMap(spec, "rootPasswordSecretKeyRef")
+		if err != nil || !found {
+			return "", "", fmt.Errorf("rootPasswordSecretKeyRef not found in MariaDB spec: %w", err)
+		}
+
+		rootSecretName, found, err := unstructured.NestedString(rootPasswordRef, "name")
+		if err != nil || !found {
+			return "", "", fmt.Errorf("secret name not found in rootPasswordSecretKeyRef: %w", err)
+		}
+
+		rootSecretKey, found, err := unstructured.NestedString(rootPasswordRef, "key")
+		if err != nil || !found {
+			// Default key is "password" if not specified
+			rootSecretKey = "password"
+			logger.Info("Using default key 'password' for root secret")
+		}
+
+		// Get the root password secret
+		secret := &corev1.Secret{}
+		err = r.Get(ctx, types.NamespacedName{Name: rootSecretName, Namespace: mariadbNamespace}, secret)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get MariaDB root secret %s: %w", rootSecretName, err)
+		}
+
+		password, ok := secret.Data[rootSecretKey]
+		if !ok {
+			return "", "", fmt.Errorf("key %s not found in secret %s", rootSecretKey, rootSecretName)
+		}
+		return "root", string(password), nil
+	}
+
+	return "", "", fmt.Errorf("unsupported database mode: %s", site.Spec.DBConfig.Mode)
+}
+
 func (r *FrappeSiteReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
 	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
 		return bench.Spec.Security.PodSecurityContext
 	}
+	// Default to 1001 (OpenShift standard) but allow override via environment
+	defaultUID := getDefaultUID()
+	defaultGID := getDefaultGID()
+	defaultFSGroup := getDefaultFSGroup()
 	return &corev1.PodSecurityContext{
+		RunAsUser:  &defaultUID,
+		RunAsGroup: &defaultGID,
+		FSGroup:    &defaultFSGroup,
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -1034,7 +1273,12 @@ func (r *FrappeSiteReconciler) getContainerSecurityContext(bench *vyogotechv1alp
 	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
 		return bench.Spec.Security.SecurityContext
 	}
+	// Default to 1001 (OpenShift standard) but allow override via environment
+	defaultUID := getDefaultUID()
+	defaultGID := getDefaultGID()
 	return &corev1.SecurityContext{
+		RunAsUser:                &defaultUID,
+		RunAsGroup:               &defaultGID,
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},

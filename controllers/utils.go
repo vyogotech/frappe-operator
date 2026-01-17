@@ -21,6 +21,8 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -112,4 +114,35 @@ func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
 
 	// If we can list Routes successfully, we're on OpenShift
 	return err == nil
+}
+
+// getDefaultUID returns the default UID for security contexts
+// Defaults to 1001 (OpenShift standard) but can be overridden via FRAPPE_DEFAULT_UID env var
+func getDefaultUID() int64 {
+	return getEnvAsInt64("FRAPPE_DEFAULT_UID", 1001)
+}
+
+// getDefaultGID returns the default GID for security contexts
+// Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_GID env var
+func getDefaultGID() int64 {
+	return getEnvAsInt64("FRAPPE_DEFAULT_GID", 0)
+}
+
+// getDefaultFSGroup returns the default FSGroup for security contexts
+// Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_FSGROUP env var
+func getDefaultFSGroup() int64 {
+	return getEnvAsInt64("FRAPPE_DEFAULT_FSGROUP", 0)
+}
+
+// getEnvAsInt64 retrieves an environment variable as int64 with a default fallback
+func getEnvAsInt64(key string, defaultValue int64) int64 {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return defaultValue
+	}
+	return parsed
 }

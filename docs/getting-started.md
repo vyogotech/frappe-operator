@@ -466,6 +466,76 @@ If something goes wrong, check:
 
 For more detailed troubleshooting, see the [Troubleshooting Guide](troubleshooting.md).
 
+## Security Context Configuration
+
+The operator provides flexible security context configuration for different environments.
+
+### Default Behavior (OpenShift Compatible)
+
+Out of the box, the operator uses OpenShift-compatible defaults:
+- `runAsUser: 1001` (OpenShift arbitrary UID)
+- `runAsGroup: 0` (root group for OpenShift)
+- `fsGroup: 0`
+
+**No configuration needed for OpenShift deployments!**
+
+### Custom Security Contexts
+
+#### Option 1: Per-Bench Override
+
+Configure security context for a specific bench:
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: custom-bench
+spec:
+  security:
+    podSecurityContext:
+      runAsUser: 2000      # Custom UID
+      runAsGroup: 2000
+      fsGroup: 2000
+    securityContext:
+      runAsUser: 2000
+      runAsGroup: 2000
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+  apps:
+    - name: erpnext
+```
+
+#### Option 2: Cluster-Wide Defaults
+
+Set environment variables in the operator deployment:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frappe-operator-controller-manager
+  namespace: frappe-operator-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        env:
+        - name: FRAPPE_DEFAULT_UID
+          value: "2000"        # All benches default to UID 2000
+        - name: FRAPPE_DEFAULT_GID
+          value: "2000"
+        - name: FRAPPE_DEFAULT_FSGROUP
+          value: "2000"
+```
+
+**Priority:** `spec.security` → Environment Variables → Hardcoded Defaults (1001/0/0)
+
+For detailed examples and best practices, see:
+- [SECURITY_CONTEXT_FIX.md](../SECURITY_CONTEXT_FIX.md)
+- [Operations Guide - Security](operations.md#security)
+
 ## Clean Up
 
 To remove everything:

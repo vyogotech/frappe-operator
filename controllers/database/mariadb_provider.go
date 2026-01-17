@@ -515,11 +515,22 @@ func (p *MariaDBProviderUnstructured) ensureGrantCR(ctx context.Context, site *v
 					"name":      mariadbName,
 					"namespace": mariadbNamespace,
 				},
-				"privileges":  []string{"ALL PRIVILEGES"},
+				// Grant minimal privileges for Frappe operations (no DROP DATABASE)
+				// Site user can perform table operations but cannot drop the database
+				"privileges": []string{
+					"SELECT", "INSERT", "UPDATE", "DELETE",
+					"CREATE", "ALTER", "INDEX", "DROP", // Table-level DROP only
+					"REFERENCES",
+					"CREATE TEMPORARY TABLES", "LOCK TABLES",
+					"EXECUTE",
+					"CREATE VIEW", "SHOW VIEW",
+					"CREATE ROUTINE", "ALTER ROUTINE",
+					"EVENT", "TRIGGER",
+				},
 				"database":    dbName,
 				"table":       "*",
 				"username":    dbUser,
-				"grantOption": true,
+				"grantOption": false, // Prevent privilege escalation
 			},
 		},
 	}

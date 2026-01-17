@@ -70,7 +70,7 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: localhost/frappe-operator:v2.1.0
+        image: controller:latest
         imagePullPolicy: Never
         name: manager
         securityContext:
