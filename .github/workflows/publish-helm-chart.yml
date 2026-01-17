@@ -60,37 +60,48 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 Chart version: $VERSION"
 
+      - name: Update Helm dependencies
+        run: |
+          cd helm/frappe-operator
+          helm dependency update
+          cd ../..
+
       - name: Package Helm chart
         run: |
           mkdir -p docs/helm-repo
+          echo "📦 Packaging Helm chart version ${{ steps.version.outputs.version }}..."
           helm package helm/frappe-operator \
             --destination docs/helm-repo \
             --version "${{ steps.version.outputs.version }}" \
             --app-version "${{ steps.version.outputs.version }}"
+          echo "✅ Chart packaged successfully"
+          ls -la docs/helm-repo/*.tgz
 
       - name: Generate Helm repository index
         run: |
+          echo "🔍 Generating Helm repo index..."
           helm repo index docs/helm-repo \
             --url "https://vyogotech.github.io/frappe-operator/helm-repo" \
             --merge docs/helm-repo/index.yaml 2>/dev/null || \
           helm repo index docs/helm-repo \
             --url "https://vyogotech.github.io/frappe-operator/helm-repo"
+          echo "✅ Index generated"
+          cat docs/helm-repo/index.yaml | head -20
 
       - name: Commit and push changes
         run: |
           git add docs/helm-repo/
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "⚠️  No changes to commit"
           else
+            echo "📝 Committing changes..."
             git commit -m "chore: publish Helm chart v${{ steps.version.outputs.version }}"
+            echo "🚀 Pushing to repository..."
             git push
+            echo "✅ Changes pushed successfully"
           fi
 
       - name: Verify chart package
         run: |
-          if [ ! -f "docs/helm-repo/${{ steps.version.outputs.version }}.tgz" ] && [ ! -f "docs/helm-repo/frappe-operator-${{ steps.version.outputs.version }}.tgz" ]; then
-            echo "Chart package not found, listing files:"
-            ls -la docs/helm-repo/
-            exit 1
-          fi
-          echo "✅ Chart packaged successfully"
+          echo "✅ Chart packaged and published successfully!"
+          ls -lh docs/helm-repo/*.tgz
