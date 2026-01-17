@@ -1,28 +1,35 @@
-# GitHub Pages Configuration
-theme: jekyll-theme-cayman
-title: Frappe Operator
-description: Kubernetes Operator for managing Frappe Framework deployments
-show_downloads: true
-github:
-  repository_url: https://github.com/vyogotech/frappe-operator
-  is_project_page: true
+title: "Frappe Operator"
+description: "Production-ready Kubernetes operator for Frappe/ERPNext"
 
-# Navigation
-navigation:
-  - title: Home
-    url: /
-  - title: Getting Started
-    url: /getting-started
-  - title: Concepts
-    url: /concepts
-  - title: API Reference
-    url: /api-reference
-  - title: Examples
-    url: /examples
-  - title: Operations
-    url: /operations
-  - title: Troubleshooting
-    url: /troubleshooting
+# Use Just the Docs for a wiki-like sidebar + search
+remote_theme: just-the-docs/just-the-docs
+color_scheme: dark
+
+# Base URL for GitHub Pages
+url: https://vyogotech.github.io
+baseurl: /frappe-operator
+
+# Search
+search_enabled: true
+search:
+  heading_level: 2
+  previews: 3
+  tokenizer_separator: /[\s/]+/
+
+# Navigation / ordering (per-page via front matter: nav_order)
+nav_external_links:
+  - title: GitHub
+    url: https://github.com/vyogotech/frappe-operator
+    hide_icon: false
+  - title: Helm Repo
+    url: https://vyogotech.github.io/frappe-operator/helm-repo
+
+# Footer links
+footer_content: "Built with ❤️ by Vyogo Technologies"
+
+# Aux links (top-right)
+aux_links:
+  "Frappe Operator on GitHub": https://github.com/vyogotech/frappe-operator
 
 # Plugins
 plugins:

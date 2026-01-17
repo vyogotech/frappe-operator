@@ -4,6 +4,7 @@ title: Frappe Operator Documentation
 nav_order: 1
 description: "Complete guide for deploying and managing Frappe Framework applications on Kubernetes"
 permalink: /
+has_toc: true
 ---
 
 # Frappe Operator Documentation
