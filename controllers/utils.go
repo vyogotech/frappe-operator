@@ -117,21 +117,40 @@ func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
 }
 
 // getDefaultUID returns the default UID for security contexts
-// Defaults to 1001 (OpenShift standard) but can be overridden via FRAPPE_DEFAULT_UID env var
-func getDefaultUID() int64 {
-	return getEnvAsInt64("FRAPPE_DEFAULT_UID", 1001)
+// Returns nil for OpenShift (let platform assign) but can be overridden via FRAPPE_DEFAULT_UID env var
+func getDefaultUID() *int64 {
+	if value := os.Getenv("FRAPPE_DEFAULT_UID"); value != "" {
+		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return &parsed
+		}
+	}
+	// Return nil to let OpenShift assign UID automatically
+	return nil
 }
 
 // getDefaultGID returns the default GID for security contexts
-// Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_GID env var
-func getDefaultGID() int64 {
-	return getEnvAsInt64("FRAPPE_DEFAULT_GID", 0)
+// Returns nil for OpenShift (let platform assign) but can be overridden via FRAPPE_DEFAULT_GID env var
+func getDefaultGID() *int64 {
+	if value := os.Getenv("FRAPPE_DEFAULT_GID"); value != "" {
+		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return &parsed
+		}
+	}
+	// Return nil to let OpenShift assign GID automatically
+	return nil
 }
 
 // getDefaultFSGroup returns the default FSGroup for security contexts
-// Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_FSGROUP env var
-func getDefaultFSGroup() int64 {
-	return getEnvAsInt64("FRAPPE_DEFAULT_FSGROUP", 0)
+// Returns nil for OpenShift (let platform assign) but can be overridden via FRAPPE_DEFAULT_FSGROUP env var
+func getDefaultFSGroup() *int64 {
+	if value := os.Getenv("FRAPPE_DEFAULT_FSGROUP"); value != "" {
+		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return &parsed
+		}
+	}
+	// Default to group 0 (root group) for OpenShift compatibility
+	var defaultFSGroup int64 = 0
+	return &defaultFSGroup
 }
 
 // getEnvAsInt64 retrieves an environment variable as int64 with a default fallback
