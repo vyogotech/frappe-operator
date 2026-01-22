@@ -595,12 +595,10 @@ func (p *MariaDBProviderUnstructured) generateDBName(site *vyogotechv1alpha1.Fra
 }
 
 func (p *MariaDBProviderUnstructured) generateDBUser(site *vyogotechv1alpha1.FrappeSite) string {
-	safeName := p.sanitizeName(site.Name)
-	userName := fmt.Sprintf("%s_user", safeName)
-	if len(userName) > 32 {
-		userName = userName[:32]
-	}
-	return userName
+	// For maximum compatibility with all bench versions, especially those not supporting --db-user flag,
+	// we use the same name for both database and user.
+	// Frappe defaults to using the database name as the username if not explicitly specified.
+	return p.generateDBName(site)
 }
 
 func (p *MariaDBProviderUnstructured) sanitizeName(name string) string {

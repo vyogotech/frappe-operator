@@ -429,6 +429,16 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 	initScript := fmt.Sprintf(`#!/bin/bash
 set -e
 
+# Setup user for OpenShift compatibility (fixes getpwuid() error)
+if ! whoami &>/dev/null; then
+  export USER=frappe
+  export LOGNAME=frappe
+  # Try to add user to /etc/passwd if writable
+  if [ -w /etc/passwd ]; then
+    echo "frappe:x:$(id -u):0:frappe user:/home/frappe:/sbin/nologin" >> /etc/passwd
+  fi
+fi
+
 cd /home/frappe/frappe-bench
 
 echo "Configuring Frappe bench..."
@@ -495,6 +505,10 @@ echo "Bench configuration complete"
 								{
 									Name:  "SKIP_BENCH_BUILD",
 									Value: skipBuild,
+								},
+								{
+									Name:  "USER",
+									Value: "frappe",
 								},
 							},
 						},

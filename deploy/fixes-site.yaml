@@ -1,0 +1,22 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: fixes-site3
+  namespace: frappe-fixes
+spec:
+  siteName: fixes3-site.apps.cluster-dz66n.dynamic.redhatworkshops.io
+  benchRef:
+    name: fixes-bench
+
+  # Database configuration
+  dbConfig:
+    provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: frappe-operator-system
+
+  # Ingress configuration for OpenShift
+  ingress:
+    enabled: true
+    className: openshift-default

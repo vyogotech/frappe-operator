@@ -1,0 +1,41 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: my-bench-v6
+  namespace: default
+  annotations:
+    frappe.tech/storage-access-mode: ReadWriteOnce
+spec:
+  frappeVersion: "v15.0.0"
+  
+  # Use custom image
+  imageConfig:
+    repository: ghcr.io/rmallam/frappe_docker
+    tag: sha-850f0c8@sha256:82044fdf3f69b3c95d389db331768dac17bc31ead04a49a0d45c332397f3923d
+    pullPolicy: Always
+
+  # Apps to install
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image
+  
+  # Component replicas (minimal for development)
+  componentReplicas:
+    gunicorn: 1
+    nginx: 1
+    socketio: 1
+    scheduler: 1
+    workers:
+      default: 1
+      short: 1
+      long: 1
+  
+  # Storage configuration
+  storageSize: "10Gi"
+  
+  # Security context: Ensure volume is writable by group 0
+  security:
+    podSecurityContext:
+      fsGroup: 0
