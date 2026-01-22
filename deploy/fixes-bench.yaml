@@ -11,3 +11,21 @@ spec:
     pullPolicy: Always
   storageClassName: ocs-external-storagecluster-cephfs
   storageSize: 2Gi
+
+ # Apps to install
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image
+
+  # Component replicas (minimal for development)
+  componentReplicas:
+    gunicorn: 1
+    nginx: 1
+    socketio: 1
+    scheduler: 1
+    workers:
+      default: 1
+      short: 0
+      long: 0

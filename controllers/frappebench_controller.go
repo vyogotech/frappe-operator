@@ -457,14 +457,11 @@ cat > sites/common_site_config.json <<EOF
 }
 EOF
 
-# Detect if we should build assets (requires node_modules and npm)
-if [ "$SKIP_BENCH_BUILD" == "1" ]; then
-    echo "Skipping bench build: SKIP_BENCH_BUILD=1 is set."
-elif [ -d "apps/frappe/node_modules" ] && command -v npm &> /dev/null; then
-    echo "Building assets for production..."
-    bench build --production
-else
-    echo "Skipping bench build: node_modules or npm missing. Assuming pre-built assets are present."
+# Sync assets from the image cache to the Persistent Volume
+if [ -d "/home/frappe/assets_cache" ]; then
+    echo "Syncing pre-built assets from image to PVC..."
+    mkdir -p sites/assets
+    cp -rup /home/frappe/assets_cache/* sites/assets/
 fi
 
 echo "Bench configuration complete"
