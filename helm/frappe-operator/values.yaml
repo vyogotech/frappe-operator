@@ -8,8 +8,8 @@ operator:
   replicaCount: 1
   
   image:
-    repository: ghcr.io/vyogotech/frappe-operator
-    pullPolicy: IfNotPresent
+    repository: ghcr.io/rmallam/frappe-operator
+    pullPolicy: Always
     tag: "latest"
   
   imagePullSecrets: []

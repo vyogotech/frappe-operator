@@ -40,26 +40,9 @@ func TestFrappeBenchReconciler_getPodSecurityContext_Defaults(t *testing.T) {
 
 	psc := r.getPodSecurityContext(bench)
 
-	if psc == nil {
-		t.Fatal("Expected non-nil PodSecurityContext")
-	}
-
-	// Verify default values (1001 for UID, 0 for GID/FSGroup for OpenShift compatibility)
-	if psc.RunAsUser == nil || *psc.RunAsUser != 1001 {
-		t.Errorf("Expected RunAsUser=1001, got %v", psc.RunAsUser)
-	}
-
-	if psc.RunAsGroup == nil || *psc.RunAsGroup != 0 {
-		t.Errorf("Expected RunAsGroup=0 (OpenShift compatibility), got %v", psc.RunAsGroup)
-	}
-
-	if psc.FSGroup == nil || *psc.FSGroup != 0 {
-		t.Errorf("Expected FSGroup=0 (OpenShift compatibility), got %v", psc.FSGroup)
-	}
-
-	// Verify seccomp profile
-	if psc.SeccompProfile == nil || psc.SeccompProfile.Type != corev1.SeccompProfileTypeRuntimeDefault {
-		t.Errorf("Expected SeccompProfile RuntimeDefault, got %v", psc.SeccompProfile)
+	// With new OpenShift compatibility changes, this should be nil if no env vars are set
+	if psc != nil {
+		t.Errorf("Expected nil PodSecurityContext (defer to platform), got %v", psc)
 	}
 }
 
@@ -124,35 +107,9 @@ func TestFrappeBenchReconciler_getContainerSecurityContext_Defaults(t *testing.T
 
 	csc := r.getContainerSecurityContext(bench)
 
-	if csc == nil {
-		t.Fatal("Expected non-nil SecurityContext")
-	}
-
-	// Verify default values (1001 for UID, 0 for GID for OpenShift compatibility)
-	if csc.RunAsUser == nil || *csc.RunAsUser != 1001 {
-		t.Errorf("Expected RunAsUser=1001, got %v", csc.RunAsUser)
-	}
-
-	if csc.RunAsGroup == nil || *csc.RunAsGroup != 0 {
-		t.Errorf("Expected RunAsGroup=0 (OpenShift compatibility), got %v", csc.RunAsGroup)
-	}
-
-	// Verify security hardening
-	if csc.AllowPrivilegeEscalation == nil || *csc.AllowPrivilegeEscalation != false {
-		t.Errorf("Expected AllowPrivilegeEscalation=false, got %v", csc.AllowPrivilegeEscalation)
-	}
-
-	if csc.ReadOnlyRootFilesystem == nil || *csc.ReadOnlyRootFilesystem != false {
-		t.Errorf("Expected ReadOnlyRootFilesystem=false, got %v", csc.ReadOnlyRootFilesystem)
-	}
-
-	// Verify capabilities
-	if csc.Capabilities == nil {
-		t.Fatal("Expected non-nil Capabilities")
-	}
-
-	if len(csc.Capabilities.Drop) != 1 || csc.Capabilities.Drop[0] != "ALL" {
-		t.Errorf("Expected Capabilities.Drop=[ALL], got %v", csc.Capabilities.Drop)
+	// With new OpenShift compatibility changes, this should be nil if no env vars are set
+	if csc != nil {
+		t.Errorf("Expected nil SecurityContext (defer to platform), got %v", csc)
 	}
 }
 
@@ -217,21 +174,9 @@ func TestFrappeSiteReconciler_getPodSecurityContext_Defaults(t *testing.T) {
 
 	psc := r.getPodSecurityContext(bench)
 
-	if psc == nil {
-		t.Fatal("Expected non-nil PodSecurityContext")
-	}
-
-	// Verify default values (1001 for UID, 0 for GID/FSGroup for OpenShift compatibility)
-	if psc.RunAsUser == nil || *psc.RunAsUser != 1001 {
-		t.Errorf("Expected RunAsUser=1001, got %v", psc.RunAsUser)
-	}
-
-	if psc.RunAsGroup == nil || *psc.RunAsGroup != 0 {
-		t.Errorf("Expected RunAsGroup=0 (OpenShift compatibility), got %v", psc.RunAsGroup)
-	}
-
-	if psc.FSGroup == nil || *psc.FSGroup != 0 {
-		t.Errorf("Expected FSGroup=0 (OpenShift compatibility), got %v", psc.FSGroup)
+	// With new OpenShift compatibility changes, this should be nil if no env vars are set
+	if psc != nil {
+		t.Errorf("Expected nil PodSecurityContext (defer to platform), got %v", psc)
 	}
 }
 
@@ -251,30 +196,9 @@ func TestFrappeSiteReconciler_getContainerSecurityContext_Defaults(t *testing.T)
 
 	csc := r.getContainerSecurityContext(bench)
 
-	if csc == nil {
-		t.Fatal("Expected non-nil SecurityContext")
-	}
-
-	// Verify default values (1001 for UID, 0 for GID for OpenShift compatibility)
-	if csc.RunAsUser == nil || *csc.RunAsUser != 1001 {
-		t.Errorf("Expected RunAsUser=1001, got %v", csc.RunAsUser)
-	}
-
-	if csc.RunAsGroup == nil || *csc.RunAsGroup != 0 {
-		t.Errorf("Expected RunAsGroup=0 (OpenShift compatibility), got %v", csc.RunAsGroup)
-	}
-
-	// Verify security hardening
-	if csc.AllowPrivilegeEscalation == nil || *csc.AllowPrivilegeEscalation != false {
-		t.Errorf("Expected AllowPrivilegeEscalation=false, got %v", csc.AllowPrivilegeEscalation)
-	}
-
-	if csc.Capabilities == nil {
-		t.Fatal("Expected non-nil Capabilities")
-	}
-
-	if len(csc.Capabilities.Drop) != 1 || csc.Capabilities.Drop[0] != "ALL" {
-		t.Errorf("Expected Capabilities.Drop=[ALL], got %v", csc.Capabilities.Drop)
+	// With new OpenShift compatibility changes, this should be nil if no env vars are set
+	if csc != nil {
+		t.Errorf("Expected nil SecurityContext (defer to platform), got %v", csc)
 	}
 }
 
@@ -297,14 +221,14 @@ func TestSecurityContext_NoRootUser(t *testing.T) {
 
 	// Critical security check: ensure we never default to root USER (UID 0)
 	// Note: GID 0 is intentionally allowed for OpenShift arbitrary UID support
-	if psc.RunAsUser != nil && *psc.RunAsUser == 0 {
+	if psc != nil && psc.RunAsUser != nil && *psc.RunAsUser == 0 {
 		t.Error("SECURITY ISSUE: PodSecurityContext defaults to root user (UID 0)")
 	}
 
 	// OpenShift uses GID 0 for arbitrary UID support - this is expected and safe
 	// when combined with non-root UID
 
-	if csc.RunAsUser != nil && *csc.RunAsUser == 0 {
+	if csc != nil && csc.RunAsUser != nil && *csc.RunAsUser == 0 {
 		t.Error("SECURITY ISSUE: SecurityContext defaults to root user (UID 0)")
 	}
 }
@@ -324,6 +248,11 @@ func TestSecurityContext_PSPCompliance(t *testing.T) {
 	}
 
 	psc := r.getPodSecurityContext(bench)
+
+	if psc == nil {
+		// Nil is compliant by definition (defer to platform)
+		return
+	}
 
 	// PSP requirement: if RunAsGroup is set, RunAsUser must also be set
 	if psc.RunAsGroup != nil && psc.RunAsUser == nil {

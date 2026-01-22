@@ -38,3 +38,5 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+!bin/manager-amd64

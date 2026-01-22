@@ -1,0 +1,13 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: fixes-bench
+  namespace: frappe-fixes
+spec:
+  frappeVersion: "15.0.0"
+  imageConfig:
+    repository: ghcr.io/rmallam/frappe_docker
+    tag: sha-c39d75f
+    pullPolicy: Always
+  storageClassName: ocs-external-storagecluster-cephfs
+  storageSize: 2Gi

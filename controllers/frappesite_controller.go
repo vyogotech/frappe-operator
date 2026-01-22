@@ -406,6 +406,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	var routeHost string
 	if createIngress {
+		logger.Info("External access enabled, checking platform", "site", site.Name)
 		// Check if we're on OpenShift and should create Routes instead
 		if r.isOpenShiftPlatform(ctx) && (site.Spec.RouteConfig == nil || site.Spec.RouteConfig.Enabled == nil || *site.Spec.RouteConfig.Enabled) {
 			if err := r.ensureRoute(ctx, site, bench, domain); err != nil {
@@ -576,13 +577,13 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 	logger := log.FromContext(ctx)
 
 	secretName := fmt.Sprintf("%s-init-secrets", site.Name)
-	
+
 	// Get DB_PROVIDER from database info
 	dbProvider := "mariadb" // default
 	if site.Spec.DBConfig.Provider != "" {
 		dbProvider = site.Spec.DBConfig.Provider
 	}
-	
+
 	// Get apps to install if specified
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
@@ -592,7 +593,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		"bench_name":     []byte(bench.Name),
 		"db_provider":    []byte(dbProvider),
 	}
-	
+
 	// Add database credentials if using external database
 	if dbProvider == "mariadb" || dbProvider == "postgres" {
 		if dbInfo != nil {
@@ -605,7 +606,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 			secretData["db_password"] = []byte(dbCreds.Password)
 		}
 	}
-	
+
 	// Create or update the secret
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -619,13 +620,13 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		Type: corev1.SecretTypeOpaque,
 		Data: secretData,
 	}
-	
+
 	// Set controller reference
 	if err := controllerutil.SetControllerReference(site, secret, r.Scheme); err != nil {
 		logger.Error(err, "Failed to set controller reference for secret", "secret", secretName)
 		return err
 	}
-	
+
 	// Create or update secret
 	var existing corev1.Secret
 	err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: site.Namespace}, &existing)
@@ -648,7 +649,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		}
 		logger.Info("Updated initialization secret", "secret", secretName)
 	}
-	
+
 	return nil
 }
 
@@ -747,28 +748,39 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 			// Use existing generated password
 			adminPassword = string(adminPasswordSecret.Data["password"])
 			logger.Info("Using existing generated password", "secret", generatedSecretName)
-
-			// Ensure initialization secret exists with all credentials
-			if err := r.ensureInitSecrets(ctx, site, bench, domain, dbInfo, dbCreds, adminPassword); err != nil {
-				logger.Error(err, "Failed to create initialization secret")
-				return false, fmt.Errorf("failed to create init secret: %w", err)
-			}
 		}
+	}
+
+	// Ensure initialization secret exists with all credentials
+	if err := r.ensureInitSecrets(ctx, site, bench, domain, dbInfo, dbCreds, adminPassword); err != nil {
+		logger.Error(err, "Failed to create initialization secret")
+		return false, fmt.Errorf("failed to create init secret: %w", err)
 	}
 
 	// Create the init script using environment variables to prevent shell injection
 	initScript := `#!/bin/bash
 set -e
+umask 0002
+
+# Setup user for OpenShift compatibility (fixes getpwuid() error)
+if ! whoami &>/dev/null; then
+  export USER=frappe
+  export LOGNAME=frappe
+  # Try to add user to /etc/passwd if writable (rarely the case on OpenShift, but good practice)
+  if [ -w /etc/passwd ]; then
+    echo "frappe:x:$(id -u):0:frappe user:/home/frappe:/sbin/nologin" >> /etc/passwd
+  fi
+fi
 
 cd /home/frappe/frappe-bench
 
-# Read from secret files mounted at /run/secrets
-SITE_NAME=$(cat /run/secrets/site_name)
-DOMAIN=$(cat /run/secrets/domain)
-ADMIN_PASSWORD=$(cat /run/secrets/admin_password)
-BENCH_NAME=$(cat /run/secrets/bench_name)
-DB_PROVIDER=$(cat /run/secrets/db_provider)
-APPS_TO_INSTALL=$(cat /run/secrets/apps_to_install 2>/dev/null || echo "")
+# Read from secret files mounted at /tmp/site-secrets
+SITE_NAME=$(cat /tmp/site-secrets/site_name)
+DOMAIN=$(cat /tmp/site-secrets/domain)
+ADMIN_PASSWORD=$(cat /tmp/site-secrets/admin_password)
+BENCH_NAME=$(cat /tmp/site-secrets/bench_name)
+DB_PROVIDER=$(cat /tmp/site-secrets/db_provider)
+APPS_TO_INSTALL=$(cat /tmp/site-secrets/apps_to_install 2>/dev/null || echo "")
 
 echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
@@ -793,11 +805,11 @@ fi
 if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
 	# For MariaDB and PostgreSQL: use pre-provisioned database with dedicated credentials
 	# These are mounted from secret volumes, not environment variables
-	DB_HOST=$(cat /run/secrets/db_host)
-	DB_PORT=$(cat /run/secrets/db_port)
-	DB_NAME=$(cat /run/secrets/db_name)
-	DB_USER=$(cat /run/secrets/db_user)
-	DB_PASSWORD=$(cat /run/secrets/db_password)
+	DB_HOST=$(cat /tmp/site-secrets/db_host)
+	DB_PORT=$(cat /tmp/site-secrets/db_port)
+	DB_NAME=$(cat /tmp/site-secrets/db_name)
+	DB_USER=$(cat /tmp/site-secrets/db_user)
+	DB_PASSWORD=$(cat /tmp/site-secrets/db_password)
     
 	if [[ -z "$DB_HOST" || -z "$DB_PORT" || -z "$DB_NAME" || -z "$DB_USER" || -z "$DB_PASSWORD" ]]; then
 		echo "ERROR: Database connection secret files not found for $DB_PROVIDER"
@@ -845,13 +857,25 @@ echo "Updating site_config.json with domain and Redis"
 python3 << 'PYTHON_SCRIPT'
 import json, os
 
-# Read from secret files mounted at /run/secrets
-with open('/run/secrets/site_name', 'r') as f:
+# Read from secret files mounted at /tmp/site-secrets
+with open('/tmp/site-secrets/site_name', 'r') as f:
     site_name = f.read().strip()
-with open('/run/secrets/domain', 'r') as f:
+with open('/tmp/site-secrets/domain', 'r') as f:
     domain = f.read().strip()
-with open('/run/secrets/bench_name', 'r') as f:
+with open('/tmp/site-secrets/bench_name', 'r') as f:
     bench_name = f.read().strip()
+with open('/tmp/site-secrets/db_host', 'r') as f:
+    db_host = f.read().strip()
+with open('/tmp/site-secrets/db_port', 'r') as f:
+    db_port = f.read().strip()
+with open('/tmp/site-secrets/db_name', 'r') as f:
+    db_name = f.read().strip()
+with open('/tmp/site-secrets/db_user', 'r') as f:
+    db_user = f.read().strip()
+with open('/tmp/site-secrets/db_password', 'r') as f:
+    db_password = f.read().strip()
+with open('/tmp/site-secrets/db_provider', 'r') as f:
+    db_provider = f.read().strip()
 
 site_path = f"/home/frappe/frappe-bench/sites/{site_name}"
 config_file = os.path.join(site_path, "site_config.json")
@@ -870,8 +894,18 @@ config['host_name'] = domain
 config['redis_cache'] = f"redis://{bench_name}-redis-cache:6379"
 config['redis_queue'] = f"redis://{bench_name}-redis-queue:6379"
 
+# Explicitly add database credentials for self-healing
+config['db_name'] = db_name
+config['db_user'] = db_user
+config['db_password'] = db_password
+config['db_host'] = db_host
+config['db_type'] = db_provider
+
 # Ensure directory exists
 os.makedirs(site_path, exist_ok=True)
+
+# Ensure logs directory exists
+os.makedirs(os.path.join(site_path, "logs"), exist_ok=True)
 
 # Write back
 with open(config_file, 'w') as f:
@@ -883,6 +917,14 @@ print(f"Redis queue: {bench_name}-redis-queue:6379")
 PYTHON_SCRIPT
 
 echo "Site initialization complete!"
+
+# Ensure everything is group-readable for OpenShift compatibility
+echo "Fixing permissions for OpenShift group 0..."
+if [ -d /home/frappe/frappe-bench/sites ]; then
+    # chmod contents only to avoid "Operation not permitted" on the mount point itself
+    find /home/frappe/frappe-bench/sites -mindepth 1 -exec chmod g+rwX {} + || true
+    find /home/frappe/frappe-bench/sites -mindepth 1 -exec chgrp 0 {} + || true
+fi
 
 # Exit success regardless of whether new-site ran
 exit 0
@@ -918,7 +960,7 @@ exit 0
 								},
 								{
 									Name:      "site-secrets",
-									MountPath: "/run/secrets",
+									MountPath: "/tmp/site-secrets",
 								},
 							},
 							SecurityContext: r.getContainerSecurityContext(bench),
@@ -939,8 +981,8 @@ exit 0
 							Name: "site-secrets",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: fmt.Sprintf("%s-init-secrets", site.Name),
-									DefaultMode: int32Ptr(0400), // Read-only for security
+									SecretName:  fmt.Sprintf("%s-init-secrets", site.Name),
+									DefaultMode: int32Ptr(0444), // Read-only for security, but allow all users to read
 								},
 							},
 						},
@@ -997,14 +1039,14 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 
 		// Job doesn't exist, create it
 		logger.Info("Creating site deletion job", "job", jobName)
-		
+
 		// Get MariaDB root credentials for deletion (site user has limited privileges)
 		rootUser, rootPassword, err := r.getMariaDBRootCredentials(ctx, site)
 		if err != nil {
 			return fmt.Errorf("failed to get MariaDB root credentials: %w", err)
 		}
 
-		// Create deletion secret with root credentials  
+		// Create deletion secret with root credentials
 		deletionSecretName := fmt.Sprintf("%s-deletion-secret", site.Name)
 		deletionSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1022,11 +1064,11 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 				"site_name":        []byte(site.Spec.SiteName),
 			},
 		}
-		
+
 		if err := controllerutil.SetControllerReference(site, deletionSecret, r.Scheme); err != nil {
 			return err
 		}
-		
+
 		if err := r.Create(ctx, deletionSecret); err != nil {
 			if !errors.IsAlreadyExists(err) {
 				return fmt.Errorf("failed to create deletion secret: %w", err)
@@ -1041,16 +1083,27 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 				return fmt.Errorf("failed to update deletion secret: %w", err)
 			}
 		}
-		
+
 		// Use root credentials from secret volume (not environment variables)
 		deleteScript := `#!/bin/bash
 set -e
+
+# Setup user for OpenShift compatibility (fixes getpwuid() error)
+if ! whoami &>/dev/null; then
+  export USER=frappe
+  export LOGNAME=frappe
+  # Try to add user to /etc/passwd if writable
+  if [ -w /etc/passwd ]; then
+    echo "frappe:x:$(id -u):0:frappe user:/home/frappe:/sbin/nologin" >> /etc/passwd
+  fi
+fi
+
 cd /home/frappe/frappe-bench
 
 # Read credentials from mounted secret files
-DB_ROOT_USER=$(cat /run/secrets/db_root_user)
-DB_ROOT_PASSWORD=$(cat /run/secrets/db_root_password)
-SITE_NAME=$(cat /run/secrets/site_name)
+DB_ROOT_USER=$(cat /tmp/secrets/db_root_user)
+DB_ROOT_PASSWORD=$(cat /tmp/secrets/db_root_password)
+SITE_NAME=$(cat /tmp/secrets/site_name)
 
 echo "Dropping Frappe site: $SITE_NAME"
 echo "Using MariaDB root credentials from secret volume for secure deletion"
@@ -1088,12 +1141,12 @@ echo "Site $SITE_NAME dropped successfully!"
 									},
 									{
 										Name:      "deletion-secret",
-										MountPath: "/run/secrets",
+										MountPath: "/tmp/secrets",
 										ReadOnly:  true,
 									},
 								},
 								SecurityContext: r.getContainerSecurityContext(bench),
-								Env:              []corev1.EnvVar{}, // No environment variables for sensitive data
+								Env:             []corev1.EnvVar{}, // No environment variables for sensitive data
 							},
 						},
 						Volumes: []corev1.Volume{
@@ -1167,6 +1220,7 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&vyogotechv1alpha1.FrappeSite{}).
 		Owns(&batchv1.Job{}).
 		Owns(&networkingv1.Ingress{}).
+		Owns(&routev1.Route{}).
 		Complete(r)
 }
 
@@ -1259,10 +1313,16 @@ func (r *FrappeSiteReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.Fr
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 	defaultFSGroup := getDefaultFSGroup()
+
+	// If no defaults are set via environment, return nil to let platform defaults take over
+	if defaultUID == nil && defaultGID == nil && defaultFSGroup == nil {
+		return nil
+	}
+
 	return &corev1.PodSecurityContext{
-		RunAsUser:  &defaultUID,
-		RunAsGroup: &defaultGID,
-		FSGroup:    &defaultFSGroup,
+		RunAsUser:  defaultUID,
+		RunAsGroup: defaultGID,
+		FSGroup:    defaultFSGroup,
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -1276,9 +1336,15 @@ func (r *FrappeSiteReconciler) getContainerSecurityContext(bench *vyogotechv1alp
 	// Default to 1001 (OpenShift standard) but allow override via environment
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
+
+	// If no defaults are set via environment, return nil to let platform defaults take over
+	if defaultUID == nil && defaultGID == nil {
+		return nil
+	}
+
 	return &corev1.SecurityContext{
-		RunAsUser:                &defaultUID,
-		RunAsGroup:               &defaultGID,
+		RunAsUser:                defaultUID,
+		RunAsGroup:               defaultGID,
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},

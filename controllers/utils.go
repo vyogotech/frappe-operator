@@ -31,6 +31,7 @@ import (
 	"github.com/vyogotech/frappe-operator/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // getBenchImage returns the image to use from the bench
@@ -108,12 +109,19 @@ func (r *FrappeSiteReconciler) generatePassword(length int) string {
 
 // isOpenShiftPlatform checks if we're running on OpenShift
 func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
+	logger := log.FromContext(ctx)
 	// Try to list Routes to check if API is available
 	routeList := &routev1.RouteList{}
 	err := r.List(ctx, routeList)
 
+	if err != nil {
+		logger.Info("Platform detection check failed", "error", err)
+		return false
+	}
+
 	// If we can list Routes successfully, we're on OpenShift
-	return err == nil
+	logger.Info("OpenShift platform detected successfully")
+	return true
 }
 
 // getDefaultUID returns the default UID for security contexts
@@ -148,9 +156,8 @@ func getDefaultFSGroup() *int64 {
 			return &parsed
 		}
 	}
-	// Default to group 0 (root group) for OpenShift compatibility
-	var defaultFSGroup int64 = 0
-	return &defaultFSGroup
+	// Return nil to let OpenShift assign FSGroup automatically
+	return nil
 }
 
 // getEnvAsInt64 retrieves an environment variable as int64 with a default fallback
