@@ -50,13 +50,42 @@ jobs:
           cd helm/frappe-operator
           helm dependency update
 
-      - name: Install Frappe Operator
+      - name: "Install Frappe Operator (Stage 1: Bootstrap & CRDs)"
         run: |
+          echo "Stage 1: Installing dependencies and operator without the MariaDB instance..."
           helm upgrade --install ${{ github.event.inputs.release_name }} ./helm/frappe-operator \
             --namespace ${{ github.event.inputs.namespace }} \
             ${{ github.event.inputs.create_namespace == 'true' && '--create-namespace' || '' }} \
             --set operator.image.repository=${{ github.event.inputs.image_repository }} \
             --set operator.image.tag=${{ github.event.inputs.image_tag }} \
+            --set mariadb.enabled=false \
+            --wait \
+            --timeout 5m
+
+      - name: Wait for MariaDB CRD
+        run: |
+          echo "Waiting for MariaDB CRDs to be established..."
+          # The MariaDB Operator installs these CRDs. We wait for them before applying the Mariadb instance.
+          for i in {1..20}; do
+            if kubectl get crd mariadbs.k8s.mariadb.com &>/dev/null; then
+              echo "✅ MariaDB CRD detected!"
+              kubectl wait --for condition=established --timeout=60s crd mariadbs.k8s.mariadb.com
+              exit 0
+            fi
+            echo "Waiting for CRD... ($i/20)"
+            sleep 5
+          done
+          echo "❌ MariaDB CRD did not appear in time."
+          exit 1
+
+      - name: "Install Frappe Operator (Stage 2: Full Installation)"
+        run: |
+          echo "Stage 2: Enabling MariaDB instance and finalizing installation..."
+          helm upgrade --install ${{ github.event.inputs.release_name }} ./helm/frappe-operator \
+            --namespace ${{ github.event.inputs.namespace }} \
+            --set operator.image.repository=${{ github.event.inputs.image_repository }} \
+            --set operator.image.tag=${{ github.event.inputs.image_tag }} \
+            --set mariadb.enabled=true \
             --wait \
             --timeout 10m
 
