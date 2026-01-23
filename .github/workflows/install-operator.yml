@@ -1,0 +1,75 @@
+name: Install Frappe Operator
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: 'Namespace to install the operator into'
+        required: true
+        default: 'frappe-operator-system'
+      create_namespace:
+        description: 'Create the namespace if it does not exist'
+        required: true
+        type: boolean
+        default: true
+      release_name:
+        description: 'Helm release name'
+        required: true
+        default: 'frappe-operator'
+      image_tag:
+        description: 'Operator image tag to install'
+        required: true
+        default: 'v0.0.6'
+      image_repository:
+        description: 'Operator image repository'
+        required: true
+        default: 'ghcr.io/rmallam/frappe-operator'
+
+jobs:
+  install:
+    name: Install Operator via Helm
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: Configure Kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }} # Requires KUBE_CONFIG secret
+
+      - name: Update Helm dependencies
+        run: |
+          cd helm/frappe-operator
+          helm dependency update
+
+      - name: Install Frappe Operator
+        run: |
+          helm upgrade --install ${{ github.event.inputs.release_name }} ./helm/frappe-operator \
+            --namespace ${{ github.event.inputs.namespace }} \
+            ${{ github.event.inputs.create_namespace == 'true' && '--create-namespace' || '' }} \
+            --set operator.image.repository=${{ github.event.inputs.image_repository }} \
+            --set operator.image.tag=${{ github.event.inputs.image_tag }} \
+            --wait \
+            --timeout 10m
+
+      - name: Verify Installation
+        run: |
+          echo "Checking deployment status..."
+          kubectl rollout status deployment/${{ github.event.inputs.release_name }}-controller-manager -n ${{ github.event.inputs.namespace }} --timeout=2m
+
+          echo "Checking CRD status..."
+          kubectl wait --for condition=established --timeout=60s crd frappebenches.vyogo.tech
+          kubectl wait --for condition=established --timeout=60s crd frappesites.vyogo.tech
+
+          echo "Listing pods in ${{ github.event.inputs.namespace }}..."
+          kubectl get pods -n ${{ github.event.inputs.namespace }}
+
+          echo "✅ Frappe Operator successfully installed and verified!"

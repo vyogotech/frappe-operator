@@ -1,0 +1,148 @@
+name: Deploy on OpenShift
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_name:
+        description: 'Name of the FrappeSite resource'
+        required: true
+        default: 'prod-site-1'
+      bench_name:
+        description: 'Name of the FrappeBench resource'
+        required: true
+        default: 'prod-bench'
+      domain:
+        description: 'Domain for the site (optional, will use site_name + domain_suffix if empty)'
+        required: false
+      domain_suffix:
+        description: 'Default domain suffix if domain is not provided'
+        required: true
+        default: '.frappe.example.com'
+      namespace:
+        description: 'Target namespace for deployment'
+        required: true
+        default: 'frappe-prod'
+      frappe_version:
+        description: 'Frappe version (e.g., version-15)'
+        required: true
+        default: 'version-15'
+      image_repository:
+        description: 'Frappe Docker image repository'
+        required: true
+        default: 'ghcr.io/rmallam/frappe_docker'
+      image_tag:
+        description: 'Frappe Docker image tag'
+        required: true
+        default: 'sha-ae82c47@sha256:fc7d472b57a1f5a75bfffb9985d9d2298a2a910d0b17ec23e36fb11b053da565'
+      admin_password:
+        description: 'Admin password for the new site'
+        required: true
+        default: 'admin123'
+
+jobs:
+  deploy:
+    name: Deploy to OpenShift
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure Kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Create Namespace
+        run: |
+          kubectl create namespace ${{ github.event.inputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create Admin Password Secret
+        run: |
+          kubectl create secret generic ${{ github.event.inputs.site_name }}-admin-password \
+            --from-literal=password=${{ github.event.inputs.admin_password }} \
+            --namespace ${{ github.event.inputs.namespace }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Generate Manifests
+        shell: bash
+        env:
+          SITE_NAME: ${{ github.event.inputs.site_name }}
+          BENCH_NAME: ${{ github.event.inputs.bench_name }}
+          INPUT_DOMAIN: ${{ github.event.inputs.domain }}
+          DOMAIN_SUFFIX: ${{ github.event.inputs.domain_suffix }}
+          NAMESPACE: ${{ github.event.inputs.namespace }}
+          FRAPPE_VERSION: ${{ github.event.inputs.frappe_version }}
+          IMAGE_REPOSITORY: ${{ github.event.inputs.image_repository }}
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+        run: |
+          # Calculate DOMAIN if not provided
+          if [ -z "$INPUT_DOMAIN" ]; then
+            export DOMAIN="${SITE_NAME}${DOMAIN_SUFFIX}"
+            echo "ℹ️ Domain not provided, calculated: $DOMAIN"
+          else
+            export DOMAIN="$INPUT_DOMAIN"
+          fi
+          
+          # Pass calculated domain to other steps
+          echo "DOMAIN=$DOMAIN" >> $GITHUB_OUTPUT
+          
+          envsubst < examples/openshift-deploy-template.yaml > deploy-manifest.yaml
+          echo "--- Generated Manifest ---"
+          cat deploy-manifest.yaml
+        id: manifest_gen
+
+      - name: Apply Manifests
+        run: |
+          kubectl apply -f deploy-manifest.yaml
+
+      - name: Wait for FrappeBench to be Ready
+        run: |
+          echo "Waiting for FrappeBench ${{ github.event.inputs.bench_name }} to reach Ready phase..."
+          for i in {1..120}; do
+            PHASE=$(kubectl get frappebench ${{ github.event.inputs.bench_name }} -n ${{ github.event.inputs.namespace }} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            echo "Current Phase: $PHASE"
+            if [ "$PHASE" == "Ready" ]; then
+              echo "FrappeBench is Ready!"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "ERROR: FrappeBench did not reach Ready phase within timeout"
+          kubectl describe frappebench ${{ github.event.inputs.bench_name }} -n ${{ github.event.inputs.namespace }}
+          exit 1
+
+      - name: Wait for FrappeSite to be Ready
+        run: |
+          echo "Waiting for FrappeSite ${{ github.event.inputs.site_name }} to reach Ready phase..."
+          for i in {1..60}; do
+            PHASE=$(kubectl get frappesite ${{ github.event.inputs.site_name }} -n ${{ github.event.inputs.namespace }} -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            echo "Current Phase: $PHASE"
+            if [ "$PHASE" == "Ready" ]; then
+              echo "FrappeSite is Ready!"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "ERROR: FrappeSite did not reach Ready phase within timeout"
+          kubectl describe frappesite ${{ github.event.inputs.site_name }} -n ${{ github.event.inputs.namespace }}
+          exit 1
+
+      - name: Verify OpenShift Route
+        run: |
+          CalculatedDomain="${{ steps.manifest_gen.outputs.DOMAIN }}"
+          echo "Verifying OpenShift Route for $CalculatedDomain..."
+          # Since it's OpenShift, we check for the route
+          if kubectl get route -n ${{ github.event.inputs.namespace }} | grep -q "$CalculatedDomain"; then
+            echo "✅ OpenShift Route found!"
+            kubectl get route -n ${{ github.event.inputs.namespace }}
+          else
+            echo "⚠️  OpenShift Route not found or not created yet."
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Deployment process finished."
+          kubectl get frappebench,frappesite -n ${{ github.event.inputs.namespace }}
