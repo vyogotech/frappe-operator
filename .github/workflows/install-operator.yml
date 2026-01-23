@@ -52,7 +52,8 @@ jobs:
 
       - name: "Install Frappe Operator (Stage 1: Bootstrap & CRDs)"
         run: |
-          echo "Stage 1: Installing dependencies and operator without the MariaDB instance..."
+          echo "Stage 1: Installing dependencies (MariaDB Operator, KEDA) and Frappe Operator..."
+          echo "The MariaDB instance is disabled in this stage to allow CRDs to be established first."
           helm upgrade --install ${{ github.event.inputs.release_name }} ./helm/frappe-operator \
             --namespace ${{ github.event.inputs.namespace }} \
             ${{ github.event.inputs.create_namespace == 'true' && '--create-namespace' || '' }} \
