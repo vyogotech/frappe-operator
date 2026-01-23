@@ -51,7 +51,6 @@ spec:
   # Service configuration
   service:
     type: ClusterIP
-    port: 3306
   
   # Connection details
   connection:

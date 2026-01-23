@@ -40,6 +40,11 @@ type FrappeBenchSpec struct {
 	// +optional
 	StorageClassName string `json:"storageClassName,omitempty"`
 
+	// StorageSize for the bench PVC (e.g., "10Gi")
+	// +optional
+	// +kubebuilder:default="10Gi"
+	StorageSize string `json:"storageSize,omitempty"`
+
 	// DBConfig defines default database configuration for all sites in this bench
 	// +optional
 	DBConfig *DatabaseConfig `json:"dbConfig,omitempty"`

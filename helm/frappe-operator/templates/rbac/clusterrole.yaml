@@ -79,6 +79,7 @@ rules:
   - batch
   resources:
   - jobs
+  - cronjobs
   verbs:
   - create
   - delete
@@ -107,6 +108,21 @@ rules:
   verbs:
   - get
   - list
+  - watch
+
+# OpenShift Routes
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  - routes/custom-host
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 
 # Leader Election (cluster-wide)
