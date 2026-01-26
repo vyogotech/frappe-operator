@@ -18,8 +18,10 @@ spec:
   workerAutoscaling:
     short:
       enabled: false
+      staticReplicas: 0
     long:
       enabled: false
+      staticReplicas: 0
     default:
       enabled: false
       staticReplicas: 1
