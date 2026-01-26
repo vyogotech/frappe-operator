@@ -1049,6 +1049,10 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 		// Get MariaDB root credentials for deletion (site user has limited privileges)
 		rootUser, rootPassword, err := r.getMariaDBRootCredentials(ctx, site)
 		if err != nil {
+			if errors.IsNotFound(err) {
+				logger.Info("MariaDB instance not found, skipping site deletion job")
+				return nil
+			}
 			return fmt.Errorf("failed to get MariaDB root credentials: %w", err)
 		}
 
@@ -1278,10 +1282,13 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 	// For shared mode, need to get MariaDB CR and read its rootPasswordSecretKeyRef
 	if site.Spec.DBConfig.Mode == "shared" {
 		// Get the MariaDB instance name from site spec
-		mariadbName := site.Spec.DBConfig.MariaDBRef.Name
-		mariadbNamespace := site.Spec.DBConfig.MariaDBRef.Namespace
-		if mariadbNamespace == "" {
-			mariadbNamespace = site.Namespace
+		mariadbName := "frappe-mariadb"
+		mariadbNamespace := site.Namespace
+		if site.Spec.DBConfig.MariaDBRef != nil {
+			mariadbName = site.Spec.DBConfig.MariaDBRef.Name
+			if site.Spec.DBConfig.MariaDBRef.Namespace != "" {
+				mariadbNamespace = site.Spec.DBConfig.MariaDBRef.Namespace
+			}
 		}
 
 		// Get MariaDB CR using unstructured client
@@ -1293,7 +1300,7 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 		})
 		err := r.Get(ctx, types.NamespacedName{Name: mariadbName, Namespace: mariadbNamespace}, mariadbCR)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to get MariaDB CR %s/%s: %w", mariadbNamespace, mariadbName, err)
+			return "", "", err // Return raw error so caller can check errors.IsNotFound
 		}
 
 		// Extract rootPasswordSecretKeyRef from spec

@@ -274,9 +274,9 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 			}
 
-			// 2. Scale down all deployments to 0
-			componentNames := []string{"gunicorn", "nginx", "socketio", "scheduler", "worker-default", "worker-long", "worker-short"}
-			for _, component := range componentNames {
+			// 2. Scale down all deployments and statefulsets to 0
+			deploymentComponents := []string{"gunicorn", "nginx", "socketio", "scheduler", "worker-default", "worker-long", "worker-short"}
+			for _, component := range deploymentComponents {
 				deployName := fmt.Sprintf("%s-%s", bench.Name, component)
 				deploy := &appsv1.Deployment{}
 				if err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy); err == nil {
@@ -294,9 +294,28 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 				}
 			}
 
+			redisComponents := []string{"redis-cache", "redis-queue"}
+			for _, component := range redisComponents {
+				stsName := fmt.Sprintf("%s-%s", bench.Name, component)
+				sts := &appsv1.StatefulSet{}
+				if err := r.Get(ctx, types.NamespacedName{Name: stsName, Namespace: bench.Namespace}, sts); err == nil {
+					if sts.Spec.Replicas != nil && *sts.Spec.Replicas > 0 {
+						logger.Info("Scaling down statefulset", "statefulset", stsName)
+						zero := int32(0)
+						sts.Spec.Replicas = &zero
+						if err := r.Update(ctx, sts); err != nil {
+							logger.Error(err, "Failed to scale down statefulset", "statefulset", stsName)
+							r.Recorder.Event(bench, corev1.EventTypeWarning, "ScaleDownFailed", fmt.Sprintf("Failed to scale down %s: %v", stsName, err))
+						} else {
+							r.Recorder.Event(bench, corev1.EventTypeNormal, "ScaledDown", fmt.Sprintf("Scaled down statefulset %s", stsName))
+						}
+					}
+				}
+			}
+
 			// 3. Wait for pods to terminate (check if any pods are still running)
 			allTerminated := true
-			for _, component := range componentNames {
+			for _, component := range deploymentComponents {
 				deployName := fmt.Sprintf("%s-%s", bench.Name, component)
 				deploy := &appsv1.Deployment{}
 				if err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy); err == nil {
@@ -306,13 +325,36 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 					}
 				}
 			}
+			for _, component := range redisComponents {
+				stsName := fmt.Sprintf("%s-%s", bench.Name, component)
+				sts := &appsv1.StatefulSet{}
+				if err := r.Get(ctx, types.NamespacedName{Name: stsName, Namespace: bench.Namespace}, sts); err == nil {
+					if sts.Status.Replicas > 0 || sts.Status.ReadyReplicas > 0 {
+						allTerminated = false
+						logger.Info("Waiting for pods to terminate", "statefulset", stsName, "replicas", sts.Status.Replicas)
+					}
+				}
+			}
 
 			if !allTerminated {
 				logger.Info("Pods still terminating, requeuing")
 				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 			}
 
-			// 4. Cleanup is complete - remove finalizer
+			// 4. Clean up PVC
+			pvcName := fmt.Sprintf("%s-sites", bench.Name)
+			pvc := &corev1.PersistentVolumeClaim{}
+			if err := r.Get(ctx, types.NamespacedName{Name: pvcName, Namespace: bench.Namespace}, pvc); err == nil {
+				logger.Info("Deleting bench PVC", "pvc", pvcName)
+				if err := r.Delete(ctx, pvc); err != nil {
+					logger.Error(err, "Failed to delete bench PVC", "pvc", pvcName)
+					r.Recorder.Event(bench, corev1.EventTypeWarning, "PVCDeletionFailed", fmt.Sprintf("Failed to delete PVC %s: %v", pvcName, err))
+				} else {
+					r.Recorder.Event(bench, corev1.EventTypeNormal, "PVCDeleted", fmt.Sprintf("Deleted PVC %s", pvcName))
+				}
+			}
+
+			// 5. Cleanup is complete - remove finalizer
 			logger.Info("FrappeBench cleanup complete, removing finalizer")
 			r.Recorder.Event(bench, corev1.EventTypeNormal, "Deleted", "FrappeBench cleanup completed")
 			controllerutil.RemoveFinalizer(bench, frappeBenchFinalizer)
