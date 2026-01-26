@@ -19,20 +19,20 @@ maintainers:
     url: https://vyogo.tech
 icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/main/docs/assets/icon.png
 
-# Dependencies
-#dependencies:
-#  - name: mariadb-operator
-#    version: "0.34.0"
-#    repository: https://mariadb-operator.github.io/mariadb-operator
-#    condition: mariadb-operator.enabled
-#    tags:
-#      - database
-#  - name: keda
-#    version: "2.16.1"
-#    repository: https://kedacore.github.io/charts
-#    condition: keda.enabled
-#    tags:
-#      - autoscaling
+# # Dependencies
+# dependencies:
+#   - name: mariadb-operator
+#     version: "0.34.0"
+#     repository: https://mariadb-operator.github.io/mariadb-operator
+#     condition: mariadb-operator.enabled
+#     tags:
+#       - database
+#   - name: keda
+#     version: "2.16.1"
+#     repository: https://kedacore.github.io/charts
+#     condition: keda.enabled
+#     tags:
+#       - autoscaling
 
 annotations:
   # Artifact Hub annotations

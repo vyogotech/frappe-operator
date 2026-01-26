@@ -45,31 +45,74 @@ jobs:
           method: kubeconfig
           kubeconfig: ${{ secrets.KUBE_CONFIG }} # Requires KUBE_CONFIG secret
 
-      - name: Update Helm dependencies
+      - name: Add Helm Repositories
         run: |
-          cd helm/frappe-operator
-          helm dependency update
+          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+          helm repo add keda https://kedacore.github.io/charts
+          helm repo update
 
-      - name: Install Frappe Operator
+      - name: "Install MariaDB Operator"
         run: |
+          echo "Installing MariaDB Operator..."
+          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+            --namespace ${{ github.event.inputs.namespace }} \
+            ${{ github.event.inputs.create_namespace == 'true' && '--create-namespace' || '' }} \
+            --set crds.enabled=true \
+            --wait --timeout 10m
+
+      - name: "Install KEDA (Autoscaler)"
+        run: |
+          echo "Installing KEDA..."
+          helm upgrade --install keda keda/keda \
+            --namespace ${{ github.event.inputs.namespace }} \
+            ${{ github.event.inputs.create_namespace == 'true' && '--create-namespace' || '' }} \
+            --set crds.install=true \
+            --wait --timeout 10m
+
+      - name: "Install Frappe Operator"
+        run: |
+          echo "Installing Frappe Operator..."
+          # Dependencies are now explicitly disabled in Chart.yaml and values.yaml
           helm upgrade --install ${{ github.event.inputs.release_name }} ./helm/frappe-operator \
             --namespace ${{ github.event.inputs.namespace }} \
             ${{ github.event.inputs.create_namespace == 'true' && '--create-namespace' || '' }} \
             --set operator.image.repository=${{ github.event.inputs.image_repository }} \
             --set operator.image.tag=${{ github.event.inputs.image_tag }} \
+            --set mariadb.enabled=true \
             --wait \
-            --timeout 10m
+            --timeout 15m
 
       - name: Verify Installation
         run: |
-          echo "Checking deployment status..."
-          kubectl rollout status deployment/${{ github.event.inputs.release_name }}-controller-manager -n ${{ github.event.inputs.namespace }} --timeout=2m
+          echo "Checking Frappe Operator status..."
+          kubectl rollout status deployment/${{ github.event.inputs.release_name }}-controller-manager -n ${{ github.event.inputs.namespace }} --timeout=5m
+          
+          echo "Checking MariaDB Operator status..."
+          kubectl rollout status deployment/mariadb-operator -n ${{ github.event.inputs.namespace }} --timeout=5m
+          
+          echo "Checking MariaDB instance status..."
+          # Wait for the default MariaDB instance configured in values.yaml to be ready
+          kubectl wait --for=condition=Ready mariadb/frappe-mariadb -n ${{ github.event.inputs.namespace }} --timeout=5m
 
-          echo "Checking CRD status..."
+          echo "Checking Frappe CRDs..."
           kubectl wait --for condition=established --timeout=60s crd frappebenches.vyogo.tech
           kubectl wait --for condition=established --timeout=60s crd frappesites.vyogo.tech
 
           echo "Listing pods in ${{ github.event.inputs.namespace }}..."
           kubectl get pods -n ${{ github.event.inputs.namespace }}
 
-          echo "✅ Frappe Operator successfully installed and verified!"
+          echo "✅ All components successfully installed and verified!"
+
+      - name: "Debug on Failure"
+        if: failure()
+        run: |
+          echo "Installation failed. Capturing cluster state for debugging..."
+          echo "--- Namespace: ${{ github.event.inputs.namespace }} ---"
+          kubectl get pods -n ${{ github.event.inputs.namespace }}
+          kubectl describe pods -n ${{ github.event.inputs.namespace }}
+          echo "--- Operator Logs ---"
+          kubectl logs -n ${{ github.event.inputs.namespace }} deployment/${{ github.event.inputs.release_name }}-controller-manager --tail=100 || true
+          echo "--- MariaDB Operator Status ---"
+          kubectl get pods -A | grep mariadb || true
+          echo "--- KEDA Status ---"
+          kubectl get pods -A | grep keda || true
