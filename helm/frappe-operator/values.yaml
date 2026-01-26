@@ -87,6 +87,8 @@ rbac:
 # MariaDB Operator dependency
 mariadb-operator:
   enabled: true
+  crds:
+    enabled: false
   # MariaDB Operator will be installed as a subchart
   # See: https://github.com/mariadb-operator/mariadb-operator
   
@@ -97,6 +99,8 @@ mariadb-operator:
 # KEDA (Kubernetes Event Driven Autoscaler) dependency
 keda:
   enabled: true
+  crds:
+    install: false
   # KEDA will be installed as a subchart for worker autoscaling
   # See: https://keda.sh/
 

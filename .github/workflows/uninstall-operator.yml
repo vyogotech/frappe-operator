@@ -1,0 +1,73 @@
+name: Uninstall Frappe Operator
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: 'Namespace where the operator is installed'
+        required: true
+        default: 'frappe-operator-system'
+      release_name:
+        description: 'Helm release name'
+        required: true
+        default: 'frappe-operator'
+      delete_crds:
+        description: 'Delete CRDs as well (WARNING: this deletes all benches and sites in the cluster)'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  uninstall:
+    name: Uninstall Operator and Cleanup
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure Kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Delete All Frappe Sites and Benches
+        run: |
+          echo "Deleting all FrappeSite and FrappeBench resources..."
+          # We do this first to allow finalizers to clean up dependent resources (Deployments, Services, etc.)
+          kubectl delete frappesites --all --all-namespaces --timeout=5m || true
+          kubectl delete frappebenches --all --all-namespaces --timeout=5m || true
+
+      - name: Uninstall Helm Releases
+        run: |
+          echo "Uninstalling Frappe Operator..."
+          helm uninstall ${{ github.event.inputs.release_name }} --namespace ${{ github.event.inputs.namespace }} --wait || true
+          
+          echo "Uninstalling MariaDB Operator..."
+          helm uninstall mariadb-operator --namespace ${{ github.event.inputs.namespace }} --wait || true
+          
+          echo "Uninstalling KEDA..."
+          helm uninstall keda --namespace ${{ github.event.inputs.namespace }} --wait || true
+
+      - name: Delete Namespace
+        run: |
+          echo "Deleting namespace ${{ github.event.inputs.namespace }}..."
+          kubectl delete namespace ${{ github.event.inputs.namespace }} --timeout=2m --ignore-not-found || true
+
+      - name: Delete CRDs
+        if: ${{ github.event.inputs.delete_crds == 'true' }}
+        run: |
+          echo "Deleting Frappe CRDs..."
+          kubectl delete crd frappebenches.vyogo.tech --ignore-not-found || true
+          kubectl delete crd frappesites.vyogo.tech --ignore-not-found || true
+          
+          echo "Deleting MariaDB CRDs..."
+          kubectl get crd | grep mariadb | awk '{print $1}' | xargs kubectl delete crd --ignore-not-found || true
+          
+          echo "Deleting KEDA CRDs..."
+          kubectl get crd | grep keda | awk '{print $1}' | xargs kubectl delete crd --ignore-not-found || true
+
+      - name: Final Cleanup
+        run: |
+          echo "Teardown complete."
