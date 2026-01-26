@@ -45,47 +45,37 @@ jobs:
           method: kubeconfig
           kubeconfig: ${{ secrets.KUBE_CONFIG }} # Requires KUBE_CONFIG secret
 
-      - name: Update Helm dependencies
+      - name: Add Helm Repositories
         run: |
-          cd helm/frappe-operator
-          helm dependency update
+          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+          helm repo add keda https://kedacore.github.io/charts
+          helm repo update
 
-      - name: "Install Frappe Operator (Stage 1: Bootstrap & CRDs)"
+      - name: "Install MariaDB Operator"
         run: |
-          echo "Stage 1: Installing dependencies (MariaDB Operator, KEDA) and Frappe Operator..."
-          echo "The MariaDB instance is disabled in this stage to allow CRDs to be established first."
-          # We remove --wait here because some subcharts might take time to reach 'Ready' on OpenShift
-          # The subsequent 'Wait for MariaDB CRD' step handles the actual dependency check.
+          echo "Installing MariaDB Operator..."
+          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+            --namespace ${{ github.event.inputs.namespace }} \
+            ${{ github.event.inputs.create_namespace == 'true' && '--create-namespace' || '' }} \
+            --set crds.enabled=true \
+            --wait --timeout 10m
+
+      - name: "Install KEDA (Autoscaler)"
+        run: |
+          echo "Installing KEDA..."
+          helm upgrade --install keda keda/keda \
+            --namespace ${{ github.event.inputs.namespace }} \
+            ${{ github.event.inputs.create_namespace == 'true' && '--create-namespace' || '' }} \
+            --set crds.install=true \
+            --wait --timeout 10m
+
+      - name: "Install Frappe Operator"
+        run: |
+          echo "Installing Frappe Operator..."
+          # Dependencies are now explicitly disabled in Chart.yaml and values.yaml
           helm upgrade --install ${{ github.event.inputs.release_name }} ./helm/frappe-operator \
             --namespace ${{ github.event.inputs.namespace }} \
             ${{ github.event.inputs.create_namespace == 'true' && '--create-namespace' || '' }} \
-            --set operator.image.repository=${{ github.event.inputs.image_repository }} \
-            --set operator.image.tag=${{ github.event.inputs.image_tag }} \
-            --set mariadb.enabled=false \
-            --timeout 10m
-
-      - name: Wait for MariaDB CRD
-        run: |
-          echo "Waiting for MariaDB CRDs to be established..."
-          # The MariaDB Operator installs these CRDs. We wait for them before applying the Mariadb instance.
-          for i in {1..30}; do
-            if kubectl get crd mariadbs.k8s.mariadb.com &>/dev/null; then
-              echo "✅ MariaDB CRD detected!"
-              kubectl wait --for condition=established --timeout=60s crd mariadbs.k8s.mariadb.com
-              exit 0
-            fi
-            echo "Waiting for CRD... ($i/30)"
-            sleep 10
-          done
-          echo "❌ MariaDB CRD did not appear in time."
-          kubectl get pods -A | grep mariadb || true
-          exit 1
-
-      - name: "Install Frappe Operator (Stage 2: Full Installation)"
-        run: |
-          echo "Stage 2: Enabling MariaDB instance and finalizing installation..."
-          helm upgrade --install ${{ github.event.inputs.release_name }} ./helm/frappe-operator \
-            --namespace ${{ github.event.inputs.namespace }} \
             --set operator.image.repository=${{ github.event.inputs.image_repository }} \
             --set operator.image.tag=${{ github.event.inputs.image_tag }} \
             --set mariadb.enabled=true \
@@ -94,17 +84,24 @@ jobs:
 
       - name: Verify Installation
         run: |
-          echo "Checking deployment status..."
+          echo "Checking Frappe Operator status..."
           kubectl rollout status deployment/${{ github.event.inputs.release_name }}-controller-manager -n ${{ github.event.inputs.namespace }} --timeout=5m
+          
+          echo "Checking MariaDB Operator status..."
+          kubectl rollout status deployment/mariadb-operator -n ${{ github.event.inputs.namespace }} --timeout=5m
+          
+          echo "Checking MariaDB instance status..."
+          # Wait for the default MariaDB instance configured in values.yaml to be ready
+          kubectl wait --for=condition=Ready mariadb/frappe-mariadb -n ${{ github.event.inputs.namespace }} --timeout=5m
 
-          echo "Checking CRD status..."
+          echo "Checking Frappe CRDs..."
           kubectl wait --for condition=established --timeout=60s crd frappebenches.vyogo.tech
           kubectl wait --for condition=established --timeout=60s crd frappesites.vyogo.tech
 
           echo "Listing pods in ${{ github.event.inputs.namespace }}..."
           kubectl get pods -n ${{ github.event.inputs.namespace }}
 
-          echo "✅ Frappe Operator successfully installed and verified!"
+          echo "✅ All components successfully installed and verified!"
 
       - name: "Debug on Failure"
         if: failure()
