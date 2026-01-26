@@ -73,7 +73,7 @@ jobs:
 
       - name: Deploy Test Bench and Site
         run: |
-          kubectl apply -f examples/e2e-test-manifests.yaml
+          kubectl apply -f examples/kind-e2e-manifests.yaml
 
       - name: Wait for FrappeBench to be Ready
         run: |

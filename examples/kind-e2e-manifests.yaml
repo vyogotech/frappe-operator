@@ -1,0 +1,43 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: e2e-test-bench
+  namespace: default
+spec:
+  frappeVersion: "version-15"
+  imageConfig:
+    repository: ghcr.io/rmallam/frappe_docker
+    # Note: The e2e-test workflow will replace this with a local image if needed,
+    # but for manual/kind testing we use the verified production-ready image.
+    tag: sha-ae82c47@sha256:fc7d472b57a1f5a75bfffb9985d9d2298a2a910d0b17ec23e36fb11b053da565
+  apps:
+    - name: erpnext
+      source: image
+  redisConfig:
+    type: redis
+  workerAutoscaling:
+    short:
+      enabled: false
+    long:
+      enabled: false
+    default:
+      enabled: false
+      staticReplicas: 1
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: e2e-test-site
+  namespace: default
+spec:
+  benchRef:
+    name: e2e-test-bench
+  siteName: e2e.localhost
+  adminPasswordSecretRef:
+    name: e2e-admin-password
+  dbConfig:
+    provider: mariadb
+  ingress:
+    enabled: true
+    # Note: 'domain' is a top-level field in spec, not under ingress.
+    # It defaults to siteName if not specified.
