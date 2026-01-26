@@ -1,0 +1,131 @@
+name: E2E Test (Kind)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  e2e-test:
+    name: End-to-End Test on Kind
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: frappe-e2e
+
+      - name: Build Operator Image
+        run: |
+          docker build -t ghcr.io/rmallam/frappe-operator:test .
+          kind load docker-image ghcr.io/rmallam/frappe-operator:test --name frappe-e2e
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: Add Helm Repositories
+        run: |
+          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+          helm repo add keda https://kedacore.github.io/charts
+          helm repo update
+
+      - name: Install MariaDB Operator
+        run: |
+          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+            --namespace frappe-operator-system \
+            --create-namespace \
+            --set crds.enabled=true \
+            --wait --timeout 10m
+
+      - name: Install KEDA
+        run: |
+          helm upgrade --install keda keda/keda \
+            --namespace frappe-operator-system \
+            --create-namespace \
+            --set crds.install=true \
+            --wait --timeout 10m
+
+      - name: Install Frappe Operator
+        run: |
+          helm upgrade --install frappe-operator ./helm/frappe-operator \
+            --set operator.image.repository=ghcr.io/rmallam/frappe-operator \
+            --set operator.image.tag=test \
+            --set operator.image.pullPolicy=Never \
+            --set mariadb.enabled=true \
+            --namespace frappe-operator-system \
+            --create-namespace \
+            --wait \
+            --timeout 10m
+
+      - name: Create Admin Password Secret
+        run: |
+          kubectl create secret generic e2e-admin-password \
+            --from-literal=password=admin \
+            --namespace default
+
+      - name: Deploy Test Bench and Site
+        run: |
+          kubectl apply -f examples/e2e-test-manifests.yaml
+
+      - name: Wait for FrappeBench to be Ready
+        run: |
+          echo "Waiting for FrappeBench to reach Ready phase..."
+          # Using a loop because kubectl wait might fail if the resource is not yet created or status populated
+          for i in {1..60}; do
+            PHASE=$(kubectl get frappebench e2e-test-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            echo "Current Phase: $PHASE"
+            if [ "$PHASE" == "Ready" ]; then
+              echo "FrappeBench is Ready!"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "ERROR: FrappeBench did not reach Ready phase within timeout"
+          kubectl describe frappebench e2e-test-bench -n default
+          kubectl get pods -n default
+          exit 1
+
+      - name: Wait for FrappeSite to be Ready
+        run: |
+          echo "Waiting for FrappeSite to reach Ready phase..."
+          for i in {1..30}; do
+            PHASE=$(kubectl get frappesite e2e-test-site -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            echo "Current Phase: $PHASE"
+            if [ "$PHASE" == "Ready" ]; then
+              echo "FrappeSite is Ready!"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "ERROR: FrappeSite did not reach Ready phase within timeout"
+          kubectl describe frappesite e2e-test-site -n default
+          kubectl get pods -n default
+          exit 1
+
+      - name: Test Site Accessibility
+        run: |
+          echo "Testing site accessibility from inside the cluster..."
+          # We use a temporary pod to curl the site
+          kubectl run test-curl --image=curlimages/curl -i --rm --restart=Never -- \
+            curl -s -I -H "Host: e2e.localhost" http://e2e-test-bench-gunicorn.default.svc.cluster.local:8000 | grep "200 OK"
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Site is accessible!"
+          else
+            echo "❌ Site is NOT accessible!"
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kubectl describe pods -n default
+          kubectl logs -n frappe-operator-system -l app.kubernetes.io/name=frappe-operator

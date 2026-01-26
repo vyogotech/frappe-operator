@@ -1,0 +1,31 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: new-bench
+  namespace: frappe-fixes
+spec:
+  frappeVersion: "15.0.0"
+  imageConfig:
+    repository: ghcr.io/rmallam/frappe_docker
+    tag: sha-ae82c47@sha256:fc7d472b57a1f5a75bfffb9985d9d2298a2a910d0b17ec23e36fb11b053da565
+    pullPolicy: Always
+  storageClassName: ocs-external-storagecluster-cephfs
+  storageSize: 2Gi
+
+ # Apps to install
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image
+
+  # Component replicas (minimal for development)
+  componentReplicas:
+    gunicorn: 1
+    nginx: 1
+    socketio: 1
+    scheduler: 1
+    workers:
+      default: 1
+      short: 0
+      long: 0

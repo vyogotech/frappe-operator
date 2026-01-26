@@ -1,0 +1,26 @@
+# Basic Frappe Site
+
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: my-site-v6
+  namespace: default
+spec:
+  benchRef:
+    name: my-bench-v6
+  
+  # Site domain - for local testing use .localhost
+  siteName: my-site-v6.localhost
+  
+  # Database configuration
+  dbConfig:
+    provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: default
+  
+  # Ingress (optional for local development)
+  ingress:
+    enabled: true
+    className: nginx

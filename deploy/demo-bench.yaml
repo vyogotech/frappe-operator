@@ -1,0 +1,20 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: demo-bench
+  namespace: frappe-demo
+spec:
+  frappeVersion: "15.0.0"
+  
+  security:
+    podSecurityContext: {}
+
+  imageConfig:
+    repository: ghcr.io/rmallam/frappe_docker
+    tag: sha-c39d75f
+    pullPolicy: Always
+  
+  # Permanent Fix for OpenShift RWX
+
+  storageClassName: ocs-external-storagecluster-cephfs
+  storageSize: 5Gi

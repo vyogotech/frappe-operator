@@ -1,0 +1,25 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: demo-site
+  namespace: frappe-demo
+spec:
+  benchRef:
+    name: demo-bench
+    namespace: frappe-demo
+  
+  # Site domain (will receive route demo-site.apps...)
+  siteName: demo-site.apps.cluster-dz66n.dynamic.redhatworkshops.io
+  
+  # Database configuration (Shared Instance from frappe-operator-system)
+  dbConfig:
+    provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: frappe-operator-system
+  
+  # Ingress configuration for OpenShift (Enabled to trigger Route)
+  ingress:
+    enabled: true
+    className: openshift-default

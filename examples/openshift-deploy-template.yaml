@@ -1,0 +1,41 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: ${BENCH_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  frappeVersion: "${FRAPPE_VERSION}"
+  imageConfig:
+    repository: "${IMAGE_REPOSITORY}"
+    tag: "${IMAGE_TAG}"
+  apps:
+    - name: erpnext
+      source: image
+  redisConfig:
+    type: redis
+  workerAutoscaling:
+    short:
+      enabled: false
+    long:
+      enabled: false
+    default:
+      enabled: false
+      staticReplicas: 1
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: ${SITE_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  benchRef: ${BENCH_NAME}
+  siteName: ${DOMAIN}
+  adminPasswordSecretRef:
+    name: ${SITE_NAME}-admin-password
+    key: password
+  dbConfig:
+    provider: mariadb
+  routeConfig:
+    enabled: true
+    domain: ${DOMAIN}
+    termination: edge

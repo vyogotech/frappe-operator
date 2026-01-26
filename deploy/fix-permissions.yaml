@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fix-permissions
+  namespace: default
+spec:
+  containers:
+  - name: fix
+    image: alpine
+    command: ["/bin/sh", "-c"]
+    args: ["chown -R 1000:1000 /sites && chmod -R 770 /sites && echo Done"]
+    volumeMounts:
+    - name: sites
+      mountPath: /sites
+  volumes:
+  - name: sites
+    persistentVolumeClaim:
+      claimName: my-bench-sites
+  restartPolicy: Never

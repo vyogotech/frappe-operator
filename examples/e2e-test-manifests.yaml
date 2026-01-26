@@ -21,4 +21,20 @@ spec:
     default:
       enabled: false
       staticReplicas: 1
-  storageClassName: ocs-external-storagecluster-cephfs
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: e2e-test-site
+  namespace: default
+spec:
+  benchRef: e2e-test-bench
+  siteName: e2e.localhost
+  adminPasswordSecretRef:
+    name: e2e-admin-password
+    key: password
+  dbConfig:
+    provider: mariadb
+  ingress:
+    enabled: true
+    domain: e2e.localhost
