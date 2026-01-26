@@ -71,7 +71,11 @@ func (r *FrappeBenchReconciler) ensureBenchStorage(ctx context.Context, bench *v
 func (r *FrappeBenchReconciler) createBenchPVC(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, accessMode corev1.PersistentVolumeAccessMode, sc *storagev1.StorageClass) error {
 	logger := log.FromContext(ctx)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
-	storageSize := resource.MustParse("10Gi")
+	sizeStr := bench.Spec.StorageSize
+	if sizeStr == "" {
+		sizeStr = "10Gi"
+	}
+	storageSize := resource.MustParse(sizeStr)
 
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -354,7 +358,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 							Image:   redisImage,
 							Command: []string{"redis-server"},
 							// Disable RDB/AOF persistence to avoid stop-writes-on-bgsave-error in ephemeral environments
-							Args:    []string{"--save", "", "--appendonly", "no", "--stop-writes-on-bgsave-error", "no"},
+							Args: []string{"--save", "", "--appendonly", "no", "--stop-writes-on-bgsave-error", "no"},
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 6379,
@@ -435,6 +439,13 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
+		// Update existing deployment if image has changed
+		image := r.getBenchImage(ctx, bench)
+		if deploy.Spec.Template.Spec.Containers[0].Image != image {
+			logger.Info("Updating Gunicorn Deployment image", "deployment", deployName, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
+			deploy.Spec.Template.Spec.Containers[0].Image = image
+			return r.Update(ctx, deploy)
+		}
 		return nil
 	}
 
@@ -484,6 +495,12 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 							},
 							Resources:       r.getGunicornResources(bench),
 							SecurityContext: r.getContainerSecurityContext(bench),
+							Env: []corev1.EnvVar{
+								{
+									Name:  "USER",
+									Value: "frappe",
+								},
+							},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -566,6 +583,13 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
+		// Update existing deployment if image has changed
+		image := r.getBenchImage(ctx, bench)
+		if deploy.Spec.Template.Spec.Containers[0].Image != image {
+			logger.Info("Updating NGINX Deployment image", "deployment", deployName, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
+			deploy.Spec.Template.Spec.Containers[0].Image = image
+			return r.Update(ctx, deploy)
+		}
 		return nil
 	}
 
@@ -726,6 +750,13 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
+		// Update existing deployment if image has changed
+		image := r.getBenchImage(ctx, bench)
+		if deploy.Spec.Template.Spec.Containers[0].Image != image {
+			logger.Info("Updating Socket.IO Deployment image", "deployment", deployName, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
+			deploy.Spec.Template.Spec.Containers[0].Image = image
+			return r.Update(ctx, deploy)
+		}
 		return nil
 	}
 
@@ -778,6 +809,12 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 							},
 							Resources:       r.getSocketIOResources(bench),
 							SecurityContext: r.getContainerSecurityContext(bench),
+							Env: []corev1.EnvVar{
+								{
+									Name:  "USER",
+									Value: "frappe",
+								},
+							},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -811,6 +848,13 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
+		// Update existing deployment if image has changed
+		image := r.getBenchImage(ctx, bench)
+		if deploy.Spec.Template.Spec.Containers[0].Image != image {
+			logger.Info("Updating Scheduler Deployment image", "deployment", deployName, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
+			deploy.Spec.Template.Spec.Containers[0].Image = image
+			return r.Update(ctx, deploy)
+		}
 		return nil
 	}
 
@@ -857,6 +901,12 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 							},
 							Resources:       r.getSchedulerResources(bench),
 							SecurityContext: r.getContainerSecurityContext(bench),
+							Env: []corev1.EnvVar{
+								{
+									Name:  "USER",
+									Value: "frappe",
+								},
+							},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -937,10 +987,22 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 
 	if err == nil {
 		// Deployment exists, update it if needed
+		changed := false
+		image := r.getBenchImage(ctx, bench)
+		if deploy.Spec.Template.Spec.Containers[0].Image != image {
+			logger.Info("Updating worker image", "worker", workerType, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
+			deploy.Spec.Template.Spec.Containers[0].Image = image
+			changed = true
+		}
+
 		// Only update replicas if NOT managed by KEDA (KEDA controls replicas)
 		if !kedaManaged && *deploy.Spec.Replicas != replicas {
 			logger.Info("Updating worker replicas", "worker", workerType, "oldReplicas", *deploy.Spec.Replicas, "newReplicas", replicas)
 			deploy.Spec.Replicas = &replicas
+			changed = true
+		}
+
+		if changed {
 			return r.Update(ctx, deploy)
 		}
 		return nil
@@ -1000,6 +1062,12 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 							},
 							Resources:       resources,
 							SecurityContext: r.getContainerSecurityContext(bench),
+							Env: []corev1.EnvVar{
+								{
+									Name:  "USER",
+									Value: "frappe",
+								},
+							},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -1542,14 +1610,36 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.F
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 	defaultFSGroup := getDefaultFSGroup()
-	return &corev1.PodSecurityContext{
-		RunAsUser:  &defaultUID,
-		RunAsGroup: &defaultGID,
-		FSGroup:    &defaultFSGroup,
+
+	// If no defaults are set via environment, return nil to let platform defaults take over (e.g. OpenShift SCC)
+	if defaultUID == nil && defaultGID == nil && defaultFSGroup == nil {
+		// But still apply SELinux options from bench spec if provided
+		if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil && bench.Spec.Security.PodSecurityContext.SELinuxOptions != nil {
+			return &corev1.PodSecurityContext{
+				SELinuxOptions: bench.Spec.Security.PodSecurityContext.SELinuxOptions,
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
+			}
+		}
+		return nil
+	}
+
+	secCtx := &corev1.PodSecurityContext{
+		RunAsUser:  defaultUID,
+		RunAsGroup: defaultGID,
+		FSGroup:    defaultFSGroup,
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
 	}
+
+	// Add SELinux options from bench spec if provided (for OpenShift RWX volumes)
+	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil && bench.Spec.Security.PodSecurityContext.SELinuxOptions != nil {
+		secCtx.SELinuxOptions = bench.Spec.Security.PodSecurityContext.SELinuxOptions
+	}
+
+	return secCtx
 }
 
 func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
@@ -1559,9 +1649,15 @@ func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1al
 	// Default to 1001 (OpenShift standard) but allow override via environment
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
+
+	// If no defaults are set via environment, return nil to let platform defaults take over
+	if defaultUID == nil && defaultGID == nil {
+		return nil
+	}
+
 	return &corev1.SecurityContext{
-		RunAsUser:                &defaultUID,
-		RunAsGroup:               &defaultGID,
+		RunAsUser:                defaultUID,
+		RunAsGroup:               defaultGID,
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},

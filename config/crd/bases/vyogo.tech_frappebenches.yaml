@@ -1052,6 +1052,10 @@ spec:
                 description: StorageClassName allows overriding the storage class
                   for bench PVC
                 type: string
+              storageSize:
+                default: 10Gi
+                description: StorageSize for the bench PVC (e.g., "10Gi")
+                type: string
               workerAutoscaling:
                 description: |-
                   WorkerAutoscaling defines KEDA-based or static scaling for workers
