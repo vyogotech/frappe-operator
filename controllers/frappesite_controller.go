@@ -34,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -693,10 +695,14 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	if site.Spec.AdminPasswordSecretRef != nil {
 		// Fetch from provided secret
 		adminPasswordSecret = &corev1.Secret{}
-		err := r.Get(ctx, types.NamespacedName{
+		secretKey := types.NamespacedName{
 			Name:      site.Spec.AdminPasswordSecretRef.Name,
 			Namespace: site.Spec.AdminPasswordSecretRef.Namespace,
-		}, adminPasswordSecret)
+		}
+		if secretKey.Namespace == "" {
+			secretKey.Namespace = site.Namespace
+		}
+		err := r.Get(ctx, secretKey, adminPasswordSecret)
 		if err != nil {
 			return false, fmt.Errorf("failed to get admin password secret: %w", err)
 		}
@@ -1216,12 +1222,37 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		r.Recorder = mgr.GetEventRecorderFor("frappesite-controller")
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&vyogotechv1alpha1.FrappeSite{}).
 		Owns(&batchv1.Job{}).
-		Owns(&networkingv1.Ingress{}).
-		Owns(&routev1.Route{}).
-		Complete(r)
+		Owns(&networkingv1.Ingress{})
+
+	// Check if OpenShift Route API is available before trying to watch it
+	if r.isRouteAPIAvailable(mgr.GetConfig()) {
+		builder.Owns(&routev1.Route{})
+	}
+
+	return builder.Complete(r)
+}
+
+// isRouteAPIAvailable checks if the OpenShift Route API is available in the cluster
+func (r *FrappeSiteReconciler) isRouteAPIAvailable(config *rest.Config) bool {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return false
+	}
+
+	apiGroupList, err := discoveryClient.ServerGroups()
+	if err != nil {
+		return false
+	}
+
+	for _, group := range apiGroupList.Groups {
+		if group.Name == "route.openshift.io" {
+			return true
+		}
+	}
+	return false
 }
 
 // getMariaDBRootCredentials retrieves MariaDB root credentials for site deletion

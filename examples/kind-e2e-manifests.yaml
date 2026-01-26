@@ -1,3 +1,17 @@
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: frappe-mariadb
+  namespace: default
+spec:
+  rootPasswordSecretKeyRef:
+    name: mariadb-root-password
+    key: password
+  image: mariadb:10.11
+  storage:
+    size: 2Gi
+  replicas: 1
+---
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
@@ -9,7 +23,8 @@ spec:
     repository: ghcr.io/rmallam/frappe_docker
     # Note: The e2e-test workflow will replace this with a local image if needed,
     # but for manual/kind testing we use the verified production-ready image.
-    tag: sha-ae82c47@sha256:fc7d472b57a1f5a75bfffb9985d9d2298a2a910d0b17ec23e36fb11b053da565
+    tag: sha-ae82c47
+    pullPolicy: IfNotPresent
   apps:
     - name: erpnext
       source: image
