@@ -65,12 +65,6 @@ jobs:
             --wait \
             --timeout 10m
 
-      - name: Create Admin Password Secret
-        run: |
-          kubectl create secret generic e2e-admin-password \
-            --from-literal=password=admin \
-            --namespace default
-
       - name: Deploy Test Bench and Site
         run: |
           kubectl apply -f examples/kind-e2e-manifests.yaml
@@ -124,8 +118,25 @@ jobs:
             exit 1
           fi
 
+      - name: Export Operator Logs on Failure
+        if: failure()
+        run: |
+          echo "==== Frappe Operator Logs ===="
+          kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=500
+          
+      - name: Display Cluster State on Failure
+        if: failure()
+        run: |
+          echo "==== Pods (default) ===="
+          kubectl get pods -n default
+          echo "==== FrappeBench Status ===="
+          kubectl get frappebench e2e-test-bench -n default -o yaml
+          echo "==== FrappeSite Status ===="
+          kubectl get frappesite e2e-test-site -n default -o yaml
+          echo "==== MariaDB Status ===="
+          kubectl get mariadb frappe-mariadb -n default -o yaml
+
       - name: Cleanup
         if: always()
         run: |
-          kubectl describe pods -n default
-          kubectl logs -n frappe-operator-system -l app.kubernetes.io/name=frappe-operator
+          kubectl delete -f examples/kind-e2e-manifests.yaml --ignore-not-found

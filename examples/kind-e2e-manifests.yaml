@@ -12,6 +12,24 @@ spec:
     size: 2Gi
   replicas: 1
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mariadb-root-password
+  namespace: default
+type: Opaque
+stringData:
+  password: frappe
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: e2e-admin-password
+  namespace: default
+type: Opaque
+stringData:
+  password: admin
+---
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
