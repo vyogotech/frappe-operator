@@ -1352,15 +1352,11 @@ func (r *FrappeSiteReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.Fr
 	defaultGID := getDefaultGID()
 	defaultFSGroup := getDefaultFSGroup()
 
-	// If no defaults are set via environment, return nil to let platform defaults take over
-	if defaultUID == nil && defaultGID == nil && defaultFSGroup == nil {
-		return nil
-	}
-
 	return &corev1.PodSecurityContext{
-		RunAsUser:  defaultUID,
-		RunAsGroup: defaultGID,
-		FSGroup:    defaultFSGroup,
+		RunAsNonRoot: boolPtr(true),
+		RunAsUser:    defaultUID,
+		RunAsGroup:   defaultGID,
+		FSGroup:      defaultFSGroup,
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -1375,12 +1371,8 @@ func (r *FrappeSiteReconciler) getContainerSecurityContext(bench *vyogotechv1alp
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 
-	// If no defaults are set via environment, return nil to let platform defaults take over
-	if defaultUID == nil && defaultGID == nil {
-		return nil
-	}
-
 	return &corev1.SecurityContext{
+		RunAsNonRoot:             boolPtr(true),
 		RunAsUser:                defaultUID,
 		RunAsGroup:               defaultGID,
 		AllowPrivilegeEscalation: boolPtr(false),

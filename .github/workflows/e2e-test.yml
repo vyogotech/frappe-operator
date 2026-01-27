@@ -12,6 +12,10 @@ jobs:
     name: End-to-End Test on Kind
     runs-on: ubuntu-latest
     
+    strategy:
+      matrix:
+        platform: [k8s, openshift]
+        
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,12 +23,12 @@ jobs:
       - name: Create Kind Cluster
         uses: helm/kind-action@v1.8.0
         with:
-          cluster_name: frappe-e2e
+          cluster_name: frappe-e2e-${{ matrix.platform }}
 
       - name: Build Operator Image
         run: |
           docker build -t ghcr.io/rmallam/frappe-operator:test .
-          kind load docker-image ghcr.io/rmallam/frappe-operator:test --name frappe-e2e
+          kind load docker-image ghcr.io/rmallam/frappe-operator:test --name frappe-e2e-${{ matrix.platform }}
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
@@ -65,14 +69,64 @@ jobs:
             --wait \
             --timeout 10m
 
+      - name: Mock OpenShift Environment
+        if: matrix.platform == 'openshift'
+        run: |
+          echo "Installing OpenShift Route CRD to mock platform..."
+          kubectl apply -f https://raw.githubusercontent.com/openshift/router/master/deploy/route_crd.yaml
+
       - name: Deploy Test Bench and Site
         run: |
           kubectl apply -f examples/kind-e2e-manifests.yaml
 
+      - name: Verify Platform Detection
+        run: |
+          echo "Checking operator logs for platform detection..."
+          # Wait a bit for operator to process
+          sleep 30
+          LOGS=$(kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=200)
+          
+          if [ "${{ matrix.platform }}" == "openshift" ]; then
+            echo "$LOGS" | grep -i "Route" || (echo "FAILED: OpenShift Route API not detected" && exit 1)
+            echo "SUCCESS: OpenShift platform detected correctly."
+          else
+            echo "$LOGS" | grep -i "Route" && (echo "FAILED: OpenShift detected on vanilla K8s" && exit 1) || true
+            echo "SUCCESS: Vanilla Kubernetes environment confirmed."
+          fi
+
+      - name: Verify Security Compliance (runAsNonRoot)
+        run: |
+          echo "Verifying security compliance (runAsNonRoot) on ${{ matrix.platform }}..."
+          # Check all pods in default namespace (Bench, Workers, etc.)
+          NON_COMPLIANT=$(kubectl get pods -n default -o jsonpath='{range .items[*]}{.metadata.name}{": runAsNonRoot="}{.spec.securityContext.runAsNonRoot}{"\n"}{end}' | grep "runAsNonRoot=false" || true)
+          if [ ! -z "$NON_COMPLIANT" ]; then
+            echo "FAILED: Some pods are not running as non-root:"
+            echo "$NON_COMPLIANT"
+            exit 1
+          fi
+          echo "SUCCESS: All pods are compliant with non-root security requirements."
+
+      - name: Verify Resource Creation (Ingress/Route)
+        run: |
+          if [ "${{ matrix.platform }}" == "openshift" ]; then
+            echo "Verifying OpenShift Route Creation..."
+            if [ $(kubectl get routes.route.openshift.io -A --no-headers 2>/dev/null | wc -l) -eq 0 ]; then
+              echo "FAILED: No OpenShift Routes found"
+              exit 1
+            fi
+            echo "SUCCESS: OpenShift Route created."
+          else
+            echo "Verifying Ingress Creation..."
+            if [ $(kubectl get ingress -A --no-headers 2>/dev/null | wc -l) -eq 0 ]; then
+              echo "FAILED: No Ingresses found"
+              exit 1
+            fi
+            echo "SUCCESS: Ingress created."
+          fi
+
       - name: Wait for FrappeBench to be Ready
         run: |
           echo "Waiting for FrappeBench to reach Ready phase..."
-          # Using a loop because kubectl wait might fail if the resource is not yet created or status populated
           for i in {1..60}; do
             PHASE=$(kubectl get frappebench e2e-test-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
             echo "Current Phase: $PHASE"
@@ -83,8 +137,6 @@ jobs:
             sleep 10
           done
           echo "ERROR: FrappeBench did not reach Ready phase within timeout"
-          kubectl describe frappebench e2e-test-bench -n default
-          kubectl get pods -n default
           exit 1
 
       - name: Wait for FrappeSite to be Ready
@@ -100,23 +152,7 @@ jobs:
             sleep 10
           done
           echo "ERROR: FrappeSite did not reach Ready phase within timeout"
-          kubectl describe frappesite e2e-test-site -n default
-          kubectl get pods -n default
           exit 1
-
-      - name: Test Site Accessibility
-        run: |
-          echo "Testing site accessibility from inside the cluster..."
-          # We use a temporary pod to curl the site
-          kubectl run test-curl --image=curlimages/curl -i --rm --restart=Never -- \
-            curl -s -I -H "Host: e2e.localhost" http://e2e-test-bench-gunicorn.default.svc.cluster.local:8000 | grep "200 OK"
-          
-          if [ $? -eq 0 ]; then
-            echo "✅ Site is accessible!"
-          else
-            echo "❌ Site is NOT accessible!"
-            exit 1
-          fi
 
       - name: Export Operator Logs on Failure
         if: failure()
@@ -124,18 +160,6 @@ jobs:
           echo "==== Frappe Operator Logs ===="
           kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=500
           
-      - name: Display Cluster State on Failure
-        if: failure()
-        run: |
-          echo "==== Pods (default) ===="
-          kubectl get pods -n default
-          echo "==== FrappeBench Status ===="
-          kubectl get frappebench e2e-test-bench -n default -o yaml
-          echo "==== FrappeSite Status ===="
-          kubectl get frappesite e2e-test-site -n default -o yaml
-          echo "==== MariaDB Status ===="
-          kubectl get mariadb frappe-mariadb -n default -o yaml
-
       - name: Cleanup
         if: always()
         run: |

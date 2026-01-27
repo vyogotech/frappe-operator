@@ -172,3 +172,16 @@ func getEnvAsInt64(key string, defaultValue int64) int64 {
 	}
 	return parsed
 }
+
+// Helper functions for pointer types
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func int32Ptr(i int32) *int32 {
+	return &i
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
+}
