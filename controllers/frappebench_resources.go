@@ -475,7 +475,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 					Labels: r.componentLabels(bench, "gunicorn"),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "gunicorn",
@@ -495,7 +495,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 								},
 							},
 							Resources:       r.getGunicornResources(bench),
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(context.TODO(), bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "USER",
@@ -621,7 +621,7 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 					Labels: r.componentLabels(bench, "nginx"),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "nginx",
@@ -669,7 +669,7 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 								},
 							},
 							Resources:       r.getNginxResources(bench),
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(context.TODO(), bench),
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -788,7 +788,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 					Labels: r.componentLabels(bench, "socketio"),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "socketio",
@@ -811,7 +811,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 								},
 							},
 							Resources:       r.getSocketIOResources(bench),
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(context.TODO(), bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "USER",
@@ -887,7 +887,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 					Labels: r.componentLabels(bench, "scheduler"),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "scheduler",
@@ -904,7 +904,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 								},
 							},
 							Resources:       r.getSchedulerResources(bench),
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(context.TODO(), bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "USER",
@@ -1047,7 +1047,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 					Labels: r.componentLabels(bench, fmt.Sprintf("worker-%s", workerType)),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "worker",
@@ -1066,7 +1066,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 								},
 							},
 							Resources:       resources,
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(context.TODO(), bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "USER",
@@ -1594,10 +1594,10 @@ func (r *FrappeBenchReconciler) getRedisAddress(bench *vyogotechv1alpha1.FrappeB
 	return fmt.Sprintf("%s-redis-queue.%s.svc.cluster.local:6379", bench.Name, bench.Namespace)
 }
 
-func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+func (r *FrappeBenchReconciler) getPodSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
 	// Start with defaults
-	defaultUID := getDefaultUID()
-	defaultGID := getDefaultGID()
+	// defaultUID := getDefaultUID()
+	// defaultGID := getDefaultGID()
 	defaultFSGroup := getDefaultFSGroup()
 
 	// Default FSGroupChangePolicy to Always to ensure volume permissions are fixed on every mount
@@ -1605,14 +1605,46 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.F
 	fsGroupChangePolicy := corev1.FSGroupChangeAlways
 
 	secCtx := &corev1.PodSecurityContext{
-		RunAsNonRoot:        boolPtr(true),
-		RunAsUser:           defaultUID,
-		RunAsGroup:          defaultGID,
+		RunAsNonRoot: boolPtr(true),
+		// RunAsUser:           defaultUID, // Removed to allow OpenShift SCC to assign UID
+		// RunAsGroup:          defaultGID, // Removed to allow OpenShift SCC to assign GID
 		FSGroup:             defaultFSGroup,
 		FSGroupChangePolicy: &fsGroupChangePolicy,
-		SeccompProfile: &corev1.SeccompProfile{
+	}
+
+	// For OpenShift, try to match the namespace default MCS label
+	// This ensures all pods in a bench can share the same volumes
+	logger := log.FromContext(ctx)
+	if isPlatformOpenShift(ctx, r.Client) {
+		logger.Info("OpenShift platform detected for Bench security context")
+
+		// 1. Dynamic MCS Labeling (matches namespace defaults)
+		mcsLabel := getNamespaceMCSLabel(ctx, r.Client, bench.Namespace)
+		if mcsLabel != "" {
+			logger.Info("Applying Namespace MCS label to PodSecurityContext", "mcsLabel", mcsLabel)
+			secCtx.SELinuxOptions = &corev1.SELinuxOptions{
+				Level: mcsLabel,
+			}
+		} else {
+			logger.Info("Namespace MCS label is empty, skipping SELinuxOptions")
+		}
+
+		// 2. Explicit Group IDs for OpenShift Shared Storage
+		// Removed to allow SCC restricted-v2 to function
+		// Explicitly unset FSGroup to avoid default of 0
+		secCtx.FSGroup = nil
+		secCtx.SupplementalGroups = nil
+		logger.Info("Using OpenShift defaults (no explicit FSGroup/SupplementalGroups due to SCC restricted-v2)")
+
+	} else {
+		logger.V(1).Info("Not on OpenShift platform, skipping MCS label matching")
+	}
+
+	// Add default seccomp profile if not on OpenShift (OpenShift has its own defaults)
+	if !isPlatformOpenShift(ctx, r.Client) {
+		secCtx.SeccompProfile = &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
+		}
 	}
 
 	// Merge with user-provided settings if any
@@ -1653,20 +1685,25 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.F
 	return secCtx
 }
 
-func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+func (r *FrappeBenchReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
 	// Start with defaults
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 
 	secCtx := &corev1.SecurityContext{
-		RunAsNonRoot:             boolPtr(true),
-		RunAsUser:                defaultUID,
-		RunAsGroup:               defaultGID,
+		RunAsNonRoot: boolPtr(true),
+		// RunAsUser:                defaultUID, // Removed to allow OpenShift SCC to assign UID
+		// RunAsGroup:               defaultGID, // Removed to allow OpenShift SCC to assign GID
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
 		ReadOnlyRootFilesystem: boolPtr(false),
+	}
+
+	if !isPlatformOpenShift(ctx, r.Client) {
+		secCtx.RunAsUser = defaultUID
+		secCtx.RunAsGroup = defaultGID
 	}
 
 	// Merge with user-provided settings if any
@@ -1698,9 +1735,6 @@ func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1al
 		}
 		if userCtx.WindowsOptions != nil {
 			secCtx.WindowsOptions = userCtx.WindowsOptions
-		}
-		if userCtx.RunAsGroup != nil {
-			secCtx.RunAsGroup = userCtx.RunAsGroup
 		}
 		if userCtx.ProcMount != nil {
 			secCtx.ProcMount = userCtx.ProcMount
