@@ -1589,19 +1589,6 @@ func (r *FrappeBenchReconciler) getRedisAddress(bench *vyogotechv1alpha1.FrappeB
 	return fmt.Sprintf("%s-redis-queue.%s.svc.cluster.local:6379", bench.Name, bench.Namespace)
 }
 
-// Helper functions for pointer types
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func int32Ptr(i int32) *int32 {
-	return &i
-}
-
-func int64Ptr(i int64) *int64 {
-	return &i
-}
-
 func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
 	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
 		return bench.Spec.Security.PodSecurityContext
@@ -1611,24 +1598,11 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.F
 	defaultGID := getDefaultGID()
 	defaultFSGroup := getDefaultFSGroup()
 
-	// If no defaults are set via environment, return nil to let platform defaults take over (e.g. OpenShift SCC)
-	if defaultUID == nil && defaultGID == nil && defaultFSGroup == nil {
-		// But still apply SELinux options from bench spec if provided
-		if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil && bench.Spec.Security.PodSecurityContext.SELinuxOptions != nil {
-			return &corev1.PodSecurityContext{
-				SELinuxOptions: bench.Spec.Security.PodSecurityContext.SELinuxOptions,
-				SeccompProfile: &corev1.SeccompProfile{
-					Type: corev1.SeccompProfileTypeRuntimeDefault,
-				},
-			}
-		}
-		return nil
-	}
-
 	secCtx := &corev1.PodSecurityContext{
-		RunAsUser:  defaultUID,
-		RunAsGroup: defaultGID,
-		FSGroup:    defaultFSGroup,
+		RunAsNonRoot: boolPtr(true),
+		RunAsUser:    defaultUID,
+		RunAsGroup:   defaultGID,
+		FSGroup:      defaultFSGroup,
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -1650,12 +1624,8 @@ func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1al
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 
-	// If no defaults are set via environment, return nil to let platform defaults take over
-	if defaultUID == nil && defaultGID == nil {
-		return nil
-	}
-
 	return &corev1.SecurityContext{
+		RunAsNonRoot:             boolPtr(true),
 		RunAsUser:                defaultUID,
 		RunAsGroup:               defaultGID,
 		AllowPrivilegeEscalation: boolPtr(false),
