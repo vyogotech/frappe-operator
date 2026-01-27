@@ -351,7 +351,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 					Labels: r.componentLabels(bench, fmt.Sprintf("redis-%s", role)),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getRedisPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
 							Name:    "redis",
@@ -366,7 +366,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 								},
 							},
 							Resources:       r.getRedisResources(bench),
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getRedisContainerSecurityContext(bench),
 						},
 					},
 				},
@@ -1628,6 +1628,47 @@ func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1al
 		RunAsNonRoot:             boolPtr(true),
 		RunAsUser:                defaultUID,
 		RunAsGroup:               defaultGID,
+		AllowPrivilegeEscalation: boolPtr(false),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
+		ReadOnlyRootFilesystem: boolPtr(false),
+	}
+}
+
+func (r *FrappeBenchReconciler) getRedisPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+	// If user provided custom security context, use it
+	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
+		return bench.Spec.Security.PodSecurityContext
+	}
+
+	// Redis alpine images use UID/GID 999
+	redisUID := int64(999)
+
+	return &corev1.PodSecurityContext{
+		RunAsNonRoot: boolPtr(true),
+		RunAsUser:    &redisUID,
+		RunAsGroup:   &redisUID,
+		FSGroup:      &redisUID,
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+}
+
+func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+	// If user provided custom security context, use it
+	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
+		return bench.Spec.Security.SecurityContext
+	}
+
+	// Redis alpine images use UID/GID 999
+	redisUID := int64(999)
+
+	return &corev1.SecurityContext{
+		RunAsNonRoot:             boolPtr(true),
+		RunAsUser:                &redisUID,
+		RunAsGroup:               &redisUID,
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
