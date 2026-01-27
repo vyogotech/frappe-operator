@@ -483,14 +483,23 @@ fi
 
 cd /home/frappe/frappe-bench
 
+echo "Checking directory permissions..."
+ls -ld sites || true
+id
+
 echo "Configuring Frappe bench..."
+
+# Create sites directory if it doesn't exist (safety check)
+mkdir -p sites
 
 # Create apps.txt from existing apps
 if [ -d "apps" ]; then
-    ls -1 apps > sites/apps.txt
+    echo "Creating apps.txt..."
+    ls -1 apps > sites/apps.txt || { echo "ERROR: Failed to write to sites/apps.txt. Check volume permissions."; exit 1; }
 fi
 
 # Create or update common_site_config.json
+echo "Creating common_site_config.json..."
 cat > sites/common_site_config.json <<EOF
 {
   "redis_cache": "redis://%s-redis-cache:6379",
