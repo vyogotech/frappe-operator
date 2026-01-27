@@ -37,6 +37,7 @@ metadata:
   namespace: default
 spec:
   frappeVersion: "version-15"
+  storageClassName: "ocs-external-storagecluster-cephfs" 
   imageConfig:
     repository: ghcr.io/rmallam/frappe_docker
     # Note: The e2e-test workflow will replace this with a local image if needed,
@@ -58,6 +59,10 @@ spec:
     default:
       enabled: false
       staticReplicas: 1
+  # Security context: Ensure volume is writable by group 0
+  security:
+    podSecurityContext:
+      fsGroup: 0
 ---
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite

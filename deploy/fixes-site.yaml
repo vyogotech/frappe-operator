@@ -4,7 +4,7 @@ metadata:
   name: new-site1
   namespace: frappe-fixes
 spec:
-  siteName: new-site1.apps.cluster-dz66n.dynamic.redhatworkshops.io
+  siteName: new-site1.apps.cluster-7sk98.dynamic.redhatworkshops.io 
   benchRef:
     name: new-bench
 

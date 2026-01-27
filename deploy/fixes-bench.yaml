@@ -2,7 +2,7 @@ apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
   name: new-bench
-  namespace: frappe-fixes
+  namespace: default
 spec:
   frappeVersion: "15.0.0"
   imageConfig:
