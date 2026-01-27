@@ -84,9 +84,9 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 1.0.0
-    created: "2026-01-27T04:46:36.21408196Z"
+    created: "2026-01-27T06:04:27.168064476Z"
     description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
-    digest: 4cba4916b79101305c912b376bdfde04052d4e137ffaa0be4d96a3cd3f2dcf28
+    digest: 41e82a976a02dec57004ea69a17142af19b32f118a3615a8bf4de92fb5287ed1
     home: https://github.com/vyogotech/frappe-operator
     icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/main/docs/assets/icon.png
     keywords:
@@ -106,4 +106,4 @@ entries:
     urls:
     - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-1.0.0.tgz
     version: 1.0.0
-generated: "2026-01-27T04:46:36.209583437Z"
+generated: "2026-01-27T06:04:27.162337961Z"
