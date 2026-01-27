@@ -82,47 +82,30 @@ jobs:
       - name: Verify Platform Detection
         run: |
           echo "Checking operator logs for platform detection..."
-          # Wait a bit for operator to process
-          sleep 30
-          LOGS=$(kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=200)
-          
-          if [ "${{ matrix.platform }}" == "openshift" ]; then
-            echo "$LOGS" | grep -i "Route" || (echo "FAILED: OpenShift Route API not detected" && exit 1)
-            echo "SUCCESS: OpenShift platform detected correctly."
-          else
-            echo "$LOGS" | grep -i "Route" && (echo "FAILED: OpenShift detected on vanilla K8s" && exit 1) || true
-            echo "SUCCESS: Vanilla Kubernetes environment confirmed."
-          fi
-
-      - name: Verify Security Compliance (runAsNonRoot)
-        run: |
-          echo "Verifying security compliance (runAsNonRoot) on ${{ matrix.platform }}..."
-          # Check all pods in default namespace (Bench, Workers, etc.)
-          NON_COMPLIANT=$(kubectl get pods -n default -o jsonpath='{range .items[*]}{.metadata.name}{": runAsNonRoot="}{.spec.securityContext.runAsNonRoot}{"\n"}{end}' | grep "runAsNonRoot=false" || true)
-          if [ ! -z "$NON_COMPLIANT" ]; then
-            echo "FAILED: Some pods are not running as non-root:"
-            echo "$NON_COMPLIANT"
-            exit 1
-          fi
-          echo "SUCCESS: All pods are compliant with non-root security requirements."
-
-      - name: Verify Resource Creation (Ingress/Route)
-        run: |
-          if [ "${{ matrix.platform }}" == "openshift" ]; then
-            echo "Verifying OpenShift Route Creation..."
-            if [ $(kubectl get routes.route.openshift.io -A --no-headers 2>/dev/null | wc -l) -eq 0 ]; then
-              echo "FAILED: No OpenShift Routes found"
-              exit 1
+          # Retry log check for up to 2 minutes to account for leader election
+          for i in {1..12}; do
+            LOGS=$(kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=500 2>/dev/null || echo "")
+            
+            if [ "${{ matrix.platform }}" == "openshift" ]; then
+              if echo "$LOGS" | grep -i "OpenShift platform detected"; then
+                echo "SUCCESS: OpenShift platform detected correctly."
+                exit 0
+              fi
+            else
+              if ! echo "$LOGS" | grep -i "OpenShift platform detected"; then
+                # On vanilla K8s, we want to confirm it did NOT detect OpenShift
+                # But we should wait until the manager has actually started.
+                if echo "$LOGS" | grep -i "starting manager"; then
+                  echo "SUCCESS: Vanilla Kubernetes environment confirmed (no OpenShift detected)."
+                  exit 0
+                fi
+              fi
             fi
-            echo "SUCCESS: OpenShift Route created."
-          else
-            echo "Verifying Ingress Creation..."
-            if [ $(kubectl get ingress -A --no-headers 2>/dev/null | wc -l) -eq 0 ]; then
-              echo "FAILED: No Ingresses found"
-              exit 1
-            fi
-            echo "SUCCESS: Ingress created."
-          fi
+            echo "Waiting for operator to start and detect platform (attempt $i)..."
+            sleep 10
+          done
+          echo "FAILED: Platform detection verification timed out."
+          exit 1
 
       - name: Wait for FrappeBench to be Ready
         run: |
@@ -154,11 +137,41 @@ jobs:
           echo "ERROR: FrappeSite did not reach Ready phase within timeout"
           exit 1
 
+      - name: Verify Resource Creation (Ingress/Route)
+        run: |
+          if [ "${{ matrix.platform }}" == "openshift" ]; then
+            echo "Verifying OpenShift Route Creation..."
+            if [ $(kubectl get routes.route.openshift.io -A --no-headers 2>/dev/null | wc -l) -eq 0 ]; then
+              echo "FAILED: No OpenShift Routes found"
+              exit 1
+            fi
+            echo "SUCCESS: OpenShift Route created."
+          else
+            echo "Verifying Ingress Creation..."
+            if [ $(kubectl get ingress -A --no-headers 2>/dev/null | wc -l) -eq 0 ]; then
+              echo "FAILED: No Ingresses found"
+              exit 1
+            fi
+            echo "SUCCESS: Ingress created."
+          fi
+
+      - name: Verify Security Compliance (runAsNonRoot)
+        run: |
+          echo "Verifying security compliance (runAsNonRoot) on ${{ matrix.platform }}..."
+          # Check all pods in default namespace (Bench, Workers, etc.)
+          NON_COMPLIANT=$(kubectl get pods -n default -o jsonpath='{range .items[*]}{.metadata.name}{": runAsNonRoot="}{.spec.securityContext.runAsNonRoot}{"\n"}{end}' | grep "runAsNonRoot=false" || true)
+          if [ ! -z "$NON_COMPLIANT" ]; then
+            echo "FAILED: Some pods are not running as non-root:"
+            echo "$NON_COMPLIANT"
+            exit 1
+          fi
+          echo "SUCCESS: All pods are compliant with non-root security requirements."
+
       - name: Export Operator Logs on Failure
         if: failure()
         run: |
           echo "==== Frappe Operator Logs ===="
-          kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=500
+          kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=1000
           
       - name: Cleanup
         if: always()

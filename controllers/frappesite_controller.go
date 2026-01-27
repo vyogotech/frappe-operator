@@ -1233,6 +1233,7 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Check if OpenShift Route API is available before trying to watch it
 	if r.isRouteAPIAvailable(mgr.GetConfig()) {
+		ctrl.Log.WithName("setup").Info("OpenShift platform detected - enabling Route support")
 		builder.Owns(&routev1.Route{})
 	}
 
