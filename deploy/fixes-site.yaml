@@ -1,10 +1,10 @@
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
 metadata:
-  name: new-site1
-  namespace: frappe-fixes
+  name: new-site2
+  namespace: default
 spec:
-  siteName: new-site1.apps.cluster-7sk98.dynamic.redhatworkshops.io 
+  siteName: new-site2.apps.cluster-5x9wt.dynamic.redhatworkshops.io
   benchRef:
     name: new-bench
 

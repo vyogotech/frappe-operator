@@ -37,7 +37,7 @@ metadata:
   namespace: default
 spec:
   frappeVersion: "version-15"
-  storageClassName: "ocs-external-storagecluster-cephfs" 
+  storageClassName: "standard" 
   imageConfig:
     repository: ghcr.io/rmallam/frappe_docker
     # Note: The e2e-test workflow will replace this with a local image if needed,

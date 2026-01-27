@@ -38,7 +38,7 @@ func TestFrappeBenchReconciler_getPodSecurityContext_Defaults(t *testing.T) {
 		},
 	}
 
-	psc := r.getPodSecurityContext(bench)
+	psc := r.getPodSecurityContext(context.TODO(), bench)
 
 	// With new OpenShift compatibility changes, this should be nil if no env vars are set
 	if psc != nil {
@@ -71,7 +71,7 @@ func TestFrappeBenchReconciler_getPodSecurityContext_Override(t *testing.T) {
 		},
 	}
 
-	psc := r.getPodSecurityContext(bench)
+	psc := r.getPodSecurityContext(context.TODO(), bench)
 
 	if psc == nil {
 		t.Fatal("Expected non-nil PodSecurityContext")
@@ -105,7 +105,7 @@ func TestFrappeBenchReconciler_getContainerSecurityContext_Defaults(t *testing.T
 		},
 	}
 
-	csc := r.getContainerSecurityContext(bench)
+	csc := r.getContainerSecurityContext(context.TODO(), bench)
 
 	// With new OpenShift compatibility changes, this should be nil if no env vars are set
 	if csc != nil {
@@ -138,7 +138,7 @@ func TestFrappeBenchReconciler_getContainerSecurityContext_Override(t *testing.T
 		},
 	}
 
-	csc := r.getContainerSecurityContext(bench)
+	csc := r.getContainerSecurityContext(context.TODO(), bench)
 
 	if csc == nil {
 		t.Fatal("Expected non-nil SecurityContext")
@@ -172,7 +172,7 @@ func TestFrappeSiteReconciler_getPodSecurityContext_Defaults(t *testing.T) {
 		},
 	}
 
-	psc := r.getPodSecurityContext(bench)
+	psc := r.getPodSecurityContext(context.TODO(), bench)
 
 	// With new OpenShift compatibility changes, this should be nil if no env vars are set
 	if psc != nil {
@@ -194,7 +194,7 @@ func TestFrappeSiteReconciler_getContainerSecurityContext_Defaults(t *testing.T)
 		},
 	}
 
-	csc := r.getContainerSecurityContext(bench)
+	csc := r.getContainerSecurityContext(context.TODO(), bench)
 
 	// With new OpenShift compatibility changes, this should be nil if no env vars are set
 	if csc != nil {
@@ -216,8 +216,8 @@ func TestSecurityContext_NoRootUser(t *testing.T) {
 		},
 	}
 
-	psc := r.getPodSecurityContext(bench)
-	csc := r.getContainerSecurityContext(bench)
+	psc := r.getPodSecurityContext(context.TODO(), bench)
+	csc := r.getContainerSecurityContext(context.TODO(), bench)
 
 	// Critical security check: ensure we never default to root USER (UID 0)
 	// Note: GID 0 is intentionally allowed for OpenShift arbitrary UID support
@@ -247,7 +247,7 @@ func TestSecurityContext_PSPCompliance(t *testing.T) {
 		},
 	}
 
-	psc := r.getPodSecurityContext(bench)
+	psc := r.getPodSecurityContext(context.TODO(), bench)
 
 	if psc == nil {
 		// Nil is compliant by definition (defer to platform)

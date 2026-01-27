@@ -799,6 +799,19 @@ else
     goto_update_config=0
 fi
 
+# Link apps.txt to site path for bench to find it
+# The apps.txt is in the sites directory, but bench expects it in the root
+echo "Debug: Current directory is $(pwd)"
+echo "Debug: Contents of $(pwd):"
+ls -la
+if [ -f sites/apps.txt ]; then
+    echo "Debug: sites/apps.txt found, creating link..."
+    ln -sf sites/apps.txt apps.txt || cp sites/apps.txt apps.txt || echo "Warning: Failed to create apps.txt in root"
+else
+    echo "Warning: sites/apps.txt not found!"
+fi
+ls -l apps.txt || true
+
 # Dynamically build the --install-app argument
 INSTALL_APP_ARG=""
 if [[ -n "$APPS_TO_INSTALL" ]]; then
@@ -854,6 +867,23 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
 else
     echo "ERROR: Unsupported DB provider: $DB_PROVIDER"
     exit 1
+fi
+
+# Create or update common_site_config.json
+echo "Creating common_site_config.json..."
+cat > sites/common_site_config.json <<EOF
+{
+  "redis_cache": "redis://%s-redis-cache:6379",
+  "redis_queue": "redis://%s-redis-queue:6379",
+  "socketio_port": 9000
+}
+EOF
+
+# Sync assets from the image cache to the Persistent Volume
+if [ -d "/home/frappe/assets_cache" ]; then
+    echo "Syncing pre-built assets from image to PVC..."
+    mkdir -p sites/assets
+    cp -rn /home/frappe/assets_cache/* sites/assets/ || true
 fi
 
 echo "Site $SITE_NAME created successfully!"
@@ -924,14 +954,6 @@ PYTHON_SCRIPT
 
 echo "Site initialization complete!"
 
-# Ensure everything is group-readable for OpenShift compatibility
-echo "Fixing permissions for OpenShift group 0..."
-if [ -d /home/frappe/frappe-bench/sites ]; then
-    # chmod contents only to avoid "Operation not permitted" on the mount point itself
-    find /home/frappe/frappe-bench/sites -mindepth 1 -exec chmod g+rwX {} + || true
-    find /home/frappe/frappe-bench/sites -mindepth 1 -exec chgrp 0 {} + || true
-fi
-
 # Exit success regardless of whether new-site ran
 exit 0
 `
@@ -952,7 +974,7 @@ exit 0
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:    "site-init",
@@ -963,13 +985,14 @@ exit 0
 								{
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
+									SubPath:   "frappe-sites",
 								},
 								{
 									Name:      "site-secrets",
 									MountPath: "/tmp/site-secrets",
 								},
 							},
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(ctx, bench),
 							// Removed: No environment variables for sensitive data
 							Env: []corev1.EnvVar{},
 						},
@@ -1137,7 +1160,7 @@ echo "Site $SITE_NAME dropped successfully!"
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						RestartPolicy:   corev1.RestartPolicyNever,
-						SecurityContext: r.getPodSecurityContext(bench),
+						SecurityContext: r.getPodSecurityContext(ctx, bench),
 						Containers: []corev1.Container{
 							{
 								Name:    "site-delete",
@@ -1155,7 +1178,7 @@ echo "Site $SITE_NAME dropped successfully!"
 										ReadOnly:  true,
 									},
 								},
-								SecurityContext: r.getContainerSecurityContext(bench),
+								SecurityContext: r.getContainerSecurityContext(ctx, bench),
 								Env:             []corev1.EnvVar{}, // No environment variables for sensitive data
 							},
 						},
@@ -1344,7 +1367,7 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 	return "", "", fmt.Errorf("unsupported database mode: %s", site.Spec.DBConfig.Mode)
 }
 
-func (r *FrappeSiteReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+func (r *FrappeSiteReconciler) getPodSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
 	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
 		return bench.Spec.Security.PodSecurityContext
 	}
@@ -1353,18 +1376,31 @@ func (r *FrappeSiteReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.Fr
 	defaultGID := getDefaultGID()
 	defaultFSGroup := getDefaultFSGroup()
 
-	return &corev1.PodSecurityContext{
+	secCtx := &corev1.PodSecurityContext{
 		RunAsNonRoot: boolPtr(true),
-		RunAsUser:    defaultUID,
-		RunAsGroup:   defaultGID,
-		FSGroup:      defaultFSGroup,
+		// RunAsUser:    defaultUID,
+		// RunAsGroup:   defaultGID,
+		FSGroup: defaultFSGroup,
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
 	}
+
+	if !isPlatformOpenShift(ctx, r.Client) {
+		secCtx.RunAsUser = defaultUID
+		secCtx.RunAsGroup = defaultGID
+	} else {
+		// On OpenShift, rely on SCC restricted-v2 to inject FSGroup
+		// set FSGroup to 0 to trigger recursive relabeling - REMOVED for restricted-v2
+		// Skip RunAsUser/RunAsGroup to allow SCC to assign them
+		secCtx.FSGroup = nil
+		secCtx.SupplementalGroups = nil
+	}
+
+	return secCtx
 }
 
-func (r *FrappeSiteReconciler) getContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+func (r *FrappeSiteReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
 	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
 		return bench.Spec.Security.SecurityContext
 	}
@@ -1372,14 +1408,21 @@ func (r *FrappeSiteReconciler) getContainerSecurityContext(bench *vyogotechv1alp
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 
-	return &corev1.SecurityContext{
-		RunAsNonRoot:             boolPtr(true),
-		RunAsUser:                defaultUID,
-		RunAsGroup:               defaultGID,
+	secCtx := &corev1.SecurityContext{
+		RunAsNonRoot: boolPtr(true),
+		// RunAsUser:                defaultUID,
+		// RunAsGroup:               defaultGID,
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
 		ReadOnlyRootFilesystem: boolPtr(false),
 	}
+
+	if !isPlatformOpenShift(ctx, r.Client) {
+		secCtx.RunAsUser = defaultUID
+		secCtx.RunAsGroup = defaultGID
+	}
+
+	return secCtx
 }

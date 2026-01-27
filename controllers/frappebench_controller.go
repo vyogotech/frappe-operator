@@ -54,6 +54,8 @@ const frappeBenchFinalizer = "vyogo.tech/bench-finalizer"
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappebenches/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
+//+kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch
 //+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
@@ -489,13 +491,12 @@ id
 
 echo "Configuring Frappe bench..."
 
-# Create sites directory if it doesn't exist (safety check)
+# Create sites directory if it doesn't exist
 mkdir -p sites
 
 # Test write access
 if ! touch sites/.permission_test; then
     echo "ERROR: sites directory is NOT writable by $(whoami) (UID $(id -u), GID $(id -g))."
-    echo "Directory details:"
     ls -ld sites
     exit 1
 fi
@@ -504,7 +505,8 @@ rm sites/.permission_test
 # Create apps.txt from existing apps
 if [ -d "apps" ]; then
     echo "Creating apps.txt..."
-    ls -1 apps > sites/apps.txt || { echo "ERROR: Failed to write to sites/apps.txt. Check volume permissions."; exit 1; }
+    # Write to sites/apps.txt since that is the shared volume
+    ls -1 apps > sites/apps.txt || { echo "ERROR: Failed to write to sites/apps.txt"; exit 1; }
 fi
 
 # Create or update common_site_config.json
@@ -521,7 +523,8 @@ EOF
 if [ -d "/home/frappe/assets_cache" ]; then
     echo "Syncing pre-built assets from image to PVC..."
     mkdir -p sites/assets
-    cp -rup /home/frappe/assets_cache/* sites/assets/
+    # Use -n to not overwrite existing files, preserving permissions where possible
+    cp -rn /home/frappe/assets_cache/* sites/assets/ || true
 fi
 
 echo "Bench configuration complete"
@@ -544,7 +547,7 @@ echo "Bench configuration complete"
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:    "bench-init",
@@ -558,7 +561,7 @@ echo "Bench configuration complete"
 									SubPath:   "frappe-sites",
 								},
 							},
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(ctx, bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "SKIP_BENCH_BUILD",

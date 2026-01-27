@@ -31,6 +31,7 @@ import (
 	"github.com/vyogotech/frappe-operator/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -107,21 +108,24 @@ func (r *FrappeSiteReconciler) generatePassword(length int) string {
 	return string(password)
 }
 
-// isOpenShiftPlatform checks if we're running on OpenShift
-func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
+// isPlatformOpenShift checks if we're running on OpenShift
+func isPlatformOpenShift(ctx context.Context, c client.Client) bool {
 	logger := log.FromContext(ctx)
 	// Try to list Routes to check if API is available
 	routeList := &routev1.RouteList{}
-	err := r.List(ctx, routeList)
+	err := c.List(ctx, routeList)
 
 	if err != nil {
-		logger.Info("Platform detection check failed", "error", err)
+		logger.V(1).Info("Platform detection check failed", "error", err)
 		return false
 	}
 
 	// If we can list Routes successfully, we're on OpenShift
-	logger.Info("OpenShift platform detected successfully")
 	return true
+}
+
+func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
+	return isPlatformOpenShift(ctx, r.Client)
 }
 
 // getDefaultUID returns the default UID for security contexts
@@ -156,6 +160,21 @@ func getEnvAsInt64(key string, defaultValue int64) int64 {
 		return defaultValue
 	}
 	return parsed
+}
+
+// getNamespaceMCSLabel fetches the OpenShift MCS label (categories) for a namespace
+// This ensures all pods in a bench share the same SELinux context to access shared volumes.
+func getNamespaceMCSLabel(ctx context.Context, c client.Client, namespaceName string) string {
+	ns := &corev1.Namespace{}
+	err := c.Get(ctx, types.NamespacedName{Name: namespaceName}, ns)
+	if err != nil {
+		return ""
+	}
+
+	if ns.Annotations != nil {
+		return ns.Annotations["openshift.io/sa.scc.mcs"]
+	}
+	return ""
 }
 
 // Helper functions for pointer types
