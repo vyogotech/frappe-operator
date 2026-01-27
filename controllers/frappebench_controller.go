@@ -492,6 +492,15 @@ echo "Configuring Frappe bench..."
 # Create sites directory if it doesn't exist (safety check)
 mkdir -p sites
 
+# Test write access
+if ! touch sites/.permission_test; then
+    echo "ERROR: sites directory is NOT writable by $(whoami) (UID $(id -u), GID $(id -g))."
+    echo "Directory details:"
+    ls -ld sites
+    exit 1
+fi
+rm sites/.permission_test
+
 # Create apps.txt from existing apps
 if [ -d "apps" ]; then
     echo "Creating apps.txt..."
@@ -546,6 +555,7 @@ echo "Bench configuration complete"
 								{
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
+									SubPath:   "frappe-sites",
 								},
 							},
 							SecurityContext: r.getContainerSecurityContext(bench),

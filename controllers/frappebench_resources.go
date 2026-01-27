@@ -491,6 +491,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 								{
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
+									SubPath:   "frappe-sites",
 								},
 							},
 							Resources:       r.getGunicornResources(bench),
@@ -664,6 +665,7 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 								{
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
+									SubPath:   "frappe-sites",
 								},
 							},
 							Resources:       r.getNginxResources(bench),
@@ -805,6 +807,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 								{
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
+									SubPath:   "frappe-sites",
 								},
 							},
 							Resources:       r.getSocketIOResources(bench),
@@ -897,6 +900,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 								{
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
+									SubPath:   "frappe-sites",
 								},
 							},
 							Resources:       r.getSchedulerResources(bench),
@@ -1058,6 +1062,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 								{
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
+									SubPath:   "frappe-sites",
 								},
 							},
 							Resources:       resources,
@@ -1595,11 +1600,16 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.F
 	defaultGID := getDefaultGID()
 	defaultFSGroup := getDefaultFSGroup()
 
+	// Default FSGroupChangePolicy to Always to ensure volume permissions are fixed on every mount
+	// Critical for OpenShift and certain storage provisioners (CephFS, etc.)
+	fsGroupChangePolicy := corev1.FSGroupChangeAlways
+
 	secCtx := &corev1.PodSecurityContext{
-		RunAsNonRoot: boolPtr(true),
-		RunAsUser:    defaultUID,
-		RunAsGroup:   defaultGID,
-		FSGroup:      defaultFSGroup,
+		RunAsNonRoot:        boolPtr(true),
+		RunAsUser:           defaultUID,
+		RunAsGroup:          defaultGID,
+		FSGroup:             defaultFSGroup,
+		FSGroupChangePolicy: &fsGroupChangePolicy,
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -1620,6 +1630,9 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.F
 		if userCtx.FSGroup != nil {
 			secCtx.FSGroup = userCtx.FSGroup
 		}
+		if userCtx.FSGroupChangePolicy != nil {
+			secCtx.FSGroupChangePolicy = userCtx.FSGroupChangePolicy
+		}
 		if userCtx.SupplementalGroups != nil {
 			secCtx.SupplementalGroups = userCtx.SupplementalGroups
 		}
@@ -1631,9 +1644,6 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.F
 		}
 		if userCtx.Sysctls != nil {
 			secCtx.Sysctls = userCtx.Sysctls
-		}
-		if userCtx.FSGroupChangePolicy != nil {
-			secCtx.FSGroupChangePolicy = userCtx.FSGroupChangePolicy
 		}
 		if userCtx.SeccompProfile != nil {
 			secCtx.SeccompProfile = userCtx.SeccompProfile

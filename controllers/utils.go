@@ -125,39 +125,24 @@ func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
 }
 
 // getDefaultUID returns the default UID for security contexts
-// Returns nil for OpenShift (let platform assign) but can be overridden via FRAPPE_DEFAULT_UID env var
+// Defaults to 1001 (OpenShift standard) but can be overridden via FRAPPE_DEFAULT_UID env var
 func getDefaultUID() *int64 {
-	if value := os.Getenv("FRAPPE_DEFAULT_UID"); value != "" {
-		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return &parsed
-		}
-	}
-	// Return nil to let OpenShift assign UID automatically
-	return nil
+	uid := getEnvAsInt64("FRAPPE_DEFAULT_UID", 1001)
+	return &uid
 }
 
 // getDefaultGID returns the default GID for security contexts
-// Returns nil for OpenShift (let platform assign) but can be overridden via FRAPPE_DEFAULT_GID env var
+// Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_GID env var
 func getDefaultGID() *int64 {
-	if value := os.Getenv("FRAPPE_DEFAULT_GID"); value != "" {
-		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return &parsed
-		}
-	}
-	// Return nil to let OpenShift assign GID automatically
-	return nil
+	gid := getEnvAsInt64("FRAPPE_DEFAULT_GID", 0)
+	return &gid
 }
 
 // getDefaultFSGroup returns the default FSGroup for security contexts
-// Returns nil for OpenShift (let platform assign) but can be overridden via FRAPPE_DEFAULT_FSGROUP env var
+// Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_FSGROUP env var
 func getDefaultFSGroup() *int64 {
-	if value := os.Getenv("FRAPPE_DEFAULT_FSGROUP"); value != "" {
-		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return &parsed
-		}
-	}
-	// Return nil to let OpenShift assign FSGroup automatically
-	return nil
+	fsGroup := getEnvAsInt64("FRAPPE_DEFAULT_FSGROUP", 0)
+	return &fsGroup
 }
 
 // getEnvAsInt64 retrieves an environment variable as int64 with a default fallback
