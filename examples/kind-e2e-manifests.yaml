@@ -59,10 +59,6 @@ spec:
     default:
       enabled: false
       staticReplicas: 1
-  # Security context: Ensure volume is writable by group 0
-  security:
-    podSecurityContext:
-      fsGroup: 0
 ---
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
