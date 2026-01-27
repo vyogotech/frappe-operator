@@ -1590,10 +1590,7 @@ func (r *FrappeBenchReconciler) getRedisAddress(bench *vyogotechv1alpha1.FrappeB
 }
 
 func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
-	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
-		return bench.Spec.Security.PodSecurityContext
-	}
-	// Default to 1001 (OpenShift standard) but allow override via environment
+	// Start with defaults
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 	defaultFSGroup := getDefaultFSGroup()
@@ -1608,23 +1605,50 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.F
 		},
 	}
 
-	// Add SELinux options from bench spec if provided (for OpenShift RWX volumes)
-	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil && bench.Spec.Security.PodSecurityContext.SELinuxOptions != nil {
-		secCtx.SELinuxOptions = bench.Spec.Security.PodSecurityContext.SELinuxOptions
+	// Merge with user-provided settings if any
+	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
+		userCtx := bench.Spec.Security.PodSecurityContext
+		if userCtx.RunAsNonRoot != nil {
+			secCtx.RunAsNonRoot = userCtx.RunAsNonRoot
+		}
+		if userCtx.RunAsUser != nil {
+			secCtx.RunAsUser = userCtx.RunAsUser
+		}
+		if userCtx.RunAsGroup != nil {
+			secCtx.RunAsGroup = userCtx.RunAsGroup
+		}
+		if userCtx.FSGroup != nil {
+			secCtx.FSGroup = userCtx.FSGroup
+		}
+		if userCtx.SupplementalGroups != nil {
+			secCtx.SupplementalGroups = userCtx.SupplementalGroups
+		}
+		if userCtx.SELinuxOptions != nil {
+			secCtx.SELinuxOptions = userCtx.SELinuxOptions
+		}
+		if userCtx.WindowsOptions != nil {
+			secCtx.WindowsOptions = userCtx.WindowsOptions
+		}
+		if userCtx.Sysctls != nil {
+			secCtx.Sysctls = userCtx.Sysctls
+		}
+		if userCtx.FSGroupChangePolicy != nil {
+			secCtx.FSGroupChangePolicy = userCtx.FSGroupChangePolicy
+		}
+		if userCtx.SeccompProfile != nil {
+			secCtx.SeccompProfile = userCtx.SeccompProfile
+		}
 	}
 
 	return secCtx
 }
 
 func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
-	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
-		return bench.Spec.Security.SecurityContext
-	}
-	// Default to 1001 (OpenShift standard) but allow override via environment
+	// Start with defaults
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 
-	return &corev1.SecurityContext{
+	secCtx := &corev1.SecurityContext{
 		RunAsNonRoot:             boolPtr(true),
 		RunAsUser:                defaultUID,
 		RunAsGroup:               defaultGID,
@@ -1634,6 +1658,49 @@ func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1al
 		},
 		ReadOnlyRootFilesystem: boolPtr(false),
 	}
+
+	// Merge with user-provided settings if any
+	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
+		userCtx := bench.Spec.Security.SecurityContext
+		if userCtx.RunAsNonRoot != nil {
+			secCtx.RunAsNonRoot = userCtx.RunAsNonRoot
+		}
+		if userCtx.RunAsUser != nil {
+			secCtx.RunAsUser = userCtx.RunAsUser
+		}
+		if userCtx.RunAsGroup != nil {
+			secCtx.RunAsGroup = userCtx.RunAsGroup
+		}
+		if userCtx.Privileged != nil {
+			secCtx.Privileged = userCtx.Privileged
+		}
+		if userCtx.AllowPrivilegeEscalation != nil {
+			secCtx.AllowPrivilegeEscalation = userCtx.AllowPrivilegeEscalation
+		}
+		if userCtx.Capabilities != nil {
+			secCtx.Capabilities = userCtx.Capabilities
+		}
+		if userCtx.ReadOnlyRootFilesystem != nil {
+			secCtx.ReadOnlyRootFilesystem = userCtx.ReadOnlyRootFilesystem
+		}
+		if userCtx.SELinuxOptions != nil {
+			secCtx.SELinuxOptions = userCtx.SELinuxOptions
+		}
+		if userCtx.WindowsOptions != nil {
+			secCtx.WindowsOptions = userCtx.WindowsOptions
+		}
+		if userCtx.RunAsGroup != nil {
+			secCtx.RunAsGroup = userCtx.RunAsGroup
+		}
+		if userCtx.ProcMount != nil {
+			secCtx.ProcMount = userCtx.ProcMount
+		}
+		if userCtx.SeccompProfile != nil {
+			secCtx.SeccompProfile = userCtx.SeccompProfile
+		}
+	}
+
+	return secCtx
 }
 
 func (r *FrappeBenchReconciler) getRedisPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {

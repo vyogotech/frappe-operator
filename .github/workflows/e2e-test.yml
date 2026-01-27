@@ -139,6 +139,25 @@ jobs:
           echo "ERROR: FrappeSite did not reach Ready phase within timeout"
           exit 1
 
+      - name: Verify In-Cluster Accessibility
+        run: |
+          echo "Testing site accessibility from inside the cluster..."
+          # Get the name of any running pod to use for the check
+          POD_NAME=$(kubectl get pods -l app.kubernetes.io/name=frappe-bench -o jsonpath='{.items[0].metadata.name}')
+          echo "Using pod: $POD_NAME"
+          
+          # Curl the nginx service with the correct Host header
+          RESPONSE=$(kubectl exec $POD_NAME -- curl -sI -H "Host: e2e.localhost" http://e2e-test-bench-nginx:8080)
+          echo "Response:"
+          echo "$RESPONSE"
+          
+          if echo "$RESPONSE" | grep -q "HTTP/1.1 200 OK"; then
+            echo "SUCCESS: Site e2e.localhost is accessible from inside the cluster."
+          else
+            echo "ERROR: Site e2e.localhost is NOT accessible (unexpected response)."
+            exit 1
+          fi
+
       - name: Verify Resource Creation (Ingress/Route)
         run: |
           if [ "${{ matrix.platform }}" == "openshift" ]; then
