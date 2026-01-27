@@ -57,6 +57,13 @@ jobs:
             --set crds.install=true \
             --wait --timeout 10m
 
+      - name: Mock OpenShift Environment
+        if: matrix.platform == 'openshift'
+        run: |
+          echo "Installing OpenShift Route CRD to mock platform..."
+          kubectl apply -f https://raw.githubusercontent.com/openshift/router/master/deploy/route_crd.yaml
+          sleep 5
+
       - name: Install Frappe Operator
         run: |
           helm upgrade --install frappe-operator ./helm/frappe-operator \
@@ -69,11 +76,6 @@ jobs:
             --wait \
             --timeout 10m
 
-      - name: Mock OpenShift Environment
-        if: matrix.platform == 'openshift'
-        run: |
-          echo "Installing OpenShift Route CRD to mock platform..."
-          kubectl apply -f https://raw.githubusercontent.com/openshift/router/master/deploy/route_crd.yaml
 
       - name: Deploy Test Bench and Site
         run: |
