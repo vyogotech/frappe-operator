@@ -5,6 +5,29 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.2] - 2026-01-28
+
+### Fixed
+- **Missing Namespace RBAC**: Added missing `namespaces` list/watch permissions to the operator's `ClusterRole`, resolving `forbidden` errors during platform detection and SELinux MCS label retrieval on OpenShift.
+
+---
+
+## [2.6.1] - 2026-01-28
+
+### Added
+- **Route Support for FrappeBench**: Added ownership tracking for OpenShift Routes at the bench level.
+- **Improved Platform Detection**: Refactored platform detection to use a robust Discovery Client, reducing API overhead and improving reliability.
+- **Custom-Host Route Support**: Added RBAC permissions for managing Route custom hosts.
+
+### Fixed
+- **OpenShift SCC Violations (Redis)**: Fixed `forbidden` errors for Redis pods by removing hardcoded UID/GID 999 and GID 0 in security context specifications.
+- **OpenShift SCC Violations (Init Jobs)**: Resolved security standard violations in `new-bench-init` by defaulting restricted IDs (UID/GID/FSGroup) to `nil`, allowing OpenShift to manage their values.
+- **Redis Reconciliation**: Fixed an issue where existing Redis StatefulSets were not being updated with new security contexts due to missing `ResourceVersion` handling.
+- **Security Context Refactor**: Synchronized security context helpers across all components (Bench, Site, Redis) to use a consistent, platform-aware logic.
+- **Bench Init Path Fix**: Fixed `apps.txt` creation path and symlinking for production images.
+
+---
+
 ## [2.5.0] - 2026-01-13
 
 ### Added
@@ -209,6 +232,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Major Features |
 |---------|--------------|----------------|
+| 2.6.2   | 2026-01-28   | Missing Namespace RBAC fix |
+| 2.6.1   | 2026-01-28   | OpenShift SCC fixes, Redis reconciliation refactor, Robust platform detection |
 | 2.4.0   | 2026-01-13   | External database support, Robustness improvements, CLI compatibility |
 | 2.0.0   | 2024-11-27   | Hybrid app installation, Enterprise Git control, FPM support |
 | 1.0.0   | 2024-11-20   | Initial release, Core CRDs, Site management |

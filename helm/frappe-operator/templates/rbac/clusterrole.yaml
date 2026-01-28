@@ -54,6 +54,7 @@ rules:
   - pods
   - secrets
   - services
+  - namespaces
   verbs:
   - create
   - delete
