@@ -1134,6 +1134,14 @@ fi
 
 cd /home/frappe/frappe-bench
 
+# Link apps.txt to site path for bench to find it
+# The apps.txt is in the sites directory, but bench expects it in the root
+if [ -f sites/apps.txt ]; then
+    ln -sf sites/apps.txt apps.txt || cp sites/apps.txt apps.txt || echo "Warning: Failed to create apps.txt in root"
+else
+    echo "Warning: sites/apps.txt not found!"
+fi
+
 # Read credentials from mounted secret files
 DB_ROOT_USER=$(cat /tmp/secrets/db_root_user)
 DB_ROOT_PASSWORD=$(cat /tmp/secrets/db_root_password)
@@ -1172,6 +1180,7 @@ echo "Site $SITE_NAME dropped successfully!"
 									{
 										Name:      "sites",
 										MountPath: "/home/frappe/frappe-bench/sites",
+										SubPath:   "frappe-sites",
 									},
 									{
 										Name:      "deletion-secret",

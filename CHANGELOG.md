@@ -5,6 +5,13 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.3] - 2026-01-28
+
+### Fixed
+- **Site Deletion Failure**: Fixed an issue where the site deletion job failed to find `apps.txt` by adding the same symlinking logic and volume `SubPath` mounting used in the initialization job.
+
+---
+
 ## [2.6.2] - 2026-01-28
 
 ### Fixed
@@ -232,6 +239,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Release Date | Major Features |
 |---------|--------------|----------------|
+| 2.6.3   | 2026-01-28   | Site deletion apps.txt fix |
 | 2.6.2   | 2026-01-28   | Missing Namespace RBAC fix |
 | 2.6.1   | 2026-01-28   | OpenShift SCC fixes, Redis reconciliation refactor, Robust platform detection |
 | 2.4.0   | 2026-01-13   | External database support, Robustness improvements, CLI compatibility |
