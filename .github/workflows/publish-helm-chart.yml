@@ -76,16 +76,21 @@ jobs:
 
       - name: Generate Helm repository index
         run: |
-          echo "🔍 Generating Helm repo index..."
+          REPO_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/helm-repo"
+          echo "🔍 Generating Helm repo index for $REPO_URL..."
           helm repo index docs/helm-repo \
-            --url "https://vyogotech.github.io/frappe-operator/helm-repo" \
+            --url "$REPO_URL" \
             --merge docs/helm-repo/index.yaml 2>/dev/null || \
           helm repo index docs/helm-repo \
-            --url "https://vyogotech.github.io/frappe-operator/helm-repo"
+            --url "$REPO_URL"
           echo "✅ Index generated"
           cat docs/helm-repo/index.yaml | head -20
 
       - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional PAT for pushing to the other repository
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           git add docs/helm-repo/
           if git diff --staged --quiet; then
@@ -93,9 +98,27 @@ jobs:
           else
             echo "📝 Committing changes..."
             git commit -m "chore: publish Helm chart v${{ steps.version.outputs.version }}"
-            echo "🚀 Pushing to repository..."
-            git push
-            echo "✅ Changes pushed successfully"
+            
+            echo "🚀 Pushing to current repository..."
+            git push origin ${{ github.ref_name }}
+            
+            # If PAT_TOKEN is available, also push to the other repository
+            if [ -n "$PAT_TOKEN" ]; then
+              OTHER_REPO=""
+              if [ "${{ github.repository_owner }}" == "rmallam" ]; then
+                OTHER_REPO="vyogotech/frappe-operator"
+              else
+                OTHER_REPO="rmallam/frappe-operator"
+              fi
+              
+              echo "🚀 Pushing to secondary repository: $OTHER_REPO..."
+              git remote add secondary "https://$PAT_TOKEN@github.com/$OTHER_REPO.git"
+              git push secondary ${{ github.ref_name }}
+              echo "✅ Pushed to both repositories"
+            else
+              echo "ℹ️  PAT_TOKEN not found. Skipping push to secondary repository."
+              echo "💡 TIP: add a PAT_TOKEN secret to push to both rmallam and vyogotech automatically."
+            fi
           fi
 
       - name: Verify chart package
