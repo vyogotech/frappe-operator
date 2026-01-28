@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -41,7 +42,19 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 
+// gate controller tests if etcd (envtest) binary is unavailable
+var skipControllerTests bool
+
+func init() {
+	if _, err := os.Stat("/usr/local/kubebuilder/bin/etcd"); os.IsNotExist(err) {
+		skipControllerTests = true
+	}
+}
+
 func TestAPIs(t *testing.T) {
+	if skipControllerTests {
+		t.Skip("Skipping controller tests: envtest control plane not available")
+	}
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")

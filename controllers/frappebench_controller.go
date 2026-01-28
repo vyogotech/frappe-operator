@@ -94,6 +94,10 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return result, nil
 	}
 
+	if !bench.DeletionTimestamp.IsZero() {
+		return ctrl.Result{}, nil
+	}
+
 	// Set progressing condition at start
 	r.setCondition(bench, metav1.Condition{
 		Type:    "Progressing",
@@ -401,6 +405,9 @@ func (r *FrappeBenchReconciler) updateStatus(ctx context.Context, bench *vyogote
 
 // getOperatorConfig retrieves the operator-level configuration
 func (r *FrappeBenchReconciler) getOperatorConfig(ctx context.Context, namespace string) (*corev1.ConfigMap, error) {
+	if r.Client == nil {
+		return nil, fmt.Errorf("client not initialized")
+	}
 	configMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      "frappe-operator-config",

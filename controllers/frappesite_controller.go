@@ -497,6 +497,10 @@ func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1alpha1.FrappeSit
 	config := site.Spec.DBConfig
 
 	if bench.Spec.DBConfig == nil {
+		// Default provider to MariaDB if not specified anywhere
+		if config.Provider == "" {
+			config.Provider = "mariadb"
+		}
 		return config
 	}
 

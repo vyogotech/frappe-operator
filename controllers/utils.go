@@ -110,6 +110,9 @@ func (r *FrappeSiteReconciler) generatePassword(length int) string {
 
 // isPlatformOpenShift checks if we're running on OpenShift
 func isPlatformOpenShift(ctx context.Context, c client.Client) bool {
+	if c == nil {
+		return false
+	}
 	logger := log.FromContext(ctx)
 	// Try to list Routes to check if API is available
 	routeList := &routev1.RouteList{}

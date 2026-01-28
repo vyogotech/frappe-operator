@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,6 +69,10 @@ var _ = Describe("FrappeBench Controller", func() {
 		_ = appsv1.AddToScheme(scheme)
 
 		fakeClient = fake.NewClientBuilder().WithScheme(scheme).Build()
+
+		// Seed a default StorageClass to satisfy storage provisioning lookups in tests
+		sc := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard", Annotations: map[string]string{"storageclass.kubernetes.io/is-default-class": "true"}}, Provisioner: "kubernetes.io/no-provisioner"}
+		_ = fakeClient.Create(ctx, sc)
 
 		reconciler = &FrappeBenchReconciler{
 			Client:   fakeClient,
