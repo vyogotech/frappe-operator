@@ -1,0 +1,33 @@
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: my-bench
+  namespace: frappe-operator-system
+spec:
+  storageClassName: ocs-external-storagecluster-cephfs
+  frappeVersion: "version-15"
+  apps:
+    - name: erpnext
+      source: image
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: my-site
+  namespace: frappe-operator-system
+spec:
+  benchRef:
+    name: my-bench
+    namespace: frappe-operator-system
+  siteName: my-site.example.com
+  dbConfig:
+    provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: frappe-operator-system
+  domain: my-site.example.com
+  ingress:
+    enabled: true
+  ingressClassName: nginx

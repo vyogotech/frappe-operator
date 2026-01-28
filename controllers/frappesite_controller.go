@@ -48,8 +48,9 @@ const frappeSiteFinalizer = "vyogo.tech/site-finalizer"
 // FrappeSiteReconciler reconciles a FrappeSite object
 type FrappeSiteReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme      *runtime.Scheme
+	Recorder    record.EventRecorder
+	IsOpenShift bool
 }
 
 // int32Ptr returns a pointer to the passed int32 value
@@ -62,7 +63,7 @@ type FrappeSiteReconciler struct {
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets;services;configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs;databases;users;grants,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=route.openshift.io,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop
@@ -1256,6 +1257,7 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Check if OpenShift Route API is available before trying to watch it
 	if r.isRouteAPIAvailable(mgr.GetConfig()) {
+		r.IsOpenShift = true
 		ctrl.Log.WithName("setup").Info("OpenShift platform detected - enabling Route support")
 		builder.Owns(&routev1.Route{})
 	}
