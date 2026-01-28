@@ -43,8 +43,9 @@ import (
 // FrappeBenchReconciler reconciles a FrappeBench object
 type FrappeBenchReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme      *runtime.Scheme
+	Recorder    record.EventRecorder
+	IsOpenShift bool
 }
 
 const frappeBenchFinalizer = "vyogo.tech/bench-finalizer"

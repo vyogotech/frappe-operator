@@ -125,7 +125,7 @@ func isPlatformOpenShift(ctx context.Context, c client.Client) bool {
 }
 
 func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
-	return isPlatformOpenShift(ctx, r.Client)
+	return r.IsOpenShift
 }
 
 // getDefaultUID returns the default UID for security contexts
