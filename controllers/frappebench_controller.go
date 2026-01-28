@@ -33,6 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -795,13 +797,40 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 
 // SetupWithManager sets up the controller with the Manager
 func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Set up event recorder
-	if r.Recorder == nil {
-		r.Recorder = mgr.GetEventRecorderFor("frappebench-controller")
+	builder := ctrl.NewControllerManagedBy(mgr).
+		For(&vyogotechv1alpha1.FrappeBench{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&batchv1.Job{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{})
+
+	// Detect platform
+	if r.isRouteAPIAvailable(mgr.GetConfig()) {
+		r.IsOpenShift = true
+		ctrl.Log.WithName("setup").Info("OpenShift platform detected for FrappeBench")
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&vyogotechv1alpha1.FrappeBench{}).
-		Owns(&batchv1.Job{}).
-		Complete(r)
+	return builder.Complete(r)
+}
+
+// isRouteAPIAvailable checks if the OpenShift Route API is available in the cluster
+func (r *FrappeBenchReconciler) isRouteAPIAvailable(config *rest.Config) bool {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return false
+	}
+
+	apiGroupList, err := discoveryClient.ServerGroups()
+	if err != nil {
+		return false
+	}
+
+	for _, group := range apiGroupList.Groups {
+		if group.Name == "route.openshift.io" {
+			return true
+		}
+	}
+	return false
 }

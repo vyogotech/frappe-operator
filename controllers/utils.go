@@ -131,21 +131,42 @@ func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
 // getDefaultUID returns the default UID for security contexts
 // Defaults to 1001 (OpenShift standard) but can be overridden via FRAPPE_DEFAULT_UID env var
 func getDefaultUID() *int64 {
-	uid := getEnvAsInt64("FRAPPE_DEFAULT_UID", 1001)
+	value := os.Getenv("FRAPPE_DEFAULT_UID")
+	if value == "" {
+		return nil
+	}
+	uid, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return nil
+	}
 	return &uid
 }
 
 // getDefaultGID returns the default GID for security contexts
 // Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_GID env var
 func getDefaultGID() *int64 {
-	gid := getEnvAsInt64("FRAPPE_DEFAULT_GID", 0)
+	value := os.Getenv("FRAPPE_DEFAULT_GID")
+	if value == "" {
+		return nil
+	}
+	gid, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return nil
+	}
 	return &gid
 }
 
 // getDefaultFSGroup returns the default FSGroup for security contexts
 // Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_FSGROUP env var
 func getDefaultFSGroup() *int64 {
-	fsGroup := getEnvAsInt64("FRAPPE_DEFAULT_FSGROUP", 0)
+	value := os.Getenv("FRAPPE_DEFAULT_FSGROUP")
+	if value == "" {
+		return nil
+	}
+	fsGroup, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return nil
+	}
 	return &fsGroup
 }
 

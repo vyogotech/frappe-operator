@@ -320,54 +320,56 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 	stsName := fmt.Sprintf("%s-%s", bench.Name, role)
 	sts := &appsv1.StatefulSet{}
 
+	existing := true
 	err := r.Get(ctx, types.NamespacedName{Name: stsName, Namespace: bench.Namespace}, sts)
-	if err == nil {
-		return nil
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+		existing = false
+		logger.Info("Creating Redis StatefulSet", "statefulset", stsName)
 	}
-
-	if !errors.IsNotFound(err) {
-		return err
-	}
-
-	logger.Info("Creating Redis StatefulSet", "statefulset", stsName)
 
 	replicas := int32(1)
 	redisImage := r.getRedisImage(bench)
 
-	sts = &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
+	// If it doesn't exist, initialize common fields
+	if !existing {
+		sts.ObjectMeta = metav1.ObjectMeta{
 			Name:      stsName,
 			Namespace: bench.Namespace,
-			Labels:    r.benchLabels(bench),
+		}
+	}
+
+	// Update mutable fields
+	sts.Labels = r.benchLabels(bench)
+	sts.Spec = appsv1.StatefulSetSpec{
+		ServiceName: stsName,
+		Replicas:    &replicas,
+		Selector: &metav1.LabelSelector{
+			MatchLabels: r.componentLabels(bench, fmt.Sprintf("redis-%s", role)),
 		},
-		Spec: appsv1.StatefulSetSpec{
-			ServiceName: stsName,
-			Replicas:    &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: r.componentLabels(bench, fmt.Sprintf("redis-%s", role)),
+		Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: r.componentLabels(bench, fmt.Sprintf("redis-%s", role)),
 			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: r.componentLabels(bench, fmt.Sprintf("redis-%s", role)),
-				},
-				Spec: corev1.PodSpec{
-					SecurityContext: r.getRedisPodSecurityContext(bench),
-					Containers: []corev1.Container{
-						{
-							Name:    "redis",
-							Image:   redisImage,
-							Command: []string{"redis-server"},
-							// Disable RDB/AOF persistence to avoid stop-writes-on-bgsave-error in ephemeral environments
-							Args: []string{"--save", "", "--appendonly", "no", "--stop-writes-on-bgsave-error", "no"},
-							Ports: []corev1.ContainerPort{
-								{
-									ContainerPort: 6379,
-									Name:          "redis",
-								},
+			Spec: corev1.PodSpec{
+				SecurityContext: r.getRedisPodSecurityContext(bench),
+				Containers: []corev1.Container{
+					{
+						Name:    "redis",
+						Image:   redisImage,
+						Command: []string{"redis-server"},
+						// Disable RDB/AOF persistence to avoid stop-writes-on-bgsave-error in ephemeral environments
+						Args: []string{"--save", "", "--appendonly", "no", "--stop-writes-on-bgsave-error", "no"},
+						Ports: []corev1.ContainerPort{
+							{
+								ContainerPort: 6379,
+								Name:          "redis",
 							},
-							Resources:       r.getRedisResources(bench),
-							SecurityContext: r.getRedisContainerSecurityContext(bench),
 						},
+						Resources:       r.getRedisResources(bench),
+						SecurityContext: r.getRedisContainerSecurityContext(bench),
 					},
 				},
 			},
@@ -376,6 +378,10 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 
 	if err := controllerutil.SetControllerReference(bench, sts, r.Scheme); err != nil {
 		return err
+	}
+
+	if existing {
+		return r.Update(ctx, sts)
 	}
 
 	return r.Create(ctx, sts)
@@ -1615,7 +1621,7 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(ctx context.Context, bench
 	// For OpenShift, try to match the namespace default MCS label
 	// This ensures all pods in a bench can share the same volumes
 	logger := log.FromContext(ctx)
-	if isPlatformOpenShift(ctx, r.Client) {
+	if r.IsOpenShift {
 		logger.Info("OpenShift platform detected for Bench security context")
 
 		// 1. Dynamic MCS Labeling (matches namespace defaults)
@@ -1641,7 +1647,7 @@ func (r *FrappeBenchReconciler) getPodSecurityContext(ctx context.Context, bench
 	}
 
 	// Add default seccomp profile if not on OpenShift (OpenShift has its own defaults)
-	if !isPlatformOpenShift(ctx, r.Client) {
+	if !r.IsOpenShift {
 		secCtx.SeccompProfile = &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		}
@@ -1701,7 +1707,7 @@ func (r *FrappeBenchReconciler) getContainerSecurityContext(ctx context.Context,
 		ReadOnlyRootFilesystem: boolPtr(false),
 	}
 
-	if !isPlatformOpenShift(ctx, r.Client) {
+	if !r.IsOpenShift {
 		secCtx.RunAsUser = defaultUID
 		secCtx.RunAsGroup = defaultGID
 	}
@@ -1753,18 +1759,23 @@ func (r *FrappeBenchReconciler) getRedisPodSecurityContext(bench *vyogotechv1alp
 		return bench.Spec.Security.PodSecurityContext
 	}
 
-	// Redis alpine images use UID/GID 999
-	redisUID := int64(999)
-
-	return &corev1.PodSecurityContext{
+	secCtx := &corev1.PodSecurityContext{
 		RunAsNonRoot: boolPtr(true),
-		RunAsUser:    &redisUID,
-		RunAsGroup:   &redisUID,
-		FSGroup:      &redisUID,
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
 	}
+
+	// Only set fixed UIDs if not on OpenShift
+	if !r.IsOpenShift {
+		// Redis alpine images use UID/GID 999
+		redisUID := int64(999)
+		secCtx.RunAsUser = &redisUID
+		secCtx.RunAsGroup = &redisUID
+		secCtx.FSGroup = &redisUID
+	}
+
+	return secCtx
 }
 
 func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
@@ -1773,17 +1784,22 @@ func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotec
 		return bench.Spec.Security.SecurityContext
 	}
 
-	// Redis alpine images use UID/GID 999
-	redisUID := int64(999)
-
-	return &corev1.SecurityContext{
+	secCtx := &corev1.SecurityContext{
 		RunAsNonRoot:             boolPtr(true),
-		RunAsUser:                &redisUID,
-		RunAsGroup:               &redisUID,
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
 		ReadOnlyRootFilesystem: boolPtr(false),
 	}
+
+	// Only set fixed UIDs if not on OpenShift
+	if !r.IsOpenShift {
+		// Redis alpine images use UID/GID 999
+		redisUID := int64(999)
+		secCtx.RunAsUser = &redisUID
+		secCtx.RunAsGroup = &redisUID
+	}
+
+	return secCtx
 }
