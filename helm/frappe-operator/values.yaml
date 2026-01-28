@@ -10,7 +10,7 @@ operator:
   image:
     repository: ghcr.io/rmallam/frappe-operator
     pullPolicy: Always
-    tag: "latest"
+    tag: "v2.6.3"
   
   imagePullSecrets: []
   nameOverride: ""
