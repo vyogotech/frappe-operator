@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"testing"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
@@ -38,11 +39,11 @@ func TestFrappeBenchReconciler_getPodSecurityContext_Defaults(t *testing.T) {
 		},
 	}
 
-	psc := r.getPodSecurityContext(bench)
+	psc := r.getPodSecurityContext(context.TODO(), bench)
 
 	// With new OpenShift compatibility changes, this should be nil if no env vars are set
-	if psc != nil {
-		t.Errorf("Expected nil PodSecurityContext (defer to platform), got %v", psc)
+	if psc == nil {
+		t.Errorf("Expected non-nil PodSecurityContext")
 	}
 }
 
@@ -71,7 +72,7 @@ func TestFrappeBenchReconciler_getPodSecurityContext_Override(t *testing.T) {
 		},
 	}
 
-	psc := r.getPodSecurityContext(bench)
+	psc := r.getPodSecurityContext(context.TODO(), bench)
 
 	if psc == nil {
 		t.Fatal("Expected non-nil PodSecurityContext")
@@ -105,11 +106,11 @@ func TestFrappeBenchReconciler_getContainerSecurityContext_Defaults(t *testing.T
 		},
 	}
 
-	csc := r.getContainerSecurityContext(bench)
+	csc := r.getContainerSecurityContext(context.TODO(), bench)
 
 	// With new OpenShift compatibility changes, this should be nil if no env vars are set
-	if csc != nil {
-		t.Errorf("Expected nil SecurityContext (defer to platform), got %v", csc)
+	if csc == nil {
+		t.Errorf("Expected non-nil SecurityContext")
 	}
 }
 
@@ -138,7 +139,7 @@ func TestFrappeBenchReconciler_getContainerSecurityContext_Override(t *testing.T
 		},
 	}
 
-	csc := r.getContainerSecurityContext(bench)
+	csc := r.getContainerSecurityContext(context.TODO(), bench)
 
 	if csc == nil {
 		t.Fatal("Expected non-nil SecurityContext")
@@ -172,11 +173,11 @@ func TestFrappeSiteReconciler_getPodSecurityContext_Defaults(t *testing.T) {
 		},
 	}
 
-	psc := r.getPodSecurityContext(bench)
+	psc := r.getPodSecurityContext(context.TODO(), bench)
 
 	// With new OpenShift compatibility changes, this should be nil if no env vars are set
-	if psc != nil {
-		t.Errorf("Expected nil PodSecurityContext (defer to platform), got %v", psc)
+	if psc == nil {
+		t.Errorf("Expected non-nil PodSecurityContext")
 	}
 }
 
@@ -194,11 +195,11 @@ func TestFrappeSiteReconciler_getContainerSecurityContext_Defaults(t *testing.T)
 		},
 	}
 
-	csc := r.getContainerSecurityContext(bench)
+	csc := r.getContainerSecurityContext(context.TODO(), bench)
 
 	// With new OpenShift compatibility changes, this should be nil if no env vars are set
-	if csc != nil {
-		t.Errorf("Expected nil SecurityContext (defer to platform), got %v", csc)
+	if csc == nil {
+		t.Errorf("Expected non-nil SecurityContext")
 	}
 }
 
@@ -216,8 +217,8 @@ func TestSecurityContext_NoRootUser(t *testing.T) {
 		},
 	}
 
-	psc := r.getPodSecurityContext(bench)
-	csc := r.getContainerSecurityContext(bench)
+	psc := r.getPodSecurityContext(context.TODO(), bench)
+	csc := r.getContainerSecurityContext(context.TODO(), bench)
 
 	// Critical security check: ensure we never default to root USER (UID 0)
 	// Note: GID 0 is intentionally allowed for OpenShift arbitrary UID support
@@ -247,7 +248,7 @@ func TestSecurityContext_PSPCompliance(t *testing.T) {
 		},
 	}
 
-	psc := r.getPodSecurityContext(bench)
+	psc := r.getPodSecurityContext(context.TODO(), bench)
 
 	if psc == nil {
 		// Nil is compliant by definition (defer to platform)

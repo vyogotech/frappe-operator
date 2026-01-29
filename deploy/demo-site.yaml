@@ -8,8 +8,8 @@ spec:
     name: demo-bench
     namespace: frappe-demo
   
-  # Site domain (will receive route demo-site.apps...)
-  siteName: demo-site.apps.cluster-dz66n.dynamic.redhatworkshops.io
+  # Site domain
+  siteName: demo-site.example.com
   
   # Database configuration (Shared Instance from frappe-operator-system)
   dbConfig:

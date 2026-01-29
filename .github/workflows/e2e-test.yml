@@ -12,6 +12,10 @@ jobs:
     name: End-to-End Test on Kind
     runs-on: ubuntu-latest
     
+    strategy:
+      matrix:
+        platform: [k8s, openshift]
+        
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,12 +23,12 @@ jobs:
       - name: Create Kind Cluster
         uses: helm/kind-action@v1.8.0
         with:
-          cluster_name: frappe-e2e
+          cluster_name: frappe-e2e-${{ matrix.platform }}
 
       - name: Build Operator Image
         run: |
           docker build -t ghcr.io/rmallam/frappe-operator:test .
-          kind load docker-image ghcr.io/rmallam/frappe-operator:test --name frappe-e2e
+          kind load docker-image ghcr.io/rmallam/frappe-operator:test --name frappe-e2e-${{ matrix.platform }}
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
@@ -53,6 +57,13 @@ jobs:
             --set crds.install=true \
             --wait --timeout 10m
 
+      - name: Mock OpenShift Environment
+        if: matrix.platform == 'openshift'
+        run: |
+          echo "Installing OpenShift Route CRD to mock platform..."
+          kubectl apply -f https://raw.githubusercontent.com/openshift/router/main/deploy/route_crd.yaml
+          sleep 5
+
       - name: Install Frappe Operator
         run: |
           helm upgrade --install frappe-operator ./helm/frappe-operator \
@@ -65,20 +76,42 @@ jobs:
             --wait \
             --timeout 10m
 
-      - name: Create Admin Password Secret
-        run: |
-          kubectl create secret generic e2e-admin-password \
-            --from-literal=password=admin \
-            --namespace default
 
       - name: Deploy Test Bench and Site
         run: |
-          kubectl apply -f examples/e2e-test-manifests.yaml
+          kubectl apply -f examples/kind-e2e-manifests.yaml
+
+      - name: Verify Platform Detection
+        run: |
+          echo "Checking operator logs for platform detection..."
+          # Retry log check for up to 2 minutes to account for leader election
+          for i in {1..12}; do
+            LOGS=$(kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=500 2>/dev/null || echo "")
+            
+            if [ "${{ matrix.platform }}" == "openshift" ]; then
+              if echo "$LOGS" | grep -i "OpenShift platform detected"; then
+                echo "SUCCESS: OpenShift platform detected correctly."
+                exit 0
+              fi
+            else
+              if ! echo "$LOGS" | grep -i "OpenShift platform detected"; then
+                # On vanilla K8s, we want to confirm it did NOT detect OpenShift
+                # But we should wait until the manager has actually started.
+                if echo "$LOGS" | grep -i "starting manager"; then
+                  echo "SUCCESS: Vanilla Kubernetes environment confirmed (no OpenShift detected)."
+                  exit 0
+                fi
+              fi
+            fi
+            echo "Waiting for operator to start and detect platform (attempt $i)..."
+            sleep 10
+          done
+          echo "FAILED: Platform detection verification timed out."
+          exit 1
 
       - name: Wait for FrappeBench to be Ready
         run: |
           echo "Waiting for FrappeBench to reach Ready phase..."
-          # Using a loop because kubectl wait might fail if the resource is not yet created or status populated
           for i in {1..60}; do
             PHASE=$(kubectl get frappebench e2e-test-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
             echo "Current Phase: $PHASE"
@@ -89,8 +122,6 @@ jobs:
             sleep 10
           done
           echo "ERROR: FrappeBench did not reach Ready phase within timeout"
-          kubectl describe frappebench e2e-test-bench -n default
-          kubectl get pods -n default
           exit 1
 
       - name: Wait for FrappeSite to be Ready
@@ -106,26 +137,64 @@ jobs:
             sleep 10
           done
           echo "ERROR: FrappeSite did not reach Ready phase within timeout"
-          kubectl describe frappesite e2e-test-site -n default
-          kubectl get pods -n default
           exit 1
 
-      - name: Test Site Accessibility
+      - name: Verify In-Cluster Accessibility
         run: |
           echo "Testing site accessibility from inside the cluster..."
-          # We use a temporary pod to curl the site
-          kubectl run test-curl --image=curlimages/curl -i --rm --restart=Never -- \
-            curl -s -I -H "Host: e2e.localhost" http://e2e-test-bench-gunicorn.default.svc.cluster.local:8000 | grep "200 OK"
+          # Get the name of any running pod to use for the check
+          POD_NAME=$(kubectl get pods -l app.kubernetes.io/name=frappe-bench -o jsonpath='{.items[0].metadata.name}')
+          echo "Using pod: $POD_NAME"
           
-          if [ $? -eq 0 ]; then
-            echo "✅ Site is accessible!"
+          # Curl the nginx service with the correct Host header
+          RESPONSE=$(kubectl exec $POD_NAME -- curl -sI -H "Host: e2e.localhost" http://e2e-test-bench-nginx:8080)
+          echo "Response:"
+          echo "$RESPONSE"
+          
+          if echo "$RESPONSE" | grep -q "HTTP/1.1 200 OK"; then
+            echo "SUCCESS: Site e2e.localhost is accessible from inside the cluster."
           else
-            echo "❌ Site is NOT accessible!"
+            echo "ERROR: Site e2e.localhost is NOT accessible (unexpected response)."
             exit 1
           fi
 
+      - name: Verify Resource Creation (Ingress/Route)
+        run: |
+          if [ "${{ matrix.platform }}" == "openshift" ]; then
+            echo "Verifying OpenShift Route Creation..."
+            if [ $(kubectl get routes.route.openshift.io -A --no-headers 2>/dev/null | wc -l) -eq 0 ]; then
+              echo "FAILED: No OpenShift Routes found"
+              exit 1
+            fi
+            echo "SUCCESS: OpenShift Route created."
+          else
+            echo "Verifying Ingress Creation..."
+            if [ $(kubectl get ingress -A --no-headers 2>/dev/null | wc -l) -eq 0 ]; then
+              echo "FAILED: No Ingresses found"
+              exit 1
+            fi
+            echo "SUCCESS: Ingress created."
+          fi
+
+      - name: Verify Security Compliance (runAsNonRoot)
+        run: |
+          echo "Verifying security compliance (runAsNonRoot) on ${{ matrix.platform }}..."
+          # Check all pods in default namespace (Bench, Workers, etc.)
+          NON_COMPLIANT=$(kubectl get pods -n default -o jsonpath='{range .items[*]}{.metadata.name}{": runAsNonRoot="}{.spec.securityContext.runAsNonRoot}{"\n"}{end}' | grep "runAsNonRoot=false" || true)
+          if [ ! -z "$NON_COMPLIANT" ]; then
+            echo "FAILED: Some pods are not running as non-root:"
+            echo "$NON_COMPLIANT"
+            exit 1
+          fi
+          echo "SUCCESS: All pods are compliant with non-root security requirements."
+
+      - name: Export Operator Logs on Failure
+        if: failure()
+        run: |
+          echo "==== Frappe Operator Logs ===="
+          kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=1000
+          
       - name: Cleanup
         if: always()
         run: |
-          kubectl describe pods -n default
-          kubectl logs -n frappe-operator-system -l app.kubernetes.io/name=frappe-operator
+          kubectl delete -f examples/kind-e2e-manifests.yaml --ignore-not-found

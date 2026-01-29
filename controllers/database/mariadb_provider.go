@@ -613,7 +613,7 @@ func (p *MariaDBProviderUnstructured) sanitizeName(name string) string {
 func (p *MariaDBProviderUnstructured) hashString(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
-	return fmt.Sprintf("%x", h.Sum32())
+	return fmt.Sprintf("%08x", h.Sum32())
 }
 
 func (p *MariaDBProviderUnstructured) generatePassword(length int) string {

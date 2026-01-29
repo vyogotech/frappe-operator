@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,7 +69,11 @@ var _ = Describe("FrappeBench Controller", func() {
 		_ = corev1.AddToScheme(scheme)
 		_ = appsv1.AddToScheme(scheme)
 
-		fakeClient = fake.NewClientBuilder().WithScheme(scheme).Build()
+		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&vyogotechv1alpha1.FrappeBench{}).Build()
+
+		// Seed a default StorageClass to satisfy storage provisioning lookups in tests
+		sc := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard", Annotations: map[string]string{"storageclass.kubernetes.io/is-default-class": "true"}}, Provisioner: "kubernetes.io/no-provisioner"}
+		_ = fakeClient.Create(ctx, sc)
 
 		reconciler = &FrappeBenchReconciler{
 			Client:   fakeClient,
@@ -110,13 +116,8 @@ var _ = Describe("FrappeBench Controller", func() {
 			}
 			Expect(fakeClient.Create(ctx, site)).To(Succeed())
 
-			// Refresh bench from client and mark for deletion
-			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
-			now := metav1.Now()
-			bench.SetDeletionTimestamp(&now)
-			Expect(fakeClient.Update(ctx, bench)).To(Succeed())
-
-			// Refresh again before calling handleFinalizer
+			// Mark bench for deletion (use Delete like the real API server)
+			Expect(fakeClient.Delete(ctx, bench)).To(Succeed())
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 
 			result, err := reconciler.handleFinalizer(ctx, bench)
@@ -140,7 +141,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			bench.SetFinalizers([]string{frappeBenchFinalizer})
 			Expect(fakeClient.Create(ctx, bench)).To(Succeed())
 
-			// Create deployments
+			// Create deployments with non-zero status so first handleFinalizer requeues (waits for pods to terminate)
 			components := []string{"gunicorn", "nginx", "socketio"}
 			for _, component := range components {
 				deploy := &appsv1.Deployment{
@@ -151,17 +152,16 @@ var _ = Describe("FrappeBench Controller", func() {
 					Spec: appsv1.DeploymentSpec{
 						Replicas: int32Ptr(1),
 					},
+					Status: appsv1.DeploymentStatus{
+						Replicas:      1,
+						ReadyReplicas: 1,
+					},
 				}
 				Expect(fakeClient.Create(ctx, deploy)).To(Succeed())
 			}
 
-			// Refresh bench from client and mark for deletion
-			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
-			now := metav1.Now()
-			bench.SetDeletionTimestamp(&now)
-			Expect(fakeClient.Update(ctx, bench)).To(Succeed())
-
-			// Refresh again before calling handleFinalizer
+			// Mark bench for deletion (use Delete like the real API server)
+			Expect(fakeClient.Delete(ctx, bench)).To(Succeed())
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 
 			result, err := reconciler.handleFinalizer(ctx, bench)
@@ -177,21 +177,26 @@ var _ = Describe("FrappeBench Controller", func() {
 					Name:      bench.Name + "-" + component,
 					Namespace: namespace,
 				}, deploy)).To(Succeed())
-				deploy.Spec.Replicas = int32Ptr(0)
 				deploy.Status.Replicas = 0
 				deploy.Status.ReadyReplicas = 0
-				Expect(fakeClient.Update(ctx, deploy)).To(Succeed())
+				// Try updating status subresource first
+				if err := fakeClient.Status().Update(ctx, deploy); err != nil {
+					// Fallback to main resource update if subresource not enabled
+					Expect(fakeClient.Update(ctx, deploy)).To(Succeed())
+				}
 			}
 
+			// Refresh bench from client before second call
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 			// Second call should remove finalizer
 			result, err = reconciler.handleFinalizer(ctx, bench)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Requeue).To(BeFalse())
+			Expect(result.IsZero()).To(BeTrue())
 
-			// Verify finalizer removed
+			// Verify bench is deleted (which implies finalizer removal)
 			updatedBench := &vyogotechv1alpha1.FrappeBench{}
-			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, updatedBench)).To(Succeed())
-			Expect(updatedBench.GetFinalizers()).NotTo(ContainElement(frappeBenchFinalizer))
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, updatedBench)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 	})
 

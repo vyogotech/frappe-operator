@@ -15,7 +15,8 @@ A production-ready Kubernetes operator that automates deployment, scaling, and m
 - **Multi-Tenancy** - Run hundreds of sites on shared infrastructure
 - **Secure by Default** - Auto-generated credentials, per-site DB isolation
 - **Production-Ready** - Auto-scaling, zero-downtime updates, automated backups
-- **Multi-Platform** - ARM64/AMD64 support, OpenShift compatible
+- **Multi-Platform** - ARM64/AMD64 support
+- **Enterprise-Grade** - Fully compatible with OpenShift `restricted-v2` SCCs
 
 ## Quick Start
 
@@ -71,6 +72,9 @@ For detailed guides, visit **[vyogotech.github.io/frappe-operator](https://vyogo
 - **[Operations Guide](https://vyogotech.github.io/frappe-operator/operations)** - Scaling, backups, updates, monitoring
 - **[API Reference](https://vyogotech.github.io/frappe-operator/api-reference)** - Complete CRD specifications
 - **[Troubleshooting](https://vyogotech.github.io/frappe-operator/troubleshooting)** - Common issues and solutions
+- **[OpenShift Installation](docs/INSTALL_OPENSHIFT.md)** - Step-by-step OpenShift guide
+- **[OpenShift Technical Guide](docs/openshift.md)** - Deep dive into compatibility & SCCs
+- **[MariaDB Integration Guide](docs/MARIADB_INTEGRATION.md)** - Database isolation & credentials
 
 ## Examples
 
