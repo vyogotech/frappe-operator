@@ -24,7 +24,7 @@ spec:
     gunicorn: 1
     nginx: 1
     socketio: 1
-    scheduler: 1
+    scheduler: 0
     workers:
       default: 1
       short: 0

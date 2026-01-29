@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -19,7 +21,44 @@ var (
 	testEnv    *envtest.Environment
 )
 
+// gate E2E tests if etcd (envtest) binary is unavailable
+var skipE2ETests bool
+
+func init() {
+	// Check for envtest binaries in multiple locations for better portability
+	skipE2ETests = true
+
+	// Priority 1: Check KUBEBUILDER_ASSETS environment variable
+	if assets := os.Getenv("KUBEBUILDER_ASSETS"); assets != "" {
+		etcdPath := filepath.Join(assets, "etcd")
+		if _, err := os.Stat(etcdPath); err == nil {
+			skipE2ETests = false
+			return
+		}
+	}
+
+	// Priority 2: Check common installation paths
+	commonPaths := []string{
+		"/usr/local/kubebuilder/bin/etcd",
+		"/usr/bin/etcd",
+		filepath.Join(os.Getenv("HOME"), "kubebuilder", "bin", "etcd"),
+	}
+
+	for _, path := range commonPaths {
+		if path == "" {
+			continue
+		}
+		if _, err := os.Stat(path); err == nil {
+			skipE2ETests = false
+			return
+		}
+	}
+}
+
 func TestE2E(t *testing.T) {
+	if skipE2ETests {
+		t.Skip("Skipping E2E tests: envtest control plane not available")
+	}
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "E2E Suite")
 }

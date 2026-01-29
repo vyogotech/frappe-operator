@@ -26,12 +26,13 @@ import (
 	"strings"
 	"time"
 
-	routev1 "github.com/openshift/api/route/v1"
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	"github.com/vyogotech/frappe-operator/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // getBenchImage returns the image to use from the bench
@@ -107,57 +108,71 @@ func (r *FrappeSiteReconciler) generatePassword(length int) string {
 	return string(password)
 }
 
-// isOpenShiftPlatform checks if we're running on OpenShift
-func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
-	logger := log.FromContext(ctx)
-	// Try to list Routes to check if API is available
-	routeList := &routev1.RouteList{}
-	err := r.List(ctx, routeList)
-
+// IsRouteAPIAvailable checks if the OpenShift route API group is available
+func IsRouteAPIAvailable(config *rest.Config) bool {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
-		logger.Info("Platform detection check failed", "error", err)
 		return false
 	}
 
-	// If we can list Routes successfully, we're on OpenShift
-	logger.Info("OpenShift platform detected successfully")
-	return true
+	apiGroupList, err := discoveryClient.ServerGroups()
+	if err != nil {
+		return false
+	}
+
+	for _, group := range apiGroupList.Groups {
+		if group.Name == "route.openshift.io" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
+	return r.IsOpenShift
 }
 
 // getDefaultUID returns the default UID for security contexts
-// Returns nil for OpenShift (let platform assign) but can be overridden via FRAPPE_DEFAULT_UID env var
+// Defaults to 1001 (OpenShift standard) but can be overridden via FRAPPE_DEFAULT_UID env var
 func getDefaultUID() *int64 {
-	if value := os.Getenv("FRAPPE_DEFAULT_UID"); value != "" {
-		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return &parsed
-		}
+	value := os.Getenv("FRAPPE_DEFAULT_UID")
+	if value == "" {
+		return nil
 	}
-	// Return nil to let OpenShift assign UID automatically
-	return nil
+	uid, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return nil
+	}
+	return &uid
 }
 
 // getDefaultGID returns the default GID for security contexts
-// Returns nil for OpenShift (let platform assign) but can be overridden via FRAPPE_DEFAULT_GID env var
+// Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_GID env var
 func getDefaultGID() *int64 {
-	if value := os.Getenv("FRAPPE_DEFAULT_GID"); value != "" {
-		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return &parsed
-		}
+	value := os.Getenv("FRAPPE_DEFAULT_GID")
+	if value == "" {
+		return nil
 	}
-	// Return nil to let OpenShift assign GID automatically
-	return nil
+	gid, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return nil
+	}
+	return &gid
 }
 
 // getDefaultFSGroup returns the default FSGroup for security contexts
-// Returns nil for OpenShift (let platform assign) but can be overridden via FRAPPE_DEFAULT_FSGROUP env var
+// Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_FSGROUP env var
 func getDefaultFSGroup() *int64 {
-	if value := os.Getenv("FRAPPE_DEFAULT_FSGROUP"); value != "" {
-		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return &parsed
-		}
+	value := os.Getenv("FRAPPE_DEFAULT_FSGROUP")
+	if value == "" {
+		return nil
 	}
-	// Return nil to let OpenShift assign FSGroup automatically
-	return nil
+	fsGroup, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return nil
+	}
+	return &fsGroup
 }
 
 // getEnvAsInt64 retrieves an environment variable as int64 with a default fallback
@@ -171,4 +186,32 @@ func getEnvAsInt64(key string, defaultValue int64) int64 {
 		return defaultValue
 	}
 	return parsed
+}
+
+// getNamespaceMCSLabel fetches the OpenShift MCS label (categories) for a namespace
+// This ensures all pods in a bench share the same SELinux context to access shared volumes.
+func getNamespaceMCSLabel(ctx context.Context, c client.Client, namespaceName string) string {
+	ns := &corev1.Namespace{}
+	err := c.Get(ctx, types.NamespacedName{Name: namespaceName}, ns)
+	if err != nil {
+		return ""
+	}
+
+	if ns.Annotations != nil {
+		return ns.Annotations["openshift.io/sa.scc.mcs"]
+	}
+	return ""
+}
+
+// Helper functions for pointer types
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func int32Ptr(i int32) *int32 {
+	return &i
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
 }

@@ -320,27 +320,27 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 	stsName := fmt.Sprintf("%s-%s", bench.Name, role)
 	sts := &appsv1.StatefulSet{}
 
+	existing := true
 	err := r.Get(ctx, types.NamespacedName{Name: stsName, Namespace: bench.Namespace}, sts)
-	if err == nil {
-		return nil
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+		existing = false
+		logger.Info("Creating Redis StatefulSet", "statefulset", stsName)
 	}
-
-	if !errors.IsNotFound(err) {
-		return err
-	}
-
-	logger.Info("Creating Redis StatefulSet", "statefulset", stsName)
 
 	replicas := int32(1)
 	redisImage := r.getRedisImage(bench)
 
-	sts = &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
+	// If it doesn't exist, initialize common fields
+	if !existing {
+		sts.ObjectMeta = metav1.ObjectMeta{
 			Name:      stsName,
 			Namespace: bench.Namespace,
 			Labels:    r.benchLabels(bench),
-		},
-		Spec: appsv1.StatefulSetSpec{
+		}
+		sts.Spec = appsv1.StatefulSetSpec{
 			ServiceName: stsName,
 			Replicas:    &replicas,
 			Selector: &metav1.LabelSelector{
@@ -351,7 +351,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 					Labels: r.componentLabels(bench, fmt.Sprintf("redis-%s", role)),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getRedisPodSecurityContext(bench),
 					Containers: []corev1.Container{
 						{
 							Name:    "redis",
@@ -366,9 +366,54 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 								},
 							},
 							Resources:       r.getRedisResources(bench),
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getRedisContainerSecurityContext(bench),
 						},
 					},
+				},
+			},
+		}
+
+		if err := controllerutil.SetControllerReference(bench, sts, r.Scheme); err != nil {
+			return err
+		}
+
+		return r.Create(ctx, sts)
+	}
+
+	// Update mutable fields for existing StatefulSet
+	if sts.Labels == nil {
+		sts.Labels = make(map[string]string)
+	}
+	newLabels := r.benchLabels(bench)
+	for k, v := range newLabels {
+		sts.Labels[k] = v
+	}
+	// Also ensure mandatory labels are present
+	sts.Labels["app"] = "frappe"
+	sts.Labels["bench"] = bench.Name
+
+	sts.Spec.Replicas = &replicas
+	sts.Spec.Template = corev1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: r.componentLabels(bench, fmt.Sprintf("redis-%s", role)),
+		},
+		Spec: corev1.PodSpec{
+			SecurityContext: r.getRedisPodSecurityContext(bench),
+			Containers: []corev1.Container{
+				{
+					Name:    "redis",
+					Image:   redisImage,
+					Command: []string{"redis-server"},
+					// Disable RDB/AOF persistence to avoid stop-writes-on-bgsave-error in ephemeral environments
+					Args: []string{"--save", "", "--appendonly", "no", "--stop-writes-on-bgsave-error", "no"},
+					Ports: []corev1.ContainerPort{
+						{
+							ContainerPort: 6379,
+							Name:          "redis",
+						},
+					},
+					Resources:       r.getRedisResources(bench),
+					SecurityContext: r.getRedisContainerSecurityContext(bench),
 				},
 			},
 		},
@@ -378,7 +423,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 		return err
 	}
 
-	return r.Create(ctx, sts)
+	return r.Update(ctx, sts)
 }
 
 // ensureGunicorn ensures the Gunicorn Deployment and Service exist
@@ -475,7 +520,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 					Labels: r.componentLabels(bench, "gunicorn"),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "gunicorn",
@@ -494,7 +539,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 								},
 							},
 							Resources:       r.getGunicornResources(bench),
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(ctx, bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "USER",
@@ -620,7 +665,7 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 					Labels: r.componentLabels(bench, "nginx"),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "nginx",
@@ -667,7 +712,7 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 								},
 							},
 							Resources:       r.getNginxResources(bench),
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(ctx, bench),
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -786,7 +831,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 					Labels: r.componentLabels(bench, "socketio"),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "socketio",
@@ -808,7 +853,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 								},
 							},
 							Resources:       r.getSocketIOResources(bench),
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(ctx, bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "USER",
@@ -884,7 +929,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 					Labels: r.componentLabels(bench, "scheduler"),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "scheduler",
@@ -900,7 +945,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 								},
 							},
 							Resources:       r.getSchedulerResources(bench),
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(ctx, bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "USER",
@@ -1043,7 +1088,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 					Labels: r.componentLabels(bench, fmt.Sprintf("worker-%s", workerType)),
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:  "worker",
@@ -1061,7 +1106,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 								},
 							},
 							Resources:       resources,
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(ctx, bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "USER",
@@ -1589,79 +1634,201 @@ func (r *FrappeBenchReconciler) getRedisAddress(bench *vyogotechv1alpha1.FrappeB
 	return fmt.Sprintf("%s-redis-queue.%s.svc.cluster.local:6379", bench.Name, bench.Namespace)
 }
 
-// Helper functions for pointer types
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func int32Ptr(i int32) *int32 {
-	return &i
-}
-
-func int64Ptr(i int64) *int64 {
-	return &i
-}
-
-func (r *FrappeBenchReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
-	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
-		return bench.Spec.Security.PodSecurityContext
-	}
-	// Default to 1001 (OpenShift standard) but allow override via environment
-	defaultUID := getDefaultUID()
-	defaultGID := getDefaultGID()
-	defaultFSGroup := getDefaultFSGroup()
-
-	// If no defaults are set via environment, return nil to let platform defaults take over (e.g. OpenShift SCC)
-	if defaultUID == nil && defaultGID == nil && defaultFSGroup == nil {
-		// But still apply SELinux options from bench spec if provided
-		if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil && bench.Spec.Security.PodSecurityContext.SELinuxOptions != nil {
-			return &corev1.PodSecurityContext{
-				SELinuxOptions: bench.Spec.Security.PodSecurityContext.SELinuxOptions,
-				SeccompProfile: &corev1.SeccompProfile{
-					Type: corev1.SeccompProfileTypeRuntimeDefault,
-				},
-			}
-		}
-		return nil
-	}
-
+func (r *FrappeBenchReconciler) getPodSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+	// Start with defaults
+	// defaultUID := getDefaultUID()
+	// defaultGID := getDefaultGID()
 	secCtx := &corev1.PodSecurityContext{
-		RunAsUser:  defaultUID,
-		RunAsGroup: defaultGID,
-		FSGroup:    defaultFSGroup,
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
+		RunAsNonRoot: boolPtr(true),
+		// RunAsUser/Group removed to allow OpenShift SCC or auto-detection
 	}
 
-	// Add SELinux options from bench spec if provided (for OpenShift RWX volumes)
-	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil && bench.Spec.Security.PodSecurityContext.SELinuxOptions != nil {
-		secCtx.SELinuxOptions = bench.Spec.Security.PodSecurityContext.SELinuxOptions
+	// For OpenShift, match namespace default MCS label
+	logger := log.FromContext(ctx)
+	if r.IsOpenShift {
+		logger.Info("OpenShift platform detected for Bench security context")
+		logger.Info("Using OpenShift defaults (no explicit FSGroup/SupplementalGroups due to SCC restricted-v2)")
+
+		// 1. Dynamic MCS Labeling
+		mcsLabel := getNamespaceMCSLabel(ctx, r.Client, bench.Namespace)
+		if mcsLabel != "" {
+			logger.Info("Applying Namespace MCS label to PodSecurityContext", "mcsLabel", mcsLabel)
+			secCtx.SELinuxOptions = &corev1.SELinuxOptions{
+				Level: mcsLabel,
+			}
+		} else {
+			logger.Info("Namespace MCS label is empty, skipping SELinuxOptions")
+		}
+
+		// Ensure FSGroup fields are nil for OpenShift
+		secCtx.FSGroup = nil
+		secCtx.FSGroupChangePolicy = nil
+		secCtx.SupplementalGroups = nil
+
+	} else {
+		logger.V(1).Info("Not on OpenShift platform, using standard security context")
+		// Standard Kubernetes: Set FSGroup to ensure permission fixup
+		defaultFSGroup := getDefaultFSGroup()
+		fsGroupChangePolicy := corev1.FSGroupChangeAlways
+
+		secCtx.FSGroup = defaultFSGroup
+		secCtx.FSGroupChangePolicy = &fsGroupChangePolicy
+	}
+
+	// Add default seccomp profile if not on OpenShift (OpenShift has its own defaults)
+	if !r.IsOpenShift {
+		secCtx.SeccompProfile = &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		}
+	}
+
+	// Merge with user-provided settings if any
+	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
+		userCtx := bench.Spec.Security.PodSecurityContext
+		if userCtx.RunAsNonRoot != nil {
+			secCtx.RunAsNonRoot = userCtx.RunAsNonRoot
+		}
+		if userCtx.RunAsUser != nil {
+			secCtx.RunAsUser = userCtx.RunAsUser
+		}
+		if userCtx.RunAsGroup != nil {
+			secCtx.RunAsGroup = userCtx.RunAsGroup
+		}
+		if userCtx.FSGroup != nil {
+			secCtx.FSGroup = userCtx.FSGroup
+		}
+		if userCtx.FSGroupChangePolicy != nil {
+			secCtx.FSGroupChangePolicy = userCtx.FSGroupChangePolicy
+		}
+		if userCtx.SupplementalGroups != nil {
+			secCtx.SupplementalGroups = userCtx.SupplementalGroups
+		}
+		if userCtx.SELinuxOptions != nil {
+			secCtx.SELinuxOptions = userCtx.SELinuxOptions
+		}
+		if userCtx.WindowsOptions != nil {
+			secCtx.WindowsOptions = userCtx.WindowsOptions
+		}
+		if userCtx.Sysctls != nil {
+			secCtx.Sysctls = userCtx.Sysctls
+		}
+		if userCtx.SeccompProfile != nil {
+			secCtx.SeccompProfile = userCtx.SeccompProfile
+		}
 	}
 
 	return secCtx
 }
 
-func (r *FrappeBenchReconciler) getContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
-	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
-		return bench.Spec.Security.SecurityContext
-	}
-	// Default to 1001 (OpenShift standard) but allow override via environment
+func (r *FrappeBenchReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+	// Start with defaults
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 
-	// If no defaults are set via environment, return nil to let platform defaults take over
-	if defaultUID == nil && defaultGID == nil {
-		return nil
-	}
-
-	return &corev1.SecurityContext{
-		RunAsUser:                defaultUID,
-		RunAsGroup:               defaultGID,
+	secCtx := &corev1.SecurityContext{
+		RunAsNonRoot: boolPtr(true),
+		// RunAsUser:                defaultUID, // Removed to allow OpenShift SCC to assign UID
+		// RunAsGroup:               defaultGID, // Removed to allow OpenShift SCC to assign GID
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
 		ReadOnlyRootFilesystem: boolPtr(false),
 	}
+
+	if !r.IsOpenShift {
+		secCtx.RunAsUser = defaultUID
+		secCtx.RunAsGroup = defaultGID
+	}
+
+	// Merge with user-provided settings if any
+	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
+		userCtx := bench.Spec.Security.SecurityContext
+		if userCtx.RunAsNonRoot != nil {
+			secCtx.RunAsNonRoot = userCtx.RunAsNonRoot
+		}
+		if userCtx.RunAsUser != nil {
+			secCtx.RunAsUser = userCtx.RunAsUser
+		}
+		if userCtx.RunAsGroup != nil {
+			secCtx.RunAsGroup = userCtx.RunAsGroup
+		}
+		if userCtx.Privileged != nil {
+			secCtx.Privileged = userCtx.Privileged
+		}
+		if userCtx.AllowPrivilegeEscalation != nil {
+			secCtx.AllowPrivilegeEscalation = userCtx.AllowPrivilegeEscalation
+		}
+		if userCtx.Capabilities != nil {
+			secCtx.Capabilities = userCtx.Capabilities
+		}
+		if userCtx.ReadOnlyRootFilesystem != nil {
+			secCtx.ReadOnlyRootFilesystem = userCtx.ReadOnlyRootFilesystem
+		}
+		if userCtx.SELinuxOptions != nil {
+			secCtx.SELinuxOptions = userCtx.SELinuxOptions
+		}
+		if userCtx.WindowsOptions != nil {
+			secCtx.WindowsOptions = userCtx.WindowsOptions
+		}
+		if userCtx.ProcMount != nil {
+			secCtx.ProcMount = userCtx.ProcMount
+		}
+		if userCtx.SeccompProfile != nil {
+			secCtx.SeccompProfile = userCtx.SeccompProfile
+		}
+	}
+
+	return secCtx
+}
+
+func (r *FrappeBenchReconciler) getRedisPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+	// If user provided custom security context, use it
+	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
+		return bench.Spec.Security.PodSecurityContext
+	}
+
+	secCtx := &corev1.PodSecurityContext{
+		RunAsNonRoot: boolPtr(true),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+
+	// Only set fixed UIDs if not on OpenShift
+	if !r.IsOpenShift {
+		// Redis alpine images use UID/GID 999
+		redisUID := int64(999)
+		secCtx.RunAsUser = &redisUID
+		secCtx.RunAsGroup = &redisUID
+		secCtx.FSGroup = &redisUID
+	}
+
+	return secCtx
+}
+
+func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+	// If user provided custom security context, use it
+	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
+		return bench.Spec.Security.SecurityContext
+	}
+
+	secCtx := &corev1.SecurityContext{
+		RunAsNonRoot:             boolPtr(true),
+		AllowPrivilegeEscalation: boolPtr(false),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
+		ReadOnlyRootFilesystem: boolPtr(false),
+	}
+
+	// Only set fixed UIDs if not on OpenShift
+	if !r.IsOpenShift {
+		// Redis alpine images use UID/GID 999
+		redisUID := int64(999)
+		secCtx.RunAsUser = &redisUID
+		secCtx.RunAsGroup = &redisUID
+	}
+
+	return secCtx
 }

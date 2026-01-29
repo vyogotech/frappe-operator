@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-
+.tldr
 # Test binary, built with `go test -c`
 *.test
 
@@ -118,6 +118,7 @@ docs/.buildinfo
 # Helm (if used)
 charts/*/charts/
 *.tgz
+!docs/helm-repo/*.tgz
 
 # Local operator testing
 operator-logs/

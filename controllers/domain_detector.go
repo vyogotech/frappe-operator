@@ -35,6 +35,9 @@ type DomainDetector struct {
 // DetectDomainSuffix attempts to detect the cluster's external domain suffix
 // by examining Ingress Controller services and their annotations
 func (d *DomainDetector) DetectDomainSuffix(ctx context.Context, namespace string) (string, error) {
+	if d == nil || d.Client == nil {
+		return "", fmt.Errorf("nil Kubernetes client for DomainDetector")
+	}
 	logger := log.FromContext(ctx)
 
 	// Common Ingress Controller service names and namespaces

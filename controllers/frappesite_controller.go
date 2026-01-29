@@ -46,8 +46,9 @@ const frappeSiteFinalizer = "vyogo.tech/site-finalizer"
 // FrappeSiteReconciler reconciles a FrappeSite object
 type FrappeSiteReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme      *runtime.Scheme
+	Recorder    record.EventRecorder
+	IsOpenShift bool
 }
 
 // int32Ptr returns a pointer to the passed int32 value
@@ -60,7 +61,7 @@ type FrappeSiteReconciler struct {
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets;services;configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs;databases;users;grants,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=route.openshift.io,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop
@@ -84,25 +85,13 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.Recorder.Event(site, corev1.EventTypeNormal, "FinalizerAdded", "Finalizer added to FrappeSite")
 	}
 
-	// Set progressing condition
-	r.setCondition(site, metav1.Condition{
-		Type:    "Progressing",
-		Status:  metav1.ConditionTrue,
-		Reason:  "Reconciling",
-		Message: "Starting site reconciliation",
-	})
-	if err := r.updateStatus(ctx, site); err != nil {
-		logger.Error(err, "Failed to update status")
-		return ctrl.Result{}, err
-	}
-
 	// Handle deletion
 	if site.GetDeletionTimestamp() != nil {
 		if controllerutil.ContainsFinalizer(site, frappeSiteFinalizer) {
 			logger.Info("Deleting site", "site", site.Name)
 			r.Recorder.Event(site, corev1.EventTypeNormal, "Deleting", "FrappeSite deletion started")
 
-			// Set deletion condition
+			// Set terminating condition
 			r.setCondition(site, metav1.Condition{
 				Type:    "Terminating",
 				Status:  metav1.ConditionTrue,
@@ -168,9 +157,20 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			if err := r.Update(ctx, site); err != nil {
 				return ctrl.Result{}, err
 			}
-
 		}
 		return ctrl.Result{}, nil
+	}
+
+	// Set progressing condition
+	r.setCondition(site, metav1.Condition{
+		Type:    "Progressing",
+		Status:  metav1.ConditionTrue,
+		Reason:  "Reconciling",
+		Message: "Starting site reconciliation",
+	})
+	if err := r.updateStatus(ctx, site); err != nil {
+		logger.Error(err, "Failed to update status")
+		return ctrl.Result{}, err
 	}
 
 	// Validate benchRef
@@ -494,6 +494,10 @@ func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1alpha1.FrappeSit
 	config := site.Spec.DBConfig
 
 	if bench.Spec.DBConfig == nil {
+		// Default provider to MariaDB if not specified anywhere
+		if config.Provider == "" {
+			config.Provider = "mariadb"
+		}
 		return config
 	}
 
@@ -693,10 +697,14 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	if site.Spec.AdminPasswordSecretRef != nil {
 		// Fetch from provided secret
 		adminPasswordSecret = &corev1.Secret{}
-		err := r.Get(ctx, types.NamespacedName{
+		secretKey := types.NamespacedName{
 			Name:      site.Spec.AdminPasswordSecretRef.Name,
 			Namespace: site.Spec.AdminPasswordSecretRef.Namespace,
-		}, adminPasswordSecret)
+		}
+		if secretKey.Namespace == "" {
+			secretKey.Namespace = site.Namespace
+		}
+		err := r.Get(ctx, secretKey, adminPasswordSecret)
 		if err != nil {
 			return false, fmt.Errorf("failed to get admin password secret: %w", err)
 		}
@@ -793,6 +801,19 @@ else
     goto_update_config=0
 fi
 
+# Link apps.txt to site path for bench to find it
+# The apps.txt is in the sites directory, but bench expects it in the root
+echo "Debug: Current directory is $(pwd)"
+echo "Debug: Contents of $(pwd):"
+ls -la
+if [ -f sites/apps.txt ]; then
+    echo "Debug: sites/apps.txt found, creating link..."
+    ln -sf sites/apps.txt apps.txt || cp sites/apps.txt apps.txt || echo "Warning: Failed to create apps.txt in root"
+else
+    echo "Warning: sites/apps.txt not found!"
+fi
+ls -l apps.txt || true
+
 # Dynamically build the --install-app argument
 INSTALL_APP_ARG=""
 if [[ -n "$APPS_TO_INSTALL" ]]; then
@@ -848,6 +869,23 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
 else
     echo "ERROR: Unsupported DB provider: $DB_PROVIDER"
     exit 1
+fi
+
+# Create or update common_site_config.json
+echo "Creating common_site_config.json..."
+cat > sites/common_site_config.json <<EOF
+{
+  "redis_cache": "redis://${BENCH_NAME}-redis-cache:6379",
+  "redis_queue": "redis://${BENCH_NAME}-redis-queue:6379",
+  "socketio_port": 9000
+}
+EOF
+
+# Sync assets from the image cache to the Persistent Volume
+if [ -d "/home/frappe/assets_cache" ]; then
+    echo "Syncing pre-built assets from image to PVC..."
+    mkdir -p sites/assets
+    cp -rn /home/frappe/assets_cache/* sites/assets/ || true
 fi
 
 echo "Site $SITE_NAME created successfully!"
@@ -918,14 +956,6 @@ PYTHON_SCRIPT
 
 echo "Site initialization complete!"
 
-# Ensure everything is group-readable for OpenShift compatibility
-echo "Fixing permissions for OpenShift group 0..."
-if [ -d /home/frappe/frappe-bench/sites ]; then
-    # chmod contents only to avoid "Operation not permitted" on the mount point itself
-    find /home/frappe/frappe-bench/sites -mindepth 1 -exec chmod g+rwX {} + || true
-    find /home/frappe/frappe-bench/sites -mindepth 1 -exec chgrp 0 {} + || true
-fi
-
 # Exit success regardless of whether new-site ran
 exit 0
 `
@@ -946,7 +976,7 @@ exit 0
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:    "site-init",
@@ -963,7 +993,7 @@ exit 0
 									MountPath: "/tmp/site-secrets",
 								},
 							},
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(ctx, bench),
 							// Removed: No environment variables for sensitive data
 							Env: []corev1.EnvVar{},
 						},
@@ -996,7 +1026,9 @@ exit 0
 		return false, err
 	}
 
-	if err := r.Create(ctx, job); err != nil {
+	jobToCreate := job.DeepCopy()
+	jobToCreate.ResourceVersion = ""
+	if err := r.Create(ctx, jobToCreate); err != nil {
 		return false, err
 	}
 
@@ -1043,6 +1075,10 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 		// Get MariaDB root credentials for deletion (site user has limited privileges)
 		rootUser, rootPassword, err := r.getMariaDBRootCredentials(ctx, site)
 		if err != nil {
+			if errors.IsNotFound(err) {
+				logger.Info("MariaDB instance not found, skipping site deletion job")
+				return nil
+			}
 			return fmt.Errorf("failed to get MariaDB root credentials: %w", err)
 		}
 
@@ -1100,6 +1136,14 @@ fi
 
 cd /home/frappe/frappe-bench
 
+# Link apps.txt to site path for bench to find it
+# The apps.txt is in the sites directory, but bench expects it in the root
+if [ -f sites/apps.txt ]; then
+    ln -sf sites/apps.txt apps.txt || cp sites/apps.txt apps.txt || echo "Warning: Failed to create apps.txt in root"
+else
+    echo "Warning: sites/apps.txt not found!"
+fi
+
 # Read credentials from mounted secret files
 DB_ROOT_USER=$(cat /tmp/secrets/db_root_user)
 DB_ROOT_PASSWORD=$(cat /tmp/secrets/db_root_password)
@@ -1127,7 +1171,7 @@ echo "Site $SITE_NAME dropped successfully!"
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						RestartPolicy:   corev1.RestartPolicyNever,
-						SecurityContext: r.getPodSecurityContext(bench),
+						SecurityContext: r.getPodSecurityContext(ctx, bench),
 						Containers: []corev1.Container{
 							{
 								Name:    "site-delete",
@@ -1145,7 +1189,7 @@ echo "Site $SITE_NAME dropped successfully!"
 										ReadOnly:  true,
 									},
 								},
-								SecurityContext: r.getContainerSecurityContext(bench),
+								SecurityContext: r.getContainerSecurityContext(ctx, bench),
 								Env:             []corev1.EnvVar{}, // No environment variables for sensitive data
 							},
 						},
@@ -1173,16 +1217,15 @@ echo "Site $SITE_NAME dropped successfully!"
 			},
 		}
 
-		// Set controller reference - use site directly as it should have UID set
-		// Clear ResourceVersion on job before SetControllerReference to avoid fake client issues
-		job.ResourceVersion = ""
 		if err := controllerutil.SetControllerReference(site, job, r.Scheme); err != nil {
 			return err
 		}
-		// Clear ResourceVersion again after SetControllerReference (in case it was set)
-		job.ResourceVersion = ""
 
-		if err := r.Create(ctx, job); err != nil {
+		// Create a copy with no ResourceVersion so Create succeeds (required for fake client and real API)
+		jobToCreate := job.DeepCopy()
+		jobToCreate.ResourceVersion = ""
+
+		if err := r.Create(ctx, jobToCreate); err != nil {
 			return fmt.Errorf("failed to create site deletion job: %w", err)
 		}
 
@@ -1216,12 +1259,18 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		r.Recorder = mgr.GetEventRecorderFor("frappesite-controller")
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&vyogotechv1alpha1.FrappeSite{}).
 		Owns(&batchv1.Job{}).
-		Owns(&networkingv1.Ingress{}).
-		Owns(&routev1.Route{}).
-		Complete(r)
+		Owns(&networkingv1.Ingress{})
+
+	// Use the platform detection result provided via IsOpenShift
+	if r.IsOpenShift {
+		ctrl.Log.WithName("setup").Info("OpenShift platform detected - enabling Route support")
+		builder.Owns(&routev1.Route{})
+	}
+
+	return builder.Complete(r)
 }
 
 // getMariaDBRootCredentials retrieves MariaDB root credentials for site deletion
@@ -1247,10 +1296,13 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 	// For shared mode, need to get MariaDB CR and read its rootPasswordSecretKeyRef
 	if site.Spec.DBConfig.Mode == "shared" {
 		// Get the MariaDB instance name from site spec
-		mariadbName := site.Spec.DBConfig.MariaDBRef.Name
-		mariadbNamespace := site.Spec.DBConfig.MariaDBRef.Namespace
-		if mariadbNamespace == "" {
-			mariadbNamespace = site.Namespace
+		mariadbName := "frappe-mariadb"
+		mariadbNamespace := site.Namespace
+		if site.Spec.DBConfig.MariaDBRef != nil {
+			mariadbName = site.Spec.DBConfig.MariaDBRef.Name
+			if site.Spec.DBConfig.MariaDBRef.Namespace != "" {
+				mariadbNamespace = site.Spec.DBConfig.MariaDBRef.Namespace
+			}
 		}
 
 		// Get MariaDB CR using unstructured client
@@ -1262,7 +1314,7 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 		})
 		err := r.Get(ctx, types.NamespacedName{Name: mariadbName, Namespace: mariadbNamespace}, mariadbCR)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to get MariaDB CR %s/%s: %w", mariadbNamespace, mariadbName, err)
+			return "", "", err // Return raw error so caller can check errors.IsNotFound
 		}
 
 		// Extract rootPasswordSecretKeyRef from spec
@@ -1305,7 +1357,7 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 	return "", "", fmt.Errorf("unsupported database mode: %s", site.Spec.DBConfig.Mode)
 }
 
-func (r *FrappeSiteReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+func (r *FrappeSiteReconciler) getPodSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
 	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
 		return bench.Spec.Security.PodSecurityContext
 	}
@@ -1314,22 +1366,31 @@ func (r *FrappeSiteReconciler) getPodSecurityContext(bench *vyogotechv1alpha1.Fr
 	defaultGID := getDefaultGID()
 	defaultFSGroup := getDefaultFSGroup()
 
-	// If no defaults are set via environment, return nil to let platform defaults take over
-	if defaultUID == nil && defaultGID == nil && defaultFSGroup == nil {
-		return nil
-	}
-
-	return &corev1.PodSecurityContext{
-		RunAsUser:  defaultUID,
-		RunAsGroup: defaultGID,
-		FSGroup:    defaultFSGroup,
+	secCtx := &corev1.PodSecurityContext{
+		RunAsNonRoot: boolPtr(true),
+		// RunAsUser:    defaultUID,
+		// RunAsGroup:   defaultGID,
+		FSGroup: defaultFSGroup,
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
 	}
+
+	if !r.IsOpenShift {
+		secCtx.RunAsUser = defaultUID
+		secCtx.RunAsGroup = defaultGID
+	} else {
+		// On OpenShift, rely on SCC restricted-v2 to inject FSGroup
+		// set FSGroup to 0 to trigger recursive relabeling - REMOVED for restricted-v2
+		// Skip RunAsUser/RunAsGroup to allow SCC to assign them
+		secCtx.FSGroup = nil
+		secCtx.SupplementalGroups = nil
+	}
+
+	return secCtx
 }
 
-func (r *FrappeSiteReconciler) getContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+func (r *FrappeSiteReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
 	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
 		return bench.Spec.Security.SecurityContext
 	}
@@ -1337,18 +1398,21 @@ func (r *FrappeSiteReconciler) getContainerSecurityContext(bench *vyogotechv1alp
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 
-	// If no defaults are set via environment, return nil to let platform defaults take over
-	if defaultUID == nil && defaultGID == nil {
-		return nil
-	}
-
-	return &corev1.SecurityContext{
-		RunAsUser:                defaultUID,
-		RunAsGroup:               defaultGID,
+	secCtx := &corev1.SecurityContext{
+		RunAsNonRoot: boolPtr(true),
+		// RunAsUser:                defaultUID,
+		// RunAsGroup:               defaultGID,
 		AllowPrivilegeEscalation: boolPtr(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
 		ReadOnlyRootFilesystem: boolPtr(false),
 	}
+
+	if !r.IsOpenShift {
+		secCtx.RunAsUser = defaultUID
+		secCtx.RunAsGroup = defaultGID
+	}
+
+	return secCtx
 }

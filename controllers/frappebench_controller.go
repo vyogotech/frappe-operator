@@ -43,8 +43,9 @@ import (
 // FrappeBenchReconciler reconciles a FrappeBench object
 type FrappeBenchReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme      *runtime.Scheme
+	Recorder    record.EventRecorder
+	IsOpenShift bool
 }
 
 const frappeBenchFinalizer = "vyogo.tech/bench-finalizer"
@@ -54,6 +55,8 @@ const frappeBenchFinalizer = "vyogo.tech/bench-finalizer"
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappebenches/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
+//+kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch
 //+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
@@ -274,9 +277,9 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 			}
 
-			// 2. Scale down all deployments to 0
-			componentNames := []string{"gunicorn", "nginx", "socketio", "scheduler", "worker-default", "worker-long", "worker-short"}
-			for _, component := range componentNames {
+			// 2. Scale down all deployments and statefulsets to 0
+			deploymentComponents := []string{"gunicorn", "nginx", "socketio", "scheduler", "worker-default", "worker-long", "worker-short"}
+			for _, component := range deploymentComponents {
 				deployName := fmt.Sprintf("%s-%s", bench.Name, component)
 				deploy := &appsv1.Deployment{}
 				if err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy); err == nil {
@@ -294,9 +297,28 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 				}
 			}
 
+			redisComponents := []string{"redis-cache", "redis-queue"}
+			for _, component := range redisComponents {
+				stsName := fmt.Sprintf("%s-%s", bench.Name, component)
+				sts := &appsv1.StatefulSet{}
+				if err := r.Get(ctx, types.NamespacedName{Name: stsName, Namespace: bench.Namespace}, sts); err == nil {
+					if sts.Spec.Replicas != nil && *sts.Spec.Replicas > 0 {
+						logger.Info("Scaling down statefulset", "statefulset", stsName)
+						zero := int32(0)
+						sts.Spec.Replicas = &zero
+						if err := r.Update(ctx, sts); err != nil {
+							logger.Error(err, "Failed to scale down statefulset", "statefulset", stsName)
+							r.Recorder.Event(bench, corev1.EventTypeWarning, "ScaleDownFailed", fmt.Sprintf("Failed to scale down %s: %v", stsName, err))
+						} else {
+							r.Recorder.Event(bench, corev1.EventTypeNormal, "ScaledDown", fmt.Sprintf("Scaled down statefulset %s", stsName))
+						}
+					}
+				}
+			}
+
 			// 3. Wait for pods to terminate (check if any pods are still running)
 			allTerminated := true
-			for _, component := range componentNames {
+			for _, component := range deploymentComponents {
 				deployName := fmt.Sprintf("%s-%s", bench.Name, component)
 				deploy := &appsv1.Deployment{}
 				if err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy); err == nil {
@@ -306,13 +328,36 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 					}
 				}
 			}
+			for _, component := range redisComponents {
+				stsName := fmt.Sprintf("%s-%s", bench.Name, component)
+				sts := &appsv1.StatefulSet{}
+				if err := r.Get(ctx, types.NamespacedName{Name: stsName, Namespace: bench.Namespace}, sts); err == nil {
+					if sts.Status.Replicas > 0 || sts.Status.ReadyReplicas > 0 {
+						allTerminated = false
+						logger.Info("Waiting for pods to terminate", "statefulset", stsName, "replicas", sts.Status.Replicas)
+					}
+				}
+			}
 
 			if !allTerminated {
 				logger.Info("Pods still terminating, requeuing")
 				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 			}
 
-			// 4. Cleanup is complete - remove finalizer
+			// 4. Clean up PVC
+			pvcName := fmt.Sprintf("%s-sites", bench.Name)
+			pvc := &corev1.PersistentVolumeClaim{}
+			if err := r.Get(ctx, types.NamespacedName{Name: pvcName, Namespace: bench.Namespace}, pvc); err == nil {
+				logger.Info("Deleting bench PVC", "pvc", pvcName)
+				if err := r.Delete(ctx, pvc); err != nil {
+					logger.Error(err, "Failed to delete bench PVC", "pvc", pvcName)
+					r.Recorder.Event(bench, corev1.EventTypeWarning, "PVCDeletionFailed", fmt.Sprintf("Failed to delete PVC %s: %v", pvcName, err))
+				} else {
+					r.Recorder.Event(bench, corev1.EventTypeNormal, "PVCDeleted", fmt.Sprintf("Deleted PVC %s", pvcName))
+				}
+			}
+
+			// 5. Cleanup is complete - remove finalizer
 			logger.Info("FrappeBench cleanup complete, removing finalizer")
 			r.Recorder.Event(bench, corev1.EventTypeNormal, "Deleted", "FrappeBench cleanup completed")
 			controllerutil.RemoveFinalizer(bench, frappeBenchFinalizer)
@@ -354,6 +399,9 @@ func (r *FrappeBenchReconciler) updateStatus(ctx context.Context, bench *vyogote
 
 // getOperatorConfig retrieves the operator-level configuration
 func (r *FrappeBenchReconciler) getOperatorConfig(ctx context.Context, namespace string) (*corev1.ConfigMap, error) {
+	if r.Client == nil {
+		return nil, fmt.Errorf("client not initialized")
+	}
 	configMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      "frappe-operator-config",
@@ -441,14 +489,32 @@ fi
 
 cd /home/frappe/frappe-bench
 
+echo "Checking directory permissions..."
+id
+
 echo "Configuring Frappe bench..."
+
+# The PVC is mounted directly at /home/frappe/frappe-bench/sites
+# Frappe expects this directory structure for proper operation
+mkdir -p sites
+
+# Test write access to the mounted volume
+if ! touch sites/.permission_test 2>/dev/null; then
+    echo "ERROR: sites directory is NOT writable by $(whoami) (UID $(id -u), GID $(id -g))."
+    ls -ld sites
+    exit 1
+fi
+rm sites/.permission_test
 
 # Create apps.txt from existing apps
 if [ -d "apps" ]; then
-    ls -1 apps > sites/apps.txt
+    echo "Creating apps.txt..."
+    # Write to sites/apps.txt since that is the shared volume
+    ls -1 apps > sites/apps.txt || { echo "ERROR: Failed to write to sites/apps.txt"; exit 1; }
 fi
 
 # Create or update common_site_config.json
+echo "Creating common_site_config.json..."
 cat > sites/common_site_config.json <<EOF
 {
   "redis_cache": "redis://%s-redis-cache:6379",
@@ -461,7 +527,8 @@ EOF
 if [ -d "/home/frappe/assets_cache" ]; then
     echo "Syncing pre-built assets from image to PVC..."
     mkdir -p sites/assets
-    cp -rup /home/frappe/assets_cache/* sites/assets/
+    # Use -n to not overwrite existing files, preserving permissions where possible
+    cp -rn /home/frappe/assets_cache/* sites/assets/ || true
 fi
 
 echo "Bench configuration complete"
@@ -484,7 +551,7 @@ echo "Bench configuration complete"
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
-					SecurityContext: r.getPodSecurityContext(bench),
+					SecurityContext: r.getPodSecurityContext(ctx, bench),
 					Containers: []corev1.Container{
 						{
 							Name:    "bench-init",
@@ -497,7 +564,7 @@ echo "Bench configuration complete"
 									MountPath: "/home/frappe/frappe-bench/sites",
 								},
 							},
-							SecurityContext: r.getContainerSecurityContext(bench),
+							SecurityContext: r.getContainerSecurityContext(ctx, bench),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "SKIP_BENCH_BUILD",
@@ -730,13 +797,20 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 
 // SetupWithManager sets up the controller with the Manager
 func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Set up event recorder
-	if r.Recorder == nil {
-		r.Recorder = mgr.GetEventRecorderFor("frappebench-controller")
+	builder := ctrl.NewControllerManagedBy(mgr).
+		For(&vyogotechv1alpha1.FrappeBench{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&batchv1.Job{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{})
+
+	// Detect platform
+	// r.IsOpenShift is already set by main.go, no need to re-detect
+	if r.IsOpenShift {
+		ctrl.Log.WithName("setup").Info("OpenShift platform detected for FrappeBench")
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&vyogotechv1alpha1.FrappeBench{}).
-		Owns(&batchv1.Job{}).
-		Complete(r)
+	return builder.Complete(r)
 }
