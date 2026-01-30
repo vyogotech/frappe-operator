@@ -85,6 +85,7 @@ kubectl apply -f site-shared-mariadb.yaml
 ### Basic Examples
 - `basic-bench.yaml` - Simple bench with default settings
 - `basic-site.yaml` - Site using shared MariaDB (development)
+- `site-with-apps.yaml` - **NEW**: Site with specific apps (erpnext, hrms)
 
 ### Database Modes
 - `site-shared-mariadb.yaml` - Site with shared MariaDB (production)
@@ -121,11 +122,14 @@ Key configuration options:
 Key configuration options:
 - `benchRef` - Reference to FrappeBench
 - `siteName` - Site domain name
+- `apps` - **NEW**: List of apps to install (checked against container filesystem, missing apps skipped gracefully)
 - `adminPasswordSecretRef` - Admin password secret (optional, auto-generates if not provided)
 - `dbConfig` - Database configuration
 - `domain` - External domain
 - `tls` - TLS configuration
 - `ingress` - Ingress settings
+
+For details on app installation, see [Site App Installation Guide](../docs/SITE_APP_INSTALLATION.md).
 
 ## Best Practices
 

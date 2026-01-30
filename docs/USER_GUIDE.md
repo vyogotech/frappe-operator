@@ -85,6 +85,13 @@ spec:
   # The domain name for the site
   siteName: my-site.localhost
   
+  # Apps to install on this site (optional)
+  # Apps will be checked against container filesystem
+  # Missing apps are gracefully skipped with warnings
+  apps:
+    - erpnext
+    - hrms
+  
   # Database Configuration
   dbConfig:
     provider: mariadb
@@ -115,6 +122,42 @@ kubectl get frappesite my-site
 ```
 
 The status should eventually change to `Ready`.
+
+## 3. Installing Apps on Sites
+
+You can specify which apps to install when creating a site. The operator will check the actual container filesystem and gracefully skip any apps that aren't available.
+
+### Example with Apps
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: erp-site
+spec:
+  benchRef:
+    name: my-bench
+  siteName: erp.example.com
+  
+  # Specify apps to install
+  apps:
+    - erpnext
+    - hrms
+  
+  dbConfig:
+    provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+```
+
+**Key Points:**
+- Apps are installed during initial site creation only
+- Missing apps are skipped with warnings (not errors)
+- Check job logs to see which apps were installed: `kubectl logs job/erp-site-init`
+- View status: `kubectl get frappesite erp-site -o jsonpath='{.status.appInstallationStatus}'`
+
+For complete details, see [Site App Installation Guide](SITE_APP_INSTALLATION.md).
 
 ## Troubleshooting
 

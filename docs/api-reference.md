@@ -180,6 +180,12 @@ spec:
   # Required: Site name (must match domain)
   siteName: string
   
+  # Optional: Apps to install on this site
+  # Apps are checked against container filesystem
+  # Missing apps are gracefully skipped with warnings
+  apps:
+    - string
+  
   # Optional: Admin password secret
   adminPasswordSecretRef:
     name: string
@@ -244,6 +250,13 @@ status:
   
   # How domain was determined
   domainSource: string  # explicit, bench-suffix, auto-detected, sitename-default
+  
+  # Apps that were requested for installation
+  installedApps:
+    - string
+  
+  # Status of app installation
+  appInstallationStatus: string
 ```
 
 ### Field Details
@@ -264,6 +277,33 @@ benchRef:
 - **Example:** `"customer1.example.com"`, `"mysite.local"`
 
 **Important:** This is what Frappe uses to route requests based on the HTTP Host header.
+
+#### `apps` (optional)
+- **Type:** `[]string`
+- **Description:** List of apps to install on this site during creation
+- **Validation:** App names must contain only alphanumeric characters, underscores, and hyphens
+- **Behavior:** Apps are checked against the actual container filesystem; missing apps are gracefully skipped with warnings
+
+**Example:**
+```yaml
+apps:
+  - erpnext
+  - hrms
+  - custom_app
+```
+
+**Key Features:**
+- **Filesystem Verification**: Apps are validated against the actual `apps/` directory in the container
+- **Graceful Degradation**: Missing apps generate warnings but don't fail site creation
+- **Immutable After Creation**: Apps can only be installed during initial site creation
+- **Status Tracking**: View installation status via `status.appInstallationStatus` and `status.installedApps`
+
+**Important Notes:**
+- Apps must exist in the container before installation
+- Check job logs to see which apps were installed vs skipped: `kubectl logs job/<site-name>-init`
+- To add apps after creation, use bench commands directly
+
+For complete details, see the [Site App Installation Guide](SITE_APP_INSTALLATION.md).
 
 #### `adminPasswordSecretRef` (optional)
 Reference to a Secret containing the admin password.

@@ -13,6 +13,7 @@ A production-ready Kubernetes operator that automates deployment, scaling, and m
 
 - **One-Command Deployment** - Deploy Frappe/ERPNext with a single kubectl command
 - **Multi-Tenancy** - Run hundreds of sites on shared infrastructure
+- **Site-Specific Apps** - Install different apps per site with graceful degradation
 - **Secure by Default** - Auto-generated credentials, per-site DB isolation
 - **Production-Ready** - Auto-scaling, zero-downtime updates, automated backups
 - **Multi-Platform** - ARM64/AMD64 support
@@ -72,6 +73,7 @@ For detailed guides, visit **[vyogotech.github.io/frappe-operator](https://vyogo
 - **[Operations Guide](https://vyogotech.github.io/frappe-operator/operations)** - Scaling, backups, updates, monitoring
 - **[API Reference](https://vyogotech.github.io/frappe-operator/api-reference)** - Complete CRD specifications
 - **[Troubleshooting](https://vyogotech.github.io/frappe-operator/troubleshooting)** - Common issues and solutions
+- **[Site App Installation](docs/SITE_APP_INSTALLATION.md)** - Install specific apps per site
 - **[OpenShift Installation](docs/INSTALL_OPENSHIFT.md)** - Step-by-step OpenShift guide
 - **[OpenShift Technical Guide](docs/openshift.md)** - Deep dive into compatibility & SCCs
 - **[MariaDB Integration Guide](docs/MARIADB_INTEGRATION.md)** - Database isolation & credentials
@@ -82,6 +84,7 @@ Check the [`examples/`](examples/) directory for ready-to-use configurations:
 
 - **[basic-bench.yaml](examples/basic-bench.yaml)** - Simple development setup
 - **[basic-site.yaml](examples/basic-site.yaml)** - Basic site configuration
+- **[site-with-apps.yaml](examples/site-with-apps.yaml)** - Site with specific apps installed
 - **[hybrid-bench.yaml](examples/hybrid-bench.yaml)** - FPM + Git + Image sources
 - **[worker-autoscaling.yaml](examples/worker-autoscaling.yaml)** - KEDA-based autoscaling
 - **[scheduled-sitebackup.yaml](examples/scheduled-sitebackup.yaml)** - Automated backups
