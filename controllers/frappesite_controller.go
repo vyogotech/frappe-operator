@@ -594,37 +594,37 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 	appsToInstall := ""
 	if len(site.Spec.Apps) > 0 {
 		logger.Info("Apps specified for site", "apps", site.Spec.Apps, "count", len(site.Spec.Apps))
-		
+
 		var validApps []string
 		var skippedApps []string
-		
+
 		// Basic validation: check app names are safe (alphanumeric, underscore, hyphen only)
 		// This prevents shell injection but doesn't fail for missing apps
 		for _, app := range site.Spec.Apps {
 			// Check for valid characters to prevent shell injection
 			isValid := true
 			for _, char := range app {
-				if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || 
-					 (char >= '0' && char <= '9') || char == '_' || char == '-') {
+				if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') ||
+					(char >= '0' && char <= '9') || char == '_' || char == '-') {
 					isValid = false
 					break
 				}
 			}
-			
+
 			if !isValid {
 				skippedApps = append(skippedApps, app)
 				logger.Info("Skipping app with invalid characters", "app", app)
-				r.Recorder.Event(site, corev1.EventTypeWarning, "InvalidAppName", 
+				r.Recorder.Event(site, corev1.EventTypeWarning, "InvalidAppName",
 					fmt.Sprintf("App '%s' contains invalid characters and will be skipped", app))
 			} else {
 				validApps = append(validApps, app)
 			}
 		}
-		
+
 		if len(skippedApps) > 0 {
 			logger.Info("Some apps skipped due to invalid names", "skipped", skippedApps)
 		}
-		
+
 		if len(validApps) == 0 {
 			logger.Info("No valid apps to install after validation")
 		} else {
@@ -634,20 +634,20 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 				appsToInstall = appsToInstall + " " + validApps[i]
 			}
 			logger.Info("Apps prepared for reconciliation", "apps", appsToInstall, "count", len(validApps))
-			r.Recorder.Event(site, corev1.EventTypeNormal, "AppsRequested", 
+			r.Recorder.Event(site, corev1.EventTypeNormal, "AppsRequested",
 				fmt.Sprintf("Requested %d app(s): %v - will check availability in container", len(validApps), validApps))
 		}
 	} else {
 		logger.Info("No apps specified - only frappe framework will be present")
 	}
-	
+
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
-		"site_name":      []byte(site.Spec.SiteName),
-		"domain":         []byte(domain),
-		"admin_password": []byte(adminPassword),
-		"bench_name":     []byte(bench.Name),
-		"db_provider":    []byte(dbProvider),
+		"site_name":       []byte(site.Spec.SiteName),
+		"domain":          []byte(domain),
+		"admin_password":  []byte(adminPassword),
+		"bench_name":      []byte(bench.Name),
+		"db_provider":     []byte(dbProvider),
 		"apps_to_install": []byte(appsToInstall),
 	}
 
@@ -722,27 +722,27 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		// Job exists, check if it completed
 		if job.Status.Succeeded > 0 {
 			logger.Info("Site initialization job completed successfully", "job", jobName)
-			
+
 			// Update status with requested apps
 			// Note: Some apps may have been skipped if not available - check logs for details
 			if len(site.Spec.Apps) > 0 {
 				site.Status.InstalledApps = site.Spec.Apps
 				site.Status.AppInstallationStatus = fmt.Sprintf("Completed app installation for %d requested app(s) - check logs for any skipped apps", len(site.Spec.Apps))
 				logger.Info("App installation process completed", "requestedApps", site.Spec.Apps)
-				r.Recorder.Event(site, corev1.EventTypeNormal, "AppsProcessed", 
+				r.Recorder.Event(site, corev1.EventTypeNormal, "AppsProcessed",
 					fmt.Sprintf("Processed app installation for: %v - check job logs for any skipped apps", site.Spec.Apps))
 			} else {
 				site.Status.AppInstallationStatus = "No apps specified - only frappe framework installed"
 				logger.Info("Site initialized with frappe framework only")
 			}
-			
+
 			return true, nil
 		}
 		if job.Status.Failed > 0 {
 			logger.Error(nil, "Site initialization job failed", "job", jobName, "failedCount", job.Status.Failed)
 			r.Recorder.Event(site, corev1.EventTypeWarning, "SiteInitializationFailed",
 				fmt.Sprintf("Site initialization job failed after %d attempt(s)", job.Status.Failed))
-			
+
 			// Try to get pod logs for error details
 			podList := &corev1.PodList{}
 			listOpts := []client.ListOption{
@@ -753,12 +753,12 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 				// Check the most recent pod for error messages
 				pod := podList.Items[len(podList.Items)-1]
 				if pod.Status.Phase == corev1.PodFailed {
-					logger.Error(nil, "Site initialization pod failed", 
-						"pod", pod.Name, 
+					logger.Error(nil, "Site initialization pod failed",
+						"pod", pod.Name,
 						"phase", pod.Status.Phase,
 						"reason", pod.Status.Reason,
 						"message", pod.Status.Message)
-					
+
 					// Update status with failure information
 					if len(site.Spec.Apps) > 0 {
 						site.Status.AppInstallationStatus = fmt.Sprintf("Failed to install apps: %s", pod.Status.Message)
@@ -767,7 +767,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 					}
 				}
 			}
-			
+
 			return false, fmt.Errorf("site initialization job failed")
 		}
 		// Job is still running
@@ -790,7 +790,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		"dbName", dbInfo.Name,
 		"apps", site.Spec.Apps,
 		"appsCount", len(site.Spec.Apps))
-	
+
 	if len(site.Spec.Apps) > 0 {
 		r.Recorder.Event(site, corev1.EventTypeNormal, "CreatingInitJob",
 			fmt.Sprintf("Creating initialization job to install %d app(s): %v", len(site.Spec.Apps), site.Spec.Apps))
