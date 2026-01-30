@@ -15,6 +15,11 @@ spec:
   # Site domain - for local testing use .localhost
   siteName: dev.localhost
   
+  # Apps to install (optional)
+  # Uncomment to install apps - they must be available in the bench
+  # apps:
+  #   - erpnext
+  
   # Database configuration
   dbConfig:
     provider: mariadb
