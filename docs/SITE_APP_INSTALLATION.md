@@ -2,12 +2,13 @@
 
 ## Overview
 
-The Frappe Operator now supports installing specific apps during site creation through the FrappeSite CRD. This feature provides:
+The Frappe Operator supports installing specific apps during site creation through the FrappeSite CRD. This feature provides:
 
 - **Site-level App Selection**: Choose which apps to install per site, even when multiple sites share the same bench
-- **Comprehensive Validation**: Apps are validated against the bench's available apps before installation
+- **Graceful Handling**: Apps that aren't available in the container are skipped with warnings, not errors
+- **Filesystem Verification**: Apps are checked against actual filesystem (apps directory) and apps.txt
 - **Detailed Logging**: Every step of app installation is logged for debugging and auditing
-- **Error Handling**: Clear error messages and events when app installation fails
+- **Flexible Validation**: Invalid app names cause warnings, missing apps are skipped gracefully
 - **Status Tracking**: Installation status and results are tracked in the site's status fields
 
 ## Usage
@@ -37,27 +38,35 @@ spec:
 
 ### Important Notes
 
-1. **Apps must be available in the bench**: The apps specified in the site must be available in the referenced FrappeBench. The operator validates this before attempting installation.
+1. **Apps are checked in the container**: The operator checks for apps in the actual container filesystem (apps directory) and apps.txt, not just the bench CRD specification.
 
-2. **Apps are installed during initial site creation only**: Apps are installed when the site is first created using `bench new-site --install-app=<app>`. The apps field is effectively immutable - if you update it after the site is created, the operator will not attempt to install or remove apps. To add/remove apps on an existing site, use bench commands directly (`bench install-app` or `bench uninstall-app`).
+2. **Graceful handling of missing apps**: If an app specified in the CRD is not available in the container, it will be skipped with a warning in the logs. The site creation will continue successfully with the available apps.
 
-3. **If no apps are specified**: Only the frappe framework will be installed on the site (no additional apps beyond frappe).
+3. **Apps are installed during initial site creation only**: Apps are installed when the site is first created using `bench new-site --install-app=<app>`. The apps field is effectively immutable - if you update it after the site is created, the operator will not attempt to install or remove apps. To add/remove apps on an existing site, use bench commands directly (`bench install-app` or `bench uninstall-app`).
+
+4. **If no apps are specified**: Only the frappe framework will be installed on the site (no additional apps beyond frappe).
 
 ## Validation
 
-The operator performs the following validations:
+The operator performs the following validations and checks:
 
-1. **Pre-creation validation**: Before creating the initialization job, the controller checks that all specified apps are available in the bench's installed apps list.
+1. **App name validation**: App names are checked for valid characters (alphanumeric, underscore, hyphen only) to prevent shell injection. Invalid names generate warnings and are skipped.
 
-2. **Runtime validation**: The initialization script validates that each app's directory exists in the bench before attempting installation.
+2. **Filesystem verification**: During site creation, the initialization script checks that each app's directory exists in the bench's apps folder.
 
-3. **Error reporting**: If validation fails at any stage, clear error messages are logged and emitted as Kubernetes events.
+3. **apps.txt check**: The script also displays contents of apps.txt if available for reference.
 
-### Example Validation Error
+4. **Graceful skipping**: If an app isn't available in the filesystem, it's skipped with a warning rather than failing the entire site creation.
 
+### Example: App Not Available
+
+Instead of failing, the script outputs:
 ```
-ERROR: App 'custom_app' not available in bench my-bench. Available apps: frappe, erpnext, hrms
+⚠ WARNING: App 'custom_app' not found in bench directory - skipping
+  The app may not be installed in this bench yet
 ```
+
+And continues with the apps that are available.
 
 ## Status Tracking
 
@@ -67,28 +76,28 @@ The FrappeSite status includes several fields to track app installation:
 
 ```yaml
 status:
-  # List of successfully installed apps
+  # List of requested apps (some may have been skipped if not available)
   installedApps:
     - erpnext
     - hrms
   
   # Overall installation status message
-  appInstallationStatus: "Successfully installed 2 app(s)"
+  appInstallationStatus: "Completed app installation for 2 requested app(s) - check logs for any skipped apps"
 ```
 
-Note: The `failedApps` field is reserved for future use when per-app failure tracking is implemented. Currently, if any app fails, the entire site creation fails and the error is reported in `appInstallationStatus`.
+Note: The `installedApps` field shows apps that were requested, not necessarily all installed. Check the job logs to see which apps were actually installed vs skipped. The `failedApps` field is reserved for future use.
 
 ### Status Messages
 
 During installation:
-- `"Installing 2 app(s)..."` - Installation in progress
+- `"Installing <N> app(s)..."` - Installation in progress
 
-On success:
-- `"Successfully installed 2 app(s)"` - All apps installed successfully
+On completion:
+- `"Completed app installation for N requested app(s) - check logs for any skipped apps"` - Installation completed (some may have been skipped)
 - `"No apps specified - only frappe framework installed"` - No apps requested
 
 On failure:
-- `"Failed to install apps: <error details>"` - Installation failed with details
+- `"Failed to install apps: <error details>"` - Site creation failed
 
 ## Monitoring Installation
 
@@ -118,9 +127,9 @@ kubectl describe frappesite my-site
 
 Example events:
 ```
-Normal  AppsSpecified          Apps to install: [erpnext hrms]
-Normal  CreatingInitJob        Creating initialization job to install 2 app(s): [erpnext hrms]
-Normal  AppsInstalled          Successfully installed apps: [erpnext hrms]
+Normal  AppsRequested          Requested 2 app(s): [erpnext hrms] - will check availability in container
+Normal  AppsProcessed          Processed app installation for: [erpnext hrms] - check job logs for any skipped apps
+Warning InvalidAppName         App 'my-app@123' contains invalid characters and will be skipped
 ```
 
 ### 5. View Initialization Job Logs
@@ -144,13 +153,45 @@ The initialization script provides comprehensive logging:
 App Installation Configuration
 ==========================================
 Apps requested for installation: erpnext hrms
-Available apps in bench:
+Available apps in bench (from filesystem):
+erpnext
+hrms
+
+Apps listed in apps.txt:
+frappe
 erpnext
 hrms
 frappe (framework - always available)
 ------------------------------------------
 ✓ App 'erpnext' found in bench and will be installed
 ✓ App 'hrms' found in bench and will be installed
+==========================================
+Total apps to install: 2
+Install arguments:  --install-app=erpnext --install-app=hrms
+==========================================
+```
+
+### App Skipping (Graceful Handling)
+
+```
+==========================================
+App Installation Configuration
+==========================================
+Apps requested for installation: erpnext custom_app hrms
+Available apps in bench (from filesystem):
+erpnext
+hrms
+frappe (framework - always available)
+------------------------------------------
+✓ App 'erpnext' found in bench and will be installed
+⚠ WARNING: App 'custom_app' not found in bench directory - skipping
+  The app may not be installed in this bench yet
+✓ App 'hrms' found in bench and will be installed
+------------------------------------------
+⚠ Skipped apps (not available): custom_app
+  These apps will not be installed on this site
+  To install them later, ensure they're available in the bench
+  and use: bench --site mysite.example.com install-app custom_app
 ==========================================
 Total apps to install: 2
 Install arguments:  --install-app=erpnext --install-app=hrms
@@ -185,25 +226,36 @@ Installed apps:
 
 ## Error Handling
 
-### App Not Found in Bench
+### App Not Found - Graceful Skipping
 
-**Error Message:**
+**Log Message:**
 ```
-✗ ERROR: App 'custom_app' not found in bench directory
-ERROR: Cannot install app 'custom_app' - not available in bench
-Available apps: frappe, erpnext, hrms
+⚠ WARNING: App 'custom_app' not found in bench directory - skipping
+  The app may not be installed in this bench yet
+⚠ Skipped apps (not available): custom_app
+  These apps will not be installed on this site
+```
+
+**Behavior:** The site creation continues successfully with the apps that are available. No error is raised.
+
+**Kubernetes Event:**
+```
+Normal  AppsProcessed  Processed app installation for: [erpnext custom_app hrms] - check job logs for any skipped apps
+```
+
+### Invalid App Name
+
+**Log Message:**
+```
+Skipping app with invalid characters: my-app@123
 ```
 
 **Kubernetes Event:**
 ```
-Warning  InvalidApps  Apps not available in bench my-bench: [custom_app]. Available apps: [frappe erpnext hrms]
+Warning  InvalidAppName  App 'my-app@123' contains invalid characters and will be skipped
 ```
 
-**Status:**
-```yaml
-status:
-  appInstallationStatus: "Failed to install apps: <error details>"
-```
+**Behavior:** App is skipped, site creation continues.
 
 ### Installation Failure
 
@@ -229,23 +281,36 @@ kubectl logs <pod-name>
 
 ## Troubleshooting
 
-### Problem: App not installing
+### Problem: App listed in CRD but not installing
 
 **Check:**
-1. Verify the app is listed in the bench's status:
-   ```bash
-   kubectl get frappebench my-bench -o jsonpath='{.status.installedApps}'
-   ```
-
-2. Check if the app directory exists in the bench:
-   ```bash
-   kubectl exec -it deployment/my-bench-gunicorn -- ls -la apps/
-   ```
-
-3. Review initialization job logs for errors:
+1. View the initialization job logs to see if the app was skipped:
    ```bash
    kubectl logs job/my-site-init
    ```
+   Look for warning messages about skipped apps.
+
+2. Verify the app exists in the bench pod:
+   ```bash
+   kubectl exec -it deployment/my-bench-gunicorn -- ls -la apps/
+   kubectl exec -it deployment/my-bench-gunicorn -- cat sites/apps.txt
+   ```
+
+3. If the app is missing, it needs to be installed in the bench first before the site can use it.
+
+### Problem: Want to install app after site creation
+
+**Solution:**
+Since apps are only installed during initial site creation through the CRD, you need to use bench commands:
+
+```bash
+# Get a shell in the bench pod
+kubectl exec -it deployment/my-bench-gunicorn -- bash
+
+# Install the app
+cd /home/frappe/frappe-bench
+bench --site mysite.example.com install-app custom_app
+```
 
 ### Problem: Installation job keeps failing
 
@@ -327,9 +392,11 @@ spec:
 
 1. **Apps are immutable after initial site creation**: Once a site is created, updating the apps field in the CRD spec will have no effect. The apps can only be installed during the initial `bench new-site` command. If you need to add or remove apps after site creation, use `bench install-app` or `bench uninstall-app` commands directly on the bench.
 
-2. **Apps must pre-exist in bench**: You cannot specify apps that aren't already available in the bench.
+2. **Apps must exist in container filesystem**: Apps are checked in the actual container (apps directory), not just the bench CRD spec.
 
-3. **No partial installation**: If one app fails to install, the entire site creation fails. This ensures consistency.
+3. **No partial installation tracking**: Currently, the status shows all requested apps, not which were actually installed vs skipped. Check job logs for details on skipped apps.
+
+4. **No automatic app sync**: If you add an app to the bench after site creation, existing sites won't automatically get it installed. You must manually install it on each site that needs it.
 
 ## Future Enhancements
 

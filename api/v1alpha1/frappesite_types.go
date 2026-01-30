@@ -66,8 +66,8 @@ type FrappeSiteSpec struct {
 	RouteConfig *RouteConfig `json:"routeConfig,omitempty"`
 
 	// Apps to install on this site
-	// These apps must be available in the referenced bench
-	// If not specified, no additional apps beyond frappe framework will be installed
+	// These apps are checked against the actual container filesystem during installation
+	// Apps not available in the container will be gracefully skipped with warnings
 	// Note: Apps can only be installed during initial site creation and are immutable thereafter
 	// +optional
 	Apps []string `json:"apps,omitempty"`

@@ -589,21 +589,17 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 	}
 
 	// Get apps to install if specified
+	// New approach: Pass all requested apps to the script, which will check actual availability
+	// and gracefully skip any that aren't available
 	appsToInstall := ""
 	if len(site.Spec.Apps) > 0 {
-		logger.Info("Apps specified for installation", "apps", site.Spec.Apps, "count", len(site.Spec.Apps))
-		
-		// Validate that apps are available in the bench
-		benchApps := make(map[string]bool)
-		for _, app := range bench.Spec.Apps {
-			benchApps[app.Name] = true
-		}
-		benchApps["frappe"] = true // frappe is always available
+		logger.Info("Apps specified for site", "apps", site.Spec.Apps, "count", len(site.Spec.Apps))
 		
 		var validApps []string
-		var invalidApps []string
+		var skippedApps []string
 		
-		// Validate app names are safe (alphanumeric, underscore, hyphen only)
+		// Basic validation: check app names are safe (alphanumeric, underscore, hyphen only)
+		// This prevents shell injection but doesn't fail for missing apps
 		for _, app := range site.Spec.Apps {
 			// Check for valid characters to prevent shell injection
 			isValid := true
@@ -616,39 +612,33 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 			}
 			
 			if !isValid {
-				invalidApps = append(invalidApps, app)
-				logger.Error(nil, "App name contains invalid characters", "app", app, "bench", bench.Name)
-				continue
-			}
-			
-			if benchApps[app] {
-				validApps = append(validApps, app)
+				skippedApps = append(skippedApps, app)
+				logger.Info("Skipping app with invalid characters", "app", app)
+				r.Recorder.Event(site, corev1.EventTypeWarning, "InvalidAppName", 
+					fmt.Sprintf("App '%s' contains invalid characters and will be skipped", app))
 			} else {
-				invalidApps = append(invalidApps, app)
-				logger.Error(nil, "App not available in bench", "app", app, "bench", bench.Name)
+				validApps = append(validApps, app)
 			}
 		}
 		
-		if len(invalidApps) > 0 {
-			errMsg := fmt.Sprintf("Apps not available or invalid in bench %s: %v. Available apps: %v", bench.Name, invalidApps, bench.Status.InstalledApps)
-			logger.Error(nil, errMsg)
-			r.Recorder.Event(site, corev1.EventTypeWarning, "InvalidApps", errMsg)
-			return fmt.Errorf(errMsg)
+		if len(skippedApps) > 0 {
+			logger.Info("Some apps skipped due to invalid names", "skipped", skippedApps)
 		}
 		
 		if len(validApps) == 0 {
 			logger.Info("No valid apps to install after validation")
 		} else {
-			// Join valid apps with space for the bash script using strings.Join would be better but need import
+			// Pass all valid apps to the script - it will check actual availability
 			appsToInstall = validApps[0]
 			for i := 1; i < len(validApps); i++ {
 				appsToInstall = appsToInstall + " " + validApps[i]
 			}
-			logger.Info("Valid apps prepared for installation", "apps", appsToInstall, "count", len(validApps))
-			r.Recorder.Event(site, corev1.EventTypeNormal, "AppsValidated", fmt.Sprintf("Validated %d app(s) for installation: %v", len(validApps), validApps))
+			logger.Info("Apps prepared for reconciliation", "apps", appsToInstall, "count", len(validApps))
+			r.Recorder.Event(site, corev1.EventTypeNormal, "AppsRequested", 
+				fmt.Sprintf("Requested %d app(s): %v - will check availability in container", len(validApps), validApps))
 		}
 	} else {
-		logger.Info("No apps specified for installation - only frappe framework will be installed")
+		logger.Info("No apps specified - only frappe framework will be present")
 	}
 	
 	// Build secret data with all credentials as individual files
@@ -733,13 +723,14 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		if job.Status.Succeeded > 0 {
 			logger.Info("Site initialization job completed successfully", "job", jobName)
 			
-			// Update status with installed apps
+			// Update status with requested apps
+			// Note: Some apps may have been skipped if not available - check logs for details
 			if len(site.Spec.Apps) > 0 {
 				site.Status.InstalledApps = site.Spec.Apps
-				site.Status.AppInstallationStatus = fmt.Sprintf("Successfully installed %d app(s)", len(site.Spec.Apps))
-				logger.Info("Apps installed successfully", "apps", site.Spec.Apps)
-				r.Recorder.Event(site, corev1.EventTypeNormal, "AppsInstalled", 
-					fmt.Sprintf("Successfully installed apps: %v", site.Spec.Apps))
+				site.Status.AppInstallationStatus = fmt.Sprintf("Completed app installation for %d requested app(s) - check logs for any skipped apps", len(site.Spec.Apps))
+				logger.Info("App installation process completed", "requestedApps", site.Spec.Apps)
+				r.Recorder.Event(site, corev1.EventTypeNormal, "AppsProcessed", 
+					fmt.Sprintf("Processed app installation for: %v - check job logs for any skipped apps", site.Spec.Apps))
 			} else {
 				site.Status.AppInstallationStatus = "No apps specified - only frappe framework installed"
 				logger.Info("Site initialized with frappe framework only")
@@ -943,34 +934,61 @@ if [[ -n "$APPS_TO_INSTALL" ]]; then
 	
 	# Validate apps directory exists and list available apps
 	if [[ -d "apps" ]]; then
+		# Get list of available apps from apps directory
 		AVAILABLE_APPS=$(ls -1 apps/ 2>/dev/null | grep -v "^frappe$" || true)
-		echo "Available apps in bench:"
+		echo "Available apps in bench (from filesystem):"
 		if [[ -n "$AVAILABLE_APPS" ]]; then
 			echo "$AVAILABLE_APPS"
 		fi
 		echo "frappe (framework - always available)"
+		
+		# Also check apps.txt if it exists
+		if [[ -f "sites/apps.txt" ]]; then
+			echo ""
+			echo "Apps listed in apps.txt:"
+			cat sites/apps.txt || true
+		fi
 	else
-		echo "ERROR: apps directory not found in bench"
-		exit 1
+		echo "WARNING: apps directory not found in bench - this is unexpected"
 	fi
 	echo "------------------------------------------"
 	
 	# Build install arguments and validate each app
+	# New approach: Skip apps that aren't available instead of failing
+	SKIPPED_APPS=""
 	for app in $APPS_TO_INSTALL; do
+		# Check if app directory exists
 		if [[ -d "apps/$app" ]]; then
 			INSTALL_APP_ARG+=" --install-app=$app"
 			APPS_TO_INSTALL_COUNT=$((APPS_TO_INSTALL_COUNT + 1))
 			echo "✓ App '$app' found in bench and will be installed"
 		else
-			echo "✗ ERROR: App '$app' not found in bench directory"
-			echo "ERROR: Cannot install app '$app' - not available in bench" >&2
-			echo "Available apps: frappe, $AVAILABLE_APPS" >&2
-			exit 1
+			# Gracefully skip missing apps
+			echo "⚠ WARNING: App '$app' not found in bench directory - skipping"
+			echo "  The app may not be installed in this bench yet"
+			if [[ -n "$SKIPPED_APPS" ]]; then
+				SKIPPED_APPS="$SKIPPED_APPS, $app"
+			else
+				SKIPPED_APPS="$app"
+			fi
 		fi
 	done
+	
+	if [[ -n "$SKIPPED_APPS" ]]; then
+		echo "------------------------------------------"
+		echo "⚠ Skipped apps (not available): $SKIPPED_APPS"
+		echo "  These apps will not be installed on this site"
+		echo "  To install them later, ensure they're available in the bench"
+		echo "  and use: bench --site $SITE_NAME install-app <app_name>"
+	fi
+	
 	echo "=========================================="
 	echo "Total apps to install: $APPS_TO_INSTALL_COUNT"
-	echo "Install arguments: $INSTALL_APP_ARG"
+	if [[ $APPS_TO_INSTALL_COUNT -gt 0 ]]; then
+		echo "Install arguments: $INSTALL_APP_ARG"
+	else
+		echo "No apps will be installed (none available or none specified)"
+	fi
 	echo "=========================================="
 else
 	echo "=========================================="
