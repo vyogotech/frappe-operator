@@ -126,7 +126,8 @@ type FrappeSiteStatus struct {
 	// +optional
 	DomainSource string `json:"domainSource,omitempty"`
 
-	// InstalledApps lists the apps that were installed on this site
+	// InstalledApps lists the apps that were requested for installation on this site.
+	// Some requested apps may have been skipped or failed; see FailedApps and AppInstallationStatus.
 	// +optional
 	InstalledApps []string `json:"installedApps,omitempty"`
 

@@ -1065,12 +1065,12 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
         if [[ $SITE_CREATION_EXIT_CODE -eq 0 ]]; then
             echo "✓ Site created successfully!"
             if [[ $APPS_TO_INSTALL_COUNT -gt 0 ]]; then
-                echo "✓ All $APPS_TO_INSTALL_COUNT app(s) installed successfully"
+                echo "✓ Requested installation of $APPS_TO_INSTALL_COUNT app(s). See logs above for per-app status."
                 
-                # Log each installed app
-                echo "Installed apps:"
+                # Log each app that was requested for installation
+                echo "Apps requested for installation:"
                 for app in $APPS_TO_INSTALL; do
-                    echo "  ✓ $app"
+                    echo "  - $app"
                 done
             fi
         else

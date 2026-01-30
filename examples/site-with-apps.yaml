@@ -67,13 +67,13 @@ spec:
 # 
 # Expected Status Fields:
 # - status.installedApps: ["erpnext", "hrms"]
-# - status.appInstallationStatus: "Successfully installed 2 app(s)"
+# - status.appInstallationStatus: "Completed app installation for 2 requested app(s) - check logs for any skipped apps"
 # 
 # Error Handling:
-# - If an app is not available in the bench, the operator will emit a warning event
-#   and the reconciliation will fail with a clear error message
-# - If app installation fails during site creation, the job will fail and logs
-#   will contain detailed error information
+# - If an app is not available in the bench, it will be skipped with a warning
+#   in the logs, and the site creation will continue with the available apps.
+# - If app installation fails during site creation (for apps that are available),
+#   the initialization job will fail and logs will contain detailed error information.
 # - Check pod logs for the init job if installation fails:
 #   kubectl get pods -l job-name=erp-site-init
 #   kubectl logs <pod-name>
