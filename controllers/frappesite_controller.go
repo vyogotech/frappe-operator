@@ -589,6 +589,46 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 	}
 
 	// Get apps to install if specified
+	appsToInstall := ""
+	if len(site.Spec.Apps) > 0 {
+		logger.Info("Apps specified for installation", "apps", site.Spec.Apps, "count", len(site.Spec.Apps))
+		r.Recorder.Event(site, corev1.EventTypeNormal, "AppsSpecified", fmt.Sprintf("Apps to install: %v", site.Spec.Apps))
+		
+		// Validate that apps are available in the bench
+		benchApps := make(map[string]bool)
+		for _, app := range bench.Spec.Apps {
+			benchApps[app.Name] = true
+		}
+		benchApps["frappe"] = true // frappe is always available
+		
+		var validApps []string
+		var invalidApps []string
+		for _, app := range site.Spec.Apps {
+			if benchApps[app] {
+				validApps = append(validApps, app)
+			} else {
+				invalidApps = append(invalidApps, app)
+				logger.Error(nil, "App not available in bench", "app", app, "bench", bench.Name)
+			}
+		}
+		
+		if len(invalidApps) > 0 {
+			errMsg := fmt.Sprintf("Apps not available in bench %s: %v. Available apps: %v", bench.Name, invalidApps, bench.Status.InstalledApps)
+			logger.Error(nil, errMsg)
+			r.Recorder.Event(site, corev1.EventTypeWarning, "InvalidApps", errMsg)
+			return fmt.Errorf(errMsg)
+		}
+		
+		// Join valid apps with space for the bash script
+		appsToInstall = fmt.Sprintf("%s", validApps[0])
+		for i := 1; i < len(validApps); i++ {
+			appsToInstall = fmt.Sprintf("%s %s", appsToInstall, validApps[i])
+		}
+		logger.Info("Valid apps prepared for installation", "apps", appsToInstall)
+	} else {
+		logger.Info("No apps specified for installation - only frappe framework will be installed")
+	}
+	
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
 		"site_name":      []byte(site.Spec.SiteName),
@@ -596,6 +636,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		"admin_password": []byte(adminPassword),
 		"bench_name":     []byte(bench.Name),
 		"db_provider":    []byte(dbProvider),
+		"apps_to_install": []byte(appsToInstall),
 	}
 
 	// Add database credentials if using external database
@@ -668,14 +709,59 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	if err == nil {
 		// Job exists, check if it completed
 		if job.Status.Succeeded > 0 {
-			logger.Info("Site initialization job completed", "job", jobName)
+			logger.Info("Site initialization job completed successfully", "job", jobName)
+			
+			// Update status with installed apps
+			if len(site.Spec.Apps) > 0 {
+				site.Status.InstalledApps = site.Spec.Apps
+				site.Status.AppInstallationStatus = fmt.Sprintf("Successfully installed %d app(s)", len(site.Spec.Apps))
+				logger.Info("Apps installed successfully", "apps", site.Spec.Apps)
+				r.Recorder.Event(site, corev1.EventTypeNormal, "AppsInstalled", 
+					fmt.Sprintf("Successfully installed apps: %v", site.Spec.Apps))
+			} else {
+				site.Status.AppInstallationStatus = "No apps specified - only frappe framework installed"
+				logger.Info("Site initialized with frappe framework only")
+			}
+			
 			return true, nil
 		}
 		if job.Status.Failed > 0 {
-			logger.Error(nil, "Site initialization job failed", "job", jobName)
+			logger.Error(nil, "Site initialization job failed", "job", jobName, "failedCount", job.Status.Failed)
+			r.Recorder.Event(site, corev1.EventTypeWarning, "SiteInitializationFailed",
+				fmt.Sprintf("Site initialization job failed after %d attempt(s)", job.Status.Failed))
+			
+			// Try to get pod logs for error details
+			podList := &corev1.PodList{}
+			listOpts := []client.ListOption{
+				client.InNamespace(site.Namespace),
+				client.MatchingLabels{"job-name": jobName},
+			}
+			if err := r.List(ctx, podList, listOpts...); err == nil && len(podList.Items) > 0 {
+				// Check the most recent pod for error messages
+				pod := podList.Items[len(podList.Items)-1]
+				if pod.Status.Phase == corev1.PodFailed {
+					logger.Error(nil, "Site initialization pod failed", 
+						"pod", pod.Name, 
+						"phase", pod.Status.Phase,
+						"reason", pod.Status.Reason,
+						"message", pod.Status.Message)
+					
+					// Update status with failure information
+					if len(site.Spec.Apps) > 0 {
+						site.Status.AppInstallationStatus = fmt.Sprintf("Failed to install apps: %s", pod.Status.Message)
+						r.Recorder.Event(site, corev1.EventTypeWarning, "AppInstallationFailed",
+							fmt.Sprintf("Failed to install apps. Check pod %s logs for details", pod.Name))
+					}
+				}
+			}
+			
 			return false, fmt.Errorf("site initialization job failed")
 		}
 		// Job is still running
+		logger.Info("Site initialization job in progress", "job", jobName)
+		if len(site.Spec.Apps) > 0 {
+			site.Status.AppInstallationStatus = fmt.Sprintf("Installing %d app(s)...", len(site.Spec.Apps))
+		}
 		return false, nil
 	}
 
@@ -688,7 +774,17 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		"job", jobName,
 		"domain", domain,
 		"dbProvider", dbInfo.Provider,
-		"dbName", dbInfo.Name)
+		"dbName", dbInfo.Name,
+		"apps", site.Spec.Apps,
+		"appsCount", len(site.Spec.Apps))
+	
+	if len(site.Spec.Apps) > 0 {
+		r.Recorder.Event(site, corev1.EventTypeNormal, "CreatingInitJob",
+			fmt.Sprintf("Creating initialization job to install %d app(s): %v", len(site.Spec.Apps), site.Spec.Apps))
+	} else {
+		r.Recorder.Event(site, corev1.EventTypeNormal, "CreatingInitJob",
+			"Creating initialization job (frappe framework only)")
+	}
 
 	// Get or generate admin password
 	var adminPassword string
@@ -814,12 +910,44 @@ else
 fi
 ls -l apps.txt || true
 
-# Dynamically build the --install-app argument
+# Dynamically build the --install-app argument with validation and logging
 INSTALL_APP_ARG=""
+APPS_TO_INSTALL_COUNT=0
 if [[ -n "$APPS_TO_INSTALL" ]]; then
+	echo "=========================================="
+	echo "App Installation Configuration"
+	echo "=========================================="
+	echo "Apps requested for installation: $APPS_TO_INSTALL"
+	
+	# Validate apps are available in bench
+	AVAILABLE_APPS=$(ls -1 apps/ 2>/dev/null | grep -v "^frappe$" || true)
+	echo "Available apps in bench:"
+	echo "$AVAILABLE_APPS"
+	echo "frappe (framework - always available)"
+	echo "------------------------------------------"
+	
+	# Build install arguments and validate each app
 	for app in $APPS_TO_INSTALL; do
-		INSTALL_APP_ARG+=" --install-app=$app"
+		if [[ -d "apps/$app" ]]; then
+			INSTALL_APP_ARG+=" --install-app=$app"
+			APPS_TO_INSTALL_COUNT=$((APPS_TO_INSTALL_COUNT + 1))
+			echo "✓ App '$app' found in bench and will be installed"
+		else
+			echo "✗ ERROR: App '$app' not found in bench directory"
+			echo "ERROR: Cannot install app '$app' - not available in bench" >&2
+			echo "Available apps: frappe, $AVAILABLE_APPS" >&2
+			exit 1
+		fi
 	done
+	echo "=========================================="
+	echo "Total apps to install: $APPS_TO_INSTALL_COUNT"
+	echo "Install arguments: $INSTALL_APP_ARG"
+	echo "=========================================="
+else
+	echo "=========================================="
+	echo "No apps specified for installation"
+	echo "Only frappe framework will be installed"
+	echo "=========================================="
 fi
 
 # Run bench new-site with provider-specific database configuration
@@ -838,20 +966,34 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
 	fi
 
     if [[ "$goto_update_config" -eq 0 ]]; then
-        echo "Creating site with $DB_PROVIDER database (pre-provisioned)"
+        echo "=========================================="
+        echo "Creating Frappe Site"
+        echo "=========================================="
+        echo "Site Name: $SITE_NAME"
+        echo "Database Provider: $DB_PROVIDER"
+        echo "Database Name: $DB_NAME"
+        echo "Database Host: $DB_HOST:$DB_PORT"
+        echo "Apps to install: ${APPS_TO_INSTALL:-none}"
+        echo "=========================================="
         
         # Check if bench version supports --db-user flag
         DB_USER_FLAG=""
         if bench new-site --help | grep -q " --db-user"; then
-            echo "Detected support for --db-user flag"
+            echo "✓ Detected support for --db-user flag"
             DB_USER_FLAG="--db-user=$DB_USER"
         elif [[ "$DB_USER" != "$DB_NAME" ]]; then
-            echo "WARNING: Your bench version does not support --db-user. Using DB_NAME as username."
+            echo "⚠ WARNING: Your bench version does not support --db-user. Using DB_NAME as username."
         else
-            echo "Bench version does not support --db-user, but DB_USER matches DB_NAME. Proceeding."
+            echo "✓ Bench version does not support --db-user, but DB_USER matches DB_NAME. Proceeding."
         fi
 
-        bench new-site \
+        echo ""
+        echo "Executing: bench new-site with apps: $INSTALL_APP_ARG"
+        echo "------------------------------------------"
+        
+        # Capture both stdout and stderr, and exit code
+        set +e  # Don't exit on error yet, we want to capture it
+        SITE_CREATION_OUTPUT=$(bench new-site \
           --db-type="$DB_PROVIDER" \
           --db-name="$DB_NAME" \
           --db-host="$DB_HOST" \
@@ -862,9 +1004,45 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
           --admin-password="$ADMIN_PASSWORD" \
           $INSTALL_APP_ARG \
           --verbose \
-          "$SITE_NAME" || echo "bench new-site failed (possibly exists); proceeding to update config"
+          "$SITE_NAME" 2>&1)
+        SITE_CREATION_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+        
+        echo "$SITE_CREATION_OUTPUT"
+        echo "------------------------------------------"
+        
+        if [[ $SITE_CREATION_EXIT_CODE -eq 0 ]]; then
+            echo "✓ Site created successfully!"
+            if [[ $APPS_TO_INSTALL_COUNT -gt 0 ]]; then
+                echo "✓ All $APPS_TO_INSTALL_COUNT app(s) installed successfully"
+                
+                # Log each installed app
+                echo "Installed apps:"
+                for app in $APPS_TO_INSTALL; do
+                    echo "  ✓ $app"
+                done
+            fi
+        else
+            echo "✗ ERROR: Site creation failed with exit code $SITE_CREATION_EXIT_CODE"
+            echo "Error output:"
+            echo "$SITE_CREATION_OUTPUT" | grep -i "error\|traceback\|exception" || echo "$SITE_CREATION_OUTPUT"
+            
+            # Check for specific app installation failures
+            if echo "$SITE_CREATION_OUTPUT" | grep -qi "app.*not found\|no module named"; then
+                echo "ERROR: App installation failed - one or more apps could not be found or imported"
+            fi
+            
+            # If site exists, it's not a critical error, continue
+            if echo "$SITE_CREATION_OUTPUT" | grep -qi "site.*already exists"; then
+                echo "⚠ Site already exists, will proceed to update configuration"
+            else
+                echo "CRITICAL ERROR: Site creation failed. Exiting."
+                exit $SITE_CREATION_EXIT_CODE
+            fi
+        fi
+        echo "=========================================="
     else
-        echo "Skipping new-site; will update site_config.json only."
+        echo "Skipping new-site; site already exists, will update site_config.json only."
     fi
 else
     echo "ERROR: Unsupported DB provider: $DB_PROVIDER"

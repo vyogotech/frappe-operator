@@ -53,6 +53,14 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              apps:
+                description: |-
+                  Apps to install on this site
+                  These apps must be available in the referenced bench
+                  If not specified, no apps will be installed by default (only frappe framework)
+                items:
+                  type: string
+                type: array
               benchRef:
                 description: BenchRef references the FrappeBench this site belongs
                   to
@@ -266,6 +274,10 @@ spec:
           status:
             description: FrappeSiteStatus defines the observed state of FrappeSite
             properties:
+              appInstallationStatus:
+                description: AppInstallationStatus provides detailed status of app
+                  installation
+                type: string
               benchReady:
                 description: BenchReady indicates if the referenced bench is ready
                 type: boolean
@@ -347,6 +359,18 @@ spec:
                   DomainSource indicates how domain was determined
                   Values: explicit, bench-suffix, auto-detected, sitename-default
                 type: string
+              failedApps:
+                additionalProperties:
+                  type: string
+                description: FailedApps lists apps that failed to install with error
+                  messages
+                type: object
+              installedApps:
+                description: InstalledApps lists the apps that were installed on this
+                  site
+                items:
+                  type: string
+                type: array
               phase:
                 description: Phase is the current phase
                 type: string

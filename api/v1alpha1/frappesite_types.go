@@ -64,6 +64,12 @@ type FrappeSiteSpec struct {
 	// Route configuration for OpenShift platforms
 	// +optional
 	RouteConfig *RouteConfig `json:"routeConfig,omitempty"`
+
+	// Apps to install on this site
+	// These apps must be available in the referenced bench
+	// If not specified, no apps will be installed by default (only frappe framework)
+	// +optional
+	Apps []string `json:"apps,omitempty"`
 }
 
 // FrappeSitePhase represents the current phase
@@ -118,6 +124,18 @@ type FrappeSiteStatus struct {
 	// Values: explicit, bench-suffix, auto-detected, sitename-default
 	// +optional
 	DomainSource string `json:"domainSource,omitempty"`
+
+	// InstalledApps lists the apps that were installed on this site
+	// +optional
+	InstalledApps []string `json:"installedApps,omitempty"`
+
+	// AppInstallationStatus provides detailed status of app installation
+	// +optional
+	AppInstallationStatus string `json:"appInstallationStatus,omitempty"`
+
+	// FailedApps lists apps that failed to install with error messages
+	// +optional
+	FailedApps map[string]string `json:"failedApps,omitempty"`
 }
 
 //+kubebuilder:object:root=true
