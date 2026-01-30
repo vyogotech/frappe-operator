@@ -67,7 +67,8 @@ type FrappeSiteSpec struct {
 
 	// Apps to install on this site
 	// These apps must be available in the referenced bench
-	// If not specified, no apps will be installed by default (only frappe framework)
+	// If not specified, no additional apps beyond frappe framework will be installed
+	// Note: Apps can only be installed during initial site creation and are immutable thereafter
 	// +optional
 	Apps []string `json:"apps,omitempty"`
 }

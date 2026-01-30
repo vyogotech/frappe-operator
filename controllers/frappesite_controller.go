@@ -592,7 +592,6 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 	appsToInstall := ""
 	if len(site.Spec.Apps) > 0 {
 		logger.Info("Apps specified for installation", "apps", site.Spec.Apps, "count", len(site.Spec.Apps))
-		r.Recorder.Event(site, corev1.EventTypeNormal, "AppsSpecified", fmt.Sprintf("Apps to install: %v", site.Spec.Apps))
 		
 		// Validate that apps are available in the bench
 		benchApps := make(map[string]bool)
@@ -603,7 +602,25 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		
 		var validApps []string
 		var invalidApps []string
+		
+		// Validate app names are safe (alphanumeric, underscore, hyphen only)
 		for _, app := range site.Spec.Apps {
+			// Check for valid characters to prevent shell injection
+			isValid := true
+			for _, char := range app {
+				if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || 
+					 (char >= '0' && char <= '9') || char == '_' || char == '-') {
+					isValid = false
+					break
+				}
+			}
+			
+			if !isValid {
+				invalidApps = append(invalidApps, app)
+				logger.Error(nil, "App name contains invalid characters", "app", app, "bench", bench.Name)
+				continue
+			}
+			
 			if benchApps[app] {
 				validApps = append(validApps, app)
 			} else {
@@ -613,18 +630,23 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		}
 		
 		if len(invalidApps) > 0 {
-			errMsg := fmt.Sprintf("Apps not available in bench %s: %v. Available apps: %v", bench.Name, invalidApps, bench.Status.InstalledApps)
+			errMsg := fmt.Sprintf("Apps not available or invalid in bench %s: %v. Available apps: %v", bench.Name, invalidApps, bench.Status.InstalledApps)
 			logger.Error(nil, errMsg)
 			r.Recorder.Event(site, corev1.EventTypeWarning, "InvalidApps", errMsg)
 			return fmt.Errorf(errMsg)
 		}
 		
-		// Join valid apps with space for the bash script
-		appsToInstall = fmt.Sprintf("%s", validApps[0])
-		for i := 1; i < len(validApps); i++ {
-			appsToInstall = fmt.Sprintf("%s %s", appsToInstall, validApps[i])
+		if len(validApps) == 0 {
+			logger.Info("No valid apps to install after validation")
+		} else {
+			// Join valid apps with space for the bash script using strings.Join would be better but need import
+			appsToInstall = validApps[0]
+			for i := 1; i < len(validApps); i++ {
+				appsToInstall = appsToInstall + " " + validApps[i]
+			}
+			logger.Info("Valid apps prepared for installation", "apps", appsToInstall, "count", len(validApps))
+			r.Recorder.Event(site, corev1.EventTypeNormal, "AppsValidated", fmt.Sprintf("Validated %d app(s) for installation: %v", len(validApps), validApps))
 		}
-		logger.Info("Valid apps prepared for installation", "apps", appsToInstall)
 	} else {
 		logger.Info("No apps specified for installation - only frappe framework will be installed")
 	}
@@ -919,11 +941,18 @@ if [[ -n "$APPS_TO_INSTALL" ]]; then
 	echo "=========================================="
 	echo "Apps requested for installation: $APPS_TO_INSTALL"
 	
-	# Validate apps are available in bench
-	AVAILABLE_APPS=$(ls -1 apps/ 2>/dev/null | grep -v "^frappe$" || true)
-	echo "Available apps in bench:"
-	echo "$AVAILABLE_APPS"
-	echo "frappe (framework - always available)"
+	# Validate apps directory exists and list available apps
+	if [[ -d "apps" ]]; then
+		AVAILABLE_APPS=$(ls -1 apps/ 2>/dev/null | grep -v "^frappe$" || true)
+		echo "Available apps in bench:"
+		if [[ -n "$AVAILABLE_APPS" ]]; then
+			echo "$AVAILABLE_APPS"
+		fi
+		echo "frappe (framework - always available)"
+	else
+		echo "ERROR: apps directory not found in bench"
+		exit 1
+	fi
 	echo "------------------------------------------"
 	
 	# Build install arguments and validate each app
@@ -992,6 +1021,9 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
         echo "------------------------------------------"
         
         # Capture both stdout and stderr, and exit code
+        # Temporarily disable exit-on-error to capture the output
+        SITE_CREATION_OUTPUT=""
+        SITE_CREATION_EXIT_CODE=0
         set +e  # Don't exit on error yet, we want to capture it
         SITE_CREATION_OUTPUT=$(bench new-site \
           --db-type="$DB_PROVIDER" \
@@ -1008,6 +1040,7 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
         SITE_CREATION_EXIT_CODE=$?
         set -e  # Re-enable exit on error
         
+        # Always print the output
         echo "$SITE_CREATION_OUTPUT"
         echo "------------------------------------------"
         
@@ -1024,17 +1057,21 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
             fi
         else
             echo "✗ ERROR: Site creation failed with exit code $SITE_CREATION_EXIT_CODE"
-            echo "Error output:"
-            echo "$SITE_CREATION_OUTPUT" | grep -i "error\|traceback\|exception" || echo "$SITE_CREATION_OUTPUT"
             
-            # Check for specific app installation failures
-            if echo "$SITE_CREATION_OUTPUT" | grep -qi "app.*not found\|no module named"; then
+            # Try to extract error information
+            if echo "$SITE_CREATION_OUTPUT" | grep -Eqi "error|traceback|exception|failed"; then
+                echo "Error details found in output above"
+            fi
+            
+            # Check for specific app installation failures with more patterns
+            if echo "$SITE_CREATION_OUTPUT" | grep -Eqi "app.*not (found|installed)|no module named|cannot import|failed to install"; then
                 echo "ERROR: App installation failed - one or more apps could not be found or imported"
             fi
             
-            # If site exists, it's not a critical error, continue
-            if echo "$SITE_CREATION_OUTPUT" | grep -qi "site.*already exists"; then
+            # If site exists, it's not a critical error, continue to config update
+            if echo "$SITE_CREATION_OUTPUT" | grep -Eqi "site.*(already exists|exists already)"; then
                 echo "⚠ Site already exists, will proceed to update configuration"
+                # Don't exit - continue to update config
             else
                 echo "CRITICAL ERROR: Site creation failed. Exiting."
                 exit $SITE_CREATION_EXIT_CODE
@@ -1042,7 +1079,11 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
         fi
         echo "=========================================="
     else
-        echo "Skipping new-site; site already exists, will update site_config.json only."
+        echo "=========================================="
+        echo "Site already exists - skipping site creation"
+        echo "Will update site_config.json only"
+        echo "Note: Apps cannot be installed after site creation"
+        echo "=========================================="
     fi
 else
     echo "ERROR: Unsupported DB provider: $DB_PROVIDER"

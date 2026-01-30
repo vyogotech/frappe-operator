@@ -39,9 +39,9 @@ spec:
 
 1. **Apps must be available in the bench**: The apps specified in the site must be available in the referenced FrappeBench. The operator validates this before attempting installation.
 
-2. **Apps are installed during site creation**: Apps are installed when the site is first created using `bench new-site --install-app=<app>`. They cannot be added or removed after site creation through this field.
+2. **Apps are installed during initial site creation only**: Apps are installed when the site is first created using `bench new-site --install-app=<app>`. The apps field is effectively immutable - if you update it after the site is created, the operator will not attempt to install or remove apps. To add/remove apps on an existing site, use bench commands directly (`bench install-app` or `bench uninstall-app`).
 
-3. **If no apps are specified**: Only the frappe framework will be installed on the site.
+3. **If no apps are specified**: Only the frappe framework will be installed on the site (no additional apps beyond frappe).
 
 ## Validation
 
@@ -74,10 +74,9 @@ status:
   
   # Overall installation status message
   appInstallationStatus: "Successfully installed 2 app(s)"
-  
-  # Map of failed apps with error messages (if any)
-  failedApps: {}
 ```
+
+Note: The `failedApps` field is reserved for future use when per-app failure tracking is implemented. Currently, if any app fails, the entire site creation fails and the error is reported in `appInstallationStatus`.
 
 ### Status Messages
 
@@ -326,7 +325,7 @@ spec:
 
 ## Limitations
 
-1. **Apps are immutable after creation**: Once a site is created, you cannot add or remove apps through the CRD. Use `bench install-app` or `bench uninstall-app` commands directly if needed.
+1. **Apps are immutable after initial site creation**: Once a site is created, updating the apps field in the CRD spec will have no effect. The apps can only be installed during the initial `bench new-site` command. If you need to add or remove apps after site creation, use `bench install-app` or `bench uninstall-app` commands directly on the bench.
 
 2. **Apps must pre-exist in bench**: You cannot specify apps that aren't already available in the bench.
 
