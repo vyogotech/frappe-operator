@@ -4,7 +4,12 @@ metadata:
   name: stress-test-bench
   namespace: default
 spec:
-  frappeVersion: "15"
+  frappeVersion: "version-15"
+  # Use verified image from E2E manifests to avoid ImagePullBackOff
+  imageConfig:
+    repository: ghcr.io/rmallam/frappe_docker
+    tag: sha-ae82c47
+    pullPolicy: IfNotPresent
   apps:
     - name: erpnext
       source: image
