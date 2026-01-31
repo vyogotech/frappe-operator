@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -34,6 +35,7 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	"github.com/vyogotech/frappe-operator/controllers/database"
 )
 
 var _ = Describe("FrappeSite Reconciliation Stability", func() {
@@ -97,6 +99,14 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 		_ = routev1.AddToScheme(scheme)
 
 		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(bench).WithStatusSubresource(&vyogotechv1alpha1.FrappeSite{}).Build()
+
+		// Create shared MariaDB CR so Reconcile can provision DB in shared mode (Create ensures fake client can Get it)
+		sharedMariaDB := &unstructured.Unstructured{}
+		sharedMariaDB.SetGroupVersionKind(database.MariaDBGVK)
+		sharedMariaDB.SetName("frappe-mariadb")
+		sharedMariaDB.SetNamespace(namespace)
+		_ = unstructured.SetNestedMap(sharedMariaDB.Object, map[string]interface{}{}, "spec")
+		Expect(fakeClient.Create(ctx, sharedMariaDB)).To(Succeed())
 
 		reconciler = &FrappeSiteReconciler{
 			Client:   fakeClient,
@@ -172,7 +182,7 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 			// Note: In the actual implementation, we expect reconciliation to proceed
 			// This test will initially fail until we implement the generation check
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// The site should be processed (exact behavior depends on implementation)
 			// For now, we just verify no panic/error occurs
 			Expect(result).NotTo(BeNil())
@@ -201,7 +211,7 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 			// Then: Site phase should be stable (not flapping between states)
 			updatedSite := &vyogotechv1alpha1.FrappeSite{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, updatedSite)).To(Succeed())
-			
+
 			// Phase should be consistent (either Provisioning or Ready, not flapping)
 			Expect(updatedSite.Status.Phase).To(Or(
 				Equal(vyogotechv1alpha1.FrappeSitePhaseProvisioning),
@@ -233,7 +243,7 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 			// Note: This test will initially fail until we implement ObservedGeneration tracking
 			updatedSite := &vyogotechv1alpha1.FrappeSite{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, updatedSite)).To(Succeed())
-			
+
 			// We expect ObservedGeneration to be updated (this will fail initially)
 			// Commenting out the assertion for now since it will fail in Red phase
 			// Expect(updatedSite.Status.ObservedGeneration).To(Equal(int64(1)))

@@ -473,7 +473,7 @@ func (p *MariaDBProviderUnstructured) ensureUserCR(ctx context.Context, site *vy
 					"name": passwordSecretName,
 					"key":  "password",
 				},
-				"maxUserConnections": 100,
+				"maxUserConnections": int64(100),
 			},
 		},
 	}
@@ -517,7 +517,7 @@ func (p *MariaDBProviderUnstructured) ensureGrantCR(ctx context.Context, site *v
 				},
 				// Grant minimal privileges for Frappe operations (no DROP DATABASE)
 				// Site user can perform table operations but cannot drop the database
-				"privileges": []string{
+				"privileges": []interface{}{
 					"SELECT", "INSERT", "UPDATE", "DELETE",
 					"CREATE", "ALTER", "INDEX", "DROP", // Table-level DROP only
 					"REFERENCES",

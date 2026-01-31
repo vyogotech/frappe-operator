@@ -103,8 +103,23 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests (excludes test/e2e which requires a real cluster).
+test: manifests generate fmt vet envtest ## Run unit tests (excludes test/ subdirectory).
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./api/... ./pkg/... ./controllers/... -coverprofile cover.out
+
+.PHONY: integration-test
+integration-test: manifests generate fmt vet envtest ## Run integration tests (requires a real cluster).
+	INTEGRATION_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./test/integration/...
+
+.PHONY: coverage
+coverage: ## Run all tests with coverage and report total + excluding generated code (target: 60-70%%).
+	go test ./... -coverprofile=cover.out -covermode=atomic
+	@echo "--- Coverage (total) ---"
+	@go tool cover -func=cover.out | tail -1
+	@grep -v "zz_generated.deepcopy.go" cover.out > cover_no_gen.out || true
+	@if [ -s cover_no_gen.out ]; then \
+		echo "--- Coverage (excluding zz_generated.deepcopy.go) ---"; \
+		go tool cover -func=cover_no_gen.out | tail -1; \
+	fi
 
 .PHONY: e2e-test
 e2e-test: manifests generate docker-build ## Run end-to-end tests.

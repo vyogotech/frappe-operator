@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -55,12 +56,14 @@ type SiteBackupReconciler struct {
 // move the current state of the cluster closer to the desired state.
 func (r *SiteBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	startTime := time.Now()
 
 	siteBackup := &vyogotechv1alpha1.SiteBackup{}
 	if err := r.Get(ctx, req.NamespacedName, siteBackup); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
+		ReconciliationErrors.WithLabelValues("sitebackup", "fetch_error").Inc()
 		return ctrl.Result{}, err
 	}
 
@@ -112,9 +115,23 @@ func (r *SiteBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if siteBackup.Spec.Schedule == "" {
-		return r.reconcileOneTimeBackup(ctx, siteBackup, bench)
+		result, err := r.reconcileOneTimeBackup(ctx, siteBackup, bench)
+		if err != nil {
+			ReconciliationErrors.WithLabelValues("sitebackup", "backup_error").Inc()
+			ReconciliationDuration.WithLabelValues("sitebackup", "error").Observe(time.Since(startTime).Seconds())
+		} else {
+			ReconciliationDuration.WithLabelValues("sitebackup", "success").Observe(time.Since(startTime).Seconds())
+		}
+		return result, err
 	} else {
-		return r.reconcileScheduledBackup(ctx, siteBackup, bench)
+		result, err := r.reconcileScheduledBackup(ctx, siteBackup, bench)
+		if err != nil {
+			ReconciliationErrors.WithLabelValues("sitebackup", "schedule_error").Inc()
+			ReconciliationDuration.WithLabelValues("sitebackup", "error").Observe(time.Since(startTime).Seconds())
+		} else {
+			ReconciliationDuration.WithLabelValues("sitebackup", "success").Observe(time.Since(startTime).Seconds())
+		}
+		return result, err
 	}
 }
 
@@ -324,6 +341,7 @@ func (r *SiteBackupReconciler) buildBackupJob(siteBackup *vyogotechv1alpha1.Site
 			},
 		},
 	}
+	applyDefaultJobTTL(&job.Spec)
 
 	controllerutil.SetControllerReference(siteBackup, job, r.Scheme)
 	return job
@@ -385,6 +403,8 @@ func (r *SiteBackupReconciler) buildBackupCronJob(siteBackup *vyogotechv1alpha1.
 	}
 
 	controllerutil.SetControllerReference(siteBackup, cronJob, r.Scheme)
+	applyDefaultJobTTL(&cronJob.Spec.JobTemplate.Spec)
+
 	return cronJob
 }
 
