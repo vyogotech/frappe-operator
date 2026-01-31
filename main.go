@@ -60,28 +60,14 @@ func init() {
 
 const defaultMaxConcurrentSiteReconciles = 10
 
-// getMaxConcurrentSiteReconciles returns the effective max concurrent site reconciles:
-// max(operatorConfig from env FRAPPE_MAX_CONCURRENT_SITE_RECONCILES, max(spec.siteReconcileConcurrency across benches)).
-// Operator config is from frappe-operator-config ConfigMap (e.g. maxConcurrentSiteReconciles), passed via env when using Helm.
-func getMaxConcurrentSiteReconciles(mgr ctrl.Manager) int {
-	fromEnv := defaultMaxConcurrentSiteReconciles
-	if s := os.Getenv("FRAPPE_MAX_CONCURRENT_SITE_RECONCILES"); s != "" {
-		if n, err := strconv.Atoi(s); err == nil && n > 0 {
-			fromEnv = n
-		}
-	}
+// effectiveMaxFromBenches returns the effective max concurrent site reconciles from env value and bench list.
+// Used by getMaxConcurrentSiteReconciles; exported for testing.
+func effectiveMaxFromBenches(fromEnv int, items []vyogotechv1alpha1.FrappeBench) int {
 	benchMax := 0
-	cl, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
-	if err == nil {
-		var list vyogotechv1alpha1.FrappeBenchList
-		// Omit InNamespace to list FrappeBenches across all namespaces (bench-level override).
-		if err := cl.List(context.Background(), &list); err == nil {
-			for i := range list.Items {
-				if list.Items[i].Spec.SiteReconcileConcurrency != nil && *list.Items[i].Spec.SiteReconcileConcurrency > 0 {
-					if int(*list.Items[i].Spec.SiteReconcileConcurrency) > benchMax {
-						benchMax = int(*list.Items[i].Spec.SiteReconcileConcurrency)
-					}
-				}
+	for i := range items {
+		if items[i].Spec.SiteReconcileConcurrency != nil && *items[i].Spec.SiteReconcileConcurrency > 0 {
+			if int(*items[i].Spec.SiteReconcileConcurrency) > benchMax {
+				benchMax = int(*items[i].Spec.SiteReconcileConcurrency)
 			}
 		}
 	}
@@ -92,6 +78,28 @@ func getMaxConcurrentSiteReconciles(mgr ctrl.Manager) int {
 		fromEnv = 1
 	}
 	return fromEnv
+}
+
+// getMaxConcurrentSiteReconciles returns the effective max concurrent site reconciles:
+// max(operatorConfig from env FRAPPE_MAX_CONCURRENT_SITE_RECONCILES, max(spec.siteReconcileConcurrency across benches)).
+// Operator config is from frappe-operator-config ConfigMap (e.g. maxConcurrentSiteReconciles), passed via env when using Helm.
+func getMaxConcurrentSiteReconciles(mgr ctrl.Manager) int {
+	fromEnv := defaultMaxConcurrentSiteReconciles
+	if s := os.Getenv("FRAPPE_MAX_CONCURRENT_SITE_RECONCILES"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			fromEnv = n
+		}
+	}
+	var items []vyogotechv1alpha1.FrappeBench
+	cl, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
+	if err == nil {
+		var list vyogotechv1alpha1.FrappeBenchList
+		// Omit InNamespace to list FrappeBenches across all namespaces (bench-level override).
+		if err := cl.List(context.Background(), &list); err == nil {
+			items = list.Items
+		}
+	}
+	return effectiveMaxFromBenches(fromEnv, items)
 }
 
 func main() {

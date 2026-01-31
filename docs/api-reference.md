@@ -81,6 +81,11 @@ spec:
       requests: {cpu: string, memory: string}
       limits: {cpu: string, memory: string}
     storageSize: string
+  
+  # Optional: Suggests max concurrent site reconciles for sites on this bench.
+  # Operator uses max(operatorConfig.maxConcurrentSiteReconciles, max across all benches).
+  # Only applied at operator startup; change requires operator restart.
+  siteReconcileConcurrency: int32
 ```
 
 ### Status
@@ -153,6 +158,11 @@ Redis or DragonFly configuration.
 - **`maxMemory`** (string): Maximum memory (e.g., `"4gb"`)
 - **`resources`**: Resource requirements
 - **`storageSize`**: Persistent storage size
+
+#### `siteReconcileConcurrency` (optional)
+- **Type:** `int32`
+- **Description:** Suggests max concurrent FrappeSite reconciles for sites on this bench. The operator uses **max(operator config `maxConcurrentSiteReconciles`, max across all benches)** at startup. Useful when running 100+ sites. Only applied at operator startup; changing it requires an operator restart.
+- **Example:** `20`
 
 ---
 

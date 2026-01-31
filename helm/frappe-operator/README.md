@@ -109,6 +109,7 @@ helm install frappe-operator . \
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `operator.replicaCount` | Number of operator replicas | `1` |
+| `operatorConfig.maxConcurrentSiteReconciles` | Max concurrent FrappeSite reconciles (tune for 100+ sites) | `"10"` |
 | `operator.image.repository` | Operator image repository | `ghcr.io/vyogotech/frappe-operator` |
 | `operator.image.tag` | Operator image tag | `v1.0.0` |
 | `operator.resources.limits.cpu` | CPU limit | `500m` |

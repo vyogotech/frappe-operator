@@ -62,6 +62,7 @@ Frappe Operator brings the power of Kubernetes orchestration to Frappe deploymen
 - **Site-Specific App Installation** - Install different apps per site with graceful degradation
 - **Hybrid App Installation** - Install from FPM packages, Git, or images
 - **Worker Autoscaling** - Scale-to-zero for cost optimization
+- **Site reconciliation concurrency** - Tune concurrent site reconciles for 100+ sites (operator config or per-bench)
 - **Backup Management** - Automated backups with retention policies
 - **Observability** - Built-in Prometheus metrics and logging
 - **Multi-Platform** - ARM64 and AMD64 compatible
