@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -385,16 +386,21 @@ func (r *FrappeBenchReconciler) setCondition(bench *vyogotechv1alpha1.FrappeBenc
 	meta.SetStatusCondition(&bench.Status.Conditions, condition)
 }
 
-// updateStatus updates the FrappeBench status with proper error handling
+// updateStatus updates the FrappeBench status with proper error handling and conflict retry
 func (r *FrappeBenchReconciler) updateStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
-	if err := r.Status().Update(ctx, bench); err != nil {
-		if errors.IsConflict(err) {
-			// Requeue on conflict
-			return fmt.Errorf("status update conflict, will requeue: %w", err)
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest := &vyogotechv1alpha1.FrappeBench{}
+		if err := r.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, latest); err != nil {
+			return err
 		}
-		return fmt.Errorf("failed to update status: %w", err)
-	}
-	return nil
+		latest.Status = bench.Status
+		if err := r.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+		// Sync back resource version to avoid conflict in subsequent updates in same reconcile loop
+		bench.SetResourceVersion(latest.GetResourceVersion())
+		return nil
+	})
 }
 
 // getOperatorConfig retrieves the operator-level configuration
