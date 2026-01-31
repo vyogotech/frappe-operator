@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "frappe-operator.fullname" . }}-controller-manager-metrics-service
+  namespace: {{ include "frappe-operator.namespace" . }}
+  labels:
+    {{- include "frappe-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
+spec:
+  ports:
+    - name: metrics
+      port: {{ .Values.manager.metrics.port }}
+      protocol: TCP
+      targetPort: metrics
+  selector:
+    {{- include "frappe-operator.selectorLabels" . | nindent 4 }}

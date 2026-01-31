@@ -15,7 +15,8 @@ jobs:
   stress-test:
     name: Stress Test (5 Sites)
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 45
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,6 +35,8 @@ jobs:
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
 
       - name: Add Helm Repositories
         run: |

@@ -230,6 +230,186 @@ type ComponentResources struct {
 	WorkerShort *ResourceRequirements `json:"workerShort,omitempty"`
 }
 
+// DefaultComponentResources returns sensible default resource requirements for Frappe components
+// These defaults are suitable for small to medium workloads and should be adjusted for production
+func DefaultComponentResources() ComponentResources {
+	return ComponentResources{
+		Gunicorn: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1000m"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		Nginx: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		},
+		Scheduler: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("128Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+		Socketio: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		},
+		WorkerDefault: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+		WorkerLong: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1000m"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		WorkerShort: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("128Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		},
+	}
+}
+
+// ProductionComponentResources returns resource requirements suitable for production workloads
+func ProductionComponentResources() ComponentResources {
+	return ComponentResources{
+		Gunicorn: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2000m"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			},
+		},
+		Nginx: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("128Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+		Scheduler: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1000m"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		Socketio: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("128Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+		WorkerDefault: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1000m"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		},
+		WorkerLong: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2000m"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			},
+		},
+		WorkerShort: &ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+	}
+}
+
+// MergeResources merges user-provided resources with defaults, user values take precedence
+func (c ComponentResources) MergeWithDefaults(defaults ComponentResources) ComponentResources {
+	result := defaults
+	if c.Gunicorn != nil {
+		result.Gunicorn = c.Gunicorn
+	}
+	if c.Nginx != nil {
+		result.Nginx = c.Nginx
+	}
+	if c.Scheduler != nil {
+		result.Scheduler = c.Scheduler
+	}
+	if c.Socketio != nil {
+		result.Socketio = c.Socketio
+	}
+	if c.WorkerDefault != nil {
+		result.WorkerDefault = c.WorkerDefault
+	}
+	if c.WorkerLong != nil {
+		result.WorkerLong = c.WorkerLong
+	}
+	if c.WorkerShort != nil {
+		result.WorkerShort = c.WorkerShort
+	}
+	return result
+}
+
 // RedisConfig defines Redis/Dragonfly configuration
 type RedisConfig struct {
 	// Type: redis or dragonfly
@@ -425,4 +605,10 @@ type RouteConfig struct {
 	// Annotations to add to the Route
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// MustParseQuantity parses a resource quantity string and panics on error
+// This is a convenience function for tests and static initialization
+func MustParseQuantity(s string) resource.Quantity {
+	return resource.MustParse(s)
 }

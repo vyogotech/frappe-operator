@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	"github.com/vyogotech/frappe-operator/pkg/resources"
 )
 
 var _ = Describe("FrappeBench Controller", func() {
@@ -68,6 +70,7 @@ var _ = Describe("FrappeBench Controller", func() {
 		_ = vyogotechv1alpha1.AddToScheme(scheme)
 		_ = corev1.AddToScheme(scheme)
 		_ = appsv1.AddToScheme(scheme)
+		_ = batchv1.AddToScheme(scheme)
 
 		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&vyogotechv1alpha1.FrappeBench{}).Build()
 
@@ -339,6 +342,22 @@ var _ = Describe("FrappeBench Controller", func() {
 			Expect(bench.Status.InstalledApps).To(ContainElement("frappe"))
 			Expect(bench.Status.InstalledApps).To(ContainElement("erpnext"))
 			Expect(bench.Status.InstalledApps).To(ContainElement("hrms"))
+		})
+	})
+
+	Describe("Job TTL configuration", func() {
+		It("sets default TTL on bench init job", func() {
+			bench.Spec.FrappeVersion = "15"
+			Expect(fakeClient.Create(ctx, bench)).To(Succeed())
+
+			_, err := reconciler.ensureBenchInitialized(ctx, bench, false, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			job := &batchv1.Job{}
+			expectKey := types.NamespacedName{Name: bench.Name + "-init", Namespace: bench.Namespace}
+			Expect(fakeClient.Get(ctx, expectKey, job)).To(Succeed())
+			Expect(job.Spec.TTLSecondsAfterFinished).NotTo(BeNil())
+			Expect(*job.Spec.TTLSecondsAfterFinished).To(Equal(resources.DefaultJobTTL))
 		})
 	})
 })

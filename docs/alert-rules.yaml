@@ -1,0 +1,87 @@
+# PrometheusRule for Frappe Operator
+# Apply with: kubectl apply -f docs/alert-rules.yaml
+# Requires Prometheus Operator (monitoring.coreos.com)
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: frappe-operator-alerts
+  namespace: frappe-operator-system
+  labels:
+    prometheus: k8s
+    role: alert-rules
+spec:
+  groups:
+  - name: frappe-operator
+    rules:
+    - alert: FrappeOperatorDown
+      expr: absent(up{job="frappe-operator"}) == 1
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Frappe Operator is down"
+        description: "Frappe Operator has been down for more than 5 minutes"
+
+    - alert: FrappeOperatorHighErrorRate
+      expr: rate(frappe_operator_reconciliation_errors_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High reconciliation error rate"
+        description: "Controller {{ $labels.controller }} has error rate of {{ $value }} errors/sec"
+
+    - alert: FrappeOperatorSlowReconciliation
+      expr: histogram_quantile(0.95, rate(frappe_operator_reconciliation_duration_seconds_bucket[5m])) > 60
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Slow reconciliation detected"
+        description: "Controller {{ $labels.controller }} p95 reconciliation time is {{ $value }}s"
+
+    - alert: FrappeSiteNotReady
+      expr: kube_customresource_frappesite_status_phase{phase!="Ready"} == 1
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "FrappeSite not ready"
+        description: "Site {{ $labels.name }} in namespace {{ $labels.namespace }} is not ready"
+
+    - alert: FrappeBenchNotReady
+      expr: kube_customresource_frappebench_status_phase{phase!="Ready"} == 1
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "FrappeBench not ready"
+        description: "Bench {{ $labels.name }} in namespace {{ $labels.namespace }} is not ready"
+
+  - name: frappe-workloads
+    rules:
+    - alert: FrappeGunicornRestarts
+      expr: increase(kube_pod_container_status_restarts_total{container="gunicorn"}[1h]) > 3
+      labels:
+        severity: warning
+      annotations:
+        summary: "Gunicorn container restarting"
+        description: "Gunicorn container in pod {{ $labels.pod }} has restarted {{ $value }} times in the last hour"
+
+    - alert: FrappeWorkerQueueHigh
+      expr: frappe_worker_queue_length > 100
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Worker queue is backing up"
+        description: "Queue {{ $labels.queue }} has {{ $value }} pending jobs"
+
+    - alert: FrappeDatabaseConnectionsHigh
+      expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections > 0.8
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Database connections near limit"
+        description: "{{ $value | humanizePercentage }} of max connections in use"

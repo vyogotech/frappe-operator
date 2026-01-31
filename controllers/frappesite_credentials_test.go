@@ -224,6 +224,105 @@ func TestFrappeSiteReconciler_resolveDomain(t *testing.T) {
 			t.Error("Expected generated domain")
 		}
 	})
+
+	t.Run("Bench domain suffix", func(t *testing.T) {
+		suffix := ".apps.example.com"
+		bench := &vyogotechv1alpha1.FrappeBench{
+			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+				DomainConfig: &vyogotechv1alpha1.DomainConfig{Suffix: suffix},
+			},
+		}
+		site := &vyogotechv1alpha1.FrappeSite{Spec: vyogotechv1alpha1.FrappeSiteSpec{SiteName: "mysite"}}
+		domain, source := r.resolveDomain(context.TODO(), site, bench)
+		if domain != "mysite"+suffix {
+			t.Errorf("Expected mysite%s, got %s", suffix, domain)
+		}
+		if source != "bench-suffix" {
+			t.Errorf("Expected source bench-suffix, got %s", source)
+		}
+	})
+}
+
+func TestFrappeSiteReconciler_getRequeueAttempt(t *testing.T) {
+	r := &FrappeSiteReconciler{}
+	t.Run("nil annotations", func(t *testing.T) {
+		site := &vyogotechv1alpha1.FrappeSite{}
+		if r.getRequeueAttempt(site) != 0 {
+			t.Error("expected 0 for nil annotations")
+		}
+	})
+	t.Run("missing annotation", func(t *testing.T) {
+		site := &vyogotechv1alpha1.FrappeSite{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
+		if r.getRequeueAttempt(site) != 0 {
+			t.Error("expected 0 for missing annotation")
+		}
+	})
+	t.Run("valid attempt", func(t *testing.T) {
+		site := &vyogotechv1alpha1.FrappeSite{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"frappe.vyogo.tech/requeue-attempt": "3"}},
+		}
+		if r.getRequeueAttempt(site) != 3 {
+			t.Error("expected 3")
+		}
+	})
+	t.Run("invalid value", func(t *testing.T) {
+		site := &vyogotechv1alpha1.FrappeSite{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"frappe.vyogo.tech/requeue-attempt": "x"}},
+		}
+		if r.getRequeueAttempt(site) != 0 {
+			t.Error("expected 0 for invalid value")
+		}
+	})
+}
+
+func TestFrappeSiteReconciler_patchRequeueAttempt(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	site := &vyogotechv1alpha1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"},
+		Spec:       vyogotechv1alpha1.FrappeSiteSpec{SiteName: "test.local", BenchRef: &vyogotechv1alpha1.NamespacedName{Name: "bench"}},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site).WithStatusSubresource(site).Build()
+	r := &FrappeSiteReconciler{Client: client}
+	ctx := context.Background()
+	err := r.patchRequeueAttempt(ctx, site, 1)
+	if err != nil {
+		t.Fatalf("patchRequeueAttempt: %v", err)
+	}
+	updated := &vyogotechv1alpha1.FrappeSite{}
+	if err := client.Get(ctx, types.NamespacedName{Name: "site", Namespace: "default"}, updated); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if updated.Annotations["frappe.vyogo.tech/requeue-attempt"] != "1" {
+		t.Errorf("expected annotation 1, got %v", updated.Annotations["frappe.vyogo.tech/requeue-attempt"])
+	}
+}
+
+func TestFrappeSiteReconciler_getMariaDBRootCredentials_Dedicated(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "site-mariadb-root", Namespace: "default"},
+		Data:       map[string][]byte{"password": []byte("rootpass")},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(secret).Build()
+	r := &FrappeSiteReconciler{Client: client}
+	ctx := context.Background()
+	site := &vyogotechv1alpha1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"},
+		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			DBConfig: vyogotechv1alpha1.DatabaseConfig{Mode: "dedicated"},
+		},
+	}
+	user, pass, err := r.getMariaDBRootCredentials(ctx, site)
+	if err != nil {
+		t.Fatalf("getMariaDBRootCredentials: %v", err)
+	}
+	if user != "root" || pass != "rootpass" {
+		t.Errorf("expected root/rootpass, got %s/%s", user, pass)
+	}
 }
 
 func TestFrappeSiteReconciler_Reconcile(t *testing.T) {
@@ -275,6 +374,155 @@ func TestFrappeSiteReconciler_Reconcile(t *testing.T) {
 	}
 	if !found {
 		t.Error("Site finalizer not added")
+	}
+}
+
+func TestFrappeSiteReconciler_Reconcile_SiteNotFound(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	client := fake.NewClientBuilder().WithScheme(scheme).Build()
+	r := &FrappeSiteReconciler{Client: client, Scheme: scheme}
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "nonexistent", Namespace: "default"}}
+	result, err := r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Fatalf("Reconcile(site not found) should return nil: %v", err)
+	}
+	if !result.IsZero() {
+		t.Errorf("Reconcile(site not found) should return zero result, got %+v", result)
+	}
+}
+
+func TestFrappeSiteReconciler_Reconcile_BenchRefNil(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	site := &vyogotechv1alpha1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"},
+		Spec:       vyogotechv1alpha1.FrappeSiteSpec{SiteName: "site.local"}, // no BenchRef
+	}
+	site.SetFinalizers([]string{frappeSiteFinalizer})
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site).WithStatusSubresource(site).Build()
+	r := &FrappeSiteReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "site", Namespace: "default"}}
+	result, err := r.Reconcile(context.TODO(), req)
+	if err == nil {
+		t.Fatal("Reconcile(benchRef nil) should return error")
+	}
+	if !result.IsZero() {
+		t.Errorf("Reconcile(benchRef nil) should return zero result, got %+v", result)
+	}
+	updated := &vyogotechv1alpha1.FrappeSite{}
+	if err := client.Get(context.TODO(), req.NamespacedName, updated); err != nil {
+		t.Fatalf("Get site: %v", err)
+	}
+	if updated.Status.Phase != vyogotechv1alpha1.FrappeSitePhaseFailed {
+		t.Errorf("expected phase Failed, got %s", updated.Status.Phase)
+	}
+}
+
+func TestFrappeSiteReconciler_Reconcile_BenchNotFound(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	site := &vyogotechv1alpha1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"},
+		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			SiteName: "site.local",
+			BenchRef: &vyogotechv1alpha1.NamespacedName{Name: "missing-bench"},
+		},
+	}
+	site.SetFinalizers([]string{frappeSiteFinalizer})
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site).WithStatusSubresource(site).Build()
+	r := &FrappeSiteReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "site", Namespace: "default"}}
+	result, err := r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Fatalf("Reconcile(bench not found) should not return error: %v", err)
+	}
+	if result.RequeueAfter <= 0 {
+		t.Errorf("Reconcile(bench not found) should requeue with backoff, got RequeueAfter=%v", result.RequeueAfter)
+	}
+	updated := &vyogotechv1alpha1.FrappeSite{}
+	if err := client.Get(context.TODO(), req.NamespacedName, updated); err != nil {
+		t.Fatalf("Get site: %v", err)
+	}
+	if updated.Status.Phase != vyogotechv1alpha1.FrappeSitePhasePending {
+		t.Errorf("expected phase Pending, got %s", updated.Status.Phase)
+	}
+	if updated.Status.BenchReady {
+		t.Error("BenchReady should be false when bench not found")
+	}
+}
+
+func TestFrappeSiteReconciler_Reconcile_BenchNotReady(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	bench := &vyogotechv1alpha1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench", Namespace: "default"},
+		Spec:       vyogotechv1alpha1.FrappeBenchSpec{FrappeVersion: "15"},
+		Status:     vyogotechv1alpha1.FrappeBenchStatus{Phase: "Provisioning"}, // not Ready
+	}
+	site := &vyogotechv1alpha1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"},
+		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			SiteName: "site.local",
+			BenchRef: &vyogotechv1alpha1.NamespacedName{Name: "bench"},
+		},
+	}
+	site.SetFinalizers([]string{frappeSiteFinalizer})
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench, site).WithStatusSubresource(site).Build()
+	r := &FrappeSiteReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "site", Namespace: "default"}}
+	result, err := r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Fatalf("Reconcile(bench not ready) should not return error: %v", err)
+	}
+	if result.RequeueAfter <= 0 {
+		t.Errorf("Reconcile(bench not ready) should requeue with backoff, got RequeueAfter=%v", result.RequeueAfter)
+	}
+	updated := &vyogotechv1alpha1.FrappeSite{}
+	if err := client.Get(context.TODO(), req.NamespacedName, updated); err != nil {
+		t.Fatalf("Get site: %v", err)
+	}
+	if updated.Status.Phase != vyogotechv1alpha1.FrappeSitePhasePending {
+		t.Errorf("expected phase Pending, got %s", updated.Status.Phase)
+	}
+	if updated.Status.BenchReady {
+		t.Error("BenchReady should be false when bench not ready")
+	}
+}
+
+func TestFrappeSiteReconciler_Reconcile_ReadySkipReconcile(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	site := &vyogotechv1alpha1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default", Generation: 1},
+		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			SiteName: "site.local",
+			BenchRef: &vyogotechv1alpha1.NamespacedName{Name: "bench"},
+		},
+		Status: vyogotechv1alpha1.FrappeSiteStatus{
+			Phase:              vyogotechv1alpha1.FrappeSitePhaseReady,
+			ObservedGeneration: 1,
+		},
+	}
+	site.SetFinalizers([]string{frappeSiteFinalizer})
+	bench := &vyogotechv1alpha1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench", Namespace: "default"},
+		Spec:       vyogotechv1alpha1.FrappeBenchSpec{FrappeVersion: "15"},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site, bench).WithStatusSubresource(site).Build()
+	r := &FrappeSiteReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "site", Namespace: "default"}}
+	result, err := r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Fatalf("Reconcile(Ready skip): %v", err)
+	}
+	if !result.IsZero() {
+		t.Errorf("Reconcile(Ready skip) should return zero result, got %+v", result)
 	}
 }
 

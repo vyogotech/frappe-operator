@@ -4,40 +4,40 @@ overview: Implement production-readiness enhancements for Frappe Operator includ
 todos:
   - id: metrics-implementation
     content: Implement Prometheus metrics package and integrate with controllers
-    status: pending
+    status: completed
   - id: exponential-backoff
     content: Enhance backoff package and integrate with job failure handling
-    status: pending
+    status: completed
   - id: webhook-validation
     content: Create admission webhooks for FrappeSite and FrappeBench validation
-    status: pending
+    status: completed
   - id: resource-defaults
     content: Add default resource limits for all components
-    status: pending
+    status: completed
   - id: resource-builders
     content: Create resource builder pattern to reduce code duplication in controllers
-    status: pending
+    status: completed
   - id: extract-scripts
     content: Extract embedded bash scripts to Go templates with go:embed
-    status: pending
+    status: completed
   - id: template-examples
     content: Create template-based example manifests for documentation
-    status: pending
+    status: completed
   - id: job-ttl-cleanup
     content: Add TTL configuration to all Job resources
-    status: pending
+    status: completed
   - id: circuit-breaker
     content: Implement circuit breaker for external database connections
-    status: pending
+    status: completed
   - id: upgrade-guide
     content: Create comprehensive operator upgrade documentation
-    status: pending
+    status: completed
   - id: monitoring-docs
     content: Document metrics, create Grafana dashboard, and alert rules
-    status: pending
+    status: completed
   - id: integration-tests
     content: Add integration tests for new resilience and validation features
-    status: pending
+    status: completed
 isProject: false
 ---
 

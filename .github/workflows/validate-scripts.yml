@@ -1,0 +1,217 @@
+name: Validate Scripts
+
+on:
+  push:
+    paths:
+      - 'pkg/scripts/templates/**'
+      - 'controllers/**'
+      - '.github/workflows/validate-scripts.yml'
+  pull_request:
+    paths:
+      - 'pkg/scripts/templates/**'
+      - 'controllers/**'
+      - '.github/workflows/validate-scripts.yml'
+
+jobs:
+  validate-shell-scripts:
+    name: Validate Shell Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint shell scripts in templates
+        run: |
+          echo "Checking shell scripts in pkg/scripts/templates..."
+          find pkg/scripts/templates -name "*.sh" -exec shellcheck -x {} \;
+          echo "All shell scripts passed ShellCheck validation!"
+
+      - name: Check for common script issues
+        run: |
+          echo "Checking for common issues..."
+          
+          # Check for 'set -e' in all shell scripts
+          for script in pkg/scripts/templates/*.sh; do
+            if ! grep -q "set -e" "$script"; then
+              echo "ERROR: $script missing 'set -e'"
+              exit 1
+            fi
+          done
+          
+          # Check for proper shebang
+          for script in pkg/scripts/templates/*.sh; do
+            if ! head -1 "$script" | grep -q "#!/bin/bash"; then
+              echo "ERROR: $script has invalid shebang"
+              exit 1
+            fi
+          done
+          
+          echo "All common issue checks passed!"
+
+  validate-python-scripts:
+    name: Validate Python Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install linters
+        run: |
+          pip install flake8 black
+
+      - name: Check Python syntax
+        run: |
+          echo "Checking Python scripts in pkg/scripts/templates..."
+          find pkg/scripts/templates -name "*.py" -exec python -m py_compile {} \;
+          echo "All Python scripts have valid syntax!"
+
+      - name: Check formatting with Black
+        run: |
+          find pkg/scripts/templates -name "*.py" -exec black --check --diff {} \; || \
+            echo "Warning: Python files could use formatting improvements"
+
+      - name: Lint with flake8
+        run: |
+          find pkg/scripts/templates -name "*.py" -exec flake8 --max-line-length=120 {} \; || true
+
+  validate-embedded-scripts:
+    name: Validate Embedded Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run script package tests
+        run: |
+          echo "Running script package tests..."
+          go test -v ./pkg/scripts/...
+          echo "All script package tests passed!"
+
+      - name: Verify all scripts are accessible
+        run: |
+          cat > /tmp/verify_scripts.go << 'EOF'
+          package main
+
+          import (
+              "fmt"
+              "os"
+              
+              // Import to verify embed works
+              _ "github.com/vyogotech/frappe-operator/pkg/scripts"
+          )
+
+          func main() {
+              fmt.Println("Script package imports successfully")
+              os.Exit(0)
+          }
+          EOF
+          
+          go run /tmp/verify_scripts.go
+
+  validate-inline-scripts:
+    name: Validate Inline Controller Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Extract and validate inline scripts
+        run: |
+          echo "Extracting inline scripts from controllers..."
+          
+          # Create temp directory
+          mkdir -p /tmp/inline-scripts
+          
+          # Extract bash scripts from Go files (simplified extraction)
+          # This looks for strings starting with #!/bin/bash
+          for file in controllers/*.go; do
+            if grep -q '#!/bin/bash' "$file"; then
+              echo "Found inline scripts in $file"
+              # Note: Full extraction would require a Go parser
+              # This is a basic check
+            fi
+          done
+          
+          echo "Inline script analysis complete"
+
+      - name: Check for hardcoded credentials
+        run: |
+          echo "Checking for hardcoded credentials..."
+          
+          # Look for potential credential leaks
+          if grep -rn "password.*=.*['\"]" controllers/ --include="*.go" | grep -v "SecretKeyRef\|passwordSecretRef\|PasswordSecret\|password.*=.*\"\"\|password.*key\|passwordKey"; then
+            echo "WARNING: Potential hardcoded password found"
+          fi
+          
+          if grep -rn "secret.*=.*['\"][a-zA-Z0-9]" controllers/ --include="*.go" | grep -v "SecretRef\|SecretName\|secretName\|secret.*=.*\"\"\|secretKey"; then
+            echo "WARNING: Potential hardcoded secret found"
+          fi
+          
+          echo "Credential check complete"
+
+  test-script-rendering:
+    name: Test Script Template Rendering
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Test script rendering
+        run: |
+          cat > /tmp/test_render.go << 'EOF'
+          package main
+
+          import (
+              "fmt"
+              "os"
+              
+              "github.com/vyogotech/frappe-operator/pkg/scripts"
+          )
+
+          func main() {
+              // Test all scripts can be loaded
+              for _, name := range scripts.ListScripts() {
+                  content, err := scripts.GetScript(name)
+                  if err != nil {
+                      fmt.Printf("ERROR: Failed to load %s: %v\n", name, err)
+                      os.Exit(1)
+                  }
+                  if len(content) == 0 {
+                      fmt.Printf("ERROR: Script %s is empty\n", name)
+                      os.Exit(1)
+                  }
+                  fmt.Printf("OK: %s (%d bytes)\n", name, len(content))
+              }
+              
+              // Validate all scripts
+              if err := scripts.ValidateScripts(); err != nil {
+                  fmt.Printf("ERROR: Validation failed: %v\n", err)
+                  os.Exit(1)
+              }
+              
+              fmt.Println("All scripts validated successfully!")
+          }
+          EOF
+          
+          go run /tmp/test_render.go

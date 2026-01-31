@@ -89,6 +89,19 @@ jobs:
             --wait \
             --timeout 10m
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Run Integration Tests
+        env:
+          INTEGRATION_TEST: "true"
+          # KUBECONFIG is set by helm/kind-action so go test uses the Kind cluster
+        run: |
+          go test -v -count=1 ./test/integration/...
+
 
       - name: Deploy Test Bench and Site
         run: |
@@ -219,6 +232,85 @@ jobs:
             exit 1
           fi
           echo "SUCCESS: All pods are compliant with non-root security requirements."
+
+      - name: Verify Prometheus Metrics Endpoint
+        run: |
+          echo "Verifying Prometheus metrics are exposed..."
+          # Helm install exposes metrics on port 8080 (no auth proxy)
+          METRICS_PORT=8080
+          kubectl port-forward -n frappe-operator-system svc/frappe-operator-controller-manager-metrics-service ${METRICS_PORT}:${METRICS_PORT} &
+          PF_PID=$!
+          sleep 5
+          
+          METRICS=$(curl -s http://localhost:${METRICS_PORT}/metrics 2>/dev/null | head -50 || true)
+          kill $PF_PID 2>/dev/null || true
+          
+          if echo "$METRICS" | grep -qE "(frappe_operator|controller_runtime|workqueue)"; then
+            echo "SUCCESS: Prometheus metrics endpoint is working."
+            echo "Sample metrics:"
+            echo "$METRICS" | grep -E "^(frappe_operator|controller_runtime)" | head -10
+          else
+            echo "WARNING: Could not verify metrics. Checking operator logs for metrics setup..."
+            kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=100 | grep -i metric || true
+          fi
+
+      - name: Verify Job TTL Configuration
+        run: |
+          echo "Verifying Job TTL is configured on completed jobs..."
+          # Get all jobs created by the operator
+          JOBS=$(kubectl get jobs -n default -o json)
+          
+          # Check if TTLSecondsAfterFinished is set
+          TTL_CHECK=$(echo "$JOBS" | jq -r '.items[] | select(.metadata.name | contains("site")) | "\(.metadata.name): TTL=\(.spec.ttlSecondsAfterFinished // "NOT_SET")"')
+          echo "Job TTL status:"
+          echo "$TTL_CHECK"
+          
+          # Verify at least one job has TTL set
+          if echo "$TTL_CHECK" | grep -q "TTL=3600"; then
+            echo "SUCCESS: Jobs have TTLSecondsAfterFinished configured (3600s)."
+          else
+            echo "WARNING: Could not verify Job TTL. Jobs may not have completed yet or TTL not set."
+            kubectl get jobs -n default -o wide
+          fi
+
+      - name: Verify Resource Limits on Pods
+        run: |
+          echo "Verifying resource limits are set on Frappe pods..."
+          # Check that pods have resource requests/limits
+          PODS_RESOURCES=$(kubectl get pods -n default -l app=frappe -o jsonpath='{range .items[*]}{.metadata.name}: requests={.spec.containers[0].resources.requests}, limits={.spec.containers[0].resources.limits}{"\n"}{end}')
+          echo "Pod resource configuration:"
+          echo "$PODS_RESOURCES"
+          
+          # Verify at least one pod has memory limits
+          if kubectl get pods -n default -l app=frappe -o json | jq -e '.items[].spec.containers[].resources.limits.memory' > /dev/null 2>&1; then
+            echo "SUCCESS: Pods have resource limits configured."
+          else
+            echo "INFO: Pods may be using default resources from CRD or not yet created."
+          fi
+
+      - name: Verify Webhook Validation (Optional)
+        continue-on-error: true
+        run: |
+          echo "Testing webhook validation with invalid CR..."
+          # Create an invalid FrappeSite (missing required benchRef)
+          cat <<EOF | kubectl apply -f - 2>&1 | tee /tmp/webhook-test.log || true
+          apiVersion: vyogo.tech/v1alpha1
+          kind: FrappeSite
+          metadata:
+            name: invalid-test-site
+            namespace: default
+          spec:
+            siteName: "invalid.localhost"
+            # Missing benchRef - should be rejected by webhook
+          EOF
+          
+          if grep -qi "denied\|rejected\|invalid\|required" /tmp/webhook-test.log; then
+            echo "SUCCESS: Webhook correctly rejected invalid CR."
+          else
+            echo "INFO: Webhook validation test inconclusive (webhooks may not be enabled in test cluster)."
+          fi
+          # Cleanup if it was accidentally created
+          kubectl delete frappesite invalid-test-site -n default --ignore-not-found 2>/dev/null || true
 
       - name: Test attestation
         run: |

@@ -98,9 +98,9 @@ var _ = Describe("FrappeSite App Installation", func() {
 
 	Describe("ensureInitSecrets with Apps", func() {
 		var (
-			site   *vyogotechv1alpha1.FrappeSite
-			bench  *vyogotechv1alpha1.FrappeBench
-			dbInfo *database.DatabaseInfo
+			site    *vyogotechv1alpha1.FrappeSite
+			bench   *vyogotechv1alpha1.FrappeBench
+			dbInfo  *database.DatabaseInfo
 			dbCreds *database.DatabaseCredentials
 		)
 
@@ -118,7 +118,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 					},
 				},
 				Status: vyogotechv1alpha1.FrappeBenchStatus{
-					Phase: "Ready",
+					Phase:         "Ready",
 					InstalledApps: []string{"frappe", "erpnext", "hrms"},
 				},
 			}

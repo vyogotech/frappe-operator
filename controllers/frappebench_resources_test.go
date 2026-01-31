@@ -8,6 +8,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -453,6 +454,52 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 		res := r.getWorkerDefaultResources(bench)
 		if res.Requests == nil && res.Limits == nil {
 			t.Error("Expected some resource requirements")
+		}
+	})
+
+	t.Run("getGunicornResources default", func(t *testing.T) {
+		bench := &vyogotechv1alpha1.FrappeBench{
+			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
+			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+		}
+		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
+		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
+		res := r.getGunicornResources(bench)
+		if res.Requests == nil || res.Limits == nil {
+			t.Error("getGunicornResources should return default requests and limits")
+		}
+	})
+
+	t.Run("getGunicornResources override", func(t *testing.T) {
+		bench := &vyogotechv1alpha1.FrappeBench{
+			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
+			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+				ComponentResources: &vyogotechv1alpha1.ComponentResources{
+					Gunicorn: &vyogotechv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m"), corev1.ResourceMemory: resource.MustParse("1Gi")},
+						Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2"), corev1.ResourceMemory: resource.MustParse("4Gi")},
+					},
+				},
+			},
+		}
+		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
+		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
+		res := r.getGunicornResources(bench)
+		if res.Requests.Cpu().Cmp(resource.MustParse("500m")) != 0 {
+			t.Errorf("getGunicornResources override expected 500m CPU request, got %s", res.Requests.Cpu().String())
+		}
+	})
+
+	t.Run("getRedisResources default", func(t *testing.T) {
+		bench := &vyogotechv1alpha1.FrappeBench{
+			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
+			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+		}
+		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
+		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
+		res := r.getRedisResources(bench)
+		if res.Requests == nil || res.Limits == nil {
+			t.Error("getRedisResources should return default")
 		}
 	})
 }

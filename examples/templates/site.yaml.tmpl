@@ -1,0 +1,67 @@
+# Frappe Site Template
+# This is a template file. Generate examples using: go run hack/generate-examples.go
+#
+# Available variables:
+# - .Name: site resource name (default: my-site)
+# - .SiteName: actual site domain (default: mysite.local)
+# - .Namespace: namespace (default: frappe)
+# - .BenchRef: reference to FrappeBench (required)
+# - .Domain: explicit domain (optional)
+# - .TLSEnabled: enable TLS (default: false)
+
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: {{ .Name | default "my-site" }}
+  namespace: {{ .Namespace | default "frappe" }}
+spec:
+  siteName: "{{ .SiteName | default "mysite.local" }}"
+  
+  # Reference to the bench
+  benchRef:
+    name: {{ .BenchRef | required "BenchRef is required" }}
+    namespace: {{ .Namespace | default "frappe" }}
+  
+  {{- if .Domain }}
+  # Explicit domain
+  domain: "{{ .Domain }}"
+  {{- end }}
+  
+  # Database configuration (inherits from bench if not specified)
+  dbConfig:
+    mode: {{ .DBMode | default "shared" }}
+    {{- if .MariaDBRef }}
+    mariadbRef:
+      name: {{ .MariaDBRef }}
+      namespace: {{ .Namespace | default "frappe" }}
+    {{- end }}
+  
+  {{- if .AdminPasswordSecret }}
+  # Admin password from secret
+  adminPasswordSecretRef:
+    name: {{ .AdminPasswordSecret }}
+    namespace: {{ .Namespace | default "frappe" }}
+  {{- end }}
+  
+  # TLS configuration
+  tls:
+    enabled: {{ .TLSEnabled | default false }}
+    {{- if .TLSSecretName }}
+    secretName: {{ .TLSSecretName }}
+    {{- end }}
+    {{- if .TLSIssuer }}
+    issuer: {{ .TLSIssuer }}
+    {{- end }}
+  
+  # Ingress configuration
+  ingress:
+    enabled: true
+    {{- if .IngressClass }}
+    className: {{ .IngressClass }}
+    {{- end }}
+    {{- if .IngressAnnotations }}
+    annotations:
+      {{- range $key, $value := .IngressAnnotations }}
+      {{ $key }}: "{{ $value }}"
+      {{- end }}
+    {{- end }}

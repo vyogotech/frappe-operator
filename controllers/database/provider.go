@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	"github.com/vyogotech/frappe-operator/pkg/circuitbreaker"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -74,7 +75,9 @@ func NewProvider(config vyogotechv1alpha1.DatabaseConfig, client client.Client, 
 	case "sqlite":
 		return NewSQLiteProvider(client, scheme), nil
 	case "external":
-		return NewExternalProvider(client), nil
+		inner := NewExternalProvider(client)
+		cb := circuitbreaker.New(circuitbreaker.DefaultConfig("external-db"))
+		return NewCircuitBreakerProvider(inner, cb), nil
 	default:
 		return nil, fmt.Errorf("unsupported database provider: %s (supported: mariadb, postgres, sqlite, external)", providerType)
 	}

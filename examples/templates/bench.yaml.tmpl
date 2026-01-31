@@ -1,0 +1,59 @@
+# Frappe Bench Template
+# This is a template file. Generate examples using: go run hack/generate-examples.go
+#
+# Available variables:
+# - .Name: bench name (default: my-bench)
+# - .Namespace: namespace (default: frappe)
+# - .FrappeVersion: Frappe version (default: v15)
+# - .Image: container image (default: ghcr.io/vyogotech/frappe-bench:v15)
+# - .Replicas: replica count (default: 1)
+# - .StorageSize: storage size (default: 10Gi)
+# - .DBMode: database mode (default: shared)
+# - .MariaDBRef: MariaDB reference name
+
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: {{ .Name | default "my-bench" }}
+  namespace: {{ .Namespace | default "frappe" }}
+spec:
+  frappeVersion: "{{ .FrappeVersion | default "v15" }}"
+  
+  # Apps to install (pre-built in image)
+  apps:
+    - name: frappe
+      source: image
+    {{- if .IncludeERPNext }}
+    - name: erpnext
+      source: image
+    {{- end }}
+  
+  # Container image configuration
+  image:
+    repository: {{ .ImageRepository | default "ghcr.io/vyogotech/frappe-bench" }}
+    tag: {{ .ImageTag | default "v15" }}
+    pullPolicy: IfNotPresent
+  
+  # Replica configuration
+  replicas:
+    gunicorn: {{ .GunicornReplicas | default 1 }}
+    nginx: {{ .NginxReplicas | default 1 }}
+    socketio: {{ .SocketioReplicas | default 1 }}
+  
+  # Database configuration
+  dbConfig:
+    provider: mariadb
+    mode: {{ .DBMode | default "shared" }}
+    {{- if .MariaDBRef }}
+    mariadbRef:
+      name: {{ .MariaDBRef }}
+      namespace: {{ .Namespace | default "frappe" }}
+    {{- end }}
+  
+  # Storage configuration
+  storage:
+    sites:
+      size: {{ .StorageSize | default "10Gi" }}
+      {{- if .StorageClass }}
+      storageClassName: {{ .StorageClass }}
+      {{- end }}

@@ -1,0 +1,56 @@
+# MariaDB Instance Template
+# This is a template file. Generate examples using: go run hack/generate-examples.go
+#
+# Requires mariadb-operator to be installed
+# kubectl apply -f https://github.com/mariadb-operator/mariadb-operator/releases/latest/download/mariadb-operator.yaml
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Name | default "frappe-mariadb" }}-root
+  namespace: {{ .Namespace | default "frappe" }}
+type: Opaque
+stringData:
+  password: {{ .RootPassword | default "changeme" }}
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: {{ .Name | default "frappe-mariadb" }}
+  namespace: {{ .Namespace | default "frappe" }}
+spec:
+  rootPasswordSecretKeyRef:
+    name: {{ .Name | default "frappe-mariadb" }}-root
+    key: password
+  
+  image: mariadb:{{ .MariaDBVersion | default "11.4" }}
+  
+  storage:
+    size: {{ .StorageSize | default "10Gi" }}
+    {{- if .StorageClass }}
+    storageClassName: {{ .StorageClass }}
+    {{- end }}
+  
+  {{- if .HighAvailability }}
+  replicas: 3
+  replication:
+    enabled: true
+    primary:
+      automaticFailover: true
+  {{- else }}
+  replicas: 1
+  {{- end }}
+  
+  # Performance tuning
+  myCnf: |
+    [mariadb]
+    character-set-server=utf8mb4
+    collation-server=utf8mb4_unicode_ci
+    innodb_buffer_pool_size={{ .InnoDBBufferPoolSize | default "256M" }}
+    innodb_log_file_size={{ .InnoDBLogFileSize | default "64M" }}
+    max_connections={{ .MaxConnections | default 200 }}
+    
+    # Frappe optimizations
+    innodb_file_per_table=1
+    innodb_flush_log_at_trx_commit=1
+    innodb_lock_wait_timeout=120

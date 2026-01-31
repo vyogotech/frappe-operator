@@ -12,16 +12,37 @@ on:
       - '_config.yml'
       - 'docs/**'
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, feature/** ]
     paths-ignore:
       - '*.md'
       - '_config.yml'
       - 'docs/**'
 
 jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        run: |
+          go test ./api/... ./pkg/... ./controllers/... -v -coverprofile cover.out
+
   docker-build:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
+    needs: test
     timeout-minutes: 60
     if: "!startsWith(github.ref, 'refs/tags/')"
     permissions:

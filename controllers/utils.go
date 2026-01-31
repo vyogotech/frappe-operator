@@ -28,6 +28,8 @@ import (
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	"github.com/vyogotech/frappe-operator/pkg/constants"
+	"github.com/vyogotech/frappe-operator/pkg/resources"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -214,4 +216,12 @@ func int32Ptr(i int32) *int32 {
 
 func int64Ptr(i int64) *int64 {
 	return &i
+}
+
+// applyDefaultJobTTL ensures every batch Job has a TTL to avoid resource leaks (uses pkg/resources constant)
+func applyDefaultJobTTL(spec *batchv1.JobSpec) {
+	if spec == nil || spec.TTLSecondsAfterFinished != nil {
+		return
+	}
+	spec.TTLSecondsAfterFinished = int32Ptr(resources.DefaultJobTTL)
 }
