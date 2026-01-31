@@ -1,0 +1,134 @@
+name: Stress Test (High Density)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  stress-test:
+    name: Stress Test (10 Sites)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: frappe-stress-test
+
+      - name: Build Operator Image
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}:stress-test"
+          docker build -t "$IMAGE" .
+          kind load docker-image "$IMAGE" --name frappe-stress-test
+          echo "OPERATOR_IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+
+      - name: Add Helm Repositories
+        run: |
+          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+          helm repo add keda https://kedacore.github.io/charts
+          helm repo update
+
+      - name: Install MariaDB Operator
+        run: |
+          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+            --namespace frappe-operator-system \
+            --create-namespace \
+            --set crds.enabled=true \
+            --wait --timeout 10m
+
+      - name: Install KEDA
+        run: |
+          helm upgrade --install keda keda/keda \
+            --namespace frappe-operator-system \
+            --create-namespace \
+            --set crds.install=true \
+            --wait --timeout 10m
+
+      - name: Install Frappe Operator
+        run: |
+          REPO="ghcr.io/${{ github.repository }}"
+          helm upgrade --install frappe-operator ./helm/frappe-operator \
+            --set operator.image.repository="$REPO" \
+            --set operator.image.tag=stress-test \
+            --set operator.image.pullPolicy=Never \
+            --set mariadb.enabled=true \
+            --namespace frappe-operator-system \
+            --create-namespace \
+            --wait \
+            --timeout 10m
+
+      - name: Deploy Stress Test Manifests
+        run: |
+          kubectl apply -f examples/stress-test-manifests.yaml
+
+      - name: Wait for FrappeBench
+        run: |
+          echo "Waiting for Stress Test Bench..."
+          kubectl wait --for=condition=Ready --timeout=600s frappebench/stress-test-bench -n default
+
+      - name: Wait for All Sites (Parallel Ready Check)
+        run: |
+          echo "Waiting for all 5 sites to reach Ready phase..."
+          # Deploying 5 sites simultaneously triggers concurrency handling
+          for i in {1..90}; do
+            READY_COUNT=$(kubectl get frappesite -n default -o jsonpath='{.items[*].status.phase}' | tr ' ' '\n' | grep -c "Ready" || echo "0")
+            TOTAL_COUNT=$(kubectl get frappesite -n default --no-headers | wc -l)
+            echo "Ready sites: $READY_COUNT / $TOTAL_COUNT (attempt $i/90)"
+            if [ "$READY_COUNT" -eq "$TOTAL_COUNT" ] && [ "$TOTAL_COUNT" -gt 0 ]; then
+              echo "SUCCESS: All $TOTAL_COUNT sites are Ready!"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "ERROR: Not all sites reached Ready phase within timeout"
+          kubectl get frappesite -n default
+          exit 1
+
+      - name: Verify Multi-Site Accessibility
+        run: |
+          echo "Verifying internal accessibility for all sites..."
+          POD_NAME=$(kubectl get pods -l app=frappe,bench=stress-test-bench -n default -o jsonpath='{.items[0].metadata.name}')
+          
+          for i in {1..5}; do
+            SITE="site$i.localhost"
+            echo "Testing $SITE..."
+            RESPONSE=$(kubectl exec -n default $POD_NAME -- curl -sI -H "Host: $SITE" http://stress-test-bench-nginx:8080)
+            if echo "$RESPONSE" | grep -q "HTTP/1.1 200 OK"; then
+              echo "✓ $SITE is accessible"
+            else
+              echo "✗ $SITE is NOT accessible"
+              echo "$RESPONSE"
+              exit 1
+            fi
+          done
+
+      - name: Verify Dedicated DB Instances
+        run: |
+          echo "Checking for dedicated MariaDB instances (site3 and site5)..."
+          # There should be 2 MariaDB CRs in the default namespace (or wherever configured)
+          MDB_COUNT=$(kubectl get mariadb -n default --no-headers | wc -l)
+          echo "Found $MDB_COUNT MariaDB instances"
+          if [ "$MDB_COUNT" -lt 2 ]; then
+            echo "ERROR: Expected at least 2 dedicated MariaDB instances"
+            exit 1
+          fi
+          echo "SUCCESS: Dedicated database instances found."
+
+      - name: Export Logs on Failure
+        if: failure()
+        run: |
+          kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=2000
+          kubectl get pods -A

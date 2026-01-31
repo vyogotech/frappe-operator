@@ -1,0 +1,85 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: stress-test-bench
+  namespace: default
+spec:
+  frappeVersion: "15"
+  apps:
+    - name: erpnext
+      source: image
+  # Enable KEDA for stress testing
+  workerAutoscaling:
+    default:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 5
+---
+# Site 1: Shared MariaDB
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: site1-shared
+  namespace: default
+spec:
+  benchRef:
+    name: stress-test-bench
+  siteName: site1.localhost
+  apps:
+    - erpnext
+---
+# Site 2: Shared MariaDB
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: site2-shared
+  namespace: default
+spec:
+  benchRef:
+    name: stress-test-bench
+  siteName: site2.localhost
+  apps:
+    - erpnext
+---
+# Site 3: Dedicated MariaDB
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: site3-dedicated
+  namespace: default
+spec:
+  benchRef:
+    name: stress-test-bench
+  siteName: site3.localhost
+  dbConfig:
+    mode: dedicated
+  apps:
+    - erpnext
+---
+# Site 4: Shared MariaDB
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: site4-shared
+  namespace: default
+spec:
+  benchRef:
+    name: stress-test-bench
+  siteName: site4.localhost
+  apps:
+    - erpnext
+---
+# Site 5: Dedicated MariaDB
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: site5-dedicated
+  namespace: default
+spec:
+  benchRef:
+    name: stress-test-bench
+  siteName: site5.localhost
+  dbConfig:
+    mode: dedicated
+  apps:
+    - erpnext
