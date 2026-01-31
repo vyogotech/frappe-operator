@@ -146,15 +146,19 @@ jobs:
           echo "ERROR: FrappeSite did not reach Ready phase within timeout"
           exit 1
 
-      - name: Verify ERPNext installed on site
+      - name: Verify ERPNext installed on site (bench list-apps)
         run: |
-          echo "Verifying ERPNext installation on e2e-test-site..."
-          INSTALLED=$(kubectl get frappesite e2e-test-site -n default -o jsonpath='{.status.installedApps}' 2>/dev/null || echo "[]")
-          echo "Installed apps: $INSTALLED"
-          if echo "$INSTALLED" | grep -q "erpnext"; then
-            echo "SUCCESS: ERPNext is installed on the site."
+          # Per bench docs: bench --site {site} list-apps lists apps on the site (default output JSON)
+          echo "Verifying ERPNext via bench --site e2e.localhost list-apps..."
+          POD_NAME=$(kubectl get pods -l app=frappe,bench=e2e-test-bench -n default -o jsonpath='{.items[0].metadata.name}')
+          echo "Using pod: $POD_NAME"
+          APPS=$(kubectl exec -n default $POD_NAME -- bash -c "cd /home/frappe/frappe-bench && bench --site e2e.localhost list-apps" 2>/dev/null || true)
+          echo "Installed apps (bench list-apps):"
+          echo "$APPS"
+          if echo "$APPS" | grep -qi "erpnext"; then
+            echo "SUCCESS: ERPNext is installed on the site (verified via bench list-apps)."
           else
-            echo "ERROR: ERPNext not found in status.installedApps (got: $INSTALLED)"
+            echo "ERROR: ERPNext not found in bench --site e2e.localhost list-apps output"
             exit 1
           fi
 
