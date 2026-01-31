@@ -36,3 +36,5 @@ data:
   defaultPostgresImage: {{ .Values.operatorConfig.defaultPostgresImage | quote }}
   defaultRedisImage: {{ .Values.operatorConfig.defaultRedisImage | quote }}
   defaultNginxImage: {{ .Values.operatorConfig.defaultNginxImage | quote }}
+  # Max concurrent FrappeSite reconciles (default 10). Tune for 100s of sites.
+  maxConcurrentSiteReconciles: {{ .Values.operatorConfig.maxConcurrentSiteReconciles | default "10" | quote }}

@@ -17,8 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
+	"strconv"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -28,6 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -53,6 +56,50 @@ func init() {
 	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(routev1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+}
+
+const defaultMaxConcurrentSiteReconciles = 10
+
+// effectiveMaxFromBenches returns the effective max concurrent site reconciles from env value and bench list.
+// Used by getMaxConcurrentSiteReconciles; exported for testing.
+func effectiveMaxFromBenches(fromEnv int, items []vyogotechv1alpha1.FrappeBench) int {
+	benchMax := 0
+	for i := range items {
+		if items[i].Spec.SiteReconcileConcurrency != nil && *items[i].Spec.SiteReconcileConcurrency > 0 {
+			if int(*items[i].Spec.SiteReconcileConcurrency) > benchMax {
+				benchMax = int(*items[i].Spec.SiteReconcileConcurrency)
+			}
+		}
+	}
+	if benchMax > fromEnv {
+		fromEnv = benchMax
+	}
+	if fromEnv < 1 {
+		fromEnv = 1
+	}
+	return fromEnv
+}
+
+// getMaxConcurrentSiteReconciles returns the effective max concurrent site reconciles:
+// max(operatorConfig from env FRAPPE_MAX_CONCURRENT_SITE_RECONCILES, max(spec.siteReconcileConcurrency across benches)).
+// Operator config is from frappe-operator-config ConfigMap (e.g. maxConcurrentSiteReconciles), passed via env when using Helm.
+func getMaxConcurrentSiteReconciles(mgr ctrl.Manager) int {
+	fromEnv := defaultMaxConcurrentSiteReconciles
+	if s := os.Getenv("FRAPPE_MAX_CONCURRENT_SITE_RECONCILES"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			fromEnv = n
+		}
+	}
+	var items []vyogotechv1alpha1.FrappeBench
+	cl, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
+	if err == nil {
+		var list vyogotechv1alpha1.FrappeBenchList
+		// Omit InNamespace to list FrappeBenches across all namespaces (bench-level override).
+		if err := cl.List(context.Background(), &list); err == nil {
+			items = list.Items
+		}
+	}
+	return effectiveMaxFromBenches(fromEnv, items)
 }
 
 func main() {
@@ -113,11 +160,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "FrappeBench")
 		os.Exit(1)
 	}
+	maxSiteReconciles := getMaxConcurrentSiteReconciles(mgr)
+	setupLog.Info("FrappeSite controller concurrency", "maxConcurrentReconciles", maxSiteReconciles)
 	if err = (&controllers.FrappeSiteReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		Recorder:    mgr.GetEventRecorderFor("frappesite-controller"),
-		IsOpenShift: isOpenShift,
+		Client:                   mgr.GetClient(),
+		Scheme:                   mgr.GetScheme(),
+		Recorder:                 mgr.GetEventRecorderFor("frappesite-controller"),
+		IsOpenShift:              isOpenShift,
+		MaxConcurrentReconciles:  maxSiteReconciles,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FrappeSite")
 		os.Exit(1)

@@ -41,6 +41,7 @@ Frappe Operator brings the power of Kubernetes orchestration to Frappe deploymen
 - **[Concepts](concepts.md)** - Understanding Frappe Operator architecture
 - **[API Reference](api-reference.md)** - Complete CRD documentation
 - **[Examples](examples.md)** - Real-world deployment examples
+- **[Site App Installation](SITE_APP_INSTALLATION.md)** - Install specific apps per site
 - **[Backup Management](examples.md#site-backup-management)** - Automated site backups
 - **[Best Practices](COMPREHENSIVE_GUIDE.md#best-practices)** - Production deployment patterns
 
@@ -58,8 +59,10 @@ Frappe Operator brings the power of Kubernetes orchestration to Frappe deploymen
 
 ### 🔧 Advanced Features
 
+- **Site-Specific App Installation** - Install different apps per site with graceful degradation
 - **Hybrid App Installation** - Install from FPM packages, Git, or images
 - **Worker Autoscaling** - Scale-to-zero for cost optimization
+- **Site reconciliation concurrency** - Tune concurrent site reconciles for 100+ sites (operator config or per-bench)
 - **Backup Management** - Automated backups with retention policies
 - **Observability** - Built-in Prometheus metrics and logging
 - **Multi-Platform** - ARM64 and AMD64 compatible
@@ -127,6 +130,7 @@ kubectl apply -f examples/basic-site.yaml
 ## What's New
 
 ### v2.6.0 (Upcoming)
+- ✅ **Site-Specific App Installation**: Install different apps per site with graceful degradation
 - ✅ **SiteBackup CRD**: Automated site backups with `bench backup`
 - ✅ Full backup options support (files, compression, selective DocTypes)
 - ✅ Scheduled backups via CronJob and one-time via Job

@@ -482,6 +482,29 @@ spec:
 
 > **Note**: For workers, use KEDA autoscaling (above) instead of HPA for queue-based scaling.
 
+### Site reconciliation concurrency (100+ sites)
+
+When you run **100s of Frappe sites**, the operator reconciles one site at a time by default. To speed up convergence (e.g. after a restart or when creating many sites), increase the number of concurrent site reconciles.
+
+**Operator config (recommended)** – set in the `frappe-operator-config` ConfigMap (or via Helm `operatorConfig.maxConcurrentSiteReconciles`):
+
+```yaml
+# In frappe-operator-config ConfigMap
+data:
+  maxConcurrentSiteReconciles: "10"   # default; increase for 100+ sites
+```
+
+When using Helm, the value is passed to the operator via the `FRAPPE_MAX_CONCURRENT_SITE_RECONCILES` env. Changing the ConfigMap requires an **operator restart** to take effect.
+
+**Per-bench override** – optional hint on `FrappeBench`:
+
+```yaml
+spec:
+  siteReconcileConcurrency: 20   # operator uses max(operatorConfig, max across benches)
+```
+
+The operator uses **max(operator config value, max of all benches’ `siteReconcileConcurrency`)** at startup. Tune down if you hit API or database rate limits.
+
 ### Vertical Scaling
 
 Update resource limits:
