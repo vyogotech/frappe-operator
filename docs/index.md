@@ -128,7 +128,7 @@ kubectl apply -f examples/basic-site.yaml
 
 ## What's New
 
-### v2.6.0 (Current)
+### v2.6.0 (Upcoming)
 - ✅ **Site-Specific App Installation**: Install different apps per site with graceful degradation
 - ✅ **SiteBackup CRD**: Automated site backups with `bench backup`
 - ✅ Full backup options support (files, compression, selective DocTypes)

@@ -251,7 +251,7 @@ status:
   # How domain was determined
   domainSource: string  # explicit, bench-suffix, auto-detected, sitename-default
   
-  # Apps that were requested for installation
+  # Apps that were requested for installation on this site
   installedApps:
     - string
   

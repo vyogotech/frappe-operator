@@ -19,7 +19,7 @@ Apps []string `json:"apps,omitempty"`
 
 **FrappeSiteStatus** - Added tracking fields:
 ```go
-// InstalledApps lists the apps that were installed on this site
+// InstalledApps lists the apps that were requested for installation on this site
 InstalledApps []string `json:"installedApps,omitempty"`
 
 // AppInstallationStatus provides detailed status of app installation

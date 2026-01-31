@@ -37,6 +37,13 @@ spec:
         - --metrics-bind-address=:{{ .Values.manager.metrics.port }}
         - --health-probe-bind-address=:{{ .Values.manager.health.port }}
         - --zap-log-level={{ .Values.manager.logLevel }}
+        env:
+        - name: FRAPPE_MAX_CONCURRENT_SITE_RECONCILES
+          valueFrom:
+            configMapKeyRef:
+              name: frappe-operator-config
+              key: maxConcurrentSiteReconciles
+              optional: true
         ports:
         - containerPort: {{ .Values.manager.metrics.port }}
           name: metrics

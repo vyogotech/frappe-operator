@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -46,9 +48,10 @@ const frappeSiteFinalizer = "vyogo.tech/site-finalizer"
 // FrappeSiteReconciler reconciles a FrappeSite object
 type FrappeSiteReconciler struct {
 	client.Client
-	Scheme      *runtime.Scheme
-	Recorder    record.EventRecorder
-	IsOpenShift bool
+	Scheme                   *runtime.Scheme
+	Recorder                 record.EventRecorder
+	IsOpenShift              bool
+	MaxConcurrentReconciles  int // from operator config and/or bench-level siteReconcileConcurrency
 }
 
 // int32Ptr returns a pointer to the passed int32 value
@@ -629,10 +632,8 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 			logger.Info("No valid apps to install after validation")
 		} else {
 			// Pass all valid apps to the script - it will check actual availability
-			appsToInstall = validApps[0]
-			for i := 1; i < len(validApps); i++ {
-				appsToInstall = appsToInstall + " " + validApps[i]
-			}
+			// Use strings.Join for efficient space-separated string construction
+			appsToInstall = strings.Join(validApps, " ")
 			logger.Info("Apps prepared for reconciliation", "apps", appsToInstall, "count", len(validApps))
 			r.Recorder.Event(site, corev1.EventTypeNormal, "AppsRequested",
 				fmt.Sprintf("Requested %d app(s): %v - will check availability in container", len(validApps), validApps))
@@ -1496,7 +1497,12 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		r.Recorder = mgr.GetEventRecorderFor("frappesite-controller")
 	}
 
+	opts := controller.Options{}
+	if r.MaxConcurrentReconciles > 0 {
+		opts.MaxConcurrentReconciles = r.MaxConcurrentReconciles
+	}
 	builder := ctrl.NewControllerManagedBy(mgr).
+		WithOptions(opts).
 		For(&vyogotechv1alpha1.FrappeSite{}).
 		Owns(&batchv1.Job{}).
 		Owns(&networkingv1.Ingress{})
