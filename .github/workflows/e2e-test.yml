@@ -124,12 +124,12 @@ jobs:
           echo "ERROR: FrappeBench did not reach Ready phase within timeout"
           exit 1
 
-      - name: Wait for FrappeSite to be Ready
+      - name: Wait for FrappeSite to be Ready (with ERPNext install)
         run: |
-          echo "Waiting for FrappeSite to reach Ready phase..."
-          for i in {1..30}; do
+          echo "Waiting for FrappeSite to reach Ready phase (site install includes ERPNext)..."
+          for i in {1..60}; do
             PHASE=$(kubectl get frappesite e2e-test-site -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-            echo "Current Phase: $PHASE"
+            echo "Current Phase: $PHASE (attempt $i/60)"
             if [ "$PHASE" == "Ready" ]; then
               echo "FrappeSite is Ready!"
               exit 0
@@ -138,6 +138,18 @@ jobs:
           done
           echo "ERROR: FrappeSite did not reach Ready phase within timeout"
           exit 1
+
+      - name: Verify ERPNext installed on site
+        run: |
+          echo "Verifying ERPNext installation on e2e-test-site..."
+          INSTALLED=$(kubectl get frappesite e2e-test-site -n default -o jsonpath='{.status.installedApps}' 2>/dev/null || echo "[]")
+          echo "Installed apps: $INSTALLED"
+          if echo "$INSTALLED" | grep -q "erpnext"; then
+            echo "SUCCESS: ERPNext is installed on the site."
+          else
+            echo "ERROR: ERPNext not found in status.installedApps (got: $INSTALLED)"
+            exit 1
+          fi
 
       - name: Verify In-Cluster Accessibility
         run: |
