@@ -1,3 +1,26 @@
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: frappe-mariadb
+  namespace: default
+spec:
+  rootPasswordSecretKeyRef:
+    name: mariadb-root-password
+    key: password
+  image: mariadb:10.11
+  storage:
+    size: 2Gi
+  replicas: 1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mariadb-root-password
+  namespace: default
+type: Opaque
+stringData:
+  password: frappe
+---
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
