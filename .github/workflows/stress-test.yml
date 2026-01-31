@@ -83,11 +83,12 @@ jobs:
         run: |
           echo "Waiting for all 5 sites to reach Ready phase..."
           # Deploying 5 sites simultaneously triggers concurrency handling
-          for i in {1..90}; do
+          # Increased timeout to 25 minutes for OCP-like environments
+          for i in {1..150}; do
             # Count Ready sites more reliably without introducing newlines
             READY_COUNT=$(kubectl get frappesite -n default -o json | jq '[.items[].status.phase] | map(select(. == "Ready")) | length')
             TOTAL_COUNT=$(kubectl get frappesite -n default --no-headers | wc -l | tr -d ' ')
-            echo "Ready sites: $READY_COUNT / $TOTAL_COUNT (attempt $i/90)"
+            echo "Ready sites: $READY_COUNT / $TOTAL_COUNT (attempt $i/150)"
             if [ "$READY_COUNT" -eq "$TOTAL_COUNT" ] && [ "$TOTAL_COUNT" -gt 0 ]; then
               echo "SUCCESS: All $TOTAL_COUNT sites are Ready!"
               exit 0

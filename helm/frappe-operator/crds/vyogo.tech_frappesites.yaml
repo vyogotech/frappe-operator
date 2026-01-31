@@ -373,6 +373,11 @@ spec:
                 items:
                   type: string
                 type: array
+              observedGeneration:
+                description: ObservedGeneration reflects the generation of the most
+                  recently observed FrappeSite spec
+                format: int64
+                type: integer
               phase:
                 description: Phase is the current phase
                 type: string

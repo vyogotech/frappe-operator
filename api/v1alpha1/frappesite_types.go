@@ -138,6 +138,10 @@ type FrappeSiteStatus struct {
 	// FailedApps lists apps that failed to install with error messages
 	// +optional
 	FailedApps map[string]string `json:"failedApps,omitempty"`
+
+	// ObservedGeneration reflects the generation of the most recently observed FrappeSite spec
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 //+kubebuilder:object:root=true
