@@ -7,7 +7,7 @@
 .tldr
 # Test binary, built with `go test -c`
 *.test
-
+.cursor
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
