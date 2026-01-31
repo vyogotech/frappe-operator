@@ -84,8 +84,9 @@ jobs:
           echo "Waiting for all 5 sites to reach Ready phase..."
           # Deploying 5 sites simultaneously triggers concurrency handling
           for i in {1..90}; do
-            READY_COUNT=$(kubectl get frappesite -n default -o jsonpath='{.items[*].status.phase}' | tr ' ' '\n' | grep -c "Ready" || echo "0")
-            TOTAL_COUNT=$(kubectl get frappesite -n default --no-headers | wc -l)
+            # Count Ready sites more reliably without introducing newlines
+            READY_COUNT=$(kubectl get frappesite -n default -o json | jq '[.items[].status.phase] | map(select(. == "Ready")) | length')
+            TOTAL_COUNT=$(kubectl get frappesite -n default --no-headers | wc -l | tr -d ' ')
             echo "Ready sites: $READY_COUNT / $TOTAL_COUNT (attempt $i/90)"
             if [ "$READY_COUNT" -eq "$TOTAL_COUNT" ] && [ "$TOTAL_COUNT" -gt 0 ]; then
               echo "SUCCESS: All $TOTAL_COUNT sites are Ready!"
@@ -94,7 +95,9 @@ jobs:
             sleep 10
           done
           echo "ERROR: Not all sites reached Ready phase within timeout"
-          kubectl get frappesite -n default
+          kubectl get frappesite -n default -o wide
+          echo "=== Site Details ==="
+          kubectl get frappesite -n default -o yaml
           exit 1
 
       - name: Verify Multi-Site Accessibility
