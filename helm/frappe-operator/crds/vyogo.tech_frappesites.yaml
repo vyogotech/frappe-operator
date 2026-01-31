@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: frappesites.vyogo.tech
 spec:
   group: vyogo.tech
@@ -53,6 +53,15 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              apps:
+                description: |-
+                  Apps to install on this site
+                  These apps are checked against the actual container filesystem during installation
+                  Apps not available in the container will be gracefully skipped with warnings
+                  Note: Apps can only be installed during initial site creation and are immutable thereafter
+                items:
+                  type: string
+                type: array
               benchRef:
                 description: BenchRef references the FrappeBench this site belongs
                   to
@@ -70,8 +79,9 @@ spec:
                 description: DBConfig defines database configuration for this site
                 properties:
                   connectionSecretRef:
-                    description: ConnectionSecretRef references a Secret containing
-                      database credentials (legacy)
+                    description: |-
+                      ConnectionSecretRef references a Secret containing database credentials
+                      Required for 'external' provider. Secret should contain: username, password, database (optional, defaults to siteName)
                     properties:
                       name:
                         description: name is unique within a namespace to reference
@@ -84,8 +94,11 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   host:
-                    description: Host is the database hostname (legacy, for backward
-                      compatibility)
+                    description: Host is the database hostname for external connections
+                    type: string
+                  image:
+                    description: Image is the database container image (for dedicated
+                      mode)
                     type: string
                   mariadbRef:
                     description: |-
@@ -111,7 +124,7 @@ spec:
                     - dedicated
                     type: string
                   port:
-                    description: Port is the database port (legacy, for backward compatibility)
+                    description: Port is the database port for external connections
                     type: string
                   postgresRef:
                     description: PostgresRef references an existing PostgreSQL cluster
@@ -128,11 +141,12 @@ spec:
                     type: object
                   provider:
                     default: mariadb
-                    description: 'Provider: mariadb, postgres, sqlite'
+                    description: 'Provider: mariadb, postgres, sqlite, external'
                     enum:
                     - mariadb
                     - postgres
                     - sqlite
+                    - external
                     type: string
                   resources:
                     description: Resources for dedicated database mode
@@ -202,6 +216,38 @@ spec:
               ingressClassName:
                 description: IngressClassName specifies the ingress class
                 type: string
+              routeConfig:
+                description: Route configuration for OpenShift platforms
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations to add to the Route
+                    type: object
+                  enabled:
+                    description: Enabled controls whether Route should be created
+                      (defaults to true on OpenShift)
+                    type: boolean
+                  host:
+                    description: Host overrides the auto-generated hostname for the
+                      Route
+                    type: string
+                  tlsTermination:
+                    default: edge
+                    description: TLSTermination defines TLS termination type
+                    enum:
+                    - edge
+                    - passthrough
+                    - reencrypt
+                    type: string
+                  wildcardPolicy:
+                    default: none
+                    description: WildcardPolicy controls wildcard route behavior
+                    enum:
+                    - none
+                    - subdomain
+                    type: string
+                type: object
               siteName:
                 description: |-
                   SiteName is the Frappe site name - MUST match the domain that will receive traffic
@@ -229,9 +275,71 @@ spec:
           status:
             description: FrappeSiteStatus defines the observed state of FrappeSite
             properties:
+              appInstallationStatus:
+                description: AppInstallationStatus provides detailed status of app
+                  installation
+                type: string
               benchReady:
                 description: BenchReady indicates if the referenced bench is ready
                 type: boolean
+              conditions:
+                description: Conditions represent the latest available observations
+                  of site's state
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
               databaseCredentialsSecret:
                 description: DatabaseCredentialsSecret is the name of the Secret with
                   site-specific DB credentials
@@ -252,6 +360,19 @@ spec:
                   DomainSource indicates how domain was determined
                   Values: explicit, bench-suffix, auto-detected, sitename-default
                 type: string
+              failedApps:
+                additionalProperties:
+                  type: string
+                description: FailedApps lists apps that failed to install with error
+                  messages
+                type: object
+              installedApps:
+                description: |-
+                  InstalledApps lists the apps that were requested for installation on this site.
+                  Some requested apps may have been skipped or failed; see FailedApps and AppInstallationStatus.
+                items:
+                  type: string
+                type: array
               phase:
                 description: Phase is the current phase
                 type: string

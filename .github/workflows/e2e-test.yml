@@ -143,7 +143,7 @@ jobs:
         run: |
           echo "Testing site accessibility from inside the cluster..."
           # Get the name of any running pod to use for the check
-          POD_NAME=$(kubectl get pods -l app.kubernetes.io/name=frappe-bench -o jsonpath='{.items[0].metadata.name}')
+          POD_NAME=$(kubectl get pods -l app=frappe,bench=e2e-test-bench -o jsonpath='{.items[0].metadata.name}')
           echo "Using pod: $POD_NAME"
           
           # Curl the nginx service with the correct Host header

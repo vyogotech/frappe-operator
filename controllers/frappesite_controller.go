@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -480,16 +481,21 @@ func (r *FrappeSiteReconciler) setCondition(site *vyogotechv1alpha1.FrappeSite, 
 	meta.SetStatusCondition(&site.Status.Conditions, condition)
 }
 
-// updateStatus updates the FrappeSite status with proper error handling
+// updateStatus updates the FrappeSite status with proper error handling and conflict retry
 func (r *FrappeSiteReconciler) updateStatus(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
-	if err := r.Status().Update(ctx, site); err != nil {
-		if errors.IsConflict(err) {
-			// Requeue on conflict
-			return fmt.Errorf("status update conflict, will requeue: %w", err)
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest := &vyogotechv1alpha1.FrappeSite{}
+		if err := r.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, latest); err != nil {
+			return err
 		}
-		return fmt.Errorf("failed to update status: %w", err)
-	}
-	return nil
+		latest.Status = site.Status
+		if err := r.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+		// Sync back resource version to avoid conflict in subsequent updates in same reconcile loop
+		site.SetResourceVersion(latest.GetResourceVersion())
+		return nil
+	})
 }
 
 // resolveDBConfig merges site-specific database configuration with bench-level defaults
