@@ -89,6 +89,18 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.Recorder.Event(site, corev1.EventTypeNormal, "FinalizerAdded", "Finalizer added to FrappeSite")
 	}
 
+	// Early-exit guard: Skip reconciliation for Ready sites with unchanged specs
+	// This prevents status flapping during concurrent reconciliations
+	if site.Status.Phase == vyogotechv1alpha1.FrappeSitePhaseReady {
+		if site.Status.ObservedGeneration == site.Generation {
+			logger.V(1).Info("Site is Ready and spec unchanged, skipping reconciliation")
+			return ctrl.Result{}, nil
+		}
+		logger.Info("Site is Ready but spec changed, proceeding with reconciliation",
+			"observedGeneration", site.Status.ObservedGeneration,
+			"currentGeneration", site.Generation)
+	}
+
 	// Handle deletion
 	if site.GetDeletionTimestamp() != nil {
 		if controllerutil.ContainsFinalizer(site, frappeSiteFinalizer) {
@@ -440,6 +452,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// 3. Update final status
 	site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseReady
+	site.Status.ObservedGeneration = site.Generation // Track that we've processed this generation
 	if routeHost != "" {
 		// Use Route hostname if available
 		site.Status.SiteURL = fmt.Sprintf("http://%s", routeHost)
