@@ -1048,6 +1048,13 @@ spec:
                         type: object
                     type: object
                 type: object
+              siteReconcileConcurrency:
+                description: |-
+                  SiteReconcileConcurrency suggests max concurrent site reconciles for sites on this bench.
+                  Operator uses max(operatorConfig.maxConcurrentSiteReconciles, max across all benches).
+                  Only applied at operator startup; change requires operator restart.
+                format: int32
+                type: integer
               storageClassName:
                 description: StorageClassName allows overriding the storage class
                   for bench PVC

@@ -168,6 +168,10 @@ data:
   # Git configuration
   gitEnabled: "false"
   
+  # Max concurrent FrappeSite reconciles (default: 10). Tune for 100s of sites.
+  # Can be overridden per-bench via spec.siteReconcileConcurrency (operator uses max).
+  maxConcurrentSiteReconciles: "10"
+  
   # FPM configuration
   fpmCliPath: "/usr/local/bin/fpm"
   fpmRepositories: |

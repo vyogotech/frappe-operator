@@ -1,0 +1,79 @@
+# Example: Frappe Site with App Installation
+# This example demonstrates how to create a site with specific apps installed
+# Prerequisites:
+# 1. Create a FrappeBench with apps (see basic-bench.yaml or fpm-bench.yaml)
+# 2. Create shared MariaDB instance (see mariadb-shared-instance.yaml)
+
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: erp-site
+  namespace: default
+  labels:
+    environment: production
+    purpose: erp
+spec:
+  benchRef:
+    name: dev-bench  # Reference to a bench that has erpnext and hrms available
+  
+  # Site domain
+  siteName: erp.example.com
+  
+  # Apps to install on this site
+  # These apps must be available in the referenced bench
+  # The operator will validate and install these apps during site creation
+  apps:
+    - erpnext
+    - hrms
+  
+  # Database configuration
+  dbConfig:
+    provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: default
+  
+  # Ingress configuration
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+  
+  # TLS configuration
+  tls:
+    enabled: true
+    issuer: letsencrypt-prod
+
+---
+# After deploying, you can check the status:
+# 
+# 1. Check site status:
+#    kubectl get frappesite erp-site -o yaml
+# 
+# 2. View installed apps in status:
+#    kubectl get frappesite erp-site -o jsonpath='{.status.installedApps}'
+# 
+# 3. Check app installation status:
+#    kubectl get frappesite erp-site -o jsonpath='{.status.appInstallationStatus}'
+# 
+# 4. View events for installation progress:
+#    kubectl describe frappesite erp-site
+# 
+# 5. Check initialization job logs:
+#    kubectl logs job/erp-site-init
+# 
+# Expected Status Fields:
+# - status.installedApps: ["erpnext", "hrms"]
+# - status.appInstallationStatus: "Completed app installation for 2 requested app(s) - check logs for any skipped apps"
+# 
+# Error Handling:
+# - If an app is not available in the bench, it will be skipped with a warning
+#   in the logs, and the site creation will continue with the available apps.
+# - If app installation fails during site creation (for apps that are available),
+#   the initialization job will fail and logs will contain detailed error information.
+# - Check pod logs for the init job if installation fails:
+#   kubectl get pods -l job-name=erp-site-init
+#   kubectl logs <pod-name>

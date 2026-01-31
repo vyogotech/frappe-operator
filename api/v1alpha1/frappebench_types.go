@@ -72,6 +72,12 @@ type FrappeBenchSpec struct {
 	// Security defines security context settings for all pods in this bench
 	// +optional
 	Security *SecurityConfig `json:"security,omitempty"`
+
+	// SiteReconcileConcurrency suggests max concurrent site reconciles for sites on this bench.
+	// Operator uses max(operatorConfig.maxConcurrentSiteReconciles, max across all benches).
+	// Only applied at operator startup; change requires operator restart.
+	// +optional
+	SiteReconcileConcurrency *int32 `json:"siteReconcileConcurrency,omitempty"`
 }
 
 // WorkerScalingStatus reports the scaling status of a worker

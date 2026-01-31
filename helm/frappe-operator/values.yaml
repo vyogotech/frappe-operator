@@ -143,6 +143,10 @@ operatorConfig:
   defaultRedisImage: "docker.io/library/redis:7-alpine"
   defaultNginxImage: "docker.io/library/nginx:1.25-alpine"
   
+  # Max concurrent FrappeSite reconciles (default 10). Tune for 100s of sites.
+  # Can be overridden per-bench via spec.siteReconcileConcurrency (operator uses max).
+  maxConcurrentSiteReconciles: "10"
+  
   # Override KEDA values if needed
   # resources:
   #   operator:

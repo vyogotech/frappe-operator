@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -461,6 +462,24 @@ var _ = Describe("FrappeSite Controller", func() {
 				// If site still exists, Phase should NOT be "Provisioning"
 				Expect(updatedSite.Status.Phase).NotTo(Equal(vyogotechv1alpha1.FrappeSitePhaseProvisioning))
 			}
+		})
+	})
+
+	Describe("SetupWithManager", func() {
+		It("succeeds when MaxConcurrentReconciles is set", func() {
+			if skipControllerTests {
+				Skip("envtest not available")
+			}
+			mgr, err := ctrl.NewManager(cfg, ctrl.Options{Scheme: scheme.Scheme})
+			Expect(err).NotTo(HaveOccurred())
+			r := &FrappeSiteReconciler{
+				Client:                  mgr.GetClient(),
+				Scheme:                  mgr.GetScheme(),
+				Recorder:                mgr.GetEventRecorderFor("frappesite-controller"),
+				IsOpenShift:             false,
+				MaxConcurrentReconciles: 5,
+			}
+			Expect(r.SetupWithManager(mgr)).To(Succeed())
 		})
 	})
 })
