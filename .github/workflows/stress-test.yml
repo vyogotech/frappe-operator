@@ -13,7 +13,7 @@ on:
 
 jobs:
   stress-test:
-    name: Stress Test (10 Sites)
+    name: Stress Test (5 Sites)
     runs-on: ubuntu-latest
     
     steps:
@@ -70,14 +70,33 @@ jobs:
             --wait \
             --timeout 10m
 
+      - name: Pre-load Bench Image into Kind
+        run: |
+          # Match image from examples/stress-test-manifests.yaml to avoid pull during init job
+          BENCH_IMAGE="ghcr.io/rmallam/frappe_docker:sha-ae82c47"
+          docker pull "$BENCH_IMAGE"
+          kind load docker-image "$BENCH_IMAGE" --name frappe-stress-test
+
       - name: Deploy Stress Test Manifests
         run: |
           kubectl apply -f examples/stress-test-manifests.yaml
 
       - name: Wait for FrappeBench
         run: |
-          echo "Waiting for Stress Test Bench..."
-          kubectl wait --for=condition=Ready --timeout=600s frappebench/stress-test-bench -n default
+          echo "Waiting for Stress Test Bench (status.phase=Ready)..."
+          # Use jsonpath; condition=Ready may not be set early by the controller
+          for i in {1..90}; do
+            PHASE=$(kubectl get frappebench stress-test-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+            echo "Bench phase: $PHASE (attempt $i/90)"
+            if [ "$PHASE" = "Ready" ]; then
+              echo "FrappeBench is Ready!"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "ERROR: FrappeBench did not reach Ready within timeout"
+          kubectl get frappebench stress-test-bench -n default -o yaml
+          exit 1
 
       - name: Wait for All Sites (Parallel Ready Check)
         run: |
@@ -134,5 +153,17 @@ jobs:
       - name: Export Logs on Failure
         if: failure()
         run: |
+          echo "==== Operator Logs ===="
           kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=2000
+          echo "==== FrappeBench status ===="
+          kubectl get frappebench -n default -o yaml
+          echo "==== FrappeSite status ===="
+          kubectl get frappesite -n default -o yaml
+          echo "==== Init jobs (site-*-init) ===="
+          for j in $(kubectl get jobs -n default -o name 2>/dev/null | grep -E "init"); do
+            echo "--- $j ---"
+            kubectl describe $j -n default 2>/dev/null || true
+            kubectl logs -n default $j --tail=100 2>/dev/null || true
+          done
+          echo "==== All pods ===="
           kubectl get pods -A
