@@ -31,8 +31,11 @@ jobs:
 
       - name: Build Operator Image
         run: |
-          docker build -t ghcr.io/rmallam/frappe-operator:test .
-          kind load docker-image ghcr.io/rmallam/frappe-operator:test --name frappe-e2e-${{ matrix.platform }}
+          # Use current repo so e2e runs the operator image built from this commit (recent changes)
+          IMAGE="ghcr.io/${{ github.repository }}:test"
+          docker build -t "$IMAGE" .
+          kind load docker-image "$IMAGE" --name frappe-e2e-${{ matrix.platform }}
+          echo "OPERATOR_IMAGE=$IMAGE" >> $GITHUB_ENV
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
@@ -70,8 +73,10 @@ jobs:
 
       - name: Install Frappe Operator
         run: |
+          # Use the image we just built (from $GITHUB_REPOSITORY) so e2e tests recent operator code
+          REPO="ghcr.io/${{ github.repository }}"
           helm upgrade --install frappe-operator ./helm/frappe-operator \
-            --set operator.image.repository=ghcr.io/rmallam/frappe-operator \
+            --set operator.image.repository="$REPO" \
             --set operator.image.tag=test \
             --set operator.image.pullPolicy=Never \
             --set mariadb.enabled=true \
