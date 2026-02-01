@@ -30,7 +30,7 @@ This project and everyone participating in it is governed by our Code of Conduct
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.22 or higher (matches CI; see `go.mod` for current minimum)
 - Docker
 - kubectl
 - kind or minikube (for local testing)
@@ -206,28 +206,32 @@ metadata:
 ### Unit Tests
 
 ```bash
-# Run all tests
+# Run all unit tests (api, pkg, controllers; requires envtest)
 make test
 
-# Run with coverage
-make test-coverage
+# Run with coverage (all packages)
+make coverage
 
-# Run specific test
-go test ./controllers -run TestFrappeBenchController
+# Run specific package or test
+go test ./controllers/... -v -run TestFrappeBenchReconciler
+go test ./api/... ./pkg/... ./controllers/... -v -coverprofile cover.out
 ```
+
+CI runs unit tests on every push and PR to `main`, `master`, `develop`, and `feature/**`. The Docker build job depends on the test job passing.
 
 ### Integration Tests
 
+Integration tests run against a real Kubernetes cluster (Kind, Minikube, or in-cluster). They are gated by `INTEGRATION_TEST=true` so they do not run with `make test`.
+
 ```bash
-# Setup test environment
-make test-setup
+# Run integration tests (sets INTEGRATION_TEST=true and uses envtest)
+make integration-test
 
-# Run integration tests
-make test-integration
-
-# Cleanup
-make test-cleanup
+# Or manually with a cluster: ensure KUBECONFIG points to your cluster, then:
+INTEGRATION_TEST=true go test -v -count=1 ./test/integration/...
 ```
+
+The E2E workflow (`.github/workflows/e2e-test.yml`) runs integration tests inside the Kind cluster after installing the operator, then runs the full E2E suite (bench/site deploy, platform detection, metrics, etc.).
 
 ### Writing Tests
 

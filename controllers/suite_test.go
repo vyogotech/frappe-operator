@@ -58,7 +58,26 @@ func init() {
 		}
 	}
 
-	// Priority 2: Check common installation paths
+	// Priority 2: Check project-local bin directory (standard for this project)
+	cwd, _ := os.Getwd()
+	// Navigate up from controllers if necessary, or check relative to root
+	// In suite_test.go, Getwd() is normally the directory containing the file
+	binPath := filepath.Join(cwd, "..", "bin", "k8s")
+	
+	// Try to find any etcd in bin/k8s subdirectories
+	filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
+		if err == nil && info.Name() == "etcd" && !info.IsDir() {
+			os.Setenv("KUBEBUILDER_ASSETS", filepath.Dir(path))
+			skipControllerTests = false
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if !skipControllerTests {
+		return
+	}
+
+	// Priority 3: Check common installation paths
 	commonPaths := []string{
 		"/usr/local/kubebuilder/bin/etcd",
 		"/usr/bin/etcd",

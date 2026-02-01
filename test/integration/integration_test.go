@@ -130,7 +130,7 @@ func TestBenchCreation(t *testing.T) {
 			Namespace: namespace,
 		},
 		Spec: vyogotechv1alpha1.FrappeBenchSpec{
-			FrappeVersion: "v15",
+			FrappeVersion: "version-15",
 			Apps: []vyogotechv1alpha1.AppSource{
 				{
 					Name:   "frappe",
@@ -207,7 +207,7 @@ func TestSiteCreation(t *testing.T) {
 			Namespace: namespace,
 		},
 		Spec: vyogotechv1alpha1.FrappeBenchSpec{
-			FrappeVersion: "v15",
+			FrappeVersion: "version-15",
 			Apps: []vyogotechv1alpha1.AppSource{
 				{Name: "frappe", Source: "image"},
 			},
