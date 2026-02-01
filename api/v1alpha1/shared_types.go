@@ -16,6 +16,42 @@ type SecurityConfig struct {
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 }
 
+// GeoTagConfig defines geographic placement settings
+type GeoTagConfig struct {
+	// Region specifies the geographic region (e.g., "us-east-1")
+	// Maps to topology.kubernetes.io/region node label
+	// +optional
+	Region string `json:"region,omitempty"`
+
+	// Zone specifies the geographic zone (e.g., "us-east-1a")
+	// Maps to topology.kubernetes.io/zone node label
+	// +optional
+	Zone string `json:"zone,omitempty"`
+}
+
+// PodConfig defines advanced pod configuration settings
+type PodConfig struct {
+	// Labels specifies custom labels to add to pods
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// NodeSelector specifies node selection criteria
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Affinity specifies pod affinity/anti-affinity rules
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Tolerations specifies pod tolerations
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// GeoTag specifies geographic placement constraints
+	// +optional
+	GeoTag *GeoTagConfig `json:"geoTag,omitempty"`
+}
+
 // ResourceRequirements defines compute resource requirements
 type ResourceRequirements struct {
 	// Requests describes the minimum amount of compute resources required

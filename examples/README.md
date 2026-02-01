@@ -93,6 +93,7 @@ kubectl apply -f site-shared-mariadb.yaml
 
 ### Advanced Examples  
 - `autoscaling-bench.yaml` - **NEW**: Bench with KEDA-based worker autoscaling (scale-to-zero)
+- `advanced-pod-config.yaml` - **NEW**: Advanced Pod Configuration (Labels, Geo-tagging, Affinity)
 - `hybrid-bench.yaml` - Bench with hybrid app installation
 - `fpm-bench.yaml` - Bench using FPM packages
 
@@ -112,6 +113,12 @@ Key configuration options:
   - `short` - Short-running tasks (scale-to-zero capable)
   - `long` - Long-running tasks (minimum replicas configurable)
   - `default` - Default queue workers (static or autoscaled)
+- `podConfig` - **NEW**: Advanced pod configuration
+  - `labels` - Custom labels for all pods
+  - `geoTag` - Simplified region/zone configuration (sets topology labels and affinity)
+  - `affinity` - Custom pod affinity/anti-affinity
+  - `nodeSelector` - Node selection constraints
+  - `tolerations` - Pod tolerations
 - `componentResources` - CPU/memory for each component
 - `storageSize` - PVC size (default: 10Gi)
 - `storageClassName` - Storage class to use

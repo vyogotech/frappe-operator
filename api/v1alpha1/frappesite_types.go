@@ -71,6 +71,10 @@ type FrappeSiteSpec struct {
 	// Note: Apps can only be installed during initial site creation and are immutable thereafter
 	// +optional
 	Apps []string `json:"apps,omitempty"`
+
+	// PodConfig defines advanced pod configuration for site-specific jobs (init, backup, etc.)
+	// +optional
+	PodConfig *PodConfig `json:"podConfig,omitempty"`
 }
 
 // FrappeSitePhase represents the current phase

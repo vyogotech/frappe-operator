@@ -88,6 +88,7 @@ Check the [`examples/`](examples/) directory for ready-to-use configurations:
 - **[hybrid-bench.yaml](examples/hybrid-bench.yaml)** - FPM + Git + Image sources
 - **[worker-autoscaling.yaml](examples/worker-autoscaling.yaml)** - KEDA-based autoscaling
 - **[scheduled-sitebackup.yaml](examples/scheduled-sitebackup.yaml)** - Automated backups
+- **[advanced-pod-config.yaml](examples/advanced-pod-config.yaml)** - Custom labels, geo-tagging, and affinity
 - And [many more](examples/)...
 
 ## Custom Resources

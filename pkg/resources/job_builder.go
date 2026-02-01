@@ -206,6 +206,23 @@ func (b *JobBuilder) WithTolerations(tolerations []corev1.Toleration) *JobBuilde
 	return b
 }
 
+// WithAffinity sets affinity rules
+func (b *JobBuilder) WithAffinity(affinity *corev1.Affinity) *JobBuilder {
+	b.job.Spec.Template.Spec.Affinity = affinity
+	return b
+}
+
+// WithExtraPodLabels adds extra labels to the pod template
+func (b *JobBuilder) WithExtraPodLabels(labels map[string]string) *JobBuilder {
+	if b.job.Spec.Template.Labels == nil {
+		b.job.Spec.Template.Labels = make(map[string]string)
+	}
+	for k, v := range labels {
+		b.job.Spec.Template.Labels[k] = v
+	}
+	return b
+}
+
 // Build returns the constructed Job
 func (b *JobBuilder) Build() (*batchv1.Job, error) {
 	if b.owner != nil && b.scheme != nil {

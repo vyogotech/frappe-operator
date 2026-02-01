@@ -1,0 +1,11 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: e2e-test-bench
+  namespace: default
+spec:
+  # Patch existing bench with advanced configuration
+  podConfig:
+    labels:
+      e2e-test-label: "true"
+      custom-metadata: "verified"

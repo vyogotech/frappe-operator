@@ -54,8 +54,11 @@ func (r *FrappeBenchReconciler) ensureGunicornService(ctx context.Context, bench
 
 	logger.Info("Creating Gunicorn Service", "service", svcName)
 
+	// Apply Pod Config (Labels only for Service)
+	_, _, _, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
+
 	svc, err = resources.NewServiceBuilder(svcName, bench.Namespace).
-		WithLabels(r.benchLabels(bench)).
+		WithLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, "gunicorn")).
 		WithPort("http", 8000, 8000).
 		WithOwner(bench, r.Scheme).
@@ -103,10 +106,17 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 		WithEnv("USER", "frappe").
 		Build()
 
+	// Apply Pod Config
+	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
+
 	deploy, err = resources.NewDeploymentBuilder(deployName, bench.Namespace).
-		WithLabels(r.benchLabels(bench)).
+		WithLabels(extraLabels).
+		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, "gunicorn")).
 		WithReplicas(replicas).
+		WithNodeSelector(nodeSelector).
+		WithAffinity(affinity).
+		WithTolerations(tolerations).
 		WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
 		WithContainer(container).
 		WithPVCVolume("sites", pvcName).
@@ -144,8 +154,11 @@ func (r *FrappeBenchReconciler) ensureNginxService(ctx context.Context, bench *v
 
 	logger.Info("Creating NGINX Service", "service", svcName)
 
+	// Apply Pod Config (Labels only for Service)
+	_, _, _, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
+
 	svc, err = resources.NewServiceBuilder(svcName, bench.Namespace).
-		WithLabels(r.benchLabels(bench)).
+		WithLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, "nginx")).
 		WithPort("http", 8080, 8080).
 		WithOwner(bench, r.Scheme).
@@ -200,10 +213,17 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		Build()
 
+	// Apply Pod Config
+	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
+
 	deploy, err = resources.NewDeploymentBuilder(deployName, bench.Namespace).
-		WithLabels(r.benchLabels(bench)).
+		WithLabels(extraLabels).
+		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, "nginx")).
 		WithReplicas(replicas).
+		WithNodeSelector(nodeSelector).
+		WithAffinity(affinity).
+		WithTolerations(tolerations).
 		WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
 		WithContainer(container).
 		WithPVCVolume("sites", pvcName).
@@ -241,8 +261,11 @@ func (r *FrappeBenchReconciler) ensureSocketIOService(ctx context.Context, bench
 
 	logger.Info("Creating Socket.IO Service", "service", svcName)
 
+	// Apply Pod Config (Labels only for Service)
+	_, _, _, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
+
 	svc, err = resources.NewServiceBuilder(svcName, bench.Namespace).
-		WithLabels(r.benchLabels(bench)).
+		WithLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, "socketio")).
 		WithPort("socketio", 9000, 9000).
 		WithOwner(bench, r.Scheme).
@@ -291,10 +314,17 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 		WithEnv("USER", "frappe").
 		Build()
 
+	// Apply Pod Config
+	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
+
 	deploy, err = resources.NewDeploymentBuilder(deployName, bench.Namespace).
-		WithLabels(r.benchLabels(bench)).
+		WithLabels(extraLabels).
+		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, "socketio")).
 		WithReplicas(replicas).
+		WithNodeSelector(nodeSelector).
+		WithAffinity(affinity).
+		WithTolerations(tolerations).
 		WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
 		WithContainer(container).
 		WithPVCVolume("sites", pvcName).
@@ -344,10 +374,17 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 		WithEnv("USER", "frappe").
 		Build()
 
+	// Apply Pod Config
+	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
+
 	deploy, err = resources.NewDeploymentBuilder(deployName, bench.Namespace).
-		WithLabels(r.benchLabels(bench)).
+		WithLabels(extraLabels).
+		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, "scheduler")).
 		WithReplicas(replicas).
+		WithNodeSelector(nodeSelector).
+		WithAffinity(affinity).
+		WithTolerations(tolerations).
 		WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
 		WithContainer(container).
 		WithPVCVolume("sites", pvcName).

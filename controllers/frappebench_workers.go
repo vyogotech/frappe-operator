@@ -137,11 +137,18 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 		WithEnv("USER", "frappe").
 		Build()
 
+	// Apply Pod Config
+	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
+
 	deploy, err = resources.NewDeploymentBuilder(deployName, bench.Namespace).
-		WithLabels(r.benchLabels(bench)).
+		WithLabels(extraLabels).
+		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, fmt.Sprintf("worker-%s", workerType))).
 		WithAnnotations(annotations).
 		WithReplicas(replicas).
+		WithNodeSelector(nodeSelector).
+		WithAffinity(affinity).
+		WithTolerations(tolerations).
 		WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
 		WithContainer(container).
 		WithPVCVolume("sites", pvcName).

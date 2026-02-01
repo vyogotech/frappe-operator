@@ -78,6 +78,10 @@ type FrappeBenchSpec struct {
 	// Only applied at operator startup; change requires operator restart.
 	// +optional
 	SiteReconcileConcurrency *int32 `json:"siteReconcileConcurrency,omitempty"`
+
+	// PodConfig defines advanced pod configuration for all bench components
+	// +optional
+	PodConfig *PodConfig `json:"podConfig,omitempty"`
 }
 
 // WorkerScalingStatus reports the scaling status of a worker

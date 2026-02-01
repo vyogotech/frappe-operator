@@ -212,6 +212,17 @@ func (b *DeploymentBuilder) WithAffinity(affinity *corev1.Affinity) *DeploymentB
 	return b
 }
 
+// WithExtraPodLabels adds extra labels to the pod template
+func (b *DeploymentBuilder) WithExtraPodLabels(labels map[string]string) *DeploymentBuilder {
+	if b.deployment.Spec.Template.Labels == nil {
+		b.deployment.Spec.Template.Labels = make(map[string]string)
+	}
+	for k, v := range labels {
+		b.deployment.Spec.Template.Labels[k] = v
+	}
+	return b
+}
+
 // WithStrategy sets the deployment strategy
 func (b *DeploymentBuilder) WithStrategy(strategy appsv1.DeploymentStrategy) *DeploymentBuilder {
 	b.deployment.Spec.Strategy = strategy
