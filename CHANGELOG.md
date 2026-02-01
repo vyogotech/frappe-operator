@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Webhook Validation in Tests**: Added required `Apps` to `FrappeBench` and `FrappeSite` resources in integration tests to satisfy newer webhook validation rules.
 
 ### Added
+- **Advanced Pod Configuration**: Added support for custom labels, node selectors, affinity, and tolerations via `podConfig` in `FrappeBench` and `FrappeSite` CRDs. 
+- **Geo-tagging Support**: Added `geoTag` configuration (under `podConfig`) to easily set region/zone labels and node affinity for geographic placement.
 - **Dynamic `envtest` Detection**: Improved test suites to automatically search for `etcd` and `kube-apiserver` in the project-local `bin/k8s` directory. This enables `TestAPIs` and E2E tests to run without manual `KUBEBUILDER_ASSETS` configuration.
 - **E2E Bootstrap Configuration**: Enabled E2E tests to attempt execution even when local `envtest` binaries are missing, provided an existing cluster is available.
 

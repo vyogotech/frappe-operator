@@ -150,6 +150,32 @@ jobs:
           echo "ERROR: FrappeBench did not reach Ready phase within timeout"
           exit 1
 
+      - name: Apply Advanced Pod Configuration
+        run: |
+          echo "Applying advanced pod configuration patch..."
+          # Patch the bench with custom labels
+          kubectl patch frappebench e2e-test-bench --type=merge --patch '{"spec":{"podConfig":{"labels":{"e2e-custom-label":"verified"}}}}'
+          echo "Waiting for pods to be updated..."
+          sleep 10 
+          # Wait a bit for reconciliation
+
+      - name: Verify Advanced Pod Configuration
+        run: |
+          echo "Verifying custom labels are propagated to pods..."
+          # We check if *any* pod has the label. Note: Rolling updates might take time, so we poll.
+          for i in {1..30}; do
+            PODS_WITH_LABEL=$(kubectl get pods -l e2e-custom-label=verified -n default -o name)
+            if [ ! -z "$PODS_WITH_LABEL" ]; then
+              echo "SUCCESS: Custom label 'e2e-custom-label=verified' found on pods:"
+              echo "$PODS_WITH_LABEL"
+              exit 0
+            fi
+            echo "Waiting for pods to have custom label... ($i/30)"
+            sleep 5
+          done
+          echo "ERROR: Custom label not propagated to pods within timeout."
+          exit 1
+
       - name: Wait for FrappeSite to be Ready (with ERPNext install)
         run: |
           # OpenShift/Kind can be slower; allow 20 min for openshift, 10 min for k8s

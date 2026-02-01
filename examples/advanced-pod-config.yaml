@@ -1,0 +1,50 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: advanced-bench
+  namespace: frappe-bench-system
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image
+  
+  # Advanced Pod Configuration
+  podConfig:
+    # 1. Custom Labels: Applied to all pods (Gunicorn, Nginx, Workers, Scheduler)
+    labels:
+      environment: production
+      cost-center: "marketing-1234"
+      team: "erp-ops"
+      
+    # 2. Geo-tagging: automatically configures NodeAffinity and Pod Labels
+    # This ensures pods are scheduled only on nodes with:
+    #   topology.kubernetes.io/region=us-east-1
+    #   topology.kubernetes.io/zone=us-east-1a
+    geoTag:
+      region: "us-east-1"
+      zone: "us-east-1a"
+      
+    # 3. Tolerations: Allow scheduling on tainted nodes (e.g., spot instances)
+    tolerations:
+      - key: "env"
+        operator: "Equal"
+        value: "production"
+        effect: "NoSchedule"
+        
+    # 4. Custom Affinity: Merged with GeoTag affinity
+    # Example: Spread pods across different hosts for high availability
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - frappe-bench
+            topologyKey: kubernetes.io/hostname

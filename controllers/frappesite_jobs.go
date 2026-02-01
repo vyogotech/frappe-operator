@@ -141,6 +141,12 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		return false, fmt.Errorf("failed to load site init script: %w", err)
 	}
 
+	// Apply Pod Config from Site Spec (init jobs use site config)
+	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(site.Spec.PodConfig, map[string]string{
+		"app":  "frappe",
+		"site": site.Name,
+	})
+
 	// Get bench PVC name
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 
@@ -155,10 +161,11 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 
 	// Build the job
 	job = resources.NewJobBuilder(jobName, site.Namespace).
-		WithLabels(map[string]string{
-			"app":  "frappe",
-			"site": site.Name,
-		}).
+		WithLabels(extraLabels).
+		WithExtraPodLabels(extraLabels).
+		WithNodeSelector(nodeSelector).
+		WithAffinity(affinity).
+		WithTolerations(tolerations).
 		WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
 		WithContainer(container).
 		WithPVCVolume("sites", pvcName).
@@ -262,6 +269,12 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 			return fmt.Errorf("failed to load site delete script: %w", err)
 		}
 
+		// Apply Pod Config from Site Spec
+		nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(site.Spec.PodConfig, map[string]string{
+			"app":  "frappe",
+			"site": site.Name,
+		})
+
 		// Build the container
 		container := resources.NewContainerBuilder("site-delete", r.getBenchImage(ctx, bench)).
 			WithCommand("bash", "-c").
@@ -273,10 +286,11 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 
 		// Build the job
 		job = resources.NewJobBuilder(jobName, site.Namespace).
-			WithLabels(map[string]string{
-				"app":  "frappe",
-				"site": site.Name,
-			}).
+			WithLabels(extraLabels).
+			WithExtraPodLabels(extraLabels).
+			WithNodeSelector(nodeSelector).
+			WithAffinity(affinity).
+			WithTolerations(tolerations).
 			WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
 			WithContainer(container).
 			WithPVCVolume("sites", fmt.Sprintf("%s-sites", bench.Name)).
