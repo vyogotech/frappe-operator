@@ -37,7 +37,24 @@ func init() {
 		}
 	}
 
-	// Priority 2: Check common installation paths
+	// Priority 2: Check project-local bin directory
+	cwd, _ := os.Getwd()
+	// Navigate up from test/e2e
+	binPath := filepath.Join(cwd, "..", "..", "bin", "k8s")
+	
+	filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
+		if err == nil && info.Name() == "etcd" && !info.IsDir() {
+			os.Setenv("KUBEBUILDER_ASSETS", filepath.Dir(path))
+			skipE2ETests = false
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if !skipE2ETests {
+		return
+	}
+
+	// Priority 3: Check common installation paths
 	commonPaths := []string{
 		"/usr/local/kubebuilder/bin/etcd",
 		"/usr/bin/etcd",
@@ -52,6 +69,14 @@ func init() {
 			skipE2ETests = false
 			return
 		}
+	}
+
+	// Special case for E2E: if we use an existing cluster, we might not need local etcd
+	// but envtest.Environment.Start() might still complain if it tries to start a local control plane.
+	// However, if UseExistingCluster is explicitly true, we can try to proceed.
+	// For now, let's keep the gate but allow override via env var.
+	if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+		skipE2ETests = false
 	}
 }
 

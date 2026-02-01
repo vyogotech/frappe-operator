@@ -5,6 +5,25 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **FrappeSite stability tests**: Fixed fake client not finding shared MariaDB CR by creating the MariaDB via `fakeClient.Create()` in test setup (matching `frappesite_jobs_test.go`), so reconciliation tests no longer fail with "shared MariaDB instance 'frappe-mariadb' not found".
+- **Security context test (non-OpenShift)**: Made the test deterministic by using explicit `bench.Spec.Security` overrides instead of env vars (`FRAPPE_DEFAULT_UID`/`FRAPPE_DEFAULT_GID`), avoiding flakiness from test order or environment.
+- **Integration Test Tags**: Corrected `FrappeVersion` tags from `v15` to `version-15` in integration tests to match official Docker images.
+- **Webhook Validation in Tests**: Added required `Apps` to `FrappeBench` and `FrappeSite` resources in integration tests to satisfy newer webhook validation rules.
+
+### Added
+- **Dynamic `envtest` Detection**: Improved test suites to automatically search for `etcd` and `kube-apiserver` in the project-local `bin/k8s` directory. This enables `TestAPIs` and E2E tests to run without manual `KUBEBUILDER_ASSETS` configuration.
+- **E2E Bootstrap Configuration**: Enabled E2E tests to attempt execution even when local `envtest` binaries are missing, provided an existing cluster is available.
+
+### Changed
+- **CI**: Unit test job runs on push/PR to `main`, `master`, `develop`, and `feature/**`; Docker build depends on test job. Go version in workflows aligned to 1.22.
+- **E2E workflow**: Added "Run Integration Tests" step that runs `./test/integration/...` with `INTEGRATION_TEST=true` in the Kind cluster after installing the operator. Go version set to 1.22.
+- **CONTRIBUTING.md**: Updated Testing section to match Makefile targets (`make test`, `make coverage`, `make integration-test`), Go prerequisite (1.22+), and described CI/E2E test integration.
+
+---
+
 ## [2.6.3] - 2026-01-28
 
 ### Fixed
