@@ -201,6 +201,30 @@ jobs:
             fi
           done
 
+      - name: Verify Ingress and Site Folders
+        run: |
+          echo "Verifying Ingress creation..."
+          INGRESS_COUNT=$(kubectl get ingress -n default --no-headers | wc -l)
+          echo "Found $INGRESS_COUNT Ingress resources"
+          if [ "$INGRESS_COUNT" -lt 5 ]; then
+             echo "ERROR: Expected at least 5 Ingress resources (one per site)"
+             kubectl get ingress -n default
+             exit 1
+          fi
+          
+          echo "Verifying Site Folders in Bench..."
+          POD_NAME=$(kubectl get pods -l app=frappe,bench=stress-test-bench -n default -o jsonpath='{.items[0].metadata.name}')
+          
+          for i in {1..5}; do
+            SITE="site$i.localhost"
+            if kubectl exec -n default $POD_NAME -- ls -d "/home/frappe/frappe-bench/sites/$SITE"; then
+               echo "✓ Site folder $SITE exists"
+            else
+               echo "✗ Site folder $SITE missing"
+               exit 1
+            fi
+          done
+
       - name: Verify Dedicated DB Instances
         run: |
           echo "Checking for dedicated MariaDB instances (site3 and site5)..."
