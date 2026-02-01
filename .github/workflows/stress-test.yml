@@ -178,12 +178,25 @@ jobs:
           for i in {1..5}; do
             SITE="site$i.localhost"
             echo "Testing $SITE..."
-            RESPONSE=$(kubectl exec -n default $POD_NAME -- curl -sI -H "Host: $SITE" http://stress-test-bench-nginx:8080)
-            if echo "$RESPONSE" | grep -q "HTTP/1.1 200 OK"; then
-              echo "✓ $SITE is accessible"
-            else
-              echo "✗ $SITE is NOT accessible"
-              echo "$RESPONSE"
+            
+            # Retry loop for each site
+            MAX_RETRIES=10
+            SUCCESS=false
+            
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              RESPONSE=$(kubectl exec -n default $POD_NAME -- curl -sI -H "Host: $SITE" http://stress-test-bench-nginx:8080)
+              if echo "$RESPONSE" | grep -q "HTTP/1.1 200 OK"; then
+                echo "✓ $SITE is accessible"
+                SUCCESS=true
+                break
+              else
+                echo "Attempt $attempt/$MAX_RETRIES: $SITE gave $(echo "$RESPONSE" | head -1)"
+                sleep 5
+              fi
+            done
+            
+            if [ "$SUCCESS" = "false" ]; then
+              echo "✗ $SITE is NOT accessible after $MAX_RETRIES attempts"
               exit 1
             fi
           done
