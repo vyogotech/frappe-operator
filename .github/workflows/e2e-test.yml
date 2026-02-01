@@ -68,12 +68,13 @@ jobs:
 
       - name: Resolve and load operator image
         run: |
-          # After CI: use same image (short SHA). Manual run: use image from build-operator.
+          # After CI: use same image (sha-XXXXXXX format from docker/metadata-action). Manual run: use image from build-operator.
           if [ -n "${{ needs.build-operator.outputs.image }}" ]; then
             IMAGE="${{ needs.build-operator.outputs.image }}"
           else
+            # CI uses docker/metadata-action type=sha,format=short which produces "sha-XXXXXXX"
             SHORT_SHA=$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)
-            IMAGE="ghcr.io/${{ github.repository }}:${SHORT_SHA}"
+            IMAGE="ghcr.io/${{ github.repository }}:sha-${SHORT_SHA}"
           fi
           TAG="${IMAGE##*:}"
           docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
