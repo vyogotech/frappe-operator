@@ -1,37 +1,82 @@
 name: Stress Test (High Density)
 
+# Run after CI completes (reuse CI-built image). Manual run via workflow_dispatch builds image.
 on:
-  push:
-    branches:
-      - main
-      - master
-  pull_request:
-    branches:
-      - main
-      - master
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
+  build-operator:
+    name: Build Operator Image
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push operator image
+        id: meta
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}:stress-${{ github.run_id }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
   stress-test:
     name: Stress Test (5 Sites)
     runs-on: ubuntu-latest
+    needs: [build-operator]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Create Kind Cluster
         uses: helm/kind-action@v1.8.0
         with:
           cluster_name: frappe-stress-test
 
-      - name: Build Operator Image
+      - name: Resolve and load operator image
         run: |
-          IMAGE="ghcr.io/${{ github.repository }}:stress-test"
-          docker build -t "$IMAGE" .
+          # After CI: use same image (sha-XXXXXXX format from docker/metadata-action). Manual run: use image from build-operator.
+          if [ -n "${{ needs.build-operator.outputs.image }}" ]; then
+            IMAGE="${{ needs.build-operator.outputs.image }}"
+          else
+            # CI uses docker/metadata-action type=sha,format=short which produces "sha-XXXXXXX"
+            SHORT_SHA=$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)
+            IMAGE="ghcr.io/${{ github.repository }}:sha-${SHORT_SHA}"
+          fi
+          TAG="${IMAGE##*:}"
+          docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+          docker pull "$IMAGE"
           kind load docker-image "$IMAGE" --name frappe-stress-test
           echo "OPERATOR_IMAGE=$IMAGE" >> $GITHUB_ENV
+          echo "OPERATOR_IMAGE_TAG=$TAG" >> $GITHUB_ENV
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
@@ -65,7 +110,7 @@ jobs:
           REPO="ghcr.io/${{ github.repository }}"
           helm upgrade --install frappe-operator ./helm/frappe-operator \
             --set operator.image.repository="$REPO" \
-            --set operator.image.tag=stress-test \
+            --set operator.image.tag="${OPERATOR_IMAGE_TAG}" \
             --set operator.image.pullPolicy=Never \
             --set mariadb.enabled=true \
             --namespace frappe-operator-system \
