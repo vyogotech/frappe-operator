@@ -254,7 +254,7 @@ jobs:
               echo "SUCCESS: ERPNext is installed on the site (verified via bench list-apps)."
               exit 0
             fi
-            [ $i -lt 15 ] && sleep 10
+            if [ "$i" -lt 15 ]; then sleep 10; fi
           done
           echo "ERROR: ERPNext not found in bench --site e2e.localhost list-apps output after 15 attempts"
           exit 1
