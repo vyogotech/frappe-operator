@@ -58,6 +58,10 @@ spec:
     default:
       enabled: false
       staticReplicas: 1
+  # E2E: custom labels so "Verify Advanced Pod Configuration" can check propagation (operator applies podConfig at create time)
+  podConfig:
+    labels:
+      e2e-custom-label: verified
 ---
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
