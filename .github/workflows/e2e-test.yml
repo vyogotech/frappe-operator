@@ -242,19 +242,22 @@ jobs:
 
       - name: Verify ERPNext installed on site (bench list-apps)
         run: |
-          # Per bench docs: bench --site {site} list-apps lists apps on the site (default output JSON)
-          echo "Verifying ERPNext via bench --site e2e.localhost list-apps..."
+          # Site is Ready after init job succeeds; list-apps can lag or exec can be briefly unavailable. Poll with retries.
+          echo "Verifying ERPNext via bench --site e2e.localhost list-apps (polling up to 2.5 min)..."
           POD_NAME=$(kubectl get pods -l app=frappe,bench=e2e-test-bench -n default -o jsonpath='{.items[0].metadata.name}')
           echo "Using pod: $POD_NAME"
-          APPS=$(kubectl exec -n default $POD_NAME -- bash -c "cd /home/frappe/frappe-bench && bench --site e2e.localhost list-apps" 2>/dev/null || true)
-          echo "Installed apps (bench list-apps):"
-          echo "$APPS"
-          if echo "$APPS" | grep -qi "erpnext"; then
-            echo "SUCCESS: ERPNext is installed on the site (verified via bench list-apps)."
-          else
-            echo "ERROR: ERPNext not found in bench --site e2e.localhost list-apps output"
-            exit 1
-          fi
+          sleep 15
+          for i in $(seq 1 15); do
+            APPS=$(kubectl exec -n default $POD_NAME -- bash -c "cd /home/frappe/frappe-bench && bench --site e2e.localhost list-apps" 2>&1) || true
+            echo "Attempt $i/15 - list-apps output: $APPS"
+            if echo "$APPS" | grep -qi "erpnext"; then
+              echo "SUCCESS: ERPNext is installed on the site (verified via bench list-apps)."
+              exit 0
+            fi
+            [ $i -lt 15 ] && sleep 10
+          done
+          echo "ERROR: ERPNext not found in bench --site e2e.localhost list-apps output after 15 attempts"
+          exit 1
 
       - name: Verify In-Cluster Accessibility
         run: |
