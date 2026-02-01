@@ -44,7 +44,9 @@ jobs:
     name: Stress Test (5 Sites)
     runs-on: ubuntu-latest
     needs: [build-operator]
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    # Run when: (triggered by CI push and CI succeeded) OR (manual run and build-operator succeeded).
+    # When triggered by workflow_run, build-operator is skipped; use always() so this job still runs.
+    if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') || (github.event_name == 'workflow_dispatch' && needs.build-operator.result == 'success')) }}
     timeout-minutes: 45
     permissions:
       contents: read
