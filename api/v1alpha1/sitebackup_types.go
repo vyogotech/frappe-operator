@@ -44,6 +44,10 @@ type SiteBackupSpec struct {
 	// +kubebuilder:default=false
 	Compress bool `json:"compress,omitempty"`
 
+	// Storage configures where to store the backup
+	// +optional
+	Storage *BackupStorageConfig `json:"storage,omitempty"`
+
 	// BackupPath specifies the path to save the backup files
 	// If empty, uses the default site backup location
 	// +optional
@@ -101,6 +105,22 @@ type SiteBackupStatus struct {
 	// Message provides additional information about the backup status
 	// +optional
 	Message string `json:"message,omitempty"`
+}
+
+// BackupStorageConfig defines storage backend for backups
+type BackupStorageConfig struct {
+	// Type of storage: s3 or pvc
+	// +kubebuilder:validation:Enum=s3;pvc
+	// +kubebuilder:default=pvc
+	Type string `json:"type,omitempty"`
+
+	// S3 configuration
+	// +optional
+	S3 *S3Config `json:"s3,omitempty"`
+
+	// PVC configuration (future use)
+	// +optional
+	PVC string `json:"pvc,omitempty"`
 }
 
 //+kubebuilder:object:root=true
