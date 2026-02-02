@@ -1,0 +1,18 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteRestore
+metadata:
+  name: restore-from-s3
+  namespace: default
+spec:
+  site: e2e.example.com
+  benchRef:
+    name: e2e-bench
+    namespace: default
+  databaseBackupSource:
+    s3:
+      bucket: my-frappe-backups
+      key: "e2e.example.com/db.sql.gz"
+      credentialSecretRef:
+        name: s3-credentials
+        namespace: frappe-operator-system
+  force: true
