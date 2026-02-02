@@ -29,7 +29,7 @@ helm repo update
 # Install the MariaDB Operator
 helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
   --namespace frappe-operator-system \
-  --set crds.enabled=true 
+  --set crds.enabled=true --create-namespace
 ```
 
 ## 4. Install Frappe Operator
@@ -45,7 +45,7 @@ helm repo update
 helm upgrade --install frappe-operator frappe-operator/frappe-operator \
   --namespace frappe-operator-system \
   --set operator.image.repository=ghcr.io/rmallam/frappe-operator \
-  --set operator.image.tag=v2.6.3 \
+  --set operator.image.tag=2.6.3 \
   --wait
 ```
 
@@ -100,6 +100,20 @@ spec:
     requests:
       cpu: 250m
       memory: 512Mi
+  replicas: 1
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: frappe-mariadb
+  namespace: frappe-operator-system
+spec:
+  rootPasswordSecretKeyRef:
+    name: mariadb-root-password
+    key: password
+  image: mariadb:10.11
+  storage:
+    size: 2Gi
   replicas: 1
 ```
 

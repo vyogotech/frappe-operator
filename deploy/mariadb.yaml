@@ -2,7 +2,7 @@ apiVersion: k8s.mariadb.com/v1alpha1
 kind: MariaDB
 metadata:
   name: frappe-mariadb
-  namespace: default
+  namespace: mariadb
 spec:
   rootPasswordSecretKeyRef:
     name: mariadb-root-password
@@ -16,7 +16,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: mariadb-root-password
-  namespace: default
+  namespace: mariadb
 type: Opaque
 stringData:
   password: frappe

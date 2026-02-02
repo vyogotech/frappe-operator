@@ -14,6 +14,7 @@ rules:
   - frappesites
   - frappeworkpaces
   - sitebackups
+  - siterestores
   - sitedashboards
   - sitedashboardcharts
   - sitejobs
@@ -39,9 +40,18 @@ rules:
   resources:
   - frappebenches/status
   - frappesites/status
+  - sitebackups/status
+  - siterestores/status
   verbs:
   - get
   - patch
+  - update
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - sitebackups/finalizers
+  - siterestores/finalizers
+  verbs:
   - update
 
 # Core Kubernetes resources

@@ -1,13 +1,13 @@
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
 metadata:
-  name: new-site2
-  namespace: frappe-fixes
+  name: vyogotech
+  namespace: frappe
 spec:
-  siteName: new-site2.example.com
+  siteName: vyogo.apps-crc.testing
   benchRef:
-    name: new-bench
-    namespace: frappe-fixes
+    name: bench-test
+    namespace: frappe
 
   # Database configuration
   dbConfig:
@@ -15,7 +15,7 @@ spec:
     mode: shared
     mariadbRef:
       name: frappe-mariadb
-      namespace: frappe-operator-system
+      namespace: mariadb
 
   # Ingress configuration for OpenShift
   ingress:
