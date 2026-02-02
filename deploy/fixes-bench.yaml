@@ -1,15 +1,15 @@
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
-  name: new-bench
-  namespace: frappe-fixes
+  name: bench-test
+  namespace: frappe
 spec:
   frappeVersion: "15.0.0"
   imageConfig:
     repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-ae82c47@sha256:fc7d472b57a1f5a75bfffb9985d9d2298a2a910d0b17ec23e36fb11b053da565
+    tag: sha-7bc7484
     pullPolicy: Always
-  storageClassName: ocs-external-storagecluster-cephfs
+  storageClassName: openebs-kernel-nfs
   storageSize: 2Gi
 
  # Apps to install
