@@ -25,9 +25,9 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 2.6.4
-    created: "2026-02-02T09:13:37.092775592Z"
+    created: "2026-02-02T09:13:55.297153834Z"
     description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
-    digest: e3b0a94e89ba45e5c847b477141dc7fc93420eb345a2010f79a094f611cae8ee
+    digest: 0c4139aca093a3083f8d7433126d3357d84b2cc9aaccf4984a748623669d6e5f
     home: https://github.com/vyogotech/frappe-operator
     icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/main/docs/assets/icon.png
     keywords:
@@ -45,7 +45,7 @@ entries:
     - https://github.com/vyogotech/frappe-operator
     type: application
     urls:
-    - https://rmallam.github.io/frappe-operator/helm-repo/frappe-operator-2.6.4.tgz
+    - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-2.6.4.tgz
     version: 2.6.4
   - annotations:
       artifacthub.io/category: database
@@ -71,7 +71,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 2.6.3
-    created: "2026-02-02T09:13:37.089310478Z"
+    created: "2026-02-02T09:13:55.293601026Z"
     description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
     digest: 058919e87ac557e204e343c78f5f62f21d9a5d90dce75849ff6e87c8403bc3be
     home: https://github.com/vyogotech/frappe-operator
@@ -91,7 +91,7 @@ entries:
     - https://github.com/vyogotech/frappe-operator
     type: application
     urls:
-    - https://rmallam.github.io/frappe-operator/helm-repo/frappe-operator-2.6.3.tgz
+    - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-2.6.3.tgz
     version: 2.6.3
   - annotations:
       artifacthub.io/category: database
@@ -185,4 +185,4 @@ entries:
     urls:
     - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-1.0.0.tgz
     version: 1.0.0
-generated: "2026-02-02T09:13:37.08437004Z"
+generated: "2026-02-02T09:13:55.288929905Z"
