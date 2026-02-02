@@ -1,0 +1,13 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteRestore
+metadata:
+  name: restore-from-local-new-site2
+  namespace: frappe-fixes
+spec:
+  site: new-site2.apps.cluster-5x9wt.dynamic.redhatworkshops.io
+  benchRef:
+    name: new-bench
+    namespace: frappe-fixes
+  databaseBackupSource:
+    localPath: "sites/new-site2-bkp/20260128_223833-new-site2_apps_cluster-5x9wt_dynamic_redhatworkshops_io-database.sql.gz"
+  force: true

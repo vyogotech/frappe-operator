@@ -157,6 +157,7 @@ rules:
   - sitedashboardcharts
   - sitedashboards
   - sitejobs
+  - siterestores
   - siteusers
   - siteworkspaces
   verbs:
@@ -177,6 +178,7 @@ rules:
   - sitedashboardcharts/finalizers
   - sitedashboards/finalizers
   - sitejobs/finalizers
+  - siterestores/finalizers
   - siteusers/finalizers
   - siteworkspaces/finalizers
   verbs:
@@ -191,6 +193,7 @@ rules:
   - sitedashboardcharts/status
   - sitedashboards/status
   - sitejobs/status
+  - siterestores/status
   - siteusers/status
   - siteworkspaces/status
   verbs:
