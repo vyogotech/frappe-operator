@@ -2,8 +2,8 @@ apiVersion: v2
 name: frappe-operator
 description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
 type: application
-version: 2.6.3
-appVersion: "2.6.3"
+version: 2.6.4
+appVersion: "2.6.4"
 keywords:
   - frappe
   - erpnext
