@@ -648,3 +648,31 @@ type RouteConfig struct {
 func MustParseQuantity(s string) resource.Quantity {
 	return resource.MustParse(s)
 }
+
+// S3Config defines configuration for S3-compatible storage
+type S3Config struct {
+	// Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com" or minio URL)
+	// +kubebuilder:validation:Required
+	Endpoint string `json:"endpoint"`
+
+	// Bucket name
+	// +kubebuilder:validation:Required
+	Bucket string `json:"bucket"`
+
+	// Region (standard S3 region)
+	// +optional
+	Region string `json:"region,omitempty"`
+
+	// AccessKeySecret references a secret key containing the Access Key ID
+	// +kubebuilder:validation:Required
+	AccessKeySecret corev1.SecretKeySelector `json:"accessKeySecret"`
+
+	// SecretKeySecret references a secret key containing the Secret Access Key
+	// +kubebuilder:validation:Required
+	SecretKeySecret corev1.SecretKeySelector `json:"secretKeySecret"`
+
+	// UseSSL enables SSL/TLS for the connection
+	// +optional
+	// +kubebuilder:default=true
+	UseSSL bool `json:"useSSL,omitempty"`
+}

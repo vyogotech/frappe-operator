@@ -201,19 +201,13 @@ func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1alpha1.S
 			env = append(env, corev1.EnvVar{
 				Name: prefix + "_AWS_ACCESS_KEY_ID",
 				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: source.S3.CredentialSecretRef.Name},
-						Key:                  "AWS_ACCESS_KEY_ID",
-					},
+					SecretKeyRef: &source.S3.AccessKeySecret,
 				},
 			})
 			env = append(env, corev1.EnvVar{
 				Name: prefix + "_AWS_SECRET_ACCESS_KEY",
 				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: source.S3.CredentialSecretRef.Name},
-						Key:                  "AWS_SECRET_ACCESS_KEY",
-					},
+					SecretKeyRef: &source.S3.SecretKeySecret,
 				},
 			})
 		}
