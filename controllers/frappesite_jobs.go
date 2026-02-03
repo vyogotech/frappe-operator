@@ -155,6 +155,8 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		WithCommand("bash", "-c").
 		WithArgs(initScript).
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
+		WithResources(r.getSiteInitResources(bench)).
 		WithVolumeMount("site-secrets", "/tmp/site-secrets").
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		Build()
@@ -280,6 +282,8 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 			WithCommand("bash", "-c").
 			WithArgs(deleteScript).
 			WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
+			WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
+			WithResources(r.getSiteDeleteResources(bench)).
 			WithVolumeMountReadOnly("deletion-secret", "/tmp/secrets").
 			WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 			Build()
