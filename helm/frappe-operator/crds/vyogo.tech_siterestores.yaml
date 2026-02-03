@@ -97,37 +97,79 @@ spec:
                   s3:
                     description: S3 specifies a file in S3-compatible storage
                     properties:
+                      accessKeySecret:
+                        description: AccessKeySecret references a secret key containing
+                          the Access Key ID
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
                       bucket:
                         description: Bucket name
                         type: string
-                      credentialSecretRef:
-                        description: CredentialSecretRef references a Secret containing
-                          AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-                        properties:
-                          name:
-                            description: name is unique within a namespace to reference
-                              a secret resource.
-                            type: string
-                          namespace:
-                            description: namespace defines the space within which
-                              the secret name must be unique.
-                            type: string
-                        type: object
-                        x-kubernetes-map-type: atomic
                       endpoint:
-                        description: Endpoint URL (required for non-AWS providers
-                          like Minio/DigitalOcean)
+                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com"
+                          or minio URL)
                         type: string
                       key:
                         description: Key is the path/name of the file in the bucket
                         type: string
                       region:
-                        description: Region (optional for some providers)
+                        description: Region (standard S3 region)
                         type: string
+                      secretKeySecret:
+                        description: SecretKeySecret references a secret key containing
+                          the Secret Access Key
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      useSSL:
+                        default: true
+                        description: UseSSL enables SSL/TLS for the connection
+                        type: boolean
                     required:
+                    - accessKeySecret
                     - bucket
-                    - credentialSecretRef
+                    - endpoint
                     - key
+                    - secretKeySecret
                     type: object
                 type: object
               force:
@@ -145,37 +187,79 @@ spec:
                   s3:
                     description: S3 specifies a file in S3-compatible storage
                     properties:
+                      accessKeySecret:
+                        description: AccessKeySecret references a secret key containing
+                          the Access Key ID
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
                       bucket:
                         description: Bucket name
                         type: string
-                      credentialSecretRef:
-                        description: CredentialSecretRef references a Secret containing
-                          AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-                        properties:
-                          name:
-                            description: name is unique within a namespace to reference
-                              a secret resource.
-                            type: string
-                          namespace:
-                            description: namespace defines the space within which
-                              the secret name must be unique.
-                            type: string
-                        type: object
-                        x-kubernetes-map-type: atomic
                       endpoint:
-                        description: Endpoint URL (required for non-AWS providers
-                          like Minio/DigitalOcean)
+                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com"
+                          or minio URL)
                         type: string
                       key:
                         description: Key is the path/name of the file in the bucket
                         type: string
                       region:
-                        description: Region (optional for some providers)
+                        description: Region (standard S3 region)
                         type: string
+                      secretKeySecret:
+                        description: SecretKeySecret references a secret key containing
+                          the Secret Access Key
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      useSSL:
+                        default: true
+                        description: UseSSL enables SSL/TLS for the connection
+                        type: boolean
                     required:
+                    - accessKeySecret
                     - bucket
-                    - credentialSecretRef
+                    - endpoint
                     - key
+                    - secretKeySecret
                     type: object
                 type: object
               publicFilesSource:
@@ -189,37 +273,79 @@ spec:
                   s3:
                     description: S3 specifies a file in S3-compatible storage
                     properties:
+                      accessKeySecret:
+                        description: AccessKeySecret references a secret key containing
+                          the Access Key ID
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
                       bucket:
                         description: Bucket name
                         type: string
-                      credentialSecretRef:
-                        description: CredentialSecretRef references a Secret containing
-                          AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-                        properties:
-                          name:
-                            description: name is unique within a namespace to reference
-                              a secret resource.
-                            type: string
-                          namespace:
-                            description: namespace defines the space within which
-                              the secret name must be unique.
-                            type: string
-                        type: object
-                        x-kubernetes-map-type: atomic
                       endpoint:
-                        description: Endpoint URL (required for non-AWS providers
-                          like Minio/DigitalOcean)
+                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com"
+                          or minio URL)
                         type: string
                       key:
                         description: Key is the path/name of the file in the bucket
                         type: string
                       region:
-                        description: Region (optional for some providers)
+                        description: Region (standard S3 region)
                         type: string
+                      secretKeySecret:
+                        description: SecretKeySecret references a secret key containing
+                          the Secret Access Key
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      useSSL:
+                        default: true
+                        description: UseSSL enables SSL/TLS for the connection
+                        type: boolean
                     required:
+                    - accessKeySecret
                     - bucket
-                    - credentialSecretRef
+                    - endpoint
                     - key
+                    - secretKeySecret
                     type: object
                 type: object
               site:
