@@ -26,6 +26,7 @@ import (
 	"github.com/vyogotech/frappe-operator/controllers/database"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -376,4 +377,32 @@ func (r *FrappeSiteReconciler) getPodSecurityContext(ctx context.Context, bench 
 // getContainerSecurityContext returns the container-level security context (shared logic in security_context.go)
 func (r *FrappeSiteReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
 	return ContainerSecurityContextForBench(r.IsOpenShift, bench.Spec.Security)
+}
+
+// getSiteInitResources returns resource requirements for site initialization jobs
+func (r *FrappeSiteReconciler) getSiteInitResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("250m"),
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("1000m"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+	}
+}
+
+// getSiteDeleteResources returns resource requirements for site deletion jobs
+func (r *FrappeSiteReconciler) getSiteDeleteResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("256Mi"),
+		},
+	}
 }
