@@ -49,7 +49,7 @@ func PodSecurityContextForBench(ctx context.Context, c client.Client, isOpenShif
 		}
 		secCtx.FSGroup = int64Ptr(0)
 		secCtx.SupplementalGroups = []int64{0}
-		logger.Info("Applied OpenShift specific FSGroup: 0 and SupplementalGroups: [0] for volume access")
+		logger.Info("Applied OpenShift specific FSGroup: 0 and SupplementalGroups: [0] for volume access (requires anyuid SCC for UID 1001)")
 	} else {
 		logger.V(1).Info("Not on OpenShift platform, skipping MCS label matching")
 	}
