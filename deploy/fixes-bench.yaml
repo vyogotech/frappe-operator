@@ -9,10 +9,9 @@ spec:
     repository: ghcr.io/rmallam/frappe_docker
     tag: sha-7bc7484
     pullPolicy: Always
-  storageClassName: openebs-kernel-nfs
   storageSize: 2Gi
 
- # Apps to install
+  # Apps to install
   apps:
     - name: frappe
       source: image
