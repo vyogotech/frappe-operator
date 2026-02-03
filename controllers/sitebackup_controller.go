@@ -325,6 +325,11 @@ func (r *SiteBackupReconciler) buildBackupJob(siteBackup *vyogotechv1alpha1.Site
 									MountPath: "/home/frappe/frappe-bench/sites",
 									SubPath:   "frappe-sites",
 								},
+								{
+									Name:      "sites",
+									MountPath: "/home/frappe/frappe-bench/sites/assets",
+									SubPath:   "frappe-sites/assets",
+								},
 							},
 						},
 					},
@@ -383,6 +388,11 @@ func (r *SiteBackupReconciler) buildBackupCronJob(siteBackup *vyogotechv1alpha1.
 											Name:      "sites",
 											MountPath: "/home/frappe/frappe-bench/sites",
 											SubPath:   "frappe-sites",
+										},
+										{
+											Name:      "sites",
+											MountPath: "/home/frappe/frappe-bench/sites/assets",
+											SubPath:   "frappe-sites/assets",
 										},
 									},
 								},

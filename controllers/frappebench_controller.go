@@ -524,6 +524,11 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 									MountPath: "/home/frappe/frappe-bench/sites",
 									SubPath:   "frappe-sites",
 								},
+								{
+									Name:      "sites",
+									MountPath: "/home/frappe/frappe-bench/sites/assets",
+									SubPath:   "frappe-sites/assets",
+								},
 							},
 							SecurityContext: r.getContainerSecurityContext(ctx, bench),
 							Env: []corev1.EnvVar{
