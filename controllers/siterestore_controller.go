@@ -261,7 +261,11 @@ func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1alpha1.S
 								{
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
-									SubPath:   "frappe-sites",
+								},
+								{
+									Name:      "sites",
+									MountPath: "/home/frappe/frappe-bench/sites/assets",
+									SubPath:   "assets",
 								},
 							},
 							Env: env,
