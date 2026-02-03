@@ -2,9 +2,9 @@ resources:
 - manager.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-images:
 # Production image configuration
 # For local development, override with: kustomize edit set image controller=<your-image>
+images:
 - name: controller
-  newName: ghcr.io/rmallam/frappe-operator
+  newName: localhost/frappe-operator-local
   newTag: latest

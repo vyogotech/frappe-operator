@@ -41,7 +41,7 @@ spec:
   # rmallam image (includes frappe + erpnext; amd64)
   imageConfig:
     repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-ae82c47
+    tag: sha-3db38eb
     pullPolicy: IfNotPresent
   apps:
     - name: erpnext
