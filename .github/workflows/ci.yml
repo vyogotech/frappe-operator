@@ -17,6 +17,7 @@ on:
       - '*.md'
       - '_config.yml'
       - 'docs/**'
+  workflow_dispatch:
 
 jobs:
   test:
