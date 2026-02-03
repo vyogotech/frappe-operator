@@ -100,8 +100,8 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 
 	container := resources.NewContainerBuilder("gunicorn", image).
 		WithPort("http", 8000).
-		WithVolumeMount("sites", "/home/frappe/frappe-bench/sites").
-		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "assets").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
 		WithResources(r.getGunicornResources(bench)).
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		WithEnv("USER", "frappe").
@@ -209,8 +209,8 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 		WithEnv("UPSTREAM_REAL_IP_RECURSIVE", "off").
 		WithEnv("UPSTREAM_REAL_IP_HEADER", "X-Forwarded-For").
 		WithEnv("FRAPPE_SITE_NAME_HEADER", "$host").
-		WithVolumeMount("sites", "/home/frappe/frappe-bench/sites").
-		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "assets").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
 		WithResources(r.getNginxResources(bench)).
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		Build()
@@ -310,8 +310,8 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 	container := resources.NewContainerBuilder("socketio", image).
 		WithArgs("node", "/home/frappe/frappe-bench/apps/frappe/socketio.js").
 		WithPort("socketio", 9000).
-		WithVolumeMount("sites", "/home/frappe/frappe-bench/sites").
-		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "assets").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
 		WithResources(r.getSocketIOResources(bench)).
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		WithEnv("USER", "frappe").
@@ -371,8 +371,8 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 
 	container := resources.NewContainerBuilder("scheduler", image).
 		WithArgs("bench", "schedule").
-		WithVolumeMount("sites", "/home/frappe/frappe-bench/sites").
-		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "assets").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
 		WithResources(r.getSchedulerResources(bench)).
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		WithEnv("USER", "frappe").

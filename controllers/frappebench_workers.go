@@ -131,8 +131,8 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 
 	container := resources.NewContainerBuilder("worker", image).
 		WithArgs("bench", "worker", "--queue", queue).
-		WithVolumeMount("sites", "/home/frappe/frappe-bench/sites").
-		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "assets").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
+		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
 		WithResources(workerResources).
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		WithEnv("USER", "frappe").
