@@ -28,3 +28,6 @@ spec:
       default: 1
       short: 0
       long: 0
+  podConfig:
+    labels:
+      e2e-custom-label: verified
