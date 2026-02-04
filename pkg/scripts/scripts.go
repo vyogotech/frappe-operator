@@ -90,6 +90,7 @@ type SiteInitData struct {
 	BenchName     string
 	DBProvider    string
 	AppsToInstall []string
+	RedisAddress  string
 }
 
 // SiteDeleteData provides data for site deletion script
@@ -99,7 +100,8 @@ type SiteDeleteData struct {
 
 // BenchInitData provides data for bench initialization script
 type BenchInitData struct {
-	BenchName string
+	BenchName    string
+	RedisAddress string
 }
 
 // SiteBackupData provides data for site backup script

@@ -11,6 +11,7 @@ resources:
 - bases/vyogo.tech_sitedashboards.yaml
 - bases/vyogo.tech_sitejobs.yaml
 - bases/vyogo.tech_sitebackups.yaml
+- bases/vyogo.tech_siterestores.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

@@ -472,6 +472,19 @@ type RedisConfig struct {
 	// ConnectionSecretRef for external Redis
 	// +optional
 	ConnectionSecretRef *corev1.SecretReference `json:"connectionSecretRef,omitempty"`
+
+	// Host is the Redis hostname for external connections
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// Port is the Redis port for external connections
+	// +optional
+	Port int32 `json:"port,omitempty"`
+
+	// External indicates whether this is an external Redis instance
+	// If true, the operator will not provision internal Redis
+	// +optional
+	External bool `json:"external,omitempty"`
 }
 
 // AppSource defines where an app comes from and how to install it

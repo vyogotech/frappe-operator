@@ -130,7 +130,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	}
 
 	// Ensure initialization secret exists with all credentials
-	if err := r.ensureInitSecrets(ctx, site, bench, domain, dbInfo, dbCreds, adminPassword); err != nil {
+	if err := r.ensureInitSecrets(ctx, site, bench, domain, dbInfo, dbCreds, adminPassword, r.resolveRedisURL(ctx, bench)); err != nil {
 		logger.Error(err, "Failed to create initialization secret")
 		return false, fmt.Errorf("failed to create init secret: %w", err)
 	}
@@ -323,4 +323,41 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 	}
 
 	return fmt.Errorf("site deletion job is still running")
+}
+
+// resolveRedisURL returns the Redis connection URL for the bench
+func (r *FrappeSiteReconciler) resolveRedisURL(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+	// Default internal Redis URL
+	host := fmt.Sprintf("%s-redis-cache", bench.Name)
+	port := int32(6379)
+	password := ""
+
+	// If external Redis is configured, resolve host, port, and password
+	if bench.Spec.RedisConfig != nil && bench.Spec.RedisConfig.External {
+		if bench.Spec.RedisConfig.Host != "" {
+			host = bench.Spec.RedisConfig.Host
+		}
+		if bench.Spec.RedisConfig.Port > 0 {
+			port = bench.Spec.RedisConfig.Port
+		}
+
+		// Resolve password from secret if provided
+		if bench.Spec.RedisConfig.ConnectionSecretRef != nil {
+			secret := &corev1.Secret{}
+			err := r.Get(ctx, types.NamespacedName{
+				Name:      bench.Spec.RedisConfig.ConnectionSecretRef.Name,
+				Namespace: bench.Namespace,
+			}, secret)
+			if err == nil {
+				if p, ok := secret.Data["password"]; ok {
+					password = string(p)
+				}
+			}
+		}
+	}
+
+	if password != "" {
+		return fmt.Sprintf(":%%s@%s:%d", password, host, port)
+	}
+	return fmt.Sprintf("%s:%d", host, port)
 }
