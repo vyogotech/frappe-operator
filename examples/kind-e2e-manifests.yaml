@@ -2,7 +2,7 @@ apiVersion: k8s.mariadb.com/v1alpha1
 kind: MariaDB
 metadata:
   name: frappe-mariadb
-  namespace: default
+  namespace: frappe
 spec:
   rootPasswordSecretKeyRef:
     name: mariadb-root-password
@@ -16,7 +16,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: mariadb-root-password
-  namespace: default
+  namespace: frappe
 type: Opaque
 stringData:
   password: frappe
@@ -25,7 +25,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: e2e-admin-password
-  namespace: default
+  namespace: frappe
 type: Opaque
 stringData:
   password: admin
@@ -34,10 +34,9 @@ apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
   name: e2e-test-bench
-  namespace: default
+  namespace: frappe
 spec:
   frappeVersion: "version-15"
-  storageClassName: "standard"
   # rmallam image (includes frappe + erpnext; amd64)
   imageConfig:
     repository: ghcr.io/rmallam/frappe_docker
@@ -67,11 +66,11 @@ apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
 metadata:
   name: e2e-test-site
-  namespace: default
+  namespace: frappe
 spec:
   benchRef:
     name: e2e-test-bench
-  siteName: e2e.localhost
+  siteName: e2e.apps-crc.testing   
   # Install ERPNext on the site (bench already has erpnext app from image)
   apps:
     - erpnext
