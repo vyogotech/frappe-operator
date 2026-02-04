@@ -76,8 +76,13 @@ spec:
     - erpnext
   adminPasswordSecretRef:
     name: e2e-admin-password
+  # Database configuration
   dbConfig:
     provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: default
   ingress:
     enabled: true
     # Note: 'domain' is a top-level field in spec, not under ingress.
