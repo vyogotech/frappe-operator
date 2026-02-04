@@ -82,7 +82,7 @@ spec:
     mode: shared
     mariadbRef:
       name: frappe-mariadb
-      namespace: default
+      namespace: frappe
   ingress:
     enabled: true
     # Note: 'domain' is a top-level field in spec, not under ingress.
