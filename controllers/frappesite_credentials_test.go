@@ -161,7 +161,8 @@ func TestFrappeSiteReconciler_ensureInitSecrets(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site, bench).Build()
 	r := &FrappeSiteReconciler{Client: client, Scheme: scheme}
 
-	err := r.ensureInitSecrets(context.TODO(), site, bench, "example.local", dbInfo, dbCreds, "admin123")
+	ctx := context.TODO()
+	err := r.ensureInitSecrets(ctx, site, bench, "test.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

@@ -31,6 +31,12 @@ import (
 
 // ensureRedis ensures the Redis StatefulSet and Service exist
 func (r *FrappeBenchReconciler) ensureRedis(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+	// If external Redis is enabled, skip provisioning local resources
+	if bench.Spec.RedisConfig != nil && bench.Spec.RedisConfig.External {
+		log.FromContext(ctx).Info("External Redis enabled, skipping local provisioning", "bench", bench.Name)
+		return nil
+	}
+
 	// Create redis-cache and redis-queue services (socketio not needed for v15+)
 	if err := r.ensureRedisService(ctx, bench, "redis-cache"); err != nil {
 		return err
@@ -126,6 +132,39 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 	return r.Update(ctx, sts)
 }
 
-func (r *FrappeBenchReconciler) getRedisAddress(bench *vyogotechv1alpha1.FrappeBench) string {
-	return fmt.Sprintf("%s-redis-cache:6379", bench.Name)
+// resolveRedisURL returns the Redis connection URL for the bench
+func (r *FrappeBenchReconciler) resolveRedisURL(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+	// Default internal Redis URL
+	host := fmt.Sprintf("%s-redis-cache", bench.Name)
+	port := int32(6379)
+	password := ""
+
+	// If external Redis is configured, resolve host, port, and password
+	if bench.Spec.RedisConfig != nil && bench.Spec.RedisConfig.External {
+		if bench.Spec.RedisConfig.Host != "" {
+			host = bench.Spec.RedisConfig.Host
+		}
+		if bench.Spec.RedisConfig.Port > 0 {
+			port = bench.Spec.RedisConfig.Port
+		}
+
+		// Resolve password from secret if provided
+		if bench.Spec.RedisConfig.ConnectionSecretRef != nil {
+			secret := &corev1.Secret{}
+			err := r.Get(ctx, types.NamespacedName{
+				Name:      bench.Spec.RedisConfig.ConnectionSecretRef.Name,
+				Namespace: bench.Namespace,
+			}, secret)
+			if err == nil {
+				if p, ok := secret.Data["password"]; ok {
+					password = string(p)
+				}
+			}
+		}
+	}
+
+	if password != "" {
+		return fmt.Sprintf(":%%s@%s:%d", password, host, port)
+	}
+	return fmt.Sprintf("%s:%d", host, port)
 }

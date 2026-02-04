@@ -1555,6 +1555,14 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
+                  external:
+                    description: |-
+                      External indicates whether this is an external Redis instance
+                      If true, the operator will not provision internal Redis
+                    type: boolean
+                  host:
+                    description: Host is the Redis hostname for external connections
+                    type: string
                   image:
                     description: Image is the Redis/Dragonfly container image
                     type: string
@@ -1565,6 +1573,10 @@ spec:
                     description: MaxMemory sets maximum memory for cache eviction
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
+                  port:
+                    description: Port is the Redis port for external connections
+                    format: int32
+                    type: integer
                   resources:
                     description: Resources for Redis/Dragonfly
                     properties:
