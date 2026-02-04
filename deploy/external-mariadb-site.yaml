@@ -1,0 +1,15 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: external-mock-site
+  namespace: frappe
+spec:
+  benchRef:
+    name: bench-test
+  siteName: external-mock.apps.crc.testing
+  dbConfig:
+    provider: external
+    host: frappe-mariadb.mariadb.svc.cluster.local
+    port: "3306"
+    connectionSecretRef:
+      name: external-mariadb-creds

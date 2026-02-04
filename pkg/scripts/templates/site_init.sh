@@ -23,6 +23,7 @@ ADMIN_PASSWORD=$(cat /tmp/site-secrets/admin_password)
 BENCH_NAME=$(cat /tmp/site-secrets/bench_name)
 DB_PROVIDER=$(cat /tmp/site-secrets/db_provider)
 APPS_TO_INSTALL=$(cat /tmp/site-secrets/apps_to_install 2>/dev/null || echo "")
+REDIS_ADDRESS=$(cat /tmp/site-secrets/redis_address)
 
 echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
@@ -237,8 +238,8 @@ fi
 echo "Creating common_site_config.json..."
 cat > sites/common_site_config.json <<EOF
 {
-  "redis_cache": "redis://${BENCH_NAME}-redis-cache:6379",
-  "redis_queue": "redis://${BENCH_NAME}-redis-queue:6379",
+  "redis_cache": "redis://${REDIS_ADDRESS}",
+  "redis_queue": "redis://${REDIS_ADDRESS}",
   "socketio_port": 9000
 }
 EOF
@@ -264,6 +265,8 @@ with open('/tmp/site-secrets/domain', 'r') as f:
     domain = f.read().strip()
 with open('/tmp/site-secrets/bench_name', 'r') as f:
     bench_name = f.read().strip()
+with open('/tmp/site-secrets/redis_address', 'r') as f:
+    redis_address = f.read().strip()
 with open('/tmp/site-secrets/db_host', 'r') as f:
     db_host = f.read().strip()
 with open('/tmp/site-secrets/db_port', 'r') as f:
@@ -291,8 +294,8 @@ except FileNotFoundError:
 config['host_name'] = domain
 
 # Add Redis configuration for this site
-config['redis_cache'] = f"redis://{bench_name}-redis-cache:6379"
-config['redis_queue'] = f"redis://{bench_name}-redis-queue:6379"
+config['redis_cache'] = f"redis://{redis_address}"
+config['redis_queue'] = f"redis://{redis_address}"
 
 # Explicitly add database credentials for self-healing
 config['db_name'] = db_name
@@ -312,8 +315,7 @@ with open(config_file, 'w') as f:
     json.dump(config, f, indent=2)
 
 print(f"Updated site_config.json for domain: {domain}")
-print(f"Redis cache: {bench_name}-redis-cache:6379")
-print(f"Redis queue: {bench_name}-redis-queue:6379")
+print(f"Redis address: {redis_address}")
 PYTHON_SCRIPT
 
 echo "Site initialization complete!"

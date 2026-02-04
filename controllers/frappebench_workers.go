@@ -231,7 +231,7 @@ func (r *FrappeBenchReconciler) ensureScaledObject(ctx context.Context, bench *v
 			map[string]interface{}{
 				"type": "redis",
 				"metadata": map[string]interface{}{
-					"address":              r.getRedisAddress(bench),
+					"address":              r.resolveRedisURL(ctx, bench),
 					"listName":             queueName,
 					"listLength":           fmt.Sprintf("%d", *config.QueueLength),
 					"enableTLS":            "false",

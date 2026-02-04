@@ -110,14 +110,16 @@ func (r *FrappeSiteReconciler) ensureAdminPassword(ctx context.Context, site *vy
 }
 
 // ensureInitSecrets creates a Secret containing all initialization credentials
-func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string) error {
+func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string, redisAddress string) error {
 	logger := log.FromContext(ctx)
 
 	secretName := fmt.Sprintf("%s-init-secrets", site.Name)
 
 	// Get DB_PROVIDER from database info
 	dbProvider := "mariadb" // default
-	if site.Spec.DBConfig.Provider != "" {
+	if dbInfo != nil {
+		dbProvider = dbInfo.Provider
+	} else if site.Spec.DBConfig.Provider != "" {
 		dbProvider = site.Spec.DBConfig.Provider
 	}
 
@@ -158,6 +160,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		"bench_name":      []byte(bench.Name),
 		"db_provider":     []byte(dbProvider),
 		"apps_to_install": []byte(appsToInstall),
+		"redis_address":   []byte(redisAddress),
 	}
 
 	// Add database credentials
