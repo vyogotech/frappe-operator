@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-mariadb-creds
+  namespace: frappe
+type: Opaque
+stringData:
+  username: frappe_user
+  password: secure_password
+  database: custom_db_name
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: external-db-site
+  namespace: frappe
+spec:
+  benchRef:
+    name: e2e-test-bench
+  siteName: external-db.local
+  dbConfig:
+    provider: external
+    host: mariadb.external-services.svc.cluster.local
+    port: "3306"
+    connectionSecretRef:
+      name: external-mariadb-creds
