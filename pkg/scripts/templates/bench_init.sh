@@ -21,8 +21,9 @@ id
 echo "Configuring Frappe bench..."
 
 # The PVC is mounted directly at /home/frappe/frappe-bench/sites
-# Frappe expects this directory structure for proper operation
-mkdir -p sites
+# Frappe expects this directory structure for proper operation:
+# When using subPath, the directory is pre-created by the volume provisioner.
+# mkdir -p sites  # (Removed to avoid nested directory issues with subPath)
 
 # Test write access to the mounted volume
 if ! touch sites/.permission_test 2>/dev/null; then
