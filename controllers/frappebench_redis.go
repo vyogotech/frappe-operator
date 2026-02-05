@@ -164,7 +164,7 @@ func (r *FrappeBenchReconciler) resolveRedisURL(ctx context.Context, bench *vyog
 	}
 
 	if password != "" {
-		return fmt.Sprintf(":%%s@%s:%d", password, host, port)
+		return fmt.Sprintf(":%s@%s:%d", password, host, port)
 	}
 	return fmt.Sprintf("%s:%d", host, port)
 }
