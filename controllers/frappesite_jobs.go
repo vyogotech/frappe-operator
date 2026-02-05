@@ -357,7 +357,7 @@ func (r *FrappeSiteReconciler) resolveRedisURL(ctx context.Context, bench *vyogo
 	}
 
 	if password != "" {
-		return fmt.Sprintf(":%%s@%s:%d", password, host, port)
+		return fmt.Sprintf(":%s@%s:%d", password, host, port)
 	}
 	return fmt.Sprintf("%s:%d", host, port)
 }
