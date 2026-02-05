@@ -75,6 +75,12 @@ type FrappeSiteSpec struct {
 	// PodConfig defines advanced pod configuration for site-specific jobs (init, backup, etc.)
 	// +optional
 	PodConfig *PodConfig `json:"podConfig,omitempty"`
+
+	// SkipInit bypasses the bench new-site initialization.
+	// Use this when the database already contains a valid Frappe schema.
+	// When true, the initialization job only performs migrations and configuration updates.
+	// +optional
+	SkipInit bool `json:"skipInit,omitempty"`
 }
 
 // FrappeSitePhase represents the current phase

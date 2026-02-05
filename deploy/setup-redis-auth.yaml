@@ -43,7 +43,7 @@ spec:
       - name: redis
         image: redis:7-alpine
         command: ["redis-server"]
-        args: ["--requirepass", "$(REDIS_PASSWORD)"]
+        args: ["--requirepass", "$(REDIS_PASSWORD)", "--save", ""]
         env:
         - name: REDIS_PASSWORD
           valueFrom:

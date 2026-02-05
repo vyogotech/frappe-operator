@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
@@ -103,6 +104,13 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 		if !kedaManaged && *deploy.Spec.Replicas != replicas {
 			logger.Info("Updating worker replicas", "worker", workerType, "oldReplicas", *deploy.Spec.Replicas, "newReplicas", replicas)
 			deploy.Spec.Replicas = &replicas
+			changed = true
+		}
+
+		// Check resources
+		if !reflect.DeepEqual(deploy.Spec.Template.Spec.Containers[0].Resources, workerResources) {
+			logger.Info("Updating worker resources", "worker", workerType)
+			deploy.Spec.Template.Spec.Containers[0].Resources = workerResources
 			changed = true
 		}
 

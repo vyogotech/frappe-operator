@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
@@ -78,11 +79,23 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
-		// Update existing deployment if image has changed
+		// Update existing deployment if image or resources have changed
+		changed := false
 		image := r.getBenchImage(ctx, bench)
 		if deploy.Spec.Template.Spec.Containers[0].Image != image {
 			logger.Info("Updating Gunicorn Deployment image", "deployment", deployName, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
 			deploy.Spec.Template.Spec.Containers[0].Image = image
+			changed = true
+		}
+
+		resources := r.getGunicornResources(bench)
+		if !reflect.DeepEqual(deploy.Spec.Template.Spec.Containers[0].Resources, resources) {
+			logger.Info("Updating Gunicorn Deployment resources", "deployment", deployName)
+			deploy.Spec.Template.Spec.Containers[0].Resources = resources
+			changed = true
+		}
+
+		if changed {
 			return r.Update(ctx, deploy)
 		}
 		return nil
@@ -179,11 +192,23 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
-		// Update existing deployment if image has changed
+		// Update existing deployment if image or resources have changed
+		changed := false
 		image := r.getBenchImage(ctx, bench)
 		if deploy.Spec.Template.Spec.Containers[0].Image != image {
 			logger.Info("Updating NGINX Deployment image", "deployment", deployName, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
 			deploy.Spec.Template.Spec.Containers[0].Image = image
+			changed = true
+		}
+
+		resources := r.getNginxResources(bench)
+		if !reflect.DeepEqual(deploy.Spec.Template.Spec.Containers[0].Resources, resources) {
+			logger.Info("Updating NGINX Deployment resources", "deployment", deployName)
+			deploy.Spec.Template.Spec.Containers[0].Resources = resources
+			changed = true
+		}
+
+		if changed {
 			return r.Update(ctx, deploy)
 		}
 		return nil
@@ -287,11 +312,23 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
-		// Update existing deployment if image has changed
+		// Update existing deployment if image or resources have changed
+		changed := false
 		image := r.getBenchImage(ctx, bench)
 		if deploy.Spec.Template.Spec.Containers[0].Image != image {
 			logger.Info("Updating Socket.IO Deployment image", "deployment", deployName, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
 			deploy.Spec.Template.Spec.Containers[0].Image = image
+			changed = true
+		}
+
+		resources := r.getSocketIOResources(bench)
+		if !reflect.DeepEqual(deploy.Spec.Template.Spec.Containers[0].Resources, resources) {
+			logger.Info("Updating Socket.IO Deployment resources", "deployment", deployName)
+			deploy.Spec.Template.Spec.Containers[0].Resources = resources
+			changed = true
+		}
+
+		if changed {
 			return r.Update(ctx, deploy)
 		}
 		return nil
@@ -349,11 +386,23 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
-		// Update existing deployment if image has changed
+		// Update existing deployment if image or resources have changed
+		changed := false
 		image := r.getBenchImage(ctx, bench)
 		if deploy.Spec.Template.Spec.Containers[0].Image != image {
 			logger.Info("Updating Scheduler Deployment image", "deployment", deployName, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
 			deploy.Spec.Template.Spec.Containers[0].Image = image
+			changed = true
+		}
+
+		resources := r.getSchedulerResources(bench)
+		if !reflect.DeepEqual(deploy.Spec.Template.Spec.Containers[0].Resources, resources) {
+			logger.Info("Updating Scheduler Deployment resources", "deployment", deployName)
+			deploy.Spec.Template.Spec.Containers[0].Resources = resources
+			changed = true
+		}
+
+		if changed {
 			return r.Update(ctx, deploy)
 		}
 		return nil

@@ -91,6 +91,7 @@ type SiteInitData struct {
 	DBProvider    string
 	AppsToInstall []string
 	RedisAddress  string
+	SkipInit      bool
 }
 
 // SiteDeleteData provides data for site deletion script
