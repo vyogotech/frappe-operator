@@ -4,12 +4,13 @@ metadata:
   name: external-mock-site
   namespace: frappe
 spec:
+  siteName: external-mock.apps.crc.testing
   benchRef:
     name: external-redis-bench
-  siteName: external-mock.apps.crc.testing
   dbConfig:
     provider: external
     host: frappe-mariadb.mariadb.svc.cluster.local
     port: "3306"
     connectionSecretRef:
       name: external-mariadb-creds
+  skipInit: true

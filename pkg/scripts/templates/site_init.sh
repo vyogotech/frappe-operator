@@ -24,6 +24,7 @@ BENCH_NAME=$(cat /tmp/site-secrets/bench_name)
 DB_PROVIDER=$(cat /tmp/site-secrets/db_provider)
 APPS_TO_INSTALL=$(cat /tmp/site-secrets/apps_to_install 2>/dev/null || echo "")
 REDIS_ADDRESS=$(cat /tmp/site-secrets/redis_address)
+SKIP_INIT=$(cat /tmp/site-secrets/skip_init 2>/dev/null || echo "false")
 
 echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
@@ -138,7 +139,37 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
 		exit 1
 	fi
 
-    if [[ "$goto_update_config" -eq 0 ]]; then
+    if [[ "$SKIP_INIT" == "true" ]]; then
+        echo "=========================================="
+        echo "SKIP_INIT is true - Registering Existing Site"
+        echo "=========================================="
+        echo "Site Name: $SITE_NAME"
+        echo "Database Provider: $DB_PROVIDER"
+        echo "Database Name: $DB_NAME"
+        echo "Database Host: $DB_HOST:$DB_PORT"
+        echo "=========================================="
+
+        mkdir -p "sites/$SITE_NAME/logs"
+        
+        # Create site_config.json manually so bench migrate can run
+        cat > "sites/$SITE_NAME/site_config.json" <<EOF
+{
+ "db_name": "$DB_NAME",
+ "db_password": "$DB_PASSWORD",
+ "db_type": "$DB_PROVIDER",
+ "db_host": "$DB_HOST",
+ "db_port": $DB_PORT,
+ "db_user": "$DB_USER"
+}
+EOF
+        echo "✓ Created/Updated manual site_config.json"
+        
+        echo "Running bench migrate..."
+        bench --site "$SITE_NAME" migrate
+        echo "✓ Bench migrate completed"
+        
+        SITE_CREATION_EXIT_CODE=0
+    elif [[ "$goto_update_config" -eq 0 ]]; then
         echo "=========================================="
         echo "Creating Frappe Site"
         echo "=========================================="
@@ -216,6 +247,7 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
             if echo "$SITE_CREATION_OUTPUT" | grep -Eqi "site.*(already exists|exists already)"; then
                 echo "⚠ Site already exists, will proceed to update configuration"
                 # Don't exit - continue to update config
+                SITE_CREATION_EXIT_CODE=0
             else
                 echo "CRITICAL ERROR: Site creation failed. Exiting."
                 exit $SITE_CREATION_EXIT_CODE
