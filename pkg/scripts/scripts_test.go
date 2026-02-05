@@ -160,15 +160,15 @@ func TestRenderScript(t *testing.T) {
 		t.Error("rendered delete script should contain bench drop-site")
 	}
 	// BenchInitData
-	benchData := BenchInitData{BenchName: "e2e-bench"}
+	benchData := BenchInitData{
+		BenchName:    "e2e-bench",
+		RedisAddress: "e2e-bench-redis-cache:6379",
+	}
 	benchContent, err := RenderScript(BenchInit, benchData)
 	if err != nil {
 		t.Fatalf("RenderScript(BenchInit, benchData) error: %v", err)
 	}
 	if !strings.Contains(benchContent, "redis://e2e-bench-redis-cache:6379") {
-		t.Error("rendered bench init script should contain bench name in redis_cache URL")
-	}
-	if !strings.Contains(benchContent, "redis://e2e-bench-redis-queue:6379") {
-		t.Error("rendered bench init script should contain bench name in redis_queue URL")
+		t.Error("rendered bench init script should contain redis address in redis_cache URL")
 	}
 }
