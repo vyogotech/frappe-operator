@@ -12,8 +12,9 @@ spec:
   
   # External Redis configuration
   redisConfig:
+    type: redis
     external: true
-    host: redis-external.frappe.svc.cluster.local
+    host: redis-external.redis.svc.cluster.local
     port: 6379
     connectionSecretRef:
       name: external-redis-creds
