@@ -150,7 +150,7 @@ func (m *FPMManager) GenerateFPMConfigScript(repos []vyogotechv1alpha1.FPMReposi
 	}
 
 	if defaultRepo != "" {
-		script.WriteString(fmt.Sprintf("# Set default repository for publishing\n"))
+		script.WriteString("# Set default repository for publishing\n")
 		script.WriteString(fmt.Sprintf("fpm repo default %s || echo 'Could not set default repository'\n\n", defaultRepo))
 	}
 

@@ -37,10 +37,6 @@ func applyPodConfig(config *vyogotechv1alpha1.PodConfig, initialLabels map[strin
 
 	// Geo Tag Logic
 	if config.GeoTag != nil {
-		if labels == nil {
-			labels = make(map[string]string)
-		}
-
 		geoRequirements := []corev1.NodeSelectorRequirement{}
 
 		if config.GeoTag.Region != "" {
@@ -72,7 +68,7 @@ func applyPodConfig(config *vyogotechv1alpha1.PodConfig, initialLabels map[strin
 				affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
 			}
 
-			// Add a new term or merge into existing terms? 
+			// Add a new term or merge into existing terms?
 			// For simplicity, we add it as a requirement to all existing terms if they exist,
 			// or create a new term if none exist.
 			if len(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {

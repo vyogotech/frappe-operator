@@ -1242,6 +1242,12 @@ spec:
                   Example: "erp.customer.com" or "customer1.myplatform.com"
                 pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                 type: string
+              skipInit:
+                description: |-
+                  SkipInit bypasses the bench new-site initialization.
+                  Use this when the database already contains a valid Frappe schema.
+                  When true, the initialization job only performs migrations and configuration updates.
+                type: boolean
               tls:
                 description: TLS configuration
                 properties:
