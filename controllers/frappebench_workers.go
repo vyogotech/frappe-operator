@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -175,13 +176,15 @@ func (r *FrappeBenchReconciler) isKEDAAvailable(ctx context.Context) bool {
 	// Attempt to list - if this succeeds, KEDA is available
 	err := r.Client.List(ctx, list, client.Limit(1))
 
-	// NoMatchError means the CRD doesn't exist
+	// meta.IsNoMatchError means the CRD doesn't exist
+	if meta.IsNoMatchError(err) {
+		return false
+	}
 	if errors.IsNotFound(err) {
 		return false
 	}
 
 	// Any other error or success means KEDA is likely available
-	// We don't care about permission errors - just whether the CRD exists
 	return true
 }
 
@@ -284,8 +287,8 @@ func (r *FrappeBenchReconciler) deleteScaledObjectIfExists(ctx context.Context, 
 
 	err := r.Get(ctx, types.NamespacedName{Name: scaledObjectName, Namespace: bench.Namespace}, scaledObject)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil // Already deleted
+		if meta.IsNoMatchError(err) || errors.IsNotFound(err) {
+			return nil // Already deleted or CRD doesn't exist
 		}
 		return err
 	}
