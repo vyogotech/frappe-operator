@@ -34,16 +34,24 @@ make deploy IMG=localhost:5001/frappe-operator:repro
 kubectl -n frappe-operator-system rollout restart deployment/frappe-operator-controller-manager
 kubectl -n frappe-operator-system rollout status deployment/frappe-operator-controller-manager
 
-# Step 3: Delete failed job to trigger reconciliation
+# Step 3: Trigger reconciliation by restarting deployment if job doesn't exist, or just wait
 print_status "Step 3: Triggering reconciliation..."
 kubectl delete job test-keda-bench-init -n ${NAMESPACE} --ignore-not-found=true
 
 # Wait for issue to be resolved
 print_status "Waiting for bench-init to start..."
-sleep 10
+for i in {1..20}; do
+    if kubectl get job test-keda-bench-init -n ${NAMESPACE} &>/dev/null; then
+        print_status "Job created!"
+        break
+    fi
+    echo "Waiting for job to be created (iteration $i/20)..."
+    sleep 3
+done
+
 echo "Init Job Status:"
-kubectl get job test-keda-bench-init -n ${NAMESPACE} -o yaml
+kubectl get job test-keda-bench-init -n ${NAMESPACE} -o yaml || true
 echo "Init Job Pods:"
-kubectl get pods -l job-name=test-keda-bench-init -n ${NAMESPACE}
+kubectl get pods -l job-name=test-keda-bench-init -n ${NAMESPACE} || true
 echo "Pod Description:"
-kubectl describe pod -l job-name=test-keda-bench-init -n ${NAMESPACE}
+kubectl describe pod -l job-name=test-keda-bench-init -n ${NAMESPACE} || true
