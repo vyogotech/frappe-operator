@@ -65,6 +65,9 @@ echo "  Cluster: $CLUSTER_NAME"
 echo "  Namespace: $NAMESPACE"
 echo "========================================================"
 
+# Get script directory for absolute paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -131,10 +134,6 @@ fi
 # Step 2: Update Helm dependencies
 print_status "Step 2: Updating Helm chart dependencies..."
 
-# Save current directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
-
 # Add required repos
 print_status "Adding Helm repositories..."
 helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator 2>/dev/null || true
@@ -143,7 +142,7 @@ helm repo update
 
 # Update dependencies
 print_status "Updating Helm chart dependencies..."
-cd helm/frappe-operator || {
+cd "${SCRIPT_DIR}/helm/frappe-operator" || {
     print_error "Failed to change to helm/frappe-operator directory"
     exit 1
 }
