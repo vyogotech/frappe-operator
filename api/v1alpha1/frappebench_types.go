@@ -69,6 +69,12 @@ type FrappeBenchSpec struct {
 	// +optional
 	WorkerAutoscaling *WorkerAutoscalingConfig `json:"workerAutoscaling,omitempty"`
 
+	// NginxAutoscaling defines KEDA-based or static scaling for nginx
+	// Requires KEDA 2.x+ for autoscaling features
+	// If KEDA not available, gracefully falls back to static replicas
+	// +optional
+	NginxAutoscaling *NginxAutoscaling `json:"nginxAutoscaling,omitempty"`
+
 	// Security defines security context settings for all pods in this bench
 	// +optional
 	Security *SecurityConfig `json:"security,omitempty"`
@@ -128,6 +134,10 @@ type FrappeBenchStatus struct {
 	// WorkerScaling reports scaling mode per worker type
 	// +optional
 	WorkerScaling map[string]WorkerScalingStatus `json:"workerScaling,omitempty"`
+
+	// NginxScaling reports scaling mode for nginx
+	// +optional
+	NginxScaling *WorkerScalingStatus `json:"nginxScaling,omitempty"`
 }
 
 //+kubebuilder:object:root=true

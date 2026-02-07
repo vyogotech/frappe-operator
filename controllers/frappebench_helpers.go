@@ -449,3 +449,93 @@ func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotec
 
 	return secCtx
 }
+
+// Nginx autoscaling helper functions
+
+// getNginxAutoscalingConfig returns the nginx autoscaling configuration
+func (r *FrappeBenchReconciler) getNginxAutoscalingConfig(bench *vyogotechv1alpha1.FrappeBench) *vyogotechv1alpha1.NginxAutoscaling {
+// Return configured autoscaling if available
+if bench.Spec.NginxAutoscaling != nil {
+return bench.Spec.NginxAutoscaling
+}
+
+// Fall back to legacy ComponentReplicas for nginx
+if bench.Spec.ComponentReplicas != nil && bench.Spec.ComponentReplicas.Nginx > 0 {
+return &vyogotechv1alpha1.NginxAutoscaling{
+Enabled:        boolPtr(false), // Legacy is always static
+StaticReplicas: int32Ptr(bench.Spec.ComponentReplicas.Nginx),
+}
+}
+
+return nil
+}
+
+// fillNginxAutoscalingDefaults fills in default values for nginx autoscaling configuration
+func (r *FrappeBenchReconciler) fillNginxAutoscalingDefaults(config *vyogotechv1alpha1.NginxAutoscaling) *vyogotechv1alpha1.NginxAutoscaling {
+if config == nil {
+return r.getDefaultNginxAutoscalingConfig()
+}
+
+result := &vyogotechv1alpha1.NginxAutoscaling{}
+*result = *config
+
+// Fill in defaults
+defaults := r.getDefaultNginxAutoscalingConfig()
+if result.Enabled == nil {
+result.Enabled = defaults.Enabled
+}
+if result.MinReplicas == nil {
+result.MinReplicas = defaults.MinReplicas
+}
+if result.MaxReplicas == nil {
+result.MaxReplicas = defaults.MaxReplicas
+}
+if result.StaticReplicas == nil {
+result.StaticReplicas = defaults.StaticReplicas
+}
+if result.TargetAverageValue == "" {
+result.TargetAverageValue = defaults.TargetAverageValue
+}
+if result.MetricType == "" {
+result.MetricType = defaults.MetricType
+}
+if result.CooldownPeriod == nil {
+result.CooldownPeriod = defaults.CooldownPeriod
+}
+if result.PollingInterval == nil {
+result.PollingInterval = defaults.PollingInterval
+}
+
+return result
+}
+
+// getDefaultNginxAutoscalingConfig returns the default nginx autoscaling configuration
+func (r *FrappeBenchReconciler) getDefaultNginxAutoscalingConfig() *vyogotechv1alpha1.NginxAutoscaling {
+return &vyogotechv1alpha1.NginxAutoscaling{
+Enabled:            boolPtr(false),  // Disabled by default for backward compatibility
+StaticReplicas:     int32Ptr(1),     // Default to 1 static replica
+MinReplicas:        int32Ptr(1),     // Minimum 1 replica (nginx cannot scale to zero)
+MaxReplicas:        int32Ptr(10),    // Maximum 10 replicas
+TargetAverageValue: "70",            // 70% CPU utilization
+MetricType:         "cpu",           // Use CPU by default
+CooldownPeriod:     int32Ptr(60),    // 60 seconds cooldown
+PollingInterval:    int32Ptr(30),    // Check every 30 seconds
+}
+}
+
+// getNginxReplicaCount determines the replica count based on scaling mode
+func (r *FrappeBenchReconciler) getNginxReplicaCount(config *vyogotechv1alpha1.NginxAutoscaling, kedaAvailable bool) int32 {
+// If KEDA autoscaling enabled and available, use MinReplicas
+if config.Enabled != nil && *config.Enabled && kedaAvailable {
+if config.MinReplicas != nil {
+return *config.MinReplicas
+}
+return 1 // Default minimum
+}
+
+// Otherwise use static replicas
+if config.StaticReplicas != nil {
+return *config.StaticReplicas
+}
+return 1 // Default
+}

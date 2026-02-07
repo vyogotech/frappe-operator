@@ -552,6 +552,69 @@ spec:
                     description: Tag is the image tag
                     type: string
                 type: object
+              nginxAutoscaling:
+                description: |-
+                  NginxAutoscaling defines KEDA-based or static scaling for nginx
+                  Requires KEDA 2.x+ for autoscaling features
+                  If KEDA not available, gracefully falls back to static replicas
+                properties:
+                  cooldownPeriod:
+                    default: 60
+                    description: CooldownPeriod in seconds before scaling down
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  enabled:
+                    default: true
+                    description: |-
+                      Enabled controls whether KEDA autoscaling is active
+                      If false or KEDA not installed, uses StaticReplicas
+                    type: boolean
+                  maxReplicas:
+                    default: 10
+                    description: |-
+                      MaxReplicas for KEDA
+                      Only used when Enabled=true AND KEDA available
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  metricType:
+                    default: cpu
+                    description: MetricType determines what metric to use for scaling
+                    enum:
+                    - cpu
+                    - memory
+                    type: string
+                  minReplicas:
+                    default: 1
+                    description: |-
+                      MinReplicas for KEDA (minimum 1 for nginx, cannot scale to zero)
+                      Only used when Enabled=true AND KEDA available
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  pollingInterval:
+                    default: 30
+                    description: PollingInterval in seconds for checking metrics
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  staticReplicas:
+                    default: 1
+                    description: |-
+                      StaticReplicas for non-autoscaled nginx
+                      Used when Enabled=false OR KEDA not available
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  targetAverageValue:
+                    default: "70"
+                    description: |-
+                      TargetAverageValue is the target average value for scaling metric
+                      For CPU: percentage (e.g., "70" means 70%)
+                      For memory: absolute value (e.g., "200Mi")
+                    type: string
+                type: object
               podConfig:
                 description: PodConfig defines advanced pod configuration for all
                   bench components
@@ -2310,6 +2373,29 @@ spec:
                 items:
                   type: string
                 type: array
+              nginxScaling:
+                description: NginxScaling reports scaling mode for nginx
+                properties:
+                  currentReplicas:
+                    description: CurrentReplicas is the actual running replica count
+                    format: int32
+                    type: integer
+                  desiredReplicas:
+                    description: DesiredReplicas is the desired count
+                    format: int32
+                    type: integer
+                  kedaManaged:
+                    description: KEDAManaged indicates if KEDA ScaledObject exists
+                    type: boolean
+                  mode:
+                    description: 'Mode: "autoscaled" or "static"'
+                    type: string
+                required:
+                - currentReplicas
+                - desiredReplicas
+                - kedaManaged
+                - mode
+                type: object
               observedGeneration:
                 description: ObservedGeneration reflects the generation of the most
                   recently observed FrappeBench
