@@ -131,6 +131,12 @@ jobs:
                     --wait \
                     --timeout 10m
 
+            - name: Configure Security Defaults
+              run: |
+                  kubectl -n frappe-operator-system set env deployment/frappe-operator-controller-manager \
+                    FRAPPE_DEFAULT_UID=1001 FRAPPE_DEFAULT_GID=0 FRAPPE_DEFAULT_FSGROUP=1001
+                  kubectl -n frappe-operator-system rollout status deployment/frappe-operator-controller-manager
+
             - name: Deploy Bench with KEDA Worker Autoscaling
               run: |
                   cat <<EOF | kubectl apply -f -
@@ -147,8 +153,11 @@ jobs:
                     apps:
                       - name: erpnext
                         source: image
-
-                    
+                    security:
+                      podSecurityContext:
+                        runAsUser: 1001
+                        runAsGroup: 1001
+                        fsGroup: 1001
                     redisConfig:
                       type: redis
                     
@@ -336,6 +345,12 @@ jobs:
                     --wait \
                     --timeout 10m
 
+            - name: Configure Security Defaults
+              run: |
+                  kubectl -n frappe-operator-system set env deployment/frappe-operator-controller-manager \
+                    FRAPPE_DEFAULT_UID=1001 FRAPPE_DEFAULT_GID=0 FRAPPE_DEFAULT_FSGROUP=1001
+                  kubectl -n frappe-operator-system rollout status deployment/frappe-operator-controller-manager
+
             - name: Deploy Bench with HPA Autoscaling
               run: |
                   cat <<EOF | kubectl apply -f -
@@ -352,7 +367,11 @@ jobs:
                     apps:
                       - name: erpnext
                         source: image
-                    
+                    security:
+                      podSecurityContext:
+                        runAsUser: 1001
+                        runAsGroup: 1001
+                        fsGroup: 1001
                     redisConfig:
                       type: redis
                     
@@ -552,13 +571,19 @@ jobs:
                   REPO="ghcr.io/${{ github.repository }}"
                   helm upgrade --install frappe-operator ./helm/frappe-operator \
                     --set operator.image.repository="$REPO" \
-                    --set operator.image.tag=test-switch \
+                    --set operator.image.tag=test-provider-switch \
                     --set operator.image.pullPolicy=Never \
                     --set mariadb.enabled=true \
                     --namespace frappe-operator-system \
                     --create-namespace \
                     --wait \
                     --timeout 10m
+
+            - name: Configure Security Defaults
+              run: |
+                  kubectl -n frappe-operator-system set env deployment/frappe-operator-controller-manager \
+                    FRAPPE_DEFAULT_UID=1001 FRAPPE_DEFAULT_GID=0 FRAPPE_DEFAULT_FSGROUP=1001
+                  kubectl -n frappe-operator-system rollout status deployment/frappe-operator-controller-manager
 
             - name: Deploy Bench with KEDA (Initial State)
               run: |
@@ -763,6 +788,12 @@ jobs:
                     --create-namespace \
                     --wait \
                     --timeout 10m
+
+            - name: Configure Security Defaults
+              run: |
+                  kubectl -n frappe-operator-system set env deployment/frappe-operator-controller-manager \
+                    FRAPPE_DEFAULT_UID=1001 FRAPPE_DEFAULT_GID=0 FRAPPE_DEFAULT_FSGROUP=1001
+                  kubectl -n frappe-operator-system rollout status deployment/frappe-operator-controller-manager
 
             - name: Deploy Bench with KEDA Provider (Should Fallback to Static)
               run: |
