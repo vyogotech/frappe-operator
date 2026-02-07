@@ -101,51 +101,125 @@ spec:
                   AppsJSON is deprecated, use Apps instead
                   JSON array of app names (e.g., '["erpnext", "hrms"]')
                 type: string
-              componentReplicas:
-                description: ComponentReplicas defines replica counts for each component
-                properties:
-                  gunicorn:
-                    default: 1
-                    description: Gunicorn replicas
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  nginx:
-                    default: 1
-                    description: Nginx replicas
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  socketio:
-                    default: 1
-                    description: Socketio replicas
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  workerDefault:
-                    default: 1
-                    description: |-
-                      WorkerDefault replicas (DEPRECATED: use WorkerAutoscaling instead)
-                      Kept for backward compatibility
-                    format: int32
-                    minimum: 0
-                    type: integer
-                  workerLong:
-                    default: 1
-                    description: |-
-                      WorkerLong replicas (DEPRECATED: use WorkerAutoscaling instead)
-                      Kept for backward compatibility
-                    format: int32
-                    minimum: 0
-                    type: integer
-                  workerShort:
-                    default: 1
-                    description: |-
-                      WorkerShort replicas (DEPRECATED: use WorkerAutoscaling instead)
-                      Kept for backward compatibility
-                    format: int32
-                    minimum: 0
-                    type: integer
+              componentAutoscaling:
+                additionalProperties:
+                  description: |-
+                    ComponentAutoscaling defines scaling configuration for a component
+                    Supports both static replicas and provider-based autoscaling
+                  properties:
+                    cooldownPeriod:
+                      default: 60
+                      description: CooldownPeriod in seconds before scaling down
+                      format: int32
+                      minimum: 0
+                      type: integer
+                    enabled:
+                      default: false
+                      description: |-
+                        Enabled controls whether autoscaling is active
+                        If false, uses StaticReplicas
+                      type: boolean
+                    hpa:
+                      description: |-
+                        HPA contains HPA-specific scaling configuration
+                        Only used when Provider="hpa"
+                      properties:
+                        metric:
+                          default: cpu
+                          description: 'Metric type: "cpu" or "memory"'
+                          enum:
+                          - cpu
+                          - memory
+                          type: string
+                        scaleDownStabilization:
+                          default: 300
+                          description: ScaleDownStabilization in seconds before scaling
+                            down
+                          format: int32
+                          minimum: 0
+                          type: integer
+                        scaleUpStabilization:
+                          default: 0
+                          description: ScaleUpStabilization in seconds before scaling
+                            up
+                          format: int32
+                          minimum: 0
+                          type: integer
+                        targetUtilization:
+                          default: 70
+                          description: TargetUtilization is the target percentage
+                            (0-100)
+                          format: int32
+                          maximum: 100
+                          minimum: 1
+                          type: integer
+                      type: object
+                    keda:
+                      description: |-
+                        KEDA contains KEDA-specific scaling configuration
+                        Only used when Provider="keda"
+                      properties:
+                        metadata:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            Metadata contains trigger-specific configuration
+                            E.g., for redis: {"listName": "rq:queue:short", "address": "..."}
+                          type: object
+                        targetValue:
+                          default: "70"
+                          description: |-
+                            TargetValue is the target value for the trigger
+                            E.g., "70" for CPU%, "5" for queue length
+                          type: string
+                        trigger:
+                          default: cpu
+                          description: 'Trigger type: "cpu", "memory", "redis"'
+                          enum:
+                          - cpu
+                          - memory
+                          - redis
+                          type: string
+                      type: object
+                    maxReplicas:
+                      default: 10
+                      description: MaxReplicas for autoscaling
+                      format: int32
+                      minimum: 1
+                      type: integer
+                    minReplicas:
+                      default: 1
+                      description: |-
+                        MinReplicas for provider-based scaling (minimum 1 for nginx/gunicorn/socketio, 0 for workers)
+                        Only used when Enabled=true AND provider available
+                      format: int32
+                      minimum: 0
+                      type: integer
+                    pollingInterval:
+                      default: 30
+                      description: PollingInterval in seconds for checking metrics
+                      format: int32
+                      minimum: 1
+                      type: integer
+                    provider:
+                      default: hpa
+                      description: Provider selects the scaling backend
+                      enum:
+                      - keda
+                      - hpa
+                      type: string
+                    staticReplicas:
+                      default: 1
+                      description: |-
+                        StaticReplicas for non-autoscaled components
+                        Used when Enabled=false OR provider not available
+                      format: int32
+                      minimum: 0
+                      type: integer
+                  type: object
+                description: |-
+                  ComponentAutoscaling defines scaling configuration for all components
+                  Map keys are component names: nginx, gunicorn, socketio, scheduler, worker-default, worker-long, worker-short
                 type: object
               componentResources:
                 description: ComponentResources defines resource requirements for
@@ -550,69 +624,6 @@ spec:
                     type: string
                   tag:
                     description: Tag is the image tag
-                    type: string
-                type: object
-              nginxAutoscaling:
-                description: |-
-                  NginxAutoscaling defines KEDA-based or static scaling for nginx
-                  Requires KEDA 2.x+ for autoscaling features
-                  If KEDA not available, gracefully falls back to static replicas
-                properties:
-                  cooldownPeriod:
-                    default: 60
-                    description: CooldownPeriod in seconds before scaling down
-                    format: int32
-                    minimum: 0
-                    type: integer
-                  enabled:
-                    default: true
-                    description: |-
-                      Enabled controls whether KEDA autoscaling is active
-                      If false or KEDA not installed, uses StaticReplicas
-                    type: boolean
-                  maxReplicas:
-                    default: 10
-                    description: |-
-                      MaxReplicas for KEDA
-                      Only used when Enabled=true AND KEDA available
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  metricType:
-                    default: cpu
-                    description: MetricType determines what metric to use for scaling
-                    enum:
-                    - cpu
-                    - memory
-                    type: string
-                  minReplicas:
-                    default: 1
-                    description: |-
-                      MinReplicas for KEDA (minimum 1 for nginx, cannot scale to zero)
-                      Only used when Enabled=true AND KEDA available
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  pollingInterval:
-                    default: 30
-                    description: PollingInterval in seconds for checking metrics
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  staticReplicas:
-                    default: 1
-                    description: |-
-                      StaticReplicas for non-autoscaled nginx
-                      Used when Enabled=false OR KEDA not available
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  targetAverageValue:
-                    default: "70"
-                    description: |-
-                      TargetAverageValue is the target average value for scaling metric
-                      For CPU: percentage (e.g., "70" means 70%)
-                      For memory: absolute value (e.g., "200Mi")
                     type: string
                 type: object
               podConfig:
@@ -2125,181 +2136,48 @@ spec:
                 default: 10Gi
                 description: StorageSize for the bench PVC (e.g., "10Gi")
                 type: string
-              workerAutoscaling:
-                description: |-
-                  WorkerAutoscaling defines KEDA-based or static scaling for workers
-                  Requires KEDA 2.x+ for autoscaling features
-                  If KEDA not available, gracefully falls back to static replicas
-                properties:
-                  default:
-                    description: Default worker scaling configuration
-                    properties:
-                      cooldownPeriod:
-                        default: 60
-                        description: CooldownPeriod in seconds before scaling down
-                        format: int32
-                        minimum: 0
-                        type: integer
-                      enabled:
-                        default: true
-                        description: |-
-                          Enabled controls whether KEDA autoscaling is active
-                          If false or KEDA not installed, uses StaticReplicas
-                        type: boolean
-                      maxReplicas:
-                        default: 10
-                        description: |-
-                          MaxReplicas for KEDA
-                          Only used when Enabled=true AND KEDA available
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      minReplicas:
-                        default: 0
-                        description: |-
-                          MinReplicas for KEDA (can be 0 for true serverless)
-                          Only used when Enabled=true AND KEDA available
-                        format: int32
-                        minimum: 0
-                        type: integer
-                      pollingInterval:
-                        default: 30
-                        description: PollingInterval in seconds for checking queue
-                          depth
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      queueLength:
-                        default: 5
-                        description: QueueLength triggers scaling when queue depth
-                          exceeds this value
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      staticReplicas:
-                        default: 1
-                        description: |-
-                          StaticReplicas for non-autoscaled workers
-                          Used when Enabled=false OR KEDA not available
-                        format: int32
-                        minimum: 0
-                        type: integer
-                    type: object
-                  long:
-                    description: Long worker scaling configuration
-                    properties:
-                      cooldownPeriod:
-                        default: 60
-                        description: CooldownPeriod in seconds before scaling down
-                        format: int32
-                        minimum: 0
-                        type: integer
-                      enabled:
-                        default: true
-                        description: |-
-                          Enabled controls whether KEDA autoscaling is active
-                          If false or KEDA not installed, uses StaticReplicas
-                        type: boolean
-                      maxReplicas:
-                        default: 10
-                        description: |-
-                          MaxReplicas for KEDA
-                          Only used when Enabled=true AND KEDA available
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      minReplicas:
-                        default: 0
-                        description: |-
-                          MinReplicas for KEDA (can be 0 for true serverless)
-                          Only used when Enabled=true AND KEDA available
-                        format: int32
-                        minimum: 0
-                        type: integer
-                      pollingInterval:
-                        default: 30
-                        description: PollingInterval in seconds for checking queue
-                          depth
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      queueLength:
-                        default: 5
-                        description: QueueLength triggers scaling when queue depth
-                          exceeds this value
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      staticReplicas:
-                        default: 1
-                        description: |-
-                          StaticReplicas for non-autoscaled workers
-                          Used when Enabled=false OR KEDA not available
-                        format: int32
-                        minimum: 0
-                        type: integer
-                    type: object
-                  short:
-                    description: Short worker scaling configuration
-                    properties:
-                      cooldownPeriod:
-                        default: 60
-                        description: CooldownPeriod in seconds before scaling down
-                        format: int32
-                        minimum: 0
-                        type: integer
-                      enabled:
-                        default: true
-                        description: |-
-                          Enabled controls whether KEDA autoscaling is active
-                          If false or KEDA not installed, uses StaticReplicas
-                        type: boolean
-                      maxReplicas:
-                        default: 10
-                        description: |-
-                          MaxReplicas for KEDA
-                          Only used when Enabled=true AND KEDA available
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      minReplicas:
-                        default: 0
-                        description: |-
-                          MinReplicas for KEDA (can be 0 for true serverless)
-                          Only used when Enabled=true AND KEDA available
-                        format: int32
-                        minimum: 0
-                        type: integer
-                      pollingInterval:
-                        default: 30
-                        description: PollingInterval in seconds for checking queue
-                          depth
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      queueLength:
-                        default: 5
-                        description: QueueLength triggers scaling when queue depth
-                          exceeds this value
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      staticReplicas:
-                        default: 1
-                        description: |-
-                          StaticReplicas for non-autoscaled workers
-                          Used when Enabled=false OR KEDA not available
-                        format: int32
-                        minimum: 0
-                        type: integer
-                    type: object
-                type: object
             required:
             - frappeVersion
             type: object
           status:
             description: FrappeBenchStatus defines the observed state of FrappeBench
             properties:
+              componentScaling:
+                additionalProperties:
+                  description: ComponentScalingStatus reports the scaling status of
+                    a component
+                  properties:
+                    currentReplicas:
+                      description: CurrentReplicas is the actual running replica count
+                      format: int32
+                      type: integer
+                    desiredReplicas:
+                      description: DesiredReplicas is the desired count
+                      format: int32
+                      type: integer
+                    mode:
+                      description: 'Mode: "autoscaled" or "static"'
+                      enum:
+                      - autoscaled
+                      - static
+                      type: string
+                    provider:
+                      description: 'Provider: "keda", "hpa", or "" (static)'
+                      type: string
+                    providerManaged:
+                      description: ProviderManaged indicates if the scaling provider
+                        manages this component
+                      type: boolean
+                  required:
+                  - currentReplicas
+                  - desiredReplicas
+                  - mode
+                  - providerManaged
+                  type: object
+                description: |-
+                  ComponentScaling reports scaling status for all components
+                  Map keys match component names from spec.componentAutoscaling
+                type: object
               conditions:
                 description: Conditions represent the latest available observations
                   of the bench's state
@@ -2373,29 +2251,6 @@ spec:
                 items:
                   type: string
                 type: array
-              nginxScaling:
-                description: NginxScaling reports scaling mode for nginx
-                properties:
-                  currentReplicas:
-                    description: CurrentReplicas is the actual running replica count
-                    format: int32
-                    type: integer
-                  desiredReplicas:
-                    description: DesiredReplicas is the desired count
-                    format: int32
-                    type: integer
-                  kedaManaged:
-                    description: KEDAManaged indicates if KEDA ScaledObject exists
-                    type: boolean
-                  mode:
-                    description: 'Mode: "autoscaled" or "static"'
-                    type: string
-                required:
-                - currentReplicas
-                - desiredReplicas
-                - kedaManaged
-                - mode
-                type: object
               observedGeneration:
                 description: ObservedGeneration reflects the generation of the most
                   recently observed FrappeBench
@@ -2404,33 +2259,6 @@ spec:
               phase:
                 description: Phase represents the current phase of the bench
                 type: string
-              workerScaling:
-                additionalProperties:
-                  description: WorkerScalingStatus reports the scaling status of a
-                    worker
-                  properties:
-                    currentReplicas:
-                      description: CurrentReplicas is the actual running replica count
-                      format: int32
-                      type: integer
-                    desiredReplicas:
-                      description: DesiredReplicas is the desired count
-                      format: int32
-                      type: integer
-                    kedaManaged:
-                      description: KEDAManaged indicates if KEDA ScaledObject exists
-                      type: boolean
-                    mode:
-                      description: 'Mode: "autoscaled" or "static"'
-                      type: string
-                  required:
-                  - currentReplicas
-                  - desiredReplicas
-                  - kedaManaged
-                  - mode
-                  type: object
-                description: WorkerScaling reports scaling mode per worker type
-                type: object
             type: object
         type: object
     served: true

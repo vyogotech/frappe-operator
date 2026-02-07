@@ -35,11 +35,11 @@ func (r *FrappeBenchReconciler) ensureWorkers(ctx context.Context, bench *vyogot
 	logger := log.FromContext(ctx)
 
 	workerTypes := []string{"default", "long", "short"}
-	
+
 	for _, typeName := range workerTypes {
 		componentName := fmt.Sprintf("worker-%s", typeName)
 		queue := typeName
-		
+
 		// Get autoscaling config
 		config := r.getComponentAutoscaling(bench, componentName)
 		config = r.fillComponentDefaults(config, componentName)

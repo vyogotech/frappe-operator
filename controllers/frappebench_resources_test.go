@@ -337,7 +337,6 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 		}
 	})
 
-
 	t.Run("getNginxResources", func(t *testing.T) {
 		bench := &vyogotechv1alpha1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
