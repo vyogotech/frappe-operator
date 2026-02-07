@@ -79,13 +79,13 @@ func (r *FrappeBench) validateBench() error {
 		return fmt.Errorf("at least one app must be specified via apps or appsJSON")
 	}
 
-	// Validate replicas if specified
-	if r.Spec.ComponentReplicas != nil {
-		if r.Spec.ComponentReplicas.Gunicorn < 0 {
-			return fmt.Errorf("componentReplicas.gunicorn must be non-negative")
+	// Component scaling validation
+	for name, config := range r.Spec.ComponentAutoscaling {
+		if config == nil {
+			continue
 		}
-		if r.Spec.ComponentReplicas.Socketio < 0 {
-			return fmt.Errorf("componentReplicas.socketio must be non-negative")
+		if config.StaticReplicas != nil && *config.StaticReplicas < 0 {
+			return fmt.Errorf("componentAutoscaling[%s].staticReplicas must be non-negative", name)
 		}
 	}
 
