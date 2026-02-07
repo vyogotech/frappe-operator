@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -596,8 +597,13 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 // Priority: 1. bench.spec.imageConfig, 2. operator ConfigMap defaults, 3. hardcoded constants
 func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
 	version := bench.Spec.FrappeVersion
+	// Only add 'v' prefix to numeric versions (e.g., "15" -> "v15", but "develop" stays "develop")
 	if version != "" && version != "latest" && !strings.HasPrefix(version, "v") {
-		version = "v" + version
+		// Check if version is numeric (e.g., "15", "14", "16.0.0")
+		isNumeric, _ := regexp.MatchString(`^[\d.]+$`, version)
+		if isNumeric {
+			version = "v" + version
+		}
 	}
 
 	// Priority 1: Check bench-level ImageConfig override
