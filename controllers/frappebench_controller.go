@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -94,6 +95,11 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return result, err
 	} else if !result.IsZero() {
 		return result, nil
+	}
+
+	// Set initial phase if empty
+	if bench.Status.Phase == "" {
+		bench.Status.Phase = "Initializing"
 	}
 
 	// Set progressing condition at start
@@ -480,6 +486,10 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 		if job.Status.Succeeded > 0 {
 			return true, nil
 		}
+		// If job failed, report it early
+		if job.Status.Failed > 0 {
+			return false, fmt.Errorf("bench initialization job %s failed", jobName)
+		}
 		return false, nil
 	}
 	if !errors.IsNotFound(err) {
@@ -521,6 +531,16 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 							Image:   r.getBenchImage(ctx, bench),
 							Command: []string{"bash", "-c"},
 							Args:    []string{initScript},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("512Mi"),
+								},
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("1000m"),
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",
