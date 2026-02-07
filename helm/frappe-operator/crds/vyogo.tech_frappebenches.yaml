@@ -516,6 +516,36 @@ spec:
                       If not specified, uses operator-level default
                     type: boolean
                 type: object
+              gunicornAutoscaling:
+                description: GunicornAutoscaling defines HPA behavior for the Gunicorn
+                  web server
+                properties:
+                  enabled:
+                    description: Enabled toggles autoscaling
+                    type: boolean
+                  maxReplicas:
+                    description: MaxReplicas is the upper limit for the number of
+                      replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  minReplicas:
+                    description: MinReplicas is the lower limit for the number of
+                      replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  targetCPUUtilizationPercentage:
+                    description: TargetCPUUtilizationPercentage is the target average
+                      CPU utilization
+                    format: int32
+                    type: integer
+                  targetMemoryUtilizationPercentage:
+                    description: TargetMemoryUtilizationPercentage is the target average
+                      Memory utilization
+                    format: int32
+                    type: integer
+                type: object
               imageConfig:
                 description: ImageConfig defines the container image configuration
                 properties:
@@ -551,6 +581,36 @@ spec:
                   tag:
                     description: Tag is the image tag
                     type: string
+                type: object
+              nginxAutoscaling:
+                description: NginxAutoscaling defines HPA behavior for the NGINX reverse
+                  proxy (HA)
+                properties:
+                  enabled:
+                    description: Enabled toggles autoscaling
+                    type: boolean
+                  maxReplicas:
+                    description: MaxReplicas is the upper limit for the number of
+                      replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  minReplicas:
+                    description: MinReplicas is the lower limit for the number of
+                      replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  targetCPUUtilizationPercentage:
+                    description: TargetCPUUtilizationPercentage is the target average
+                      CPU utilization
+                    format: int32
+                    type: integer
+                  targetMemoryUtilizationPercentage:
+                    description: TargetMemoryUtilizationPercentage is the target average
+                      Memory utilization
+                    format: int32
+                    type: integer
                 type: object
               podConfig:
                 description: PodConfig defines advanced pod configuration for all
@@ -2054,6 +2114,36 @@ spec:
                   Only applied at operator startup; change requires operator restart.
                 format: int32
                 type: integer
+              socketIOAutoscaling:
+                description: SocketIOAutoscaling defines HPA behavior for the SocketIO
+                  service
+                properties:
+                  enabled:
+                    description: Enabled toggles autoscaling
+                    type: boolean
+                  maxReplicas:
+                    description: MaxReplicas is the upper limit for the number of
+                      replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  minReplicas:
+                    description: MinReplicas is the lower limit for the number of
+                      replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  targetCPUUtilizationPercentage:
+                    description: TargetCPUUtilizationPercentage is the target average
+                      CPU utilization
+                    format: int32
+                    type: integer
+                  targetMemoryUtilizationPercentage:
+                    description: TargetMemoryUtilizationPercentage is the target average
+                      Memory utilization
+                    format: int32
+                    type: integer
+                type: object
               storageClassName:
                 description: StorageClassName allows overriding the storage class
                   for bench PVC

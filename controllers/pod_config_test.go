@@ -9,23 +9,23 @@ import (
 
 func TestApplyPodConfig(t *testing.T) {
 	tests := []struct {
-		name       string
-		podConfig  *vyogotechv1alpha1.PodConfig
-		initial    struct {
+		name      string
+		podConfig *vyogotechv1alpha1.PodConfig
+		initial   struct {
 			labels map[string]string
 		}
-		wantLabels map[string]string
+		wantLabels       map[string]string
 		wantNodeSelector map[string]string
-		wantAffinity *corev1.Affinity
-		wantTolerations []corev1.Toleration
+		wantAffinity     *corev1.Affinity
+		wantTolerations  []corev1.Toleration
 	}{
 		{
 			name: "Basic labels and nodeSelector",
 			podConfig: &vyogotechv1alpha1.PodConfig{
-				Labels: map[string]string{"foo": "bar"},
+				Labels:       map[string]string{"foo": "bar"},
 				NodeSelector: map[string]string{"disk": "ssd"},
 			},
-			wantLabels: map[string]string{"foo": "bar"},
+			wantLabels:       map[string]string{"foo": "bar"},
 			wantNodeSelector: map[string]string{"disk": "ssd"},
 		},
 		{
@@ -33,12 +33,12 @@ func TestApplyPodConfig(t *testing.T) {
 			podConfig: &vyogotechv1alpha1.PodConfig{
 				GeoTag: &vyogotechv1alpha1.GeoTagConfig{
 					Region: "us-east-1",
-					Zone: "us-east-1a",
+					Zone:   "us-east-1a",
 				},
 			},
 			wantLabels: map[string]string{
 				"topology.kubernetes.io/region": "us-east-1",
-				"topology.kubernetes.io/zone": "us-east-1a",
+				"topology.kubernetes.io/zone":   "us-east-1a",
 			},
 			wantAffinity: &corev1.Affinity{
 				NodeAffinity: &corev1.NodeAffinity{
@@ -47,14 +47,14 @@ func TestApplyPodConfig(t *testing.T) {
 							{
 								MatchExpressions: []corev1.NodeSelectorRequirement{
 									{
-										Key: "topology.kubernetes.io/region",
+										Key:      "topology.kubernetes.io/region",
 										Operator: corev1.NodeSelectorOpIn,
-										Values: []string{"us-east-1"},
+										Values:   []string{"us-east-1"},
 									},
 									{
-										Key: "topology.kubernetes.io/zone",
+										Key:      "topology.kubernetes.io/zone",
 										Operator: corev1.NodeSelectorOpIn,
-										Values: []string{"us-east-1a"},
+										Values:   []string{"us-east-1a"},
 									},
 								},
 							},
@@ -86,7 +86,7 @@ func TestApplyPodConfig(t *testing.T) {
 					labels[k] = v
 				}
 			}
-			
+
 			nodeSelector, affinity, tolerations, finalLabels := applyPodConfig(tt.podConfig, labels)
 
 			// Check Labels
