@@ -1,0 +1,29 @@
+# Simple FrappeBench with KEDA autoscaling for E2E testing
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: test-bench-keda
+  namespace: default
+spec:
+  frappeVersion: "15"
+  
+  # Use custom Frappe image
+  imageConfig:
+    repository: ghcr.io/rmallam/frappe_docker
+    tag: sha-ae82c47
+  
+  apps:
+    - name: erpnext
+      source: image
+  
+  componentAutoscaling:
+    nginx:
+      enabled: true
+      provider: keda
+      minReplicas: 1
+      maxReplicas: 3
+      pollingInterval: 15
+      cooldownPeriod: 30
+      keda:
+        trigger: cpu
+        targetValue: "50"

@@ -162,6 +162,7 @@ dist/
 test-*.yaml
 debug-*.yaml
 !config/samples/test-*.yaml
+!examples/test-*.yaml
 
 # Local development databases
 *.db
