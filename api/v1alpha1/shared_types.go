@@ -635,7 +635,7 @@ type NginxAutoscaling struct {
 	// Enabled controls whether KEDA autoscaling is active
 	// If false or KEDA not installed, uses StaticReplicas
 	// +optional
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// StaticReplicas for non-autoscaled nginx
@@ -661,7 +661,7 @@ type NginxAutoscaling struct {
 
 	// TargetAverageValue is the target average value for scaling metric
 	// For CPU: percentage (e.g., "70" means 70%)
-	// For memory: absolute value (e.g., "200Mi")
+	// For memory: percentage (e.g., "80" means 80%) or absolute value (e.g., "200Mi")
 	// +optional
 	// +kubebuilder:default="70"
 	TargetAverageValue string `json:"targetAverageValue,omitempty"`

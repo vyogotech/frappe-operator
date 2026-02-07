@@ -34,6 +34,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	// MetricTypeCPU is the CPU metric type for autoscaling
+	MetricTypeCPU = "cpu"
+	// MetricTypeMemory is the memory metric type for autoscaling
+	MetricTypeMemory = "memory"
+)
+
 // ensureGunicorn ensures the Gunicorn Deployment and Service exist
 func (r *FrappeBenchReconciler) ensureGunicorn(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
 	if err := r.ensureGunicornService(ctx, bench); err != nil {
@@ -519,7 +526,7 @@ scaledObject.SetLabels(r.componentLabels(bench, "nginx"))
 
 // Build trigger based on metric type
 var trigger map[string]interface{}
-if config.MetricType == "memory" {
+if config.MetricType == MetricTypeMemory {
 trigger = map[string]interface{}{
 "type": "memory",
 "metricType": "Utilization",
