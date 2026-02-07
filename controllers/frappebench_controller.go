@@ -215,9 +215,9 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	r.Recorder.Event(bench, corev1.EventTypeNormal, "WorkersReady", "Worker deployments created")
 
-	// Update worker scaling status
-	if err := r.updateWorkerScalingStatus(ctx, bench); err != nil {
-		logger.Error(err, "Failed to update worker scaling status")
+	// Update component scaling status
+	if err := r.updateComponentScalingStatus(ctx, bench); err != nil {
+		logger.Error(err, "Failed to update component scaling status")
 		// Don't fail the reconciliation, just log the error
 	}
 
@@ -626,41 +626,48 @@ func (r *FrappeBenchReconciler) parseAppsJSON(appsJSON string) []vyogotechv1alph
 	return apps
 }
 
-// updateBenchStatus updates the FrappeBench status
-// updateWorkerScalingStatus updates the status with current worker scaling information
-func (r *FrappeBenchReconciler) updateWorkerScalingStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+// updateComponentScalingStatus updates the status with current component scaling information
+func (r *FrappeBenchReconciler) updateComponentScalingStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
-	if bench.Status.WorkerScaling == nil {
-		bench.Status.WorkerScaling = make(map[string]vyogotechv1alpha1.WorkerScalingStatus)
+	if bench.Status.ComponentScaling == nil {
+		bench.Status.ComponentScaling = make(map[string]*vyogotechv1alpha1.ComponentScalingStatus)
 	}
 
-	kedaAvailable := r.isKEDAAvailable(ctx)
-	workerTypes := []string{"default", "long", "short"}
+	components := []string{"gunicorn", "nginx", "socketio", "worker-default", "worker-long", "worker-short"}
 
-	for _, workerType := range workerTypes {
-		// Get the deployment
-		deployName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
+	for _, componentName := range components {
+		deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)
 		deploy := &appsv1.Deployment{}
 		err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				continue // Worker not created yet
+				continue
 			}
-			logger.Error(err, "Failed to get worker deployment", "worker", workerType)
+			logger.Error(err, "Failed to get deployment for status update", "component", componentName)
 			continue
 		}
 
 		// Get autoscaling config
-		config := r.getWorkerAutoscalingConfig(bench, workerType)
-		config = r.fillAutoscalingDefaults(config, workerType)
+		config := r.getComponentAutoscaling(bench, componentName)
+		config = r.fillComponentDefaults(config, componentName)
 
-		// Determine mode and replicas
+		// Resolve provider and check availability
+		var provider ScalingProvider
+		if config.Enabled != nil && *config.Enabled && config.Provider != "" {
+			provider = resolveProvider(config.Provider, r.Client, r.Scheme)
+		}
+
+		providerAvailable := false
+		if provider != nil {
+			providerAvailable = provider.IsAvailable(ctx)
+		}
+
 		mode := "static"
-		kedaManaged := false
-		if kedaAvailable && config.Enabled != nil && *config.Enabled {
+		providerManaged := false
+		if providerAvailable && config.Enabled != nil && *config.Enabled {
 			mode = "autoscaled"
-			kedaManaged = true
+			providerManaged = true
 		}
 
 		currentReplicas := int32(0)
@@ -674,15 +681,15 @@ func (r *FrappeBenchReconciler) updateWorkerScalingStatus(ctx context.Context, b
 		}
 
 		// Update status
-		bench.Status.WorkerScaling[workerType] = vyogotechv1alpha1.WorkerScalingStatus{
+		bench.Status.ComponentScaling[componentName] = &vyogotechv1alpha1.ComponentScalingStatus{
 			Mode:            mode,
 			CurrentReplicas: currentReplicas,
 			DesiredReplicas: desiredReplicas,
-			KEDAManaged:     kedaManaged,
+			ProviderManaged: providerManaged,
 		}
 	}
 
-	return nil // Status will be updated in updateBenchStatus
+	return nil
 }
 
 func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, gitEnabled bool, fpmRepos []vyogotechv1alpha1.FPMRepository) error {

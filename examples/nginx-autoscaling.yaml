@@ -1,206 +1,72 @@
-# Example: FrappeBench with KEDA-based Nginx Autoscaling
-#
-# This example demonstrates nginx autoscaling with KEDA based on CPU or memory metrics.
-# Nginx can scale between min and max replicas based on resource utilization.
-#
-# Prerequisites:
-# - KEDA 2.x+ installed in the cluster (optional, gracefully falls back to static)
-# - Metrics server installed for CPU/memory metrics
+# Example: FrappeBench with Advanced Component Autoscaling
+# Demonstrates mixing HPA (for web) and KEDA (for workers) in a single bench
 
----
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
-  name: production-bench-nginx-autoscale
+  name: advanced-autoscale-bench
   namespace: frappe
 spec:
-  # Bench configuration
-  frappeVersion: "15"
+  frappeVersion: "version-15"
   
   apps:
     - name: erpnext
-      source: fpm
-      org: frappe
-      version: "15.0.0"
+      source: image
 
-  # Redis configuration
-  redisConfig:
-    type: redis
-    image: redis:7-alpine
-
-  # Nginx Autoscaling Configuration (CPU-based)
-  nginxAutoscaling:
-    enabled: true              # Enable KEDA autoscaling
-    minReplicas: 1             # Minimum 1 replica (nginx cannot scale to zero)
-    maxReplicas: 10            # Scale up to 10 replicas under load
-    targetAverageValue: "70"   # Target 70% CPU utilization
-    metricType: cpu            # Use CPU metric (default)
-    cooldownPeriod: 60         # Wait 60s before scaling down
-    pollingInterval: 30        # Check metrics every 30s
-
-  # Resource limits for nginx (required for CPU-based scaling)
-  componentResources:
+  # Unified Component Autoscaling API
+  componentAutoscaling:
+    # Nginx: Standard HPA (CPU-based)
     nginx:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 500m
-        memory: 256Mi
-
----
-# Example: Memory-based nginx autoscaling
-apiVersion: vyogo.tech/v1alpha1
-kind: FrappeBench
-metadata:
-  name: production-bench-nginx-memory
-  namespace: frappe
-spec:
-  frappeVersion: "15"
-  
-  apps:
-    - name: erpnext
-      source: fpm
-      org: frappe
-      version: "15.0.0"
-
-  redisConfig:
-    type: redis
-
-  # Nginx Autoscaling Configuration (Memory-based)
-  nginxAutoscaling:
-    enabled: true
-    minReplicas: 2             # Start with 2 replicas
-    maxReplicas: 15            # Scale up to 15 replicas
-    targetAverageValue: "80"   # Target 80% memory utilization
-    metricType: memory         # Use memory metric
-    cooldownPeriod: 120        # Wait 2 minutes before scaling down
-    pollingInterval: 30
-
-  componentResources:
-    nginx:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 500m
-        memory: 256Mi
-
----
-# Example: Static replicas (autoscaling disabled)
-apiVersion: vyogo.tech/v1alpha1
-kind: FrappeBench
-metadata:
-  name: development-bench-nginx-static
-  namespace: frappe
-spec:
-  frappeVersion: "15"
-  
-  apps:
-    - name: erpnext
-      source: fpm
-      org: frappe
-      version: "15.0.0"
-
-  redisConfig:
-    type: redis
-
-  # Nginx with static replicas (no autoscaling)
-  nginxAutoscaling:
-    enabled: false
-    staticReplicas: 3          # Always maintain 3 replicas
-
----
-# Example: Combined worker and nginx autoscaling
-apiVersion: vyogo.tech/v1alpha1
-kind: FrappeBench
-metadata:
-  name: production-bench-full-autoscale
-  namespace: frappe
-spec:
-  frappeVersion: "15"
-  
-  apps:
-    - name: erpnext
-      source: fpm
-      org: frappe
-      version: "15.0.0"
-
-  redisConfig:
-    type: redis
-    image: redis:7-alpine
-
-  # Worker Autoscaling (Redis queue-based)
-  workerAutoscaling:
-    short:
       enabled: true
-      minReplicas: 0             # Scale to zero when no jobs
+      provider: hpa
+      minReplicas: 2
       maxReplicas: 10
-      queueLength: 5
-      cooldownPeriod: 60
-    long:
+      hpa:
+        metric: cpu
+        targetUtilization: 70
+
+    # Gunicorn: Standard HPA (Memory-based)
+    gunicorn:
       enabled: true
-      minReplicas: 0
+      provider: hpa
+      minReplicas: 2
+      maxReplicas: 8
+      hpa:
+        metric: memory
+        targetUtilization: 80
+
+    # Short Workers: KEDA (Redis queue-based) with Scale-to-Zero
+    worker-short:
+      enabled: true
+      provider: keda
+      minReplicas: 0        # Save costs by scaling to zero when idle
+      maxReplicas: 20
+      pollingInterval: 15
+      cooldownPeriod: 60
+      keda:
+        trigger: redis
+        targetValue: "5"    # Scale up when queue length exceeds 5
+
+    # Long Workers: KEDA (Redis queue-based)
+    worker-long:
+      enabled: true
+      provider: keda
+      minReplicas: 1        # Maintain at least 1 for heavy background tasks
       maxReplicas: 5
-      queueLength: 2
-      cooldownPeriod: 300
-    default:
+      keda:
+        trigger: redis
+        targetValue: "2"
+
+    # Default/Scheduler Worker: Static Replicas (No autoscaling)
+    worker-default:
       enabled: false
-      staticReplicas: 1          # Scheduler always runs
+      staticReplicas: 1
 
-  # Nginx Autoscaling (CPU-based)
-  nginxAutoscaling:
-    enabled: true
-    minReplicas: 2               # Keep at least 2 for high availability
-    maxReplicas: 10
-    targetAverageValue: "70"
-    metricType: cpu
-    cooldownPeriod: 60
-    pollingInterval: 30
-
-  # Resource configuration
+  # Resource limits (Required for HPA CPU/Memory scaling)
   componentResources:
     nginx:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 500m
-        memory: 256Mi
+      requests: {cpu: "100m", memory: "128Mi"}
+      limits: {cpu: "500m", memory: "256Mi"}
     gunicorn:
-      requests:
-        cpu: 200m
-        memory: 512Mi
-      limits:
-        cpu: 1000m
-        memory: 2Gi
-
----
-# Example: Legacy configuration (backward compatible)
-# Using the deprecated ComponentReplicas field
-apiVersion: vyogo.tech/v1alpha1
-kind: FrappeBench
-metadata:
-  name: legacy-bench-nginx
-  namespace: frappe
-spec:
-  frappeVersion: "15"
-  
-  apps:
-    - name: erpnext
-      source: fpm
-      org: frappe
-      version: "15.0.0"
-
-  redisConfig:
-    type: redis
-
-  # Legacy configuration (DEPRECATED but still supported)
-  # These values are automatically converted to static replicas
-  componentReplicas:
-    nginx: 2
-    gunicorn: 2
-    socketio: 1
-    workerShort: 2
-    workerLong: 1
-    workerDefault: 1
+      requests: {cpu: "500m", memory: "1Gi"}
+      limits: {cpu: "1000m", memory: "2Gi"}

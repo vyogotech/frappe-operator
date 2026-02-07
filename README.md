@@ -15,7 +15,7 @@ A production-ready Kubernetes operator that automates deployment, scaling, and m
 - **Multi-Tenancy** - Run hundreds of sites on shared infrastructure
 - **Site-Specific Apps** - Install different apps per site with graceful degradation
 - **Secure by Default** - Auto-generated credentials, per-site DB isolation
-- **Production-Ready** - Auto-scaling, zero-downtime updates, automated backups
+- **Production-Ready** - Provider-agnostic auto-scaling (KEDA/HPA), zero-downtime updates, automated backups
 - **Multi-Platform** - ARM64/AMD64 support
 - **Enterprise-Grade** - Fully compatible with OpenShift `restricted-v2` SCCs
 

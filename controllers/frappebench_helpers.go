@@ -50,47 +50,6 @@ func (r *FrappeBenchReconciler) getRedisImage(bench *vyogotechv1alpha1.FrappeBen
 
 // Replica getters
 
-func (r *FrappeBenchReconciler) getGunicornReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil {
-		return bench.Spec.ComponentReplicas.Gunicorn
-	}
-	return 1
-}
-
-func (r *FrappeBenchReconciler) getNginxReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil {
-		return bench.Spec.ComponentReplicas.Nginx
-	}
-	return 1
-}
-
-func (r *FrappeBenchReconciler) getSocketIOReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil {
-		return bench.Spec.ComponentReplicas.Socketio
-	}
-	return 1
-}
-
-func (r *FrappeBenchReconciler) getWorkerDefaultReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil {
-		return bench.Spec.ComponentReplicas.WorkerDefault
-	}
-	return 1
-}
-
-func (r *FrappeBenchReconciler) getWorkerLongReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil {
-		return bench.Spec.ComponentReplicas.WorkerLong
-	}
-	return 1
-}
-
-func (r *FrappeBenchReconciler) getWorkerShortReplicas(bench *vyogotechv1alpha1.FrappeBench) int32 {
-	if bench.Spec.ComponentReplicas != nil {
-		return bench.Spec.ComponentReplicas.WorkerShort
-	}
-	return 1
-}
 
 // Resource getters
 
@@ -248,103 +207,30 @@ func (r *FrappeBenchReconciler) getWorkerShortResources(bench *vyogotechv1alpha1
 
 // Autoscaling configuration helpers
 
-// getWorkerAutoscalingConfig returns the autoscaling config for a specific worker type
-// Falls back to legacy ComponentReplicas if WorkerAutoscaling not configured
-func (r *FrappeBenchReconciler) getWorkerAutoscalingConfig(bench *vyogotechv1alpha1.FrappeBench, workerType string) *vyogotechv1alpha1.WorkerAutoscaling {
-	// Return configured autoscaling if available
-	if bench.Spec.WorkerAutoscaling != nil {
-		switch workerType {
-		case "short":
-			if bench.Spec.WorkerAutoscaling.Short != nil {
-				return bench.Spec.WorkerAutoscaling.Short
-			}
-		case "long":
-			if bench.Spec.WorkerAutoscaling.Long != nil {
-				return bench.Spec.WorkerAutoscaling.Long
-			}
-		case "default":
-			if bench.Spec.WorkerAutoscaling.Default != nil {
-				return bench.Spec.WorkerAutoscaling.Default
-			}
-		}
-	}
+// Autoscaling configuration helpers
 
-	// Fall back to legacy ComponentReplicas
-	if bench.Spec.ComponentReplicas != nil {
-		config := &vyogotechv1alpha1.WorkerAutoscaling{
-			Enabled: boolPtr(false), // Legacy is always static
-		}
-		switch workerType {
-		case "short":
-			if bench.Spec.ComponentReplicas.WorkerShort > 0 {
-				config.StaticReplicas = int32Ptr(bench.Spec.ComponentReplicas.WorkerShort)
-			} else {
-				config.StaticReplicas = int32Ptr(2)
-			}
-		case "long":
-			if bench.Spec.ComponentReplicas.WorkerLong > 0 {
-				config.StaticReplicas = int32Ptr(bench.Spec.ComponentReplicas.WorkerLong)
-			} else {
-				config.StaticReplicas = int32Ptr(1)
-			}
-		case "default":
-			if bench.Spec.ComponentReplicas.WorkerDefault > 0 {
-				config.StaticReplicas = int32Ptr(bench.Spec.ComponentReplicas.WorkerDefault)
-			} else {
-				config.StaticReplicas = int32Ptr(1)
-			}
-		}
-		return config
-	}
-
-	// Return nil to use defaults
-	return nil
-}
-
-// getDefaultAutoscalingConfig returns opinionated defaults for each worker type
-func (r *FrappeBenchReconciler) getDefaultAutoscalingConfig(workerType string) *vyogotechv1alpha1.WorkerAutoscaling {
-	switch workerType {
-	case "short":
-		// Short jobs: scale-to-zero with aggressive scaling
-		return &vyogotechv1alpha1.WorkerAutoscaling{
-			Enabled:         boolPtr(true),
-			MinReplicas:     int32Ptr(0),
-			MaxReplicas:     int32Ptr(10),
-			QueueLength:     int32Ptr(5),
-			CooldownPeriod:  int32Ptr(60),
-			PollingInterval: int32Ptr(15),
-		}
-	case "long":
-		// Long jobs: scale-to-zero with conservative scaling
-		return &vyogotechv1alpha1.WorkerAutoscaling{
-			Enabled:         boolPtr(true),
-			MinReplicas:     int32Ptr(0),
-			MaxReplicas:     int32Ptr(5),
-			QueueLength:     int32Ptr(2),
-			CooldownPeriod:  int32Ptr(300),
-			PollingInterval: int32Ptr(30),
-		}
-	case "default":
-		// Default/scheduler: always one replica (scheduler must run)
-		return &vyogotechv1alpha1.WorkerAutoscaling{
-			Enabled:        boolPtr(false),
-			StaticReplicas: int32Ptr(1),
+// getComponentAutoscaling gets the autoscaling config for a component
+func (r *FrappeBenchReconciler) getComponentAutoscaling(bench *vyogotechv1alpha1.FrappeBench, componentName string) *vyogotechv1alpha1.ComponentAutoscaling {
+	if bench.Spec.ComponentAutoscaling != nil {
+		if config, exists := bench.Spec.ComponentAutoscaling[componentName]; exists && config != nil {
+			return config
 		}
 	}
 	return nil
 }
 
-// fillAutoscalingDefaults fills in missing fields with defaults
-func (r *FrappeBenchReconciler) fillAutoscalingDefaults(config *vyogotechv1alpha1.WorkerAutoscaling, workerType string) *vyogotechv1alpha1.WorkerAutoscaling {
+// fillComponentDefaults fills in default values for a component's autoscaling config
+func (r *FrappeBenchReconciler) fillComponentDefaults(config *vyogotechv1alpha1.ComponentAutoscaling, componentName string) *vyogotechv1alpha1.ComponentAutoscaling {
 	if config == nil {
-		return r.getDefaultAutoscalingConfig(workerType)
+		return r.getComponentDefaults(componentName)
 	}
 
-	result := &vyogotechv1alpha1.WorkerAutoscaling{}
+	result := &vyogotechv1alpha1.ComponentAutoscaling{}
 	*result = *config
 
-	// Fill in defaults
-	defaults := r.getDefaultAutoscalingConfig(workerType)
+	defaults := r.getComponentDefaults(componentName)
+
+	// Fill in missing fields with defaults
 	if result.Enabled == nil {
 		result.Enabled = defaults.Enabled
 	}
@@ -357,35 +243,156 @@ func (r *FrappeBenchReconciler) fillAutoscalingDefaults(config *vyogotechv1alpha
 	if result.StaticReplicas == nil {
 		result.StaticReplicas = defaults.StaticReplicas
 	}
-	if result.QueueLength == nil {
-		result.QueueLength = defaults.QueueLength
-	}
 	if result.CooldownPeriod == nil {
 		result.CooldownPeriod = defaults.CooldownPeriod
 	}
 	if result.PollingInterval == nil {
 		result.PollingInterval = defaults.PollingInterval
 	}
+	if result.Provider == "" {
+		result.Provider = defaults.Provider
+	}
+	if result.KEDA == nil && defaults.KEDA != nil {
+		result.KEDA = defaults.KEDA
+	}
+	if result.HPA == nil && defaults.HPA != nil {
+		result.HPA = defaults.HPA
+	}
 
 	return result
 }
 
-// getWorkerReplicaCount determines the replica count based on scaling mode
-func (r *FrappeBenchReconciler) getWorkerReplicaCount(config *vyogotechv1alpha1.WorkerAutoscaling, kedaAvailable bool) int32 {
-	// If KEDA autoscaling enabled and available, use MinReplicas
-	if config.Enabled != nil && *config.Enabled && kedaAvailable {
+// getComponentDefaults returns opinionated defaults per component
+func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyogotechv1alpha1.ComponentAutoscaling {
+	defaults := map[string]*vyogotechv1alpha1.ComponentAutoscaling{
+		"nginx": {
+			Enabled:        boolPtr(false),
+			StaticReplicas: int32Ptr(1),
+			MinReplicas:    int32Ptr(1),
+			MaxReplicas:    int32Ptr(10),
+			CooldownPeriod: int32Ptr(60),
+			PollingInterval: int32Ptr(30),
+			Provider:       "hpa",
+			HPA: &vyogotechv1alpha1.HPAScalingConfig{
+				Metric:                 "cpu",
+				TargetUtilization:      int32Ptr(70),
+				ScaleUpStabilization:   int32Ptr(0),
+				ScaleDownStabilization: int32Ptr(300),
+			},
+		},
+		"gunicorn": {
+			Enabled:        boolPtr(false),
+			StaticReplicas: int32Ptr(1),
+			MinReplicas:    int32Ptr(2),
+			MaxReplicas:    int32Ptr(10),
+			CooldownPeriod: int32Ptr(60),
+			PollingInterval: int32Ptr(30),
+			Provider:       "hpa",
+			HPA: &vyogotechv1alpha1.HPAScalingConfig{
+				Metric:                 "cpu",
+				TargetUtilization:      int32Ptr(70),
+				ScaleUpStabilization:   int32Ptr(0),
+				ScaleDownStabilization: int32Ptr(300),
+			},
+		},
+		"socketio": {
+			Enabled:        boolPtr(false),
+			StaticReplicas: int32Ptr(1),
+			MinReplicas:    int32Ptr(1),
+			MaxReplicas:    int32Ptr(5),
+			CooldownPeriod: int32Ptr(60),
+			PollingInterval: int32Ptr(30),
+			Provider:       "hpa",
+			HPA: &vyogotechv1alpha1.HPAScalingConfig{
+				Metric:                 "cpu",
+				TargetUtilization:      int32Ptr(70),
+				ScaleUpStabilization:   int32Ptr(0),
+				ScaleDownStabilization: int32Ptr(300),
+			},
+		},
+		"scheduler": {
+			Enabled:        boolPtr(false),
+			StaticReplicas: int32Ptr(1),
+			MinReplicas:    int32Ptr(1),
+			MaxReplicas:    int32Ptr(1), // Always 1
+			CooldownPeriod: int32Ptr(60),
+			PollingInterval: int32Ptr(30),
+			// No provider for scheduler
+		},
+		"worker-short": {
+			Enabled:        boolPtr(false),
+			StaticReplicas: int32Ptr(1),
+			MinReplicas:    int32Ptr(0),
+			MaxReplicas:    int32Ptr(10),
+			CooldownPeriod: int32Ptr(60),
+			PollingInterval: int32Ptr(30),
+			Provider:       "keda",
+			KEDA: &vyogotechv1alpha1.KEDAScalingConfig{
+				Trigger:     "redis",
+				TargetValue: "5",
+			},
+		},
+		"worker-long": {
+			Enabled:        boolPtr(false),
+			StaticReplicas: int32Ptr(1),
+			MinReplicas:    int32Ptr(0),
+			MaxReplicas:    int32Ptr(5),
+			CooldownPeriod: int32Ptr(60),
+			PollingInterval: int32Ptr(30),
+			Provider:       "keda",
+			KEDA: &vyogotechv1alpha1.KEDAScalingConfig{
+				Trigger:     "redis",
+				TargetValue: "2",
+			},
+		},
+		"worker-default": {
+			Enabled:        boolPtr(false),
+			StaticReplicas: int32Ptr(1),
+			MinReplicas:    int32Ptr(0),
+			MaxReplicas:    int32Ptr(5),
+			CooldownPeriod: int32Ptr(60),
+			PollingInterval: int32Ptr(30),
+			Provider:       "keda",
+			KEDA: &vyogotechv1alpha1.KEDAScalingConfig{
+				Trigger:     "redis",
+				TargetValue: "5",
+			},
+		},
+	}
+
+	if def, ok := defaults[componentName]; ok {
+		return def
+	}
+
+	// Safe fallback for unknown components
+	return &vyogotechv1alpha1.ComponentAutoscaling{
+		Enabled:        boolPtr(false),
+		StaticReplicas: int32Ptr(1),
+		MinReplicas:    int32Ptr(1),
+		MaxReplicas:    int32Ptr(10),
+		CooldownPeriod: int32Ptr(60),
+		PollingInterval: int32Ptr(30),
+	}
+}
+
+// getComponentReplicaCount determines the replica count based on scaling mode
+func (r *FrappeBenchReconciler) getComponentReplicaCount(config *vyogotechv1alpha1.ComponentAutoscaling, providerManaged bool) int32 {
+	if config == nil {
+		return 1
+	}
+
+	// If provider is managing (autoscaling enabled and available), use MinReplicas
+	if providerManaged && config.Enabled != nil && *config.Enabled {
 		if config.MinReplicas != nil {
 			return *config.MinReplicas
 		}
-		return 0 // Default to scale-to-zero
+		return 1
 	}
 
-	// Otherwise use static replicas
+	// Otherwise use StaticReplicas
 	if config.StaticReplicas != nil {
 		return *config.StaticReplicas
 	}
-
-	// Fallback
 	return 1
 }
 
@@ -450,92 +457,3 @@ func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotec
 	return secCtx
 }
 
-// Nginx autoscaling helper functions
-
-// getNginxAutoscalingConfig returns the nginx autoscaling configuration
-func (r *FrappeBenchReconciler) getNginxAutoscalingConfig(bench *vyogotechv1alpha1.FrappeBench) *vyogotechv1alpha1.NginxAutoscaling {
-// Return configured autoscaling if available
-if bench.Spec.NginxAutoscaling != nil {
-return bench.Spec.NginxAutoscaling
-}
-
-// Fall back to legacy ComponentReplicas for nginx
-if bench.Spec.ComponentReplicas != nil && bench.Spec.ComponentReplicas.Nginx > 0 {
-return &vyogotechv1alpha1.NginxAutoscaling{
-Enabled:        boolPtr(false), // Legacy is always static
-StaticReplicas: int32Ptr(bench.Spec.ComponentReplicas.Nginx),
-}
-}
-
-return nil
-}
-
-// fillNginxAutoscalingDefaults fills in default values for nginx autoscaling configuration
-func (r *FrappeBenchReconciler) fillNginxAutoscalingDefaults(config *vyogotechv1alpha1.NginxAutoscaling) *vyogotechv1alpha1.NginxAutoscaling {
-if config == nil {
-return r.getDefaultNginxAutoscalingConfig()
-}
-
-result := &vyogotechv1alpha1.NginxAutoscaling{}
-*result = *config
-
-// Fill in defaults
-defaults := r.getDefaultNginxAutoscalingConfig()
-if result.Enabled == nil {
-result.Enabled = defaults.Enabled
-}
-if result.MinReplicas == nil {
-result.MinReplicas = defaults.MinReplicas
-}
-if result.MaxReplicas == nil {
-result.MaxReplicas = defaults.MaxReplicas
-}
-if result.StaticReplicas == nil {
-result.StaticReplicas = defaults.StaticReplicas
-}
-if result.TargetAverageValue == "" {
-result.TargetAverageValue = defaults.TargetAverageValue
-}
-if result.MetricType == "" {
-result.MetricType = defaults.MetricType
-}
-if result.CooldownPeriod == nil {
-result.CooldownPeriod = defaults.CooldownPeriod
-}
-if result.PollingInterval == nil {
-result.PollingInterval = defaults.PollingInterval
-}
-
-return result
-}
-
-// getDefaultNginxAutoscalingConfig returns the default nginx autoscaling configuration
-func (r *FrappeBenchReconciler) getDefaultNginxAutoscalingConfig() *vyogotechv1alpha1.NginxAutoscaling {
-return &vyogotechv1alpha1.NginxAutoscaling{
-Enabled:            boolPtr(false),  // Disabled by default for backward compatibility
-StaticReplicas:     int32Ptr(1),     // Default to 1 static replica
-MinReplicas:        int32Ptr(1),     // Minimum 1 replica (nginx cannot scale to zero)
-MaxReplicas:        int32Ptr(10),    // Maximum 10 replicas
-TargetAverageValue: "70",            // 70% CPU utilization
-MetricType:         "cpu",           // Use CPU by default
-CooldownPeriod:     int32Ptr(60),    // 60 seconds cooldown
-PollingInterval:    int32Ptr(30),    // Check every 30 seconds
-}
-}
-
-// getNginxReplicaCount determines the replica count based on scaling mode
-func (r *FrappeBenchReconciler) getNginxReplicaCount(config *vyogotechv1alpha1.NginxAutoscaling, kedaAvailable bool) int32 {
-// If KEDA autoscaling enabled and available, use MinReplicas
-if config.Enabled != nil && *config.Enabled && kedaAvailable {
-if config.MinReplicas != nil {
-return *config.MinReplicas
-}
-return 1 // Default minimum
-}
-
-// Otherwise use static replicas
-if config.StaticReplicas != nil {
-return *config.StaticReplicas
-}
-return 1 // Default
-}
