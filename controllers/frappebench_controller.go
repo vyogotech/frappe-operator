@@ -172,7 +172,28 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		})
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
+
+	// Initialization complete, update status to Ready immediately
+	logger.Info("Bench initialization completed, updating status to Ready")
 	r.Recorder.Event(bench, corev1.EventTypeNormal, "Initialized", "Bench initialization completed")
+	bench.Status.Phase = "Ready"
+	r.setCondition(bench, metav1.Condition{
+		Type:    "Ready",
+		Status:  metav1.ConditionTrue,
+		Reason:  "Initialized",
+		Message: "FrappeBench is ready and initialized",
+	})
+	r.setCondition(bench, metav1.Condition{
+		Type:    "Initialized",
+		Status:  metav1.ConditionTrue,
+		Reason:  "InitCompleted",
+		Message: "Initialization job completed successfully",
+	})
+	// Persist the status update
+	if err := r.updateStatus(ctx, bench); err != nil {
+		logger.Error(err, "Failed to update status after initialization")
+		return ctrl.Result{}, err
+	}
 
 	// Ensure Redis
 	if err := r.ensureRedis(ctx, bench); err != nil {
