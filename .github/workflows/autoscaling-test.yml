@@ -203,27 +203,19 @@ jobs:
 
             - name: Wait for ScaledObjects to be Created
               run: |
-                  echo "Waiting for bench initialization first..."
-                  for i in {1..60}; do
+                  echo "Waiting for bench to be fully ready (init + all resources)..."
+                  for i in {1..90}; do
                     PHASE=$(kubectl get frappebench test-keda-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-                    echo "Bench Phase: $PHASE (iteration $i/60)"
+                    echo "Bench Phase: $PHASE (iteration $i/90)"
                     
                     # Check if init job exists and its status
                     INIT_JOB=$(kubectl get job test-keda-bench-init -n default --ignore-not-found -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
                     if [ -n "$INIT_JOB" ]; then
                       JOB_SUCCEEDED=$(kubectl get job test-keda-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
                       JOB_FAILED=$(kubectl get job test-keda-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
-                      # Fallback to 0 if empty
                       [ -z "$JOB_SUCCEEDED" ] && JOB_SUCCEEDED=0
                       [ -z "$JOB_FAILED" ] && JOB_FAILED=0
                       echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"
-                      
-                      if [ $((i % 5)) -eq 0 ]; then
-                        echo "Init Job Pod Status:"
-                        kubectl get pods -l job-name=test-keda-bench-init -n default || true
-                        echo "Init Job Logs snippet:"
-                        kubectl logs job/test-keda-bench-init -n default --tail=20 || true
-                      fi
                       
                       if [ "$JOB_FAILED" -ge 1 ]; then
                         echo "ERROR: Initialization job failed!"
@@ -231,10 +223,15 @@ jobs:
                         kubectl logs job/test-keda-bench-init -n default || true
                         exit 1
                       fi
+                      
+                      # If init succeeded, explain what's happening
+                      if [ "$JOB_SUCCEEDED" -ge 1 ] && [ "$PHASE" != "Ready" ]; then
+                        echo "Init job completed. Waiting for controller to create all resources (Redis, Nginx, Workers, etc.)..."
+                      fi
                     fi
                     
                     if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Running" ]; then
-                      echo "Bench initialized, now checking for ScaledObjects..."
+                      echo "Bench is Ready! Now checking for ScaledObjects..."
                       break
                     fi
                     sleep 10
@@ -421,27 +418,19 @@ jobs:
 
             - name: Wait for HPAs to be Created
               run: |
-                  echo "Waiting for bench initialization first..."
-                  for i in {1..60}; do
+                  echo "Waiting for bench to be fully ready (init + all resources)..."
+                  for i in {1..90}; do
                     PHASE=$(kubectl get frappebench test-hpa-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-                    echo "Bench Phase: $PHASE (iteration $i/60)"
+                    echo "Bench Phase: $PHASE (iteration $i/90)"
                     
                     # Check if init job exists and its status
                     INIT_JOB=$(kubectl get job test-hpa-bench-init -n default --ignore-not-found -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
                     if [ -n "$INIT_JOB" ]; then
                       JOB_SUCCEEDED=$(kubectl get job test-hpa-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
                       JOB_FAILED=$(kubectl get job test-hpa-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
-                      # Fallback to 0 if empty
                       [ -z "$JOB_SUCCEEDED" ] && JOB_SUCCEEDED=0
                       [ -z "$JOB_FAILED" ] && JOB_FAILED=0
                       echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"
-                      
-                      if [ $((i % 5)) -eq 0 ]; then
-                        echo "Init Job Pod Status:"
-                        kubectl get pods -l job-name=test-hpa-bench-init -n default || true
-                        echo "Init Job Logs snippet:"
-                        kubectl logs job/test-hpa-bench-init -n default --tail=20 || true
-                      fi
                       
                       if [ "$JOB_FAILED" -ge 1 ]; then
                         echo "ERROR: Initialization job failed!"
@@ -449,10 +438,15 @@ jobs:
                         kubectl logs job/test-hpa-bench-init -n default || true
                         exit 1
                       fi
+                      
+                      # If init succeeded, explain what's happening
+                      if [ "$JOB_SUCCEEDED" -ge 1 ] && [ "$PHASE" != "Ready" ]; then
+                        echo "Init job completed. Waiting for controller to create all resources (Redis, Nginx, Workers, etc.)..."
+                      fi
                     fi
                     
                     if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Running" ]; then
-                      echo "Bench initialized, now checking for HPAs..."
+                      echo "Bench is Ready! Now checking for HPAs..."
                       break
                     fi
                     sleep 10
@@ -618,27 +612,19 @@ jobs:
 
             - name: Verify KEDA ScaledObject Created
               run: |
-                  echo "Waiting for bench initialization first..."
-                  for i in {1..60}; do
+                  echo "Waiting for bench to be fully ready (init + all resources)..."
+                  for i in {1..90}; do
                     PHASE=$(kubectl get frappebench test-switch-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-                    echo "Bench Phase: $PHASE (iteration $i/60)"
+                    echo "Bench Phase: $PHASE (iteration $i/90)"
                     
                     # Check if init job exists and its status
                     INIT_JOB=$(kubectl get job test-switch-bench-init -n default --ignore-not-found -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
                     if [ -n "$INIT_JOB" ]; then
                       JOB_SUCCEEDED=$(kubectl get job test-switch-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
                       JOB_FAILED=$(kubectl get job test-switch-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
-                      # Fallback to 0 if empty
                       [ -z "$JOB_SUCCEEDED" ] && JOB_SUCCEEDED=0
                       [ -z "$JOB_FAILED" ] && JOB_FAILED=0
                       echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"
-                      
-                      if [ $((i % 5)) -eq 0 ]; then
-                        echo "Init Job Pod Status:"
-                        kubectl get pods -l job-name=test-switch-bench-init -n default || true
-                        echo "Init Job Logs snippet:"
-                        kubectl logs job/test-switch-bench-init -n default --tail=20 || true
-                      fi
                       
                       if [ "$JOB_FAILED" -ge 1 ]; then
                         echo "ERROR: Initialization job failed!"
@@ -646,20 +632,19 @@ jobs:
                         kubectl logs job/test-switch-bench-init -n default || true
                         exit 1
                       fi
+                      
+                      # If init succeeded, explain what's happening
+                      if [ "$JOB_SUCCEEDED" -ge 1 ] && [ "$PHASE" != "Ready" ]; then
+                        echo "Init job completed. Waiting for controller to create all resources (Redis, Nginx, Workers, etc.)..."
+                      fi
                     fi
                     
                     if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Running" ]; then
-                      echo "Bench initialized, now checking for KEDA ScaledObject..."
+                      echo "Bench is Ready! Now checking for KEDA ScaledObject..."
                       break
                     fi
                     
-                    # Log operator logs if it seems stuck
-                    if [ $((i % 10)) -eq 0 ]; then
-                       echo "Operator logs snippet:"
-                       kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=20 || true
-                    fi
-                    
-                    sleep 15
+                    sleep 10
                   done
                   
                   echo "Waiting for KEDA ScaledObject to be created..."
