@@ -13,17 +13,13 @@ on:
             - "controllers/scaling_provider.go"
             - "controllers/keda_provider.go"
             - "controllers/hpa_provider.go"
-            - "controllers/component_autoscaling_helpers.go"
             - "controllers/*_test.go"
             - ".github/workflows/autoscaling-test.yml"
     pull_request:
         branches: [main, master]
         paths:
-            - "api/v1alpha1/**"
-            - "controllers/scaling_provider*.go"
-            - "controllers/keda_provider*.go"
             - "controllers/hpa_provider*.go"
-            - "controllers/component_autoscaling*.go"
+            - "api/v1alpha1/**"
     workflow_dispatch:
 
 jobs:
