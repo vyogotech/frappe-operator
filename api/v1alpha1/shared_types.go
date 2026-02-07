@@ -649,7 +649,6 @@ type GitConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
-
 // RouteConfig defines OpenShift Route configuration for a site
 type RouteConfig struct {
 	// Enabled controls whether Route should be created (defaults to true on OpenShift)

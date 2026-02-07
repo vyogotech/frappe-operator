@@ -50,14 +50,14 @@ func TestKEDAProvider_IsAvailable(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = vyogotechv1alpha1.AddToScheme(scheme)
 
-	// Since we use unstructured to check KEDA availability, fake client might not be enough
-	// for a full test without discovery, but we can test the logic if we mock discovery.
-	// For now, let's test that it returns false if KEDA is not in the cluster.
+	// Since we use unstructured to check KEDA availability, the fake client
+	// might return an error if the resource is not registered in the scheme.
+	// We want it to returned an error so IsAvailable returns false.
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	p := &KEDAProvider{client: client}
 
 	if p.IsAvailable(context.TODO()) {
-		t.Error("Expected KEDA not to be available in fake client")
+		t.Error("Expected KEDA not to be available in fake client (resource not in scheme)")
 	}
 }
 

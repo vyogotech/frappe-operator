@@ -62,8 +62,8 @@ func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1alpha1.Frap
 	})
 	scaledObject.SetName(scaledObjectName)
 	scaledObject.SetNamespace(bench.Namespace)
-	
-	// Note: componentLabels is a method of FrappeBenchReconciler. 
+
+	// Note: componentLabels is a method of FrappeBenchReconciler.
 	// For now, we'll manually set labels or wait until we have a helper.
 	labels := map[string]string{
 		"bench":     bench.Name,
@@ -76,7 +76,7 @@ func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1alpha1.Frap
 	switch config.KEDA.Trigger {
 	case "cpu":
 		trigger = map[string]interface{}{
-			"type": "cpu",
+			"type":       "cpu",
 			"metricType": "Utilization",
 			"metadata": map[string]interface{}{
 				"value": config.KEDA.TargetValue,
@@ -84,7 +84,7 @@ func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1alpha1.Frap
 		}
 	case "memory":
 		trigger = map[string]interface{}{
-			"type": "memory",
+			"type":       "memory",
 			"metricType": "Utilization",
 			"metadata": map[string]interface{}{
 				"value": config.KEDA.TargetValue,
@@ -98,7 +98,7 @@ func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1alpha1.Frap
 			metadata[k] = v
 		}
 		trigger = map[string]interface{}{
-			"type": "redis",
+			"type":     "redis",
 			"metadata": metadata,
 		}
 	default:
