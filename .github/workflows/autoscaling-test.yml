@@ -490,6 +490,12 @@ jobs:
                     --timeout 10m
 
                   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+                  
+                  # Wait for metrics-server to be ready
+                  echo "Waiting for metrics-server to be ready..."
+                  kubectl wait --for=condition=ready pod \
+                    -l k8s-app=metrics-server -n kube-system \
+                    --timeout=300s || echo "Metrics server timeout (may still work)"
 
             - name: Install MariaDB Operator
               run: |
@@ -544,9 +550,9 @@ jobs:
             - name: Verify KEDA ScaledObject Created
               run: |
                   echo "Waiting for bench initialization first..."
-                  for i in {1..60}; do
+                  for i in {1..40}; do
                     PHASE=$(kubectl get frappebench test-switch-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-                    echo "Bench Phase: $PHASE (iteration $i/60)"
+                    echo "Bench Phase: $PHASE (iteration $i/40)"
                     
                     # Check if init job exists and its status
                     INIT_JOB=$(kubectl get job test-switch-bench-init -n default --ignore-not-found -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
@@ -554,13 +560,26 @@ jobs:
                       JOB_SUCCEEDED=$(kubectl get job test-switch-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
                       JOB_FAILED=$(kubectl get job test-switch-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
                       echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"
+                      
+                      if [ "$JOB_FAILED" -ge 1 ]; then
+                        echo "ERROR: Initialization job failed!"
+                        kubectl logs job/test-switch-bench-init -n default || true
+                        exit 1
+                      fi
                     fi
                     
                     if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Running" ]; then
                       echo "Bench initialized, now checking for KEDA ScaledObject..."
                       break
                     fi
-                    sleep 10
+                    
+                    # Log operator logs if it seems stuck
+                    if [ $((i % 10)) -eq 0 ]; then
+                       echo "Operator logs snippet:"
+                       kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=20 || true
+                    fi
+                    
+                    sleep 15
                   done
                   
                   echo "Waiting for KEDA ScaledObject to be created..."
@@ -570,11 +589,13 @@ jobs:
                       exit 0
                     fi
                     echo "ScaledObject not found yet (iteration $i/30)..."
-                    sleep 3
+                    sleep 5
                   done
                   echo "ERROR: KEDA ScaledObject not created"
                   echo "Bench status:"
                   kubectl get frappebench test-switch-bench -n default -o yaml || true
+                  echo "Operator Logs:"
+                  kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=100 || true
                   exit 1
 
             - name: Switch Provider from KEDA to HPA
