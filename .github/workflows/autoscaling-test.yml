@@ -15,6 +15,8 @@ on:
       - "controllers/hpa_provider.go"
       - "controllers/*_test.go"
       - ".github/workflows/autoscaling-test.yml"
+      - "test-autoscaling-helm.sh"
+      - "examples/test-*.yaml"
   pull_request:
     branches: [main, master]
     paths:
@@ -42,7 +44,6 @@ jobs:
       - name: Run Autoscaling Unit Tests
         run: |
           echo "Running Autoscaling Unit Tests..."
-          # Run all tests in controllers that match the autoscaling patterns
           go test -v -run "TestComponentAutoscaling|TestKEDAScalingConfig|TestHPAScalingConfig|TestResolveProvider|TestKEDAProvider|TestHPAProvider|TestGetHPAMetricName" ./controllers/ -coverprofile=autoscaling-total-coverage.out
 
       - name: Verify Coverage File
@@ -65,826 +66,124 @@ jobs:
     name: E2E Test - KEDA Autoscaling
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: autoscaling-unit-tests
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create Kind Cluster
-        uses: helm/kind-action@v1.8.0
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          cluster_name: frappe-keda-e2e
-
-      - name: Build Operator Image
-        run: |
-          IMAGE="ghcr.io/${{ github.repository }}:test-keda"
-          docker build -t "$IMAGE" .
-          kind load docker-image "$IMAGE" --name frappe-keda-e2e
-          echo "OPERATOR_IMAGE=$IMAGE" >> $GITHUB_ENV
+          go-version: "1.22"
+          cache: true
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
           version: "latest"
 
-      - name: Add Helm Repositories
+      - name: Run KEDA E2E Test
         run: |
-          helm repo add keda https://kedacore.github.io/charts
-          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
-          helm repo update
+          chmod +x test-autoscaling-helm.sh
+          ./test-autoscaling-helm.sh keda --cluster-name frappe-keda-e2e
 
-      - name: Install KEDA
-        run: |
-          echo "Installing KEDA..."
-          helm upgrade --install keda keda/keda \
-            --namespace frappe-operator-system \
-            --create-namespace \
-            --set crds.install=true \
-            --wait \
-            --timeout 10m
-
-      - name: Verify KEDA Installation
-        run: |
-          echo "Verifying KEDA CRD..."
-          kubectl get crd scaledobjects.keda.sh || exit 1
-          echo "KEDA CRD verified!"
-
-      - name: Install MariaDB Operator
-        run: |
-          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
-            --namespace frappe-operator-system \
-            --create-namespace \
-            --set crds.enabled=true \
-            --wait \
-            --timeout 10m
-
-      - name: Install Frappe Operator
-        run: |
-          REPO="ghcr.io/${{ github.repository }}"
-          helm upgrade --install frappe-operator ./helm/frappe-operator \
-            --set operator.image.repository="$REPO" \
-            --set operator.image.tag=test-keda \
-            --set operator.image.pullPolicy=Never \
-            --set mariadb.enabled=true \
-            --namespace frappe-operator-system \
-            --create-namespace \
-            --wait \
-            --timeout 10m
-
-      - name: Configure Security Defaults
-        run: |
-          kubectl -n frappe-operator-system set env deployment/frappe-operator-controller-manager \
-            FRAPPE_DEFAULT_UID=1001 FRAPPE_DEFAULT_GID=0 FRAPPE_DEFAULT_FSGROUP=1001
-          kubectl -n frappe-operator-system rollout status deployment/frappe-operator-controller-manager
-
-      - name: Deploy Bench with KEDA Worker Autoscaling
-        run: |
-          cat <<EOF | kubectl apply -f -
-          apiVersion: vyogo.tech/v1alpha1
-          kind: FrappeBench
-          metadata:
-            name: test-keda-bench
-            namespace: default
-          spec:
-            frappeVersion: "v15"
-            imageConfig:
-              repository: ghcr.io/rmallam/frappe_docker
-              tag: sha-ae82c47@sha256:fc7d472b57a1f5a75bfffb9985d9d2298a2a910d0b17ec23e36fb11b053da565
-            apps:
-              - name: erpnext
-                source: image
-            security:
-              podSecurityContext:
-                runAsUser: 1001
-                runAsGroup: 1001
-                fsGroup: 1001
-            redisConfig:
-              type: redis
-            
-            componentAutoscaling:
-              worker-short:
-                enabled: true
-                provider: keda
-                minReplicas: 0
-                maxReplicas: 3
-                cooldownPeriod: 30
-                pollingInterval: 15
-                keda:
-                  trigger: redis
-                  targetValue: "2"
-              
-              worker-long:
-                enabled: true
-                provider: keda
-                minReplicas: 0
-                maxReplicas: 2
-                cooldownPeriod: 60
-                pollingInterval: 30
-                keda:
-                  trigger: redis
-                  targetValue: "1"
-              
-              worker-default:
-                enabled: false
-                staticReplicas: 1
-              
-              nginx:
-                enabled: false
-                staticReplicas: 1
-              
-              gunicorn:
-                enabled: false
-                staticReplicas: 1
-              
-              scheduler:
-                enabled: false
-                staticReplicas: 1
-          EOF
-
-      - name: Wait for ScaledObjects to be Created
-        run: |
-          echo "Waiting for bench to be fully ready (init + all resources)..."
-          for i in {1..90}; do
-            PHASE=$(kubectl get frappebench test-keda-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-            echo "Bench Phase: $PHASE (iteration $i/90)"
-            
-            # Check if init job exists and its status
-            INIT_JOB=$(kubectl get job test-keda-bench-init -n default --ignore-not-found -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
-            if [ -n "$INIT_JOB" ]; then
-              JOB_SUCCEEDED=$(kubectl get job test-keda-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
-              JOB_FAILED=$(kubectl get job test-keda-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
-              [ -z "$JOB_SUCCEEDED" ] && JOB_SUCCEEDED=0
-              [ -z "$JOB_FAILED" ] && JOB_FAILED=0
-              echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"
-              
-              if [ "$JOB_FAILED" -ge 1 ]; then
-                echo "ERROR: Initialization job failed!"
-                kubectl describe job test-keda-bench-init -n default || true
-                kubectl logs job/test-keda-bench-init -n default || true
-                exit 1
-              fi
-              
-              # If init succeeded, explain what's happening
-              if [ "$JOB_SUCCEEDED" -ge 1 ] && [ "$PHASE" != "Ready" ]; then
-                echo "Init job completed. Waiting for controller to create all resources (Redis, Nginx, Workers, etc.)..."
-              fi
-            fi
-            
-            if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Running" ]; then
-              echo "Bench is Ready! Now checking for ScaledObjects..."
-              break
-            fi
-            sleep 10
-          done
-
-          echo "Now waiting for KEDA ScaledObjects to be created..."
-          for i in {1..40}; do
-            SCALED_OBJECTS=$(kubectl get scaledobjects -n default --no-headers 2>/dev/null | wc -l || echo 0)
-            echo "ScaledObjects found: $SCALED_OBJECTS (iteration $i/40)"
-            if [ "$SCALED_OBJECTS" -ge 2 ]; then
-              echo "SUCCESS: Workers scaled by KEDA!"
-              kubectl get scaledobjects -n default -o wide
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "ERROR: KEDA ScaledObjects not created within timeout"
-          echo "Bench status:"
-          kubectl get frappebench test-keda-bench -n default -o yaml || true
-          exit 1
-
-      - name: Verify ScaledObject Configuration
-        run: |
-          echo "Verifying worker-short ScaledObject trigger type..."
-          TRIGGER=$(kubectl get scaledobject test-keda-bench-worker-short -n default \
-            -o jsonpath='{.spec.triggers[0].type}' 2>/dev/null || echo "NOT_FOUND")
-          if [ "$TRIGGER" != "redis" ]; then
-            echo "ERROR: Expected redis trigger, got: $TRIGGER"
-            exit 1
-          fi
-          echo "SUCCESS: Redis trigger configured correctly"
-
-      - name: Check Scaling Status
-        run: |
-          echo "Checking component scaling status..."
-          kubectl get frappebench test-keda-bench -n default \
-            -o jsonpath='{.status.componentScaling}' | jq . || true
-
-      - name: Capture KEDA Logs on Failure
+      - name: Capture logs on failure
         if: failure()
         run: |
-          echo "KEDA Operator Logs:"
+          echo "=== KEDA Operator Logs ==="
           kubectl logs -n frappe-operator-system -l app.kubernetes.io/name=keda-operator --tail=100 || true
-
-          echo "Frappe Operator Logs:"
+          echo ""
+          echo "=== Frappe Operator Logs ==="
           kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=100 || true
+          echo ""
+          echo "=== FrappeBench Status ==="
+          kubectl get frappebench -A -o yaml || true
+          echo ""
+          echo "=== Pods ==="
+          kubectl get pods -A || true
 
   autoscaling-e2e-hpa:
     name: E2E Test - HPA Autoscaling
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: autoscaling-unit-tests
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create Kind Cluster
-        uses: helm/kind-action@v1.8.0
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          cluster_name: frappe-hpa-e2e
-
-      - name: Build Operator Image
-        run: |
-          IMAGE="ghcr.io/${{ github.repository }}:test-hpa"
-          docker build -t "$IMAGE" .
-          kind load docker-image "$IMAGE" --name frappe-hpa-e2e
-          echo "OPERATOR_IMAGE=$IMAGE" >> $GITHUB_ENV
+          go-version: "1.22"
+          cache: true
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
           version: "latest"
 
-      - name: Add Helm Repositories
+      - name: Run HPA E2E Test
         run: |
-          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
-          helm repo update
+          chmod +x test-autoscaling-helm.sh
+          ./test-autoscaling-helm.sh hpa --cluster-name frappe-hpa-e2e
 
-      - name: Install Metrics Server (required for HPA)
-        run: |
-          echo "Installing Metrics Server..."
-          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-
-          # Wait for metrics-server to be ready
-          echo "Waiting for metrics-server to be ready..."
-          kubectl wait --for=condition=ready pod \
-            -l k8s-app=metrics-server -n kube-system \
-            --timeout=300s || echo "Metrics server timeout (may still work)"
-
-      - name: Install MariaDB Operator
-        run: |
-          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
-            --namespace frappe-operator-system \
-            --create-namespace \
-            --set crds.enabled=true \
-            --wait \
-            --timeout 10m
-
-      - name: Install Frappe Operator
-        run: |
-          REPO="ghcr.io/${{ github.repository }}"
-          helm upgrade --install frappe-operator ./helm/frappe-operator \
-            --set operator.image.repository="$REPO" \
-            --set operator.image.tag=test-hpa \
-            --set operator.image.pullPolicy=Never \
-            --set mariadb.enabled=true \
-            --namespace frappe-operator-system \
-            --create-namespace \
-            --wait \
-            --timeout 10m
-
-      - name: Configure Security Defaults
-        run: |
-          kubectl -n frappe-operator-system set env deployment/frappe-operator-controller-manager \
-            FRAPPE_DEFAULT_UID=1001 FRAPPE_DEFAULT_GID=0 FRAPPE_DEFAULT_FSGROUP=1001
-          kubectl -n frappe-operator-system rollout status deployment/frappe-operator-controller-manager
-
-      - name: Deploy Bench with HPA Autoscaling
-        run: |
-          cat <<EOF | kubectl apply -f -
-          apiVersion: vyogo.tech/v1alpha1
-          kind: FrappeBench
-          metadata:
-            name: test-hpa-bench
-            namespace: default
-          spec:
-            frappeVersion: "v15"
-            imageConfig:
-              repository: ghcr.io/rmallam/frappe_docker
-              tag: sha-ae82c47@sha256:fc7d472b57a1f5a75bfffb9985d9d2298a2a910d0b17ec23e36fb11b053da565
-            apps:
-              - name: erpnext
-                source: image
-            security:
-              podSecurityContext:
-                runAsUser: 1001
-                runAsGroup: 1001
-                fsGroup: 1001
-            redisConfig:
-              type: redis
-            
-            componentAutoscaling:
-              nginx:
-                enabled: true
-                provider: hpa
-                minReplicas: 1
-                maxReplicas: 3
-                hpa:
-                  metric: cpu
-                  targetUtilization: 50
-                  scaleUpStabilization: 0
-                  scaleDownStabilization: 60
-              
-              gunicorn:
-                enabled: true
-                provider: hpa
-                minReplicas: 2
-                maxReplicas: 4
-                hpa:
-                  metric: memory
-                  targetUtilization: 70
-                  scaleUpStabilization: 30
-                  scaleDownStabilization: 60
-              
-              socketio:
-                enabled: false
-                staticReplicas: 1
-              
-              scheduler:
-                enabled: false
-                staticReplicas: 1
-              
-              worker-short:
-                enabled: false
-                staticReplicas: 1
-              
-              worker-long:
-                enabled: false
-                staticReplicas: 1
-              
-              worker-default:
-                enabled: false
-                staticReplicas: 1
-          EOF
-
-      - name: Wait for HPAs to be Created
-        run: |
-          echo "Waiting for bench to be fully ready (init + all resources)..."
-          for i in {1..90}; do
-            PHASE=$(kubectl get frappebench test-hpa-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-            echo "Bench Phase: $PHASE (iteration $i/90)"
-            
-            # Check if init job exists and its status
-            INIT_JOB=$(kubectl get job test-hpa-bench-init -n default --ignore-not-found -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
-            if [ -n "$INIT_JOB" ]; then
-              JOB_SUCCEEDED=$(kubectl get job test-hpa-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
-              JOB_FAILED=$(kubectl get job test-hpa-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
-              [ -z "$JOB_SUCCEEDED" ] && JOB_SUCCEEDED=0
-              [ -z "$JOB_FAILED" ] && JOB_FAILED=0
-              echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"
-              
-              if [ "$JOB_FAILED" -ge 1 ]; then
-                echo "ERROR: Initialization job failed!"
-                kubectl describe job test-hpa-bench-init -n default || true
-                kubectl logs job/test-hpa-bench-init -n default || true
-                exit 1
-              fi
-              
-              # If init succeeded, explain what's happening
-              if [ "$JOB_SUCCEEDED" -ge 1 ] && [ "$PHASE" != "Ready" ]; then
-                echo "Init job completed. Waiting for controller to create all resources (Redis, Nginx, Workers, etc.)..."
-              fi
-            fi
-            
-            if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Running" ]; then
-              echo "Bench is Ready! Now checking for HPAs..."
-              break
-            fi
-            sleep 10
-          done
-
-          echo "Now waiting for Kubernetes HPAs to be created..."
-          for i in {1..40}; do
-            HPAS=$(kubectl get hpa -n default --no-headers 2>/dev/null | wc -l || echo 0)
-            echo "HPAs found: $HPAS (iteration $i/40)"
-            if [ "$HPAS" -ge 2 ]; then
-              echo "SUCCESS: HPA resources created!"
-              kubectl get hpa -n default -o wide
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "ERROR: HPAs not created within timeout"
-          echo "Bench status:"
-          kubectl get frappebench test-hpa-bench -n default -o yaml || true
-          exit 1
-
-      - name: Verify HPA Configuration
-        run: |
-          echo "Verifying nginx HPA metric type..."
-          METRIC=$(kubectl get hpa test-hpa-bench-nginx -n default \
-            -o jsonpath='{.spec.metrics[0].resource.name}' 2>/dev/null || echo "NOT_FOUND")
-          if [ "$METRIC" != "cpu" ]; then
-            echo "ERROR: Expected cpu metric, got: $METRIC"
-            exit 1
-          fi
-          echo "SUCCESS: CPU metric configured for nginx"
-
-          echo "Verifying gunicorn HPA metric type..."
-          METRIC=$(kubectl get hpa test-hpa-bench-gunicorn -n default \
-            -o jsonpath='{.spec.metrics[0].resource.name}' 2>/dev/null || echo "NOT_FOUND")
-          if [ "$METRIC" != "memory" ]; then
-            echo "ERROR: Expected memory metric, got: $METRIC"
-            exit 1
-          fi
-          echo "SUCCESS: Memory metric configured for gunicorn"
-
-      - name: Check Scaling Status
-        run: |
-          echo "Checking component scaling status..."
-          kubectl get frappebench test-hpa-bench -n default \
-            -o jsonpath='{.status.componentScaling}' | jq . || true
-
-      - name: Capture HPA Logs on Failure
+      - name: Capture logs on failure
         if: failure()
         run: |
-          echo "HPA Events:"
+          echo "=== HPA Events ==="
           kubectl describe hpa -n default || true
-
-          echo "Frappe Operator Logs:"
+          echo ""
+          echo "=== Frappe Operator Logs ==="
           kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=100 || true
+          echo ""
+          echo "=== FrappeBench Status ==="
+          kubectl get frappebench -A -o yaml || true
+          echo ""
+          echo "=== Pods ==="
+          kubectl get pods -A || true
 
   autoscaling-e2e-provider-switch:
     name: E2E Test - Provider Switch (KEDA to HPA)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: autoscaling-unit-tests
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create Kind Cluster
-        uses: helm/kind-action@v1.8.0
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          cluster_name: frappe-switch-e2e
-
-      - name: Build Operator Image
-        run: |
-          IMAGE="ghcr.io/${{ github.repository }}:test-switch"
-          docker build -t "$IMAGE" .
-          kind load docker-image "$IMAGE" --name frappe-switch-e2e
-          echo "OPERATOR_IMAGE=$IMAGE" >> $GITHUB_ENV
+          go-version: "1.22"
+          cache: true
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
           version: "latest"
 
-      - name: Add Helm Repositories
+      - name: Run Provider Switch E2E Test
         run: |
-          helm repo add keda https://kedacore.github.io/charts
-          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
-          helm repo update
+          chmod +x test-autoscaling-helm.sh
+          ./test-autoscaling-helm.sh provider-switch --cluster-name frappe-switch-e2e
 
-      - name: Install KEDA and Metrics Server
-        run: |
-          helm upgrade --install keda keda/keda \
-            --namespace frappe-operator-system \
-            --create-namespace \
-            --set crds.install=true \
-            --wait \
-            --timeout 10m
-
-          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-
-          # Wait for metrics-server to be ready
-          echo "Waiting for metrics-server to be ready..."
-          kubectl wait --for=condition=ready pod \
-            -l k8s-app=metrics-server -n kube-system \
-            --timeout=300s || echo "Metrics server timeout (may still work)"
-
-      - name: Install MariaDB Operator
-        run: |
-          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
-            --namespace frappe-operator-system \
-            --create-namespace \
-            --set crds.enabled=true \
-            --wait \
-            --timeout 10m
-
-      - name: Install Frappe Operator
-        run: |
-          REPO="ghcr.io/${{ github.repository }}"
-          helm upgrade --install frappe-operator ./helm/frappe-operator \
-            --set operator.image.repository="$REPO" \
-            --set operator.image.tag=test-provider-switch \
-            --set operator.image.pullPolicy=Never \
-            --set mariadb.enabled=true \
-            --namespace frappe-operator-system \
-            --create-namespace \
-            --wait \
-            --timeout 10m
-
-      - name: Configure Security Defaults
-        run: |
-          kubectl -n frappe-operator-system set env deployment/frappe-operator-controller-manager \
-            FRAPPE_DEFAULT_UID=1001 FRAPPE_DEFAULT_GID=0 FRAPPE_DEFAULT_FSGROUP=1001
-          kubectl -n frappe-operator-system rollout status deployment/frappe-operator-controller-manager
-
-      - name: Deploy Bench with KEDA (Initial State)
-        run: |
-          cat <<EOF | kubectl apply -f -
-          apiVersion: vyogo.tech/v1alpha1
-          kind: FrappeBench
-          metadata:
-            name: test-switch-bench
-            namespace: default
-          spec:
-            frappeVersion: "v15"
-            imageConfig:
-              repository: ghcr.io/rmallam/frappe_docker
-              tag: sha-ae82c47@sha256:fc7d472b57a1f5a75bfffb9985d9d2298a2a910d0b17ec23e36fb11b053da565
-            apps:
-              - name: erpnext
-                source: image
-            
-            redisConfig:
-              type: redis
-            
-            componentAutoscaling:
-              nginx:
-                enabled: true
-                provider: keda
-                minReplicas: 1
-                maxReplicas: 3
-                keda:
-                  trigger: cpu
-                  targetValue: "50"
-          EOF
-
-      - name: Verify KEDA ScaledObject Created
-        run: |
-          echo "Waiting for bench to be fully ready (init + all resources)..."
-          for i in {1..90}; do
-            PHASE=$(kubectl get frappebench test-switch-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-            echo "Bench Phase: $PHASE (iteration $i/90)"
-            
-            # Check if init job exists and its status
-            INIT_JOB=$(kubectl get job test-switch-bench-init -n default --ignore-not-found -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
-            if [ -n "$INIT_JOB" ]; then
-              JOB_SUCCEEDED=$(kubectl get job test-switch-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
-              JOB_FAILED=$(kubectl get job test-switch-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
-              [ -z "$JOB_SUCCEEDED" ] && JOB_SUCCEEDED=0
-              [ -z "$JOB_FAILED" ] && JOB_FAILED=0
-              echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"
-              
-              if [ "$JOB_FAILED" -ge 1 ]; then
-                echo "ERROR: Initialization job failed!"
-                kubectl describe job test-switch-bench-init -n default || true
-                kubectl logs job/test-switch-bench-init -n default || true
-                exit 1
-              fi
-              
-              # If init succeeded, explain what's happening
-              if [ "$JOB_SUCCEEDED" -ge 1 ] && [ "$PHASE" != "Ready" ]; then
-                echo "Init job completed. Waiting for controller to create all resources (Redis, Nginx, Workers, etc.)..."
-              fi
-            fi
-            
-            if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Running" ]; then
-              echo "Bench is Ready! Now checking for KEDA ScaledObject..."
-              break
-            fi
-            
-            sleep 10
-          done
-
-          echo "Waiting for KEDA ScaledObject to be created..."
-          for i in {1..30}; do
-            if kubectl get scaledobject test-switch-bench-nginx -n default 2>/dev/null; then
-              echo "SUCCESS: KEDA ScaledObject created"
-              exit 0
-            fi
-            echo "ScaledObject not found yet (iteration $i/30)..."
-            sleep 5
-          done
-          echo "ERROR: KEDA ScaledObject not created"
-          echo "Bench status:"
-          kubectl get frappebench test-switch-bench -n default -o yaml || true
-          echo "Operator Logs:"
-          kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=100 || true
-          exit 1
-
-      - name: Switch Provider from KEDA to HPA
-        run: |
-          echo "Switching nginx from KEDA to HPA provider..."
-          kubectl patch frappebench test-switch-bench -n default --type=merge -p '{
-            "spec": {
-              "componentAutoscaling": {
-                "nginx": {
-                  "enabled": true,
-                  "provider": "hpa",
-                  "minReplicas": 1,
-                  "maxReplicas": 3,
-                  "hpa": {
-                    "metric": "cpu",
-                    "targetUtilization": 50
-                  }
-                }
-              }
-            }
-          }'
-
-      - name: Verify KEDA ScaledObject Deleted
-        run: |
-          echo "Verifying KEDA ScaledObject is cleaned up..."
-          for i in {1..20}; do
-            if ! kubectl get scaledobject test-switch-bench-nginx -n default 2>/dev/null; then
-              echo "SUCCESS: KEDA ScaledObject cleaned up"
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "ERROR: KEDA ScaledObject not deleted after provider switch"
-          exit 1
-
-      - name: Verify HPA Created
-        run: |
-          echo "Verifying HPA created after provider switch..."
-          for i in {1..20}; do
-            if kubectl get hpa test-switch-bench-nginx -n default 2>/dev/null; then
-              echo "SUCCESS: HPA created"
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "ERROR: HPA not created after provider switch"
-          exit 1
-
-      - name: Capture Logs on Failure
+      - name: Capture logs on failure
         if: failure()
         run: |
-          echo "Frappe Operator Logs:"
+          echo "=== KEDA Operator Logs ==="
+          kubectl logs -n frappe-operator-system -l app.kubernetes.io/name=keda-operator --tail=100 || true
+          echo ""
+          echo "=== Frappe Operator Logs ==="
           kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=100 || true
-
-  autoscaling-e2e-graceful-fallback:
-    name: E2E Test - Graceful Fallback (No KEDA)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Create Kind Cluster
-        uses: helm/kind-action@v1.8.0
-        with:
-          cluster_name: frappe-fallback-e2e
-
-      - name: Build Operator Image
-        run: |
-          IMAGE="ghcr.io/${{ github.repository }}:test-fallback"
-          docker build -t "$IMAGE" .
-          kind load docker-image "$IMAGE" --name frappe-fallback-e2e
-          echo "OPERATOR_IMAGE=$IMAGE" >> $GITHUB_ENV
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v3
-        with:
-          version: "latest"
-
-      - name: Add Helm Repositories
-        run: |
-          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
-          helm repo update
-
-      - name: Install MariaDB Operator (No KEDA)
-        run: |
-          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
-            --namespace frappe-operator-system \
-            --create-namespace \
-            --set crds.enabled=true \
-            --wait \
-            --timeout 10m
-
-          echo "Verifying KEDA is NOT installed..."
-          if kubectl get crd scaledobjects.keda.sh 2>/dev/null; then
-            echo "ERROR: KEDA should not be installed"
-            exit 1
-          fi
-          echo "Confirmed: KEDA not installed"
-
-      - name: Install Frappe Operator
-        run: |
-          REPO="ghcr.io/${{ github.repository }}"
-          helm upgrade --install frappe-operator ./helm/frappe-operator \
-            --set operator.image.repository="$REPO" \
-            --set operator.image.tag=test-fallback \
-            --set operator.image.pullPolicy=Never \
-            --set mariadb.enabled=true \
-            --namespace frappe-operator-system \
-            --create-namespace \
-            --wait \
-            --timeout 10m
-
-      - name: Configure Security Defaults
-        run: |
-          kubectl -n frappe-operator-system set env deployment/frappe-operator-controller-manager \
-            FRAPPE_DEFAULT_UID=1001 FRAPPE_DEFAULT_GID=0 FRAPPE_DEFAULT_FSGROUP=1001
-          kubectl -n frappe-operator-system rollout status deployment/frappe-operator-controller-manager
-
-      - name: Deploy Bench with KEDA Provider (Should Fallback to Static)
-        run: |
-          cat <<EOF | kubectl apply -f -
-          apiVersion: vyogo.tech/v1alpha1
-          kind: FrappeBench
-          metadata:
-            name: test-fallback-bench
-            namespace: default
-          spec:
-            frappeVersion: "v15"
-            imageConfig:
-              repository: ghcr.io/rmallam/frappe_docker
-              tag: sha-ae82c47@sha256:fc7d472b57a1f5a75bfffb9985d9d2298a2a910d0b17ec23e36fb11b053da565
-            apps:
-              - name: erpnext
-                source: image
-            
-            redisConfig:
-              type: redis
-            
-            componentAutoscaling:
-              worker-short:
-                enabled: true
-                provider: keda
-                minReplicas: 0
-                maxReplicas: 3
-                keda:
-                  trigger: redis
-                  targetValue: "2"
-              
-              nginx:
-                enabled: false
-                staticReplicas: 2
-          EOF
-
-      - name: Wait for FrappeBench to Reconcile
-        run: |
-          echo "Waiting for FrappeBench to reconcile (with graceful fallback)..."
-          for i in {1..30}; do
-            PHASE=$(kubectl get frappebench test-fallback-bench -n default \
-              -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-            echo "Current Phase: $PHASE"
-            if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Progressing" ]; then
-              echo "SUCCESS: Bench reconciling with fallback"
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "Timed out, but checking if component scaling status indicates fallback..."
-
-      - name: Verify Graceful Fallback
-        run: |
-          echo "Checking if KEDA provider was skipped and static replicas used..."
-          STATUS=$(kubectl get frappebench test-fallback-bench -n default \
-            -o jsonpath='{.status.componentScaling.worker-short}' 2>/dev/null || echo "{}")
-
-          if echo "$STATUS" | grep -q '"mode":"static"'; then
-            echo "SUCCESS: Graceful fallback to static replicas confirmed!"
-          else
-            echo "Scaling status: $STATUS"
-            echo "INFO: Static replicas should be used when KEDA unavailable"
-          fi
-
-      - name: Verify No ScaledObjects Created
-        run: |
-          COUNT=$(kubectl get scaledobjects -n default --no-headers 2>/dev/null | wc -l || echo 0)
-          if [ "$COUNT" == "0" ]; then
-            echo "SUCCESS: No KEDA ScaledObjects created (as expected)"
-          else
-            echo "WARNING: Found $COUNT ScaledObjects (should be 0)"
-          fi
-
-      - name: Capture Logs on Failure
-        if: failure()
-        run: |
-          echo "Frappe Operator Logs:"
-          kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=150 || true
-
-  test-summary:
-    name: Autoscaling Test Summary
-    runs-on: ubuntu-latest
-    needs:
-      [
-        autoscaling-unit-tests,
-        autoscaling-e2e-keda,
-        autoscaling-e2e-hpa,
-        autoscaling-e2e-provider-switch,
-        autoscaling-e2e-graceful-fallback,
-      ]
-    if: always()
-    steps:
-      - name: Check Test Results
-        run: |
-          echo "=== Autoscaling Test Summary ==="
-          echo "Unit Tests: ${{ needs.autoscaling-unit-tests.result }}"
-          echo "KEDA E2E Tests: ${{ needs.autoscaling-e2e-keda.result }}"
-          echo "HPA E2E Tests: ${{ needs.autoscaling-e2e-hpa.result }}"
-          echo "Provider Switch Tests: ${{ needs.autoscaling-e2e-provider-switch.result }}"
-          echo "Graceful Fallback Tests: ${{ needs.autoscaling-e2e-graceful-fallback.result }}"
-
-          if [ "${{ needs.autoscaling-unit-tests.result }}" != "success" ] || \
-             [ "${{ needs.autoscaling-e2e-keda.result }}" != "success" ] || \
-             [ "${{ needs.autoscaling-e2e-hpa.result }}" != "success" ] || \
-             [ "${{ needs.autoscaling-e2e-provider-switch.result }}" != "success" ] || \
-             [ "${{ needs.autoscaling-e2e-graceful-fallback.result }}" != "success" ]; then
-            echo "❌ Some autoscaling tests failed"
-            exit 1
-          fi
-          echo "✅ All autoscaling tests passed!"
+          echo ""
+          echo "=== ScaledObjects ==="
+          kubectl get scaledobjects -A || true
+          echo ""
+          echo "=== HPAs ==="
+          kubectl get hpa -A || true
+          echo ""
+          echo "=== FrappeBench Status ==="
+          kubectl get frappebench -A -o yaml || true
+          echo ""
+          echo "=== Pods ==="
+          kubectl get pods -A || true
