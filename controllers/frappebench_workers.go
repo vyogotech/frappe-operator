@@ -66,13 +66,13 @@ func (r *FrappeBenchReconciler) ensureWorkers(ctx context.Context, bench *vyogot
 
 		// Handle scaling provider
 		if providerAvailable {
+			r.cleanupOtherProviders(ctx, bench, componentName, config.Provider)
 			if err := provider.Ensure(ctx, bench, componentName, deployName, config); err != nil {
 				logger.Error(err, "Failed to ensure scaling for component", "component", componentName, "provider", provider.Name())
 			}
 		} else {
-			// Clean up both possible providers if autoscaling is disabled or provider not available
-			_ = resolveProvider("keda", r.Client, r.Scheme).Delete(ctx, bench, componentName)
-			_ = resolveProvider("hpa", r.Client, r.Scheme).Delete(ctx, bench, componentName)
+			// Clean up all providers if autoscaling is disabled or provider not available
+			r.cleanupOtherProviders(ctx, bench, componentName, "")
 		}
 	}
 

@@ -202,10 +202,10 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 
 		// Handle scaling provider
 		if managedByProvider {
+			r.cleanupOtherProviders(ctx, bench, componentName, config.Provider)
 			return provider.Ensure(ctx, bench, componentName, deployName, config)
 		} else {
-			_ = resolveProvider("hpa", r.Client, r.Scheme).Delete(ctx, bench, componentName)
-			_ = resolveProvider("keda", r.Client, r.Scheme).Delete(ctx, bench, componentName)
+			r.cleanupOtherProviders(ctx, bench, componentName, "")
 		}
 		return nil
 	}
@@ -323,10 +323,10 @@ func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotec
 		}
 
 		if managedByProvider {
+			r.cleanupOtherProviders(ctx, bench, componentName, config.Provider)
 			return provider.Ensure(ctx, bench, componentName, deployName, config)
 		} else {
-			_ = resolveProvider("hpa", r.Client, r.Scheme).Delete(ctx, bench, componentName)
-			_ = resolveProvider("keda", r.Client, r.Scheme).Delete(ctx, bench, componentName)
+			r.cleanupOtherProviders(ctx, bench, componentName, "")
 		}
 		return nil
 	}
@@ -444,10 +444,10 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 		}
 
 		if managedByProvider {
+			r.cleanupOtherProviders(ctx, bench, componentName, config.Provider)
 			return provider.Ensure(ctx, bench, componentName, deployName, config)
 		} else {
-			_ = resolveProvider("hpa", r.Client, r.Scheme).Delete(ctx, bench, componentName)
-			_ = resolveProvider("keda", r.Client, r.Scheme).Delete(ctx, bench, componentName)
+			r.cleanupOtherProviders(ctx, bench, componentName, "")
 		}
 		return nil
 	}
