@@ -84,6 +84,11 @@ spec:
   imageConfig:
     repository: ghcr.io/rmallam/frappe_docker
     tag: sha-ae82c47@sha256:fc7d472b57a1f5a75bfffb9985d9d2298a2a910d0b17ec23e36fb11b053da565
+  security:
+    podSecurityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
+      fsGroup: 1001
   apps:
     - name: erpnext
       source: image
