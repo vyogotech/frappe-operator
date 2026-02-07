@@ -108,8 +108,8 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run unit tests (excludes test/ subdirectory).
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./api/... ./pkg/... ./controllers/... -coverprofile cover.out
+test: manifests generate fmt vet envtest ## Run unit tests (includes root package and all modules, excludes test/ subdirectory).
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: manifests generate fmt vet envtest ## Run integration tests (requires a real cluster).
