@@ -40,24 +40,6 @@ jobs:
         run: |
           go test ./api/... ./pkg/... ./controllers/... -v -coverprofile cover.out
 
-      - name: Run autoscaling-specific unit tests
-        run: |
-          echo "=== Running Autoscaling Unit Tests ==="
-          echo "Testing component autoscaling types..."
-          go test -v -run TestComponentAutoscaling ./controllers/ -coverprofile=autoscaling-cover.out
-
-          echo "Testing scaling provider interface..."
-          go test -v -run TestScalingProvider ./controllers/
-
-          echo "Testing KEDA provider..."
-          go test -v -run TestKEDAProvider ./controllers/
-
-          echo "Testing HPA provider..."
-          go test -v -run TestHPAProvider ./controllers/
-
-          echo "Testing component autoscaling helpers..."
-          go test -v -run "TestGetComponentAutoscaling|TestFillComponentDefaults|TestGetComponentReplicaCount" ./controllers/
-
       - name: Lint autoscaling code
         run: |
           echo "=== Linting Autoscaling Code ==="
@@ -67,7 +49,7 @@ jobs:
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
         with:
-          files: ./cover.out,./autoscaling-cover.out
+          files: ./cover.out
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false

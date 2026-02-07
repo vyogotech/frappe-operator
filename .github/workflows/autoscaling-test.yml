@@ -41,30 +41,17 @@ jobs:
 
             - name: Run Autoscaling Unit Tests
               run: |
-                  echo "Running component autoscaling type tests..."
-                  go test -v -run TestComponentAutoscaling ./controllers/ -coverprofile=autoscaling-types-cover.out
+                  echo "Running Autoscaling Unit Tests..."
+                  # Run all tests in controllers that match the autoscaling patterns
+                  go test -v -run "TestComponentAutoscaling|TestKEDAScalingConfig|TestHPAScalingConfig|TestResolveProvider|TestKEDAProvider|TestHPAProvider|TestGetHPAMetricName" ./controllers/ -coverprofile=autoscaling-total-coverage.out
 
-                  echo "Running scaling provider tests..."
-                  go test -v -run TestScalingProvider ./controllers/ -coverprofile=scaling-provider-cover.out
-
-                  echo "Running KEDA provider tests..."
-                  go test -v -run TestKEDAProvider ./controllers/ -coverprofile=keda-provider-cover.out
-
-                  echo "Running HPA provider tests..."
-                  go test -v -run TestHPAProvider ./controllers/ -coverprofile=hpa-provider-cover.out
-
-                  echo "Running component autoscaling helper tests..."
-                  go test -v -run TestGetComponentAutoscaling ./controllers/ -coverprofile=component-helpers-cover.out
-                  go test -v -run TestFillComponentDefaults ./controllers/ -coverprofile=fill-defaults-cover.out
-                  go test -v -run TestGetComponentReplicaCount ./controllers/ -coverprofile=replica-count-cover.out
-
-            - name: Merge coverage reports
+            - name: Verify Coverage File
               run: |
-                  go install github.com/wadey/gocovmerge@latest
-                  gocovmerge autoscaling-types-cover.out scaling-provider-cover.out \
-                             keda-provider-cover.out hpa-provider-cover.out \
-                             component-helpers-cover.out fill-defaults-cover.out replica-count-cover.out \
-                             > autoscaling-total-coverage.out || true
+                  if [ ! -f autoscaling-total-coverage.out ]; then
+                    echo "ERROR: autoscaling-total-coverage.out was not generated"
+                    exit 1
+                  fi
+
 
             - name: Check coverage threshold
               run: |
