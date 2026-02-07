@@ -81,6 +81,9 @@ func init() {
 }
 
 func TestE2E(t *testing.T) {
+	if os.Getenv("E2E_TEST") != "true" {
+		t.Skip("Skipping E2E tests. Set E2E_TEST=true to run.")
+	}
 	if skipE2ETests {
 		t.Skip("Skipping E2E tests: envtest control plane not available")
 	}

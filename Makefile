@@ -138,7 +138,7 @@ e2e-test: manifests generate docker-build ## Run end-to-end tests.
 	make deploy IMG=$(IMG)
 	kubectl wait --for=condition=available --timeout=300s deployment/frappe-operator-controller-manager -n frappe-operator-system
 	# Run e2e tests
-	go test ./test/e2e/... -v -ginkgo.v
+	E2E_TEST=true go test ./test/e2e/... -v -ginkgo.v
 
 ##@ Build
 
