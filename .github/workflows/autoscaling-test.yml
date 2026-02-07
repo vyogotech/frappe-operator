@@ -62,10 +62,9 @@ jobs:
             exit 1
           fi
 
-  autoscaling-e2e-keda:
-    name: E2E Test - KEDA Autoscaling
+  build-operator-image:
+    name: Build Operator Image
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     needs: autoscaling-unit-tests
     steps:
       - name: Checkout code
@@ -82,10 +81,54 @@ jobs:
         with:
           version: "latest"
 
+      - name: Build operator binary
+        run: make build
+
+      - name: Build container image
+        run: docker build -t ghcr.io/rmallam/frappe-operator:local-test -f Dockerfile .
+
+      - name: Save image as artifact
+        run: docker save ghcr.io/rmallam/frappe-operator:local-test | gzip > operator-image.tar.gz
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-image
+          path: operator-image.tar.gz
+          retention-days: 1
+
+  autoscaling-e2e-keda:
+    name: E2E Test - KEDA Autoscaling
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-operator-image
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: "latest"
+
+      - name: Download operator image
+        uses: actions/download-artifact@v4
+        with:
+          name: operator-image
+
+      - name: Load operator image
+        run: docker load < operator-image.tar.gz
+
       - name: Run KEDA E2E Test
         run: |
           chmod +x test-autoscaling-helm.sh
-          ./test-autoscaling-helm.sh keda --cluster-name frappe-keda-e2e
+          ./test-autoscaling-helm.sh keda --cluster-name frappe-keda-e2e --skip-build
 
       - name: Capture logs on failure
         if: failure()
@@ -106,7 +149,7 @@ jobs:
     name: E2E Test - HPA Autoscaling
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: autoscaling-unit-tests
+    needs: build-operator-image
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -122,10 +165,18 @@ jobs:
         with:
           version: "latest"
 
+      - name: Download operator image
+        uses: actions/download-artifact@v4
+        with:
+          name: operator-image
+
+      - name: Load operator image
+        run: docker load < operator-image.tar.gz
+
       - name: Run HPA E2E Test
         run: |
           chmod +x test-autoscaling-helm.sh
-          ./test-autoscaling-helm.sh hpa --cluster-name frappe-hpa-e2e
+          ./test-autoscaling-helm.sh hpa --cluster-name frappe-hpa-e2e --skip-build
 
       - name: Capture logs on failure
         if: failure()
@@ -146,7 +197,7 @@ jobs:
     name: E2E Test - Provider Switch (KEDA to HPA)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: autoscaling-unit-tests
+    needs: build-operator-image
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -162,10 +213,18 @@ jobs:
         with:
           version: "latest"
 
+      - name: Download operator image
+        uses: actions/download-artifact@v4
+        with:
+          name: operator-image
+
+      - name: Load operator image
+        run: docker load < operator-image.tar.gz
+
       - name: Run Provider Switch E2E Test
         run: |
           chmod +x test-autoscaling-helm.sh
-          ./test-autoscaling-helm.sh provider-switch --cluster-name frappe-switch-e2e
+          ./test-autoscaling-helm.sh provider-switch --cluster-name frappe-switch-e2e --skip-build
 
       - name: Capture logs on failure
         if: failure()

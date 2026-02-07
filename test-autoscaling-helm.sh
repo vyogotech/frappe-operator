@@ -101,15 +101,12 @@ done
 
 # Cleanup function
 cleanup() {
-    if [ "$KEEP_CLUSTER" != "1" ]; then
-        print_warning "Skipping cleanup - cluster will remain for manual testing"
-        print_status "To delete manually: kind delete cluster --name $CLUSTER_NAME"
-        print_status "To re-enable auto-cleanup: set KEEP_CLUSTER=0"
-        # Temporarily disabled for manual testing
-        # kind delete cluster --name "$CLUSTER_NAME" 2>/dev/null || true
-    else
+    if [ "$KEEP_CLUSTER" = "1" ]; then
         print_warning "Keeping cluster alive (KEEP_CLUSTER=1)"
         print_status "To delete manually: kind delete cluster --name $CLUSTER_NAME"
+    else
+        print_status "Cleaning up Kind cluster..."
+        kind delete cluster --name "$CLUSTER_NAME" 2>/dev/null || true
     fi
 }
 
@@ -186,7 +183,10 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
         kind load docker-image ghcr.io/rmallam/frappe-operator:local-test --name "$CLUSTER_NAME"
     fi
 else
-    print_status "Step 3: Skipping operator image build"
+    print_status "Step 3: Skipping operator image build (using pre-built image)"
+    # Image is already in Docker (e.g., loaded from CI artifact), load into Kind
+    print_status "Loading pre-built image into Kind cluster..."
+    kind load docker-image ghcr.io/rmallam/frappe-operator:local-test --name "$CLUSTER_NAME"
 fi
 
 # Step 4: Install operator via Helm (includes KEDA)
