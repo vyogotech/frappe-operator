@@ -26,7 +26,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -145,10 +150,33 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 
 // ensureNginx ensures the NGINX Deployment and Service exist
 func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+	logger := log.FromContext(ctx)
+
+	// Check KEDA availability once
+	kedaAvailable := r.isKEDAAvailable(ctx)
+
+	// Get autoscaling config for nginx
+	config := r.getNginxAutoscalingConfig(bench)
+	config = r.fillNginxAutoscalingDefaults(config)
+
+	// Determine replica count based on scaling mode
+	replicas := r.getNginxReplicaCount(config, kedaAvailable)
+
 	if err := r.ensureNginxService(ctx, bench); err != nil {
 		return err
 	}
-	return r.ensureNginxDeployment(ctx, bench)
+
+	if err := r.ensureNginxDeployment(ctx, bench, replicas, config, kedaAvailable); err != nil {
+		return err
+	}
+
+	// Create/update ScaledObject if autoscaling is enabled
+	if err := r.ensureNginxScaledObject(ctx, bench, config); err != nil {
+		logger.Error(err, "Failed to ensure nginx ScaledObject")
+		// Don't fail the reconciliation, just log the error
+	}
+
+	return nil
 }
 
 func (r *FrappeBenchReconciler) ensureNginxService(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
@@ -184,13 +212,17 @@ func (r *FrappeBenchReconciler) ensureNginxService(ctx context.Context, bench *v
 	return r.Create(ctx, svc)
 }
 
-func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, replicas int32, config *vyogotechv1alpha1.NginxAutoscaling, kedaAvailable bool) error {
 	logger := log.FromContext(ctx)
 
 	deployName := fmt.Sprintf("%s-nginx", bench.Name)
 	deploy := &appsv1.Deployment{}
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
+
+	// Determine if this nginx is managed by KEDA
+	kedaManaged := kedaAvailable && config.Enabled != nil && *config.Enabled
+
 	if err == nil {
 		// Update existing deployment if image or resources have changed
 		changed := false
@@ -208,6 +240,13 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 			changed = true
 		}
 
+		// Only update replicas if NOT managed by KEDA
+		if !kedaManaged && deploy.Spec.Replicas != nil && *deploy.Spec.Replicas != replicas {
+			logger.Info("Updating NGINX Deployment replicas", "deployment", deployName, "oldReplicas", *deploy.Spec.Replicas, "newReplicas", replicas)
+			deploy.Spec.Replicas = &replicas
+			changed = true
+		}
+
 		if changed {
 			return r.Update(ctx, deploy)
 		}
@@ -218,9 +257,8 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 		return err
 	}
 
-	logger.Info("Creating NGINX Deployment", "deployment", deployName)
+	logger.Info("Creating NGINX Deployment", "deployment", deployName, "replicas", replicas, "kedaManaged", kedaManaged)
 
-	replicas := r.getNginxReplicas(bench)
 	image := r.getBenchImage(ctx, bench)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 	gunicornSvc := fmt.Sprintf("%s-gunicorn", bench.Name)
@@ -448,4 +486,123 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 	}
 
 	return r.Create(ctx, deploy)
+}
+
+// ensureNginxScaledObject ensures the KEDA ScaledObject for nginx exists
+func (r *FrappeBenchReconciler) ensureNginxScaledObject(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, config *vyogotechv1alpha1.NginxAutoscaling) error {
+logger := log.FromContext(ctx)
+
+// Skip if KEDA is not enabled for nginx
+if config.Enabled == nil || !*config.Enabled {
+// Clean up any existing ScaledObject
+return r.deleteNginxScaledObjectIfExists(ctx, bench)
+}
+
+// Check if KEDA is available
+if !r.isKEDAAvailable(ctx) {
+logger.Info("KEDA not available, skipping nginx ScaledObject creation")
+return nil
+}
+
+scaledObjectName := fmt.Sprintf("%s-nginx", bench.Name)
+deploymentName := fmt.Sprintf("%s-nginx", bench.Name)
+
+// Build the ScaledObject using unstructured
+scaledObject := &unstructured.Unstructured{}
+scaledObject.SetGroupVersionKind(schema.GroupVersionKind{
+Group:   "keda.sh",
+Version: "v1alpha1",
+Kind:    "ScaledObject",
+})
+scaledObject.SetName(scaledObjectName)
+scaledObject.SetNamespace(bench.Namespace)
+scaledObject.SetLabels(r.componentLabels(bench, "nginx"))
+
+// Build trigger based on metric type
+var trigger map[string]interface{}
+if config.MetricType == "memory" {
+trigger = map[string]interface{}{
+"type": "memory",
+"metricType": "Utilization",
+"metadata": map[string]interface{}{
+"value": config.TargetAverageValue,
+},
+}
+} else {
+// Default to CPU
+trigger = map[string]interface{}{
+"type": "cpu",
+"metricType": "Utilization",
+"metadata": map[string]interface{}{
+"value": config.TargetAverageValue,
+},
+}
+}
+
+// Build spec
+spec := map[string]interface{}{
+"scaleTargetRef": map[string]interface{}{
+"apiVersion": "apps/v1",
+"kind":       "Deployment",
+"name":       deploymentName,
+},
+"minReplicaCount": int64(*config.MinReplicas),
+"maxReplicaCount": int64(*config.MaxReplicas),
+"cooldownPeriod":  int64(*config.CooldownPeriod),
+"pollingInterval": int64(*config.PollingInterval),
+"triggers": []interface{}{
+trigger,
+},
+}
+
+if err := unstructured.SetNestedField(scaledObject.Object, spec, "spec"); err != nil {
+return fmt.Errorf("failed to set nginx ScaledObject spec: %w", err)
+}
+
+// Set owner reference
+if err := controllerutil.SetControllerReference(bench, scaledObject, r.Scheme); err != nil {
+return fmt.Errorf("failed to set owner reference: %w", err)
+}
+
+// Create or update
+existing := &unstructured.Unstructured{}
+existing.SetGroupVersionKind(scaledObject.GroupVersionKind())
+err := r.Get(ctx, types.NamespacedName{Name: scaledObjectName, Namespace: bench.Namespace}, existing)
+if err != nil {
+if errors.IsNotFound(err) {
+logger.Info("Creating nginx ScaledObject", "name", scaledObjectName)
+return r.Create(ctx, scaledObject)
+}
+return err
+}
+
+// Update existing
+scaledObject.SetResourceVersion(existing.GetResourceVersion())
+logger.Info("Updating nginx ScaledObject", "name", scaledObjectName)
+return r.Update(ctx, scaledObject)
+}
+
+// deleteNginxScaledObjectIfExists deletes nginx ScaledObject if it exists
+func (r *FrappeBenchReconciler) deleteNginxScaledObjectIfExists(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+logger := log.FromContext(ctx)
+
+scaledObjectName := fmt.Sprintf("%s-nginx", bench.Name)
+
+scaledObject := &unstructured.Unstructured{}
+scaledObject.SetGroupVersionKind(schema.GroupVersionKind{
+Group:   "keda.sh",
+Version: "v1alpha1",
+Kind:    "ScaledObject",
+})
+
+err := r.Get(ctx, types.NamespacedName{Name: scaledObjectName, Namespace: bench.Namespace}, scaledObject)
+if err != nil {
+if meta.IsNoMatchError(err) || errors.IsNotFound(err) {
+return nil // Already deleted or CRD doesn't exist
+}
+return err
+}
+
+logger.Info("Deleting nginx ScaledObject", "name", scaledObjectName)
+return r.Delete(ctx, scaledObject)
 }

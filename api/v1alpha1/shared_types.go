@@ -629,6 +629,62 @@ type WorkerAutoscalingConfig struct {
 	Default *WorkerAutoscaling `json:"default,omitempty"`
 }
 
+// NginxAutoscaling defines scaling configuration for nginx
+// Supports both KEDA-based autoscaling and static replica counts
+type NginxAutoscaling struct {
+	// Enabled controls whether KEDA autoscaling is active
+	// If false or KEDA not installed, uses StaticReplicas
+	// +optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// StaticReplicas for non-autoscaled nginx
+	// Used when Enabled=false OR KEDA not available
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	StaticReplicas *int32 `json:"staticReplicas,omitempty"`
+
+	// MinReplicas for KEDA (minimum 1 for nginx, cannot scale to zero)
+	// Only used when Enabled=true AND KEDA available
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+
+	// MaxReplicas for KEDA
+	// Only used when Enabled=true AND KEDA available
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=10
+	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
+
+	// TargetAverageValue is the target average value for scaling metric
+	// For CPU: percentage (e.g., "70" means 70%)
+	// For memory: absolute value (e.g., "200Mi")
+	// +optional
+	// +kubebuilder:default="70"
+	TargetAverageValue string `json:"targetAverageValue,omitempty"`
+
+	// MetricType determines what metric to use for scaling
+	// +kubebuilder:validation:Enum=cpu;memory
+	// +kubebuilder:default=cpu
+	// +optional
+	MetricType string `json:"metricType,omitempty"`
+
+	// CooldownPeriod in seconds before scaling down
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=60
+	CooldownPeriod *int32 `json:"cooldownPeriod,omitempty"`
+
+	// PollingInterval in seconds for checking metrics
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=30
+	PollingInterval *int32 `json:"pollingInterval,omitempty"`
+}
+
 // RouteConfig defines OpenShift Route configuration for a site
 type RouteConfig struct {
 	// Enabled controls whether Route should be created (defaults to true on OpenShift)
