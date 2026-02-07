@@ -130,21 +130,35 @@ fi
 
 # Step 2: Update Helm dependencies
 print_status "Step 2: Updating Helm chart dependencies..."
-cd helm/frappe-operator
+
+# Save current directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Add required repos
+print_status "Adding Helm repositories..."
 helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator 2>/dev/null || true
 helm repo add kedacore https://kedacore.github.io/charts 2>/dev/null || true
 helm repo update
 
 # Update dependencies
-helm dependency update
+print_status "Building Helm chart dependencies..."
+cd helm/frappe-operator || {
+    print_error "Failed to change to helm/frappe-operator directory"
+    exit 1
+}
 
-cd ../..
+helm dependency build || {
+    print_error "Helm dependency build failed"
+    exit 1
+}
+
+cd "$SCRIPT_DIR"
 
 # Step 3: Build and load operator image
 if [ "$SKIP_BUILD" -eq 0 ]; then
     print_status "Step 3: Building operator image..."
+    cd "$SCRIPT_DIR"
     make build
 
     # Check for Docker or Podman
@@ -176,7 +190,7 @@ print_status "Step 4: Installing frappe-operator with Helm (includes KEDA)..."
 
 # Note: We disable mariadb creation for this test as it's not needed for autoscaling
 # Also disable runAsNonRoot for Kind compatibility (Frappe image uses named user)
-helm upgrade --install frappe-operator ./helm/frappe-operator \
+helm upgrade --install frappe-operator "${SCRIPT_DIR}/helm/frappe-operator" \
     --create-namespace \
     --namespace frappe-operator-system \
     --set operator.image.repository=ghcr.io/rmallam/frappe-operator \
@@ -214,7 +228,7 @@ test_keda_autoscaling() {
     print_test "=========================================="
 
     print_status "Creating FrappeBench with KEDA autoscaling (from examples/)..."
-    kubectl apply -f examples/test-keda-bench.yaml
+    kubectl apply -f "${SCRIPT_DIR}/examples/test-keda-bench.yaml"
 
     print_status "Waiting for bench to initialize..."
     for i in {1..90}; do
@@ -254,7 +268,7 @@ test_hpa_autoscaling() {
     print_test "=========================================="
 
     print_status "Creating FrappeBench with HPA autoscaling (from examples/)..."
-    kubectl apply -f examples/test-hpa-bench.yaml
+    kubectl apply -f "${SCRIPT_DIR}/examples/test-hpa-bench.yaml"
 
     print_status "Waiting for HPA bench to initialize..."
     for i in {1..90}; do
