@@ -12,7 +12,6 @@ echo "========================================="
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 print_status() {
@@ -31,12 +30,27 @@ rm -f /tmp/frappe-operator.tar
 # Step 2: Deploy updated RBAC and restart operator
 print_status "Step 2: Deploying updated RBAC and restarting operator..."
 make deploy IMG=localhost:5001/frappe-operator:repro
+# Set environment variables for security context defaults
+kubectl -n frappe-operator-system set env deployment/frappe-operator-controller-manager \
+    FRAPPE_DEFAULT_UID=1001 FRAPPE_DEFAULT_GID=0 FRAPPE_DEFAULT_FSGROUP=1001
 kubectl -n frappe-operator-system rollout restart deployment/frappe-operator-controller-manager
 kubectl -n frappe-operator-system rollout status deployment/frappe-operator-controller-manager
 
-# Step 3: Trigger reconciliation by restarting deployment if job doesn't exist, or just wait
+# Step 3: Trigger reconciliation
 print_status "Step 3: Triggering reconciliation..."
 kubectl delete job test-keda-bench-init -n ${NAMESPACE} --ignore-not-found=true
+kubectl delete pvc test-keda-bench-sites -n ${NAMESPACE} --ignore-not-found=true
+
+# Patch the FrappeBench to use the custom image and correct field
+kubectl patch frappebench test-keda-bench -n ${NAMESPACE} --type=merge -p '{
+  "spec": {
+    "imageConfig": {
+      "repository": "ghcr.io/rmallam/frappe_docker",
+      "tag": "sha-ae82c47",
+      "pullPolicy": "Never"
+    }
+  }
+}'
 
 # Wait for issue to be resolved
 print_status "Waiting for bench-init to start..."
@@ -55,3 +69,5 @@ echo "Init Job Pods:"
 kubectl get pods -l job-name=test-keda-bench-init -n ${NAMESPACE} || true
 echo "Pod Description:"
 kubectl describe pod -l job-name=test-keda-bench-init -n ${NAMESPACE} || true
+echo "Pod Logs:"
+kubectl logs -l job-name=test-keda-bench-init -n ${NAMESPACE} --tail=100 || true
