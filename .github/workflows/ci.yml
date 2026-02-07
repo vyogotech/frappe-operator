@@ -61,7 +61,8 @@ jobs:
       - name: Lint autoscaling code
         run: |
           echo "=== Linting Autoscaling Code ==="
-          go vet ./controllers/scaling_provider.go ./controllers/keda_provider.go ./controllers/hpa_provider.go ./api/v1alpha1/shared_types.go
+          go vet ./controllers/scaling_provider.go ./controllers/keda_provider.go ./controllers/hpa_provider.go
+          go vet ./api/v1alpha1/shared_types.go
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
