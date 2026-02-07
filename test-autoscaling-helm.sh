@@ -142,9 +142,14 @@ helm repo add kedacore https://kedacore.github.io/charts 2>/dev/null || true
 helm repo update
 
 # Update dependencies
-print_status "Building Helm chart dependencies..."
+print_status "Updating Helm chart dependencies..."
 cd helm/frappe-operator || {
     print_error "Failed to change to helm/frappe-operator directory"
+    exit 1
+}
+
+helm dependency update || {
+    print_error "Helm dependency update failed"
     exit 1
 }
 
