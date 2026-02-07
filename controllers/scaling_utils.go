@@ -177,18 +177,37 @@ func (r *FrappeBenchReconciler) ensureScaledObjectGeneric(ctx context.Context, b
 	})
 	scaledObject.SetName(scaledObjectName)
 	scaledObject.SetNamespace(bench.Namespace)
+	if scaledObject.Object == nil {
+		scaledObject.Object = make(map[string]interface{})
+	}
+	// Re-apply GVK just in case
+	scaledObject.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "keda.sh",
+		Version: "v1alpha1",
+		Kind:    "ScaledObject",
+	})
 	scaledObject.SetLabels(r.componentLabels(bench, deployName))
 
 	// Triggers
 	triggers := []interface{}{}
 	for _, t := range config.Triggers {
-		triggers = append(triggers, map[string]interface{}{
+		metadata := map[string]interface{}{}
+		for k, v := range t.Metadata {
+			metadata[k] = v
+		}
+
+		triggerMap := map[string]interface{}{
 			"type":     t.Type,
-			"metadata": t.Metadata,
-			"authenticationRef": map[string]interface{}{
-				"name": t.AuthenticationRef,
-			},
-		})
+			"metadata": metadata,
+		}
+
+		if t.AuthenticationRef != nil && *t.AuthenticationRef != "" {
+			triggerMap["authenticationRef"] = map[string]interface{}{
+				"name": *t.AuthenticationRef,
+			}
+		}
+
+		triggers = append(triggers, triggerMap)
 	}
 
 	// Add System Triggers (CPU/Memory) if configured
