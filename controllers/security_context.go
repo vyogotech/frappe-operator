@@ -56,21 +56,8 @@ func PodSecurityContextForBench(ctx context.Context, c client.Client, isOpenShif
 
 	if !isOpenShift {
 		secCtx.SeccompProfile = &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
-
-		uid := getDefaultUID()
-		gid := getDefaultGID()
-
-		// On non-OpenShift platforms, we need a numeric UID/GID for RunAsNonRoot: true
-		// If env vars are unset (returning nil), default to 1000 (standard Frappe user)
-		if uid == nil {
-			uid = int64Ptr(1000)
-		}
-		if gid == nil {
-			gid = int64Ptr(1000)
-		}
-
-		secCtx.RunAsUser = uid
-		secCtx.RunAsGroup = gid
+		secCtx.RunAsUser = getDefaultUID()
+		secCtx.RunAsGroup = getDefaultGID()
 	}
 
 	if security != nil && security.PodSecurityContext != nil {
@@ -124,14 +111,6 @@ func ContainerSecurityContextForBench(isOpenShift bool, security *vyogotechv1alp
 	}
 
 	if !isOpenShift {
-		// On non-OpenShift platforms, we need a numeric UID/GID for RunAsNonRoot: true
-		// If env vars are unset (returning nil), default to 1000 (standard Frappe user)
-		if defaultUID == nil {
-			defaultUID = int64Ptr(1000)
-		}
-		if defaultGID == nil {
-			defaultGID = int64Ptr(1000)
-		}
 		secCtx.RunAsUser = defaultUID
 		secCtx.RunAsGroup = defaultGID
 	}
