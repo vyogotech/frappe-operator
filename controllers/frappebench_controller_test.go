@@ -345,6 +345,119 @@ var _ = Describe("FrappeBench Controller", func() {
 		})
 	})
 
+	Describe("Bench Phase Management", func() {
+		It("should preserve Initializing phase when no init job exists", func() {
+			bench.Status.Phase = "Initializing"
+			Expect(fakeClient.Create(ctx, bench)).To(Succeed())
+
+			// Refresh bench from client
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
+
+			// Update status
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			_ = err // Ignore status update errors for fake client
+
+			// Verify Initializing phase is preserved (not reset to Provisioning)
+			Expect(bench.Status.Phase).To(Equal("Initializing"))
+		})
+
+		It("should preserve Ready phase when already set", func() {
+			bench.Status.Phase = "Ready"
+			Expect(fakeClient.Create(ctx, bench)).To(Succeed())
+
+			// Create a successful init job
+			job := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      bench.Name + "-init",
+					Namespace: bench.Namespace,
+				},
+				Status: batchv1.JobStatus{
+					Succeeded: 1,
+				},
+			}
+			Expect(fakeClient.Create(ctx, job)).To(Succeed())
+
+			// Refresh bench from client
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
+
+			// Update status
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			_ = err // Ignore status update errors
+
+			// Ready phase should be maintained
+			Expect(bench.Status.Phase).To(Equal("Ready"))
+		})
+
+		It("should set Ready phase when init job succeeds", func() {
+			bench.Status.Phase = "Initializing"
+			Expect(fakeClient.Create(ctx, bench)).To(Succeed())
+
+			// Create a successful init job
+			job := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      bench.Name + "-init",
+					Namespace: bench.Namespace,
+				},
+				Status: batchv1.JobStatus{
+					Succeeded: 1,
+				},
+			}
+			Expect(fakeClient.Create(ctx, job)).To(Succeed())
+
+			// Refresh bench from client
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
+
+			// Update status
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			_ = err // Ignore status update errors
+
+			// Phase should transition to Ready
+			Expect(bench.Status.Phase).To(Equal("Ready"))
+		})
+
+		It("should set Failed phase when init job fails", func() {
+			bench.Status.Phase = "Initializing"
+			Expect(fakeClient.Create(ctx, bench)).To(Succeed())
+
+			// Create a failed init job
+			job := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      bench.Name + "-init",
+					Namespace: bench.Namespace,
+				},
+				Status: batchv1.JobStatus{
+					Failed: 1,
+				},
+			}
+			Expect(fakeClient.Create(ctx, job)).To(Succeed())
+
+			// Refresh bench from client
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
+
+			// Update status
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			_ = err // Ignore status update errors
+
+			// Phase should be Failed
+			Expect(bench.Status.Phase).To(Equal("Failed"))
+		})
+
+		It("should set Provisioning phase when phase is empty", func() {
+			bench.Status.Phase = ""
+			Expect(fakeClient.Create(ctx, bench)).To(Succeed())
+
+			// Refresh bench from client
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
+
+			// Update status
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			_ = err // Ignore status update errors
+
+			// Phase should be set to Provisioning
+			Expect(bench.Status.Phase).To(Equal("Provisioning"))
+		})
+	})
+
 	Describe("Job TTL configuration", func() {
 		It("sets default TTL on bench init job", func() {
 			bench.Spec.FrappeVersion = "15"
