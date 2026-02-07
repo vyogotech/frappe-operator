@@ -517,9 +517,15 @@ spec:
                     type: boolean
                 type: object
               gunicornAutoscaling:
-                description: GunicornAutoscaling defines HPA behavior for the Gunicorn
-                  web server
+                description: |-
+                  GunicornAutoscaling defines autoscaling behavior for the Gunicorn web server
+                  Supports both HPA (CPU/Memory) and KEDA (Triggers)
                 properties:
+                  cooldownPeriod:
+                    description: CooldownPeriod is the period to wait after the last
+                      trigger reported active before scaling back to 0
+                    format: int32
+                    type: integer
                   enabled:
                     description: Enabled toggles autoscaling
                     type: boolean
@@ -533,7 +539,12 @@ spec:
                     description: MinReplicas is the lower limit for the number of
                       replicas
                     format: int32
-                    minimum: 1
+                    minimum: 0
+                    type: integer
+                  pollingInterval:
+                    description: PollingInterval is the interval to check each trigger
+                      on
+                    format: int32
                     type: integer
                   targetCPUUtilizationPercentage:
                     description: TargetCPUUtilizationPercentage is the target average
@@ -545,6 +556,29 @@ spec:
                       Memory utilization
                     format: int32
                     type: integer
+                  triggers:
+                    description: Triggers allows defining custom KEDA triggers (e.g.
+                      Prometheus, Cron, etc.)
+                    items:
+                      description: ScaleTrigger defines a KEDA trigger
+                      properties:
+                        authenticationRef:
+                          description: AuthenticationRef points to a TriggerAuthentication
+                            object
+                          type: string
+                        metadata:
+                          additionalProperties:
+                            type: string
+                          description: Metadata for the trigger
+                          type: object
+                        type:
+                          description: Type of the trigger (e.g., prometheus, cron,
+                            redis)
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    type: array
                 type: object
               imageConfig:
                 description: ImageConfig defines the container image configuration
@@ -583,9 +617,15 @@ spec:
                     type: string
                 type: object
               nginxAutoscaling:
-                description: NginxAutoscaling defines HPA behavior for the NGINX reverse
-                  proxy (HA)
+                description: |-
+                  NginxAutoscaling defines autoscaling behavior for the NGINX reverse proxy (HA)
+                  Supports both HPA (CPU/Memory) and KEDA (Triggers)
                 properties:
+                  cooldownPeriod:
+                    description: CooldownPeriod is the period to wait after the last
+                      trigger reported active before scaling back to 0
+                    format: int32
+                    type: integer
                   enabled:
                     description: Enabled toggles autoscaling
                     type: boolean
@@ -599,7 +639,12 @@ spec:
                     description: MinReplicas is the lower limit for the number of
                       replicas
                     format: int32
-                    minimum: 1
+                    minimum: 0
+                    type: integer
+                  pollingInterval:
+                    description: PollingInterval is the interval to check each trigger
+                      on
+                    format: int32
                     type: integer
                   targetCPUUtilizationPercentage:
                     description: TargetCPUUtilizationPercentage is the target average
@@ -611,6 +656,29 @@ spec:
                       Memory utilization
                     format: int32
                     type: integer
+                  triggers:
+                    description: Triggers allows defining custom KEDA triggers (e.g.
+                      Prometheus, Cron, etc.)
+                    items:
+                      description: ScaleTrigger defines a KEDA trigger
+                      properties:
+                        authenticationRef:
+                          description: AuthenticationRef points to a TriggerAuthentication
+                            object
+                          type: string
+                        metadata:
+                          additionalProperties:
+                            type: string
+                          description: Metadata for the trigger
+                          type: object
+                        type:
+                          description: Type of the trigger (e.g., prometheus, cron,
+                            redis)
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    type: array
                 type: object
               podConfig:
                 description: PodConfig defines advanced pod configuration for all
@@ -2115,9 +2183,15 @@ spec:
                 format: int32
                 type: integer
               socketIOAutoscaling:
-                description: SocketIOAutoscaling defines HPA behavior for the SocketIO
-                  service
+                description: |-
+                  SocketIOAutoscaling defines autoscaling behavior for the SocketIO service
+                  Supports both HPA (CPU/Memory) and KEDA (Triggers)
                 properties:
+                  cooldownPeriod:
+                    description: CooldownPeriod is the period to wait after the last
+                      trigger reported active before scaling back to 0
+                    format: int32
+                    type: integer
                   enabled:
                     description: Enabled toggles autoscaling
                     type: boolean
@@ -2131,7 +2205,12 @@ spec:
                     description: MinReplicas is the lower limit for the number of
                       replicas
                     format: int32
-                    minimum: 1
+                    minimum: 0
+                    type: integer
+                  pollingInterval:
+                    description: PollingInterval is the interval to check each trigger
+                      on
+                    format: int32
                     type: integer
                   targetCPUUtilizationPercentage:
                     description: TargetCPUUtilizationPercentage is the target average
@@ -2143,6 +2222,29 @@ spec:
                       Memory utilization
                     format: int32
                     type: integer
+                  triggers:
+                    description: Triggers allows defining custom KEDA triggers (e.g.
+                      Prometheus, Cron, etc.)
+                    items:
+                      description: ScaleTrigger defines a KEDA trigger
+                      properties:
+                        authenticationRef:
+                          description: AuthenticationRef points to a TriggerAuthentication
+                            object
+                          type: string
+                        metadata:
+                          additionalProperties:
+                            type: string
+                          description: Metadata for the trigger
+                          type: object
+                        type:
+                          description: Type of the trigger (e.g., prometheus, cron,
+                            redis)
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    type: array
                 type: object
               storageClassName:
                 description: StorageClassName allows overriding the storage class
@@ -2211,6 +2313,16 @@ spec:
                         format: int32
                         minimum: 0
                         type: integer
+                      targetCPUUtilizationPercentage:
+                        description: TargetCPUUtilizationPercentage is the target
+                          average CPU utilization
+                        format: int32
+                        type: integer
+                      targetMemoryUtilizationPercentage:
+                        description: TargetMemoryUtilizationPercentage is the target
+                          average Memory utilization
+                        format: int32
+                        type: integer
                     type: object
                   long:
                     description: Long worker scaling configuration
@@ -2265,6 +2377,16 @@ spec:
                         format: int32
                         minimum: 0
                         type: integer
+                      targetCPUUtilizationPercentage:
+                        description: TargetCPUUtilizationPercentage is the target
+                          average CPU utilization
+                        format: int32
+                        type: integer
+                      targetMemoryUtilizationPercentage:
+                        description: TargetMemoryUtilizationPercentage is the target
+                          average Memory utilization
+                        format: int32
+                        type: integer
                     type: object
                   short:
                     description: Short worker scaling configuration
@@ -2318,6 +2440,16 @@ spec:
                           Used when Enabled=false OR KEDA not available
                         format: int32
                         minimum: 0
+                        type: integer
+                      targetCPUUtilizationPercentage:
+                        description: TargetCPUUtilizationPercentage is the target
+                          average CPU utilization
+                        format: int32
+                        type: integer
+                      targetMemoryUtilizationPercentage:
+                        description: TargetMemoryUtilizationPercentage is the target
+                          average Memory utilization
+                        format: int32
                         type: integer
                     type: object
                 type: object

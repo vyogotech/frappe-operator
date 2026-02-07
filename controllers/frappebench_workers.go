@@ -69,10 +69,40 @@ func (r *FrappeBenchReconciler) ensureWorkers(ctx context.Context, bench *vyogot
 			return err
 		}
 
-		// Create/update ScaledObject if autoscaling is enabled
-		if err := r.ensureScaledObject(ctx, bench, worker.name, config); err != nil {
-			logger.Error(err, "Failed to ensure ScaledObject", "worker", worker.name)
-			// Don't fail the reconciliation, just log the error
+		// Autoscaling Logic (KEDA vs HPA)
+		deployName := fmt.Sprintf("%s-worker-%s", bench.Name, worker.name)
+
+		// 1. Try KEDA first if enabled and available
+		if kedaAvailable && config.Enabled != nil && *config.Enabled {
+			// Ensure KEDA ScaledObject
+			if err := r.ensureScaledObject(ctx, bench, worker.name, config); err != nil {
+				logger.Error(err, "Failed to ensure ScaledObject", "worker", worker.name)
+			}
+			// Clean up HPA if exists (anti-thrashing)
+			_ = r.deleteHPAIfExists(ctx, bench, deployName)
+
+			// 2. Fallback to HPA if CPU/Mem metrics are defined
+		} else if config.TargetCPUUtilizationPercentage != nil || config.TargetMemoryUtilizationPercentage != nil {
+			// Convert Worker config to generic ScalingConfig for HPA
+			hpaConfig := &vyogotechv1alpha1.ScalingConfig{
+				Enabled:                           true,
+				MinReplicas:                       config.MinReplicas,
+				MaxReplicas:                       *config.MaxReplicas,
+				TargetCPUUtilizationPercentage:    config.TargetCPUUtilizationPercentage,
+				TargetMemoryUtilizationPercentage: config.TargetMemoryUtilizationPercentage,
+			}
+
+			if err := r.ensureHPA(ctx, bench, deployName, hpaConfig); err != nil {
+				logger.Error(err, "Failed to ensure HPA", "worker", worker.name)
+			}
+
+			// Clean up ScaledObject if exists
+			_ = r.deleteScaledObjectIfExists(ctx, bench, worker.name)
+
+		} else {
+			// 3. No autoscaling - clean up everything
+			_ = r.deleteHPAIfExists(ctx, bench, deployName)
+			_ = r.deleteScaledObjectIfExists(ctx, bench, worker.name)
 		}
 	}
 

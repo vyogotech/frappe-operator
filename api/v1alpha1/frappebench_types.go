@@ -69,17 +69,20 @@ type FrappeBenchSpec struct {
 	// +optional
 	WorkerAutoscaling *WorkerAutoscalingConfig `json:"workerAutoscaling,omitempty"`
 
-	// GunicornAutoscaling defines HPA behavior for the Gunicorn web server
+	// GunicornAutoscaling defines autoscaling behavior for the Gunicorn web server
+	// Supports both HPA (CPU/Memory) and KEDA (Triggers)
 	// +optional
-	GunicornAutoscaling *HPAConfig `json:"gunicornAutoscaling,omitempty"`
+	GunicornAutoscaling *ScalingConfig `json:"gunicornAutoscaling,omitempty"`
 
-	// SocketIOAutoscaling defines HPA behavior for the SocketIO service
+	// SocketIOAutoscaling defines autoscaling behavior for the SocketIO service
+	// Supports both HPA (CPU/Memory) and KEDA (Triggers)
 	// +optional
-	SocketIOAutoscaling *HPAConfig `json:"socketIOAutoscaling,omitempty"`
+	SocketIOAutoscaling *ScalingConfig `json:"socketIOAutoscaling,omitempty"`
 
-	// NginxAutoscaling defines HPA behavior for the NGINX reverse proxy (HA)
+	// NginxAutoscaling defines autoscaling behavior for the NGINX reverse proxy (HA)
+	// Supports both HPA (CPU/Memory) and KEDA (Triggers)
 	// +optional
-	NginxAutoscaling *HPAConfig `json:"nginxAutoscaling,omitempty"`
+	NginxAutoscaling *ScalingConfig `json:"nginxAutoscaling,omitempty"`
 
 	// Security defines security context settings for all pods in this bench
 	// +optional
@@ -111,14 +114,28 @@ type WorkerScalingStatus struct {
 	KEDAManaged bool `json:"kedaManaged"`
 }
 
-// HPAConfig defines configuration for Horizontal Pod Autoscaling
-type HPAConfig struct {
+// ScaleTrigger defines a KEDA trigger
+type ScaleTrigger struct {
+	// Type of the trigger (e.g., prometheus, cron, redis)
+	Type string `json:"type"`
+
+	// Metadata for the trigger
+	// +optional
+	Metadata map[string]string `json:"metadata,omitempty"`
+
+	// AuthenticationRef points to a TriggerAuthentication object
+	// +optional
+	AuthenticationRef *string `json:"authenticationRef,omitempty"`
+}
+
+// ScalingConfig defines configuration for Autoscaling (HPA & KEDA)
+type ScalingConfig struct {
 	// Enabled toggles autoscaling
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
 
 	// MinReplicas is the lower limit for the number of replicas
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=0
 	// +optional
 	MinReplicas *int32 `json:"minReplicas,omitempty"`
 
@@ -127,6 +144,8 @@ type HPAConfig struct {
 	// +optional
 	MaxReplicas int32 `json:"maxReplicas,omitempty"`
 
+	// --- HPA (Resource) Metrics ---
+
 	// TargetCPUUtilizationPercentage is the target average CPU utilization
 	// +optional
 	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty"`
@@ -134,6 +153,20 @@ type HPAConfig struct {
 	// TargetMemoryUtilizationPercentage is the target average Memory utilization
 	// +optional
 	TargetMemoryUtilizationPercentage *int32 `json:"targetMemoryUtilizationPercentage,omitempty"`
+
+	// --- KEDA Specific ---
+
+	// CooldownPeriod is the period to wait after the last trigger reported active before scaling back to 0
+	// +optional
+	CooldownPeriod *int32 `json:"cooldownPeriod,omitempty"`
+
+	// PollingInterval is the interval to check each trigger on
+	// +optional
+	PollingInterval *int32 `json:"pollingInterval,omitempty"`
+
+	// Triggers allows defining custom KEDA triggers (e.g. Prometheus, Cron, etc.)
+	// +optional
+	Triggers []ScaleTrigger `json:"triggers,omitempty"`
 }
 
 // FrappeBenchStatus defines the observed state of FrappeBench

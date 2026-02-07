@@ -36,11 +36,11 @@ func (r *FrappeBenchReconciler) ensureGunicorn(ctx context.Context, bench *vyogo
 		return err
 	}
 
-	// Ensure HPA (Create/Update or Delete)
+	// Ensure Autoscaler (HPA or KEDA)
 	deployName := fmt.Sprintf("%s-gunicorn", bench.Name)
-	if err := r.ensureHPA(ctx, bench, deployName, bench.Spec.GunicornAutoscaling); err != nil {
-		log.FromContext(ctx).Error(err, "Failed to ensure HPA for Gunicorn")
-		// Don't fail reconciliation for HPA errors
+	if err := r.ensureAutoscaler(ctx, bench, deployName, bench.Spec.GunicornAutoscaling); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to ensure Autoscaler for Gunicorn")
+		// Don't fail reconciliation for autoscaling errors
 	}
 
 	return r.ensureGunicornDeployment(ctx, bench)
@@ -179,11 +179,11 @@ func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotec
 		return err
 	}
 
-	// Ensure HPA (Create/Update or Delete)
+	// Ensure Autoscaler (HPA or KEDA)
 	deployName := fmt.Sprintf("%s-nginx", bench.Name)
-	if err := r.ensureHPA(ctx, bench, deployName, bench.Spec.NginxAutoscaling); err != nil {
-		log.FromContext(ctx).Error(err, "Failed to ensure HPA for NGINX")
-		// Don't fail reconciliation for HPA errors
+	if err := r.ensureAutoscaler(ctx, bench, deployName, bench.Spec.NginxAutoscaling); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to ensure Autoscaler for NGINX")
+		// Don't fail reconciliation for autoscaling errors
 	}
 
 	return r.ensureNginxDeployment(ctx, bench)
@@ -328,11 +328,11 @@ func (r *FrappeBenchReconciler) ensureSocketIO(ctx context.Context, bench *vyogo
 		return err
 	}
 
-	// Ensure HPA (Create/Update or Delete)
+	// Ensure Autoscaler (HPA or KEDA)
 	deployName := fmt.Sprintf("%s-socketio", bench.Name)
-	if err := r.ensureHPA(ctx, bench, deployName, bench.Spec.SocketIOAutoscaling); err != nil {
-		log.FromContext(ctx).Error(err, "Failed to ensure HPA for SocketIO")
-		// Don't fail reconciliation for HPA errors
+	if err := r.ensureAutoscaler(ctx, bench, deployName, bench.Spec.SocketIOAutoscaling); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to ensure Autoscaler for SocketIO")
+		// Don't fail reconciliation for autoscaling errors
 	}
 
 	return r.ensureSocketIODeployment(ctx, bench)

@@ -612,6 +612,14 @@ type WorkerAutoscaling struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=30
 	PollingInterval *int32 `json:"pollingInterval,omitempty"`
+
+	// TargetCPUUtilizationPercentage is the target average CPU utilization
+	// +optional
+	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty"`
+
+	// TargetMemoryUtilizationPercentage is the target average Memory utilization
+	// +optional
+	TargetMemoryUtilizationPercentage *int32 `json:"targetMemoryUtilizationPercentage,omitempty"`
 }
 
 // WorkerAutoscalingConfig defines scaling per worker type
