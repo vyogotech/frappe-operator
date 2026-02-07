@@ -193,46 +193,130 @@ type ImageConfig struct {
 	PullSecrets []corev1.LocalObjectReference `json:"pullSecrets,omitempty"`
 }
 
-// ComponentReplicas defines replica counts for bench components
-type ComponentReplicas struct {
-	// Gunicorn replicas
+// ComponentAutoscaling defines scaling configuration for a component
+// Supports both static replicas and provider-based autoscaling
+type ComponentAutoscaling struct {
+	// Enabled controls whether autoscaling is active
+	// If false, uses StaticReplicas
 	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	Gunicorn int32 `json:"gunicorn,omitempty"`
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
 
-	// Nginx replicas
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	Nginx int32 `json:"nginx,omitempty"`
-
-	// Socketio replicas
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	Socketio int32 `json:"socketio,omitempty"`
-
-	// WorkerDefault replicas (DEPRECATED: use WorkerAutoscaling instead)
-	// Kept for backward compatibility
+	// StaticReplicas for non-autoscaled components
+	// Used when Enabled=false OR provider not available
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
-	WorkerDefault int32 `json:"workerDefault,omitempty"`
+	StaticReplicas *int32 `json:"staticReplicas,omitempty"`
 
-	// WorkerLong replicas (DEPRECATED: use WorkerAutoscaling instead)
-	// Kept for backward compatibility
+	// MinReplicas for provider-based scaling (minimum 1 for nginx/gunicorn/socketio, 0 for workers)
+	// Only used when Enabled=true AND provider available
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
-	WorkerLong int32 `json:"workerLong,omitempty"`
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
 
-	// WorkerShort replicas (DEPRECATED: use WorkerAutoscaling instead)
-	// Kept for backward compatibility
+	// MaxReplicas for autoscaling
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=10
+	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
+
+	// CooldownPeriod in seconds before scaling down
 	// +optional
 	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=1
-	WorkerShort int32 `json:"workerShort,omitempty"`
+	// +kubebuilder:default=60
+	CooldownPeriod *int32 `json:"cooldownPeriod,omitempty"`
+
+	// PollingInterval in seconds for checking metrics
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=30
+	PollingInterval *int32 `json:"pollingInterval,omitempty"`
+
+	// Provider selects the scaling backend
+	// +kubebuilder:validation:Enum=keda;hpa
+	// +optional
+	// +kubebuilder:default=hpa
+	Provider string `json:"provider,omitempty"`
+
+	// KEDA contains KEDA-specific scaling configuration
+	// Only used when Provider="keda"
+	// +optional
+	KEDA *KEDAScalingConfig `json:"keda,omitempty"`
+
+	// HPA contains HPA-specific scaling configuration
+	// Only used when Provider="hpa"
+	// +optional
+	HPA *HPAScalingConfig `json:"hpa,omitempty"`
+}
+
+// KEDAScalingConfig defines KEDA trigger configuration
+type KEDAScalingConfig struct {
+	// Trigger type: "cpu", "memory", "redis"
+	// +kubebuilder:validation:Enum=cpu;memory;redis
+	// +optional
+	// +kubebuilder:default=cpu
+	Trigger string `json:"trigger,omitempty"`
+
+	// TargetValue is the target value for the trigger
+	// E.g., "70" for CPU%, "5" for queue length
+	// +optional
+	// +kubebuilder:default="70"
+	TargetValue string `json:"targetValue,omitempty"`
+
+	// Metadata contains trigger-specific configuration
+	// E.g., for redis: {"listName": "rq:queue:short", "address": "..."}
+	// +optional
+	Metadata map[string]string `json:"metadata,omitempty"`
+}
+
+// HPAScalingConfig defines HPA scaling configuration
+type HPAScalingConfig struct {
+	// Metric type: "cpu" or "memory"
+	// +kubebuilder:validation:Enum=cpu;memory
+	// +optional
+	// +kubebuilder:default=cpu
+	Metric string `json:"metric,omitempty"`
+
+	// TargetUtilization is the target percentage (0-100)
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:default=70
+	TargetUtilization *int32 `json:"targetUtilization,omitempty"`
+
+	// ScaleUpStabilization in seconds before scaling up
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	ScaleUpStabilization *int32 `json:"scaleUpStabilization,omitempty"`
+
+	// ScaleDownStabilization in seconds before scaling down
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=300
+	ScaleDownStabilization *int32 `json:"scaleDownStabilization,omitempty"`
+}
+
+// ComponentScalingStatus reports the scaling status of a component
+type ComponentScalingStatus struct {
+	// Mode: "autoscaled" or "static"
+	// +kubebuilder:validation:Enum=autoscaled;static
+	Mode string `json:"mode"`
+
+	// Provider: "keda", "hpa", or "" (static)
+	// +optional
+	Provider string `json:"provider,omitempty"`
+
+	// CurrentReplicas is the actual running replica count
+	CurrentReplicas int32 `json:"currentReplicas"`
+
+	// DesiredReplicas is the desired count
+	DesiredReplicas int32 `json:"desiredReplicas"`
+
+	// ProviderManaged indicates if the scaling provider manages this component
+	ProviderManaged bool `json:"providerManaged"`
 }
 
 // ComponentResources defines resource requirements for bench components
@@ -565,125 +649,6 @@ type GitConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
-// WorkerAutoscaling defines scaling configuration for a worker type
-// Supports both KEDA-based autoscaling and static replica counts
-type WorkerAutoscaling struct {
-	// Enabled controls whether KEDA autoscaling is active
-	// If false or KEDA not installed, uses StaticReplicas
-	// +optional
-	// +kubebuilder:default=true
-	Enabled *bool `json:"enabled,omitempty"`
-
-	// StaticReplicas for non-autoscaled workers
-	// Used when Enabled=false OR KEDA not available
-	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=1
-	StaticReplicas *int32 `json:"staticReplicas,omitempty"`
-
-	// MinReplicas for KEDA (can be 0 for true serverless)
-	// Only used when Enabled=true AND KEDA available
-	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=0
-	MinReplicas *int32 `json:"minReplicas,omitempty"`
-
-	// MaxReplicas for KEDA
-	// Only used when Enabled=true AND KEDA available
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=10
-	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
-
-	// QueueLength triggers scaling when queue depth exceeds this value
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=5
-	QueueLength *int32 `json:"queueLength,omitempty"`
-
-	// CooldownPeriod in seconds before scaling down
-	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=60
-	CooldownPeriod *int32 `json:"cooldownPeriod,omitempty"`
-
-	// PollingInterval in seconds for checking queue depth
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=30
-	PollingInterval *int32 `json:"pollingInterval,omitempty"`
-}
-
-// WorkerAutoscalingConfig defines scaling per worker type
-type WorkerAutoscalingConfig struct {
-	// Short worker scaling configuration
-	// +optional
-	Short *WorkerAutoscaling `json:"short,omitempty"`
-
-	// Long worker scaling configuration
-	// +optional
-	Long *WorkerAutoscaling `json:"long,omitempty"`
-
-	// Default worker scaling configuration
-	// +optional
-	Default *WorkerAutoscaling `json:"default,omitempty"`
-}
-
-// NginxAutoscaling defines scaling configuration for nginx
-// Supports both KEDA-based autoscaling and static replica counts
-type NginxAutoscaling struct {
-	// Enabled controls whether KEDA autoscaling is active
-	// If false or KEDA not installed, uses StaticReplicas
-	// +optional
-	// +kubebuilder:default=false
-	Enabled *bool `json:"enabled,omitempty"`
-
-	// StaticReplicas for non-autoscaled nginx
-	// Used when Enabled=false OR KEDA not available
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	StaticReplicas *int32 `json:"staticReplicas,omitempty"`
-
-	// MinReplicas for KEDA (minimum 1 for nginx, cannot scale to zero)
-	// Only used when Enabled=true AND KEDA available
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=1
-	MinReplicas *int32 `json:"minReplicas,omitempty"`
-
-	// MaxReplicas for KEDA
-	// Only used when Enabled=true AND KEDA available
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=10
-	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
-
-	// TargetAverageValue is the target average value for scaling metric
-	// For CPU: percentage (e.g., "70" means 70%)
-	// For memory: percentage (e.g., "80" means 80%) or absolute value (e.g., "200Mi")
-	// +optional
-	// +kubebuilder:default="70"
-	TargetAverageValue string `json:"targetAverageValue,omitempty"`
-
-	// MetricType determines what metric to use for scaling
-	// +kubebuilder:validation:Enum=cpu;memory
-	// +kubebuilder:default=cpu
-	// +optional
-	MetricType string `json:"metricType,omitempty"`
-
-	// CooldownPeriod in seconds before scaling down
-	// +optional
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=60
-	CooldownPeriod *int32 `json:"cooldownPeriod,omitempty"`
-
-	// PollingInterval in seconds for checking metrics
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=30
-	PollingInterval *int32 `json:"pollingInterval,omitempty"`
-}
 
 // RouteConfig defines OpenShift Route configuration for a site
 type RouteConfig struct {
