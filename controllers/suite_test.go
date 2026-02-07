@@ -63,7 +63,7 @@ func init() {
 	// Navigate up from controllers if necessary, or check relative to root
 	// In suite_test.go, Getwd() is normally the directory containing the file
 	binPath := filepath.Join(cwd, "..", "bin", "k8s")
-	
+
 	// Try to find any etcd in bin/k8s subdirectories
 	filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.Name() == "etcd" && !info.IsDir() {

@@ -1,16 +1,17 @@
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
 metadata:
-  name: external-mock-site1
+  name: prod-site
   namespace: frappe
 spec:
   benchRef:
     name: external-redis-bench
-  siteName: external1-mock.apps.crc.testing
+  siteName: prod.site.com
   dbConfig:
     provider: external
     host: frappe-mariadb.mariadb.svc.cluster.local
     port: "3306"
+    dbName: prod_db  # <--- Simulating the PROD database restoration target
     connectionSecretRef:
       name: external-mariadb-creds
   apps:

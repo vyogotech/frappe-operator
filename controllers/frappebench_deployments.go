@@ -35,6 +35,14 @@ func (r *FrappeBenchReconciler) ensureGunicorn(ctx context.Context, bench *vyogo
 	if err := r.ensureGunicornService(ctx, bench); err != nil {
 		return err
 	}
+
+	// Ensure HPA (Create/Update or Delete)
+	deployName := fmt.Sprintf("%s-gunicorn", bench.Name)
+	if err := r.ensureHPA(ctx, bench, deployName, bench.Spec.GunicornAutoscaling); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to ensure HPA for Gunicorn")
+		// Don't fail reconciliation for HPA errors
+	}
+
 	return r.ensureGunicornDeployment(ctx, bench)
 }
 
@@ -77,6 +85,9 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 	deployName := fmt.Sprintf("%s-gunicorn", bench.Name)
 	deploy := &appsv1.Deployment{}
 
+	// Determine if HPA is enabled for Gunicorn
+	hpaEnabled := bench.Spec.GunicornAutoscaling != nil && bench.Spec.GunicornAutoscaling.Enabled
+
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
 		// Update existing deployment if image or resources have changed
@@ -93,6 +104,17 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 			logger.Info("Updating Gunicorn Deployment resources", "deployment", deployName)
 			deploy.Spec.Template.Spec.Containers[0].Resources = resources
 			changed = true
+		}
+
+		// Only update replicas if HPA is NOT enabled
+		// If HPA is enabled, we let HPA manage the replicas
+		if !hpaEnabled {
+			replicas := r.getGunicornReplicas(bench)
+			if deploy.Spec.Replicas != nil && *deploy.Spec.Replicas != replicas {
+				logger.Info("Updating Gunicorn Deployment replicas", "deployment", deployName, "oldReplicas", *deploy.Spec.Replicas, "newReplicas", replicas)
+				deploy.Spec.Replicas = &replicas
+				changed = true
+			}
 		}
 
 		if changed {
@@ -140,6 +162,14 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 		return err
 	}
 
+	// Add annotation to indicate scaling mode
+	if hpaEnabled {
+		if deploy.Annotations == nil {
+			deploy.Annotations = make(map[string]string)
+		}
+		deploy.Annotations["frappe.io/scaling-mode"] = "hpa"
+	}
+
 	return r.Create(ctx, deploy)
 }
 
@@ -148,6 +178,14 @@ func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotec
 	if err := r.ensureNginxService(ctx, bench); err != nil {
 		return err
 	}
+
+	// Ensure HPA (Create/Update or Delete)
+	deployName := fmt.Sprintf("%s-nginx", bench.Name)
+	if err := r.ensureHPA(ctx, bench, deployName, bench.Spec.NginxAutoscaling); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to ensure HPA for NGINX")
+		// Don't fail reconciliation for HPA errors
+	}
+
 	return r.ensureNginxDeployment(ctx, bench)
 }
 
@@ -190,6 +228,9 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 	deployName := fmt.Sprintf("%s-nginx", bench.Name)
 	deploy := &appsv1.Deployment{}
 
+	// Determine if HPA is enabled for NGINX
+	hpaEnabled := bench.Spec.NginxAutoscaling != nil && bench.Spec.NginxAutoscaling.Enabled
+
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
 		// Update existing deployment if image or resources have changed
@@ -206,6 +247,16 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 			logger.Info("Updating NGINX Deployment resources", "deployment", deployName)
 			deploy.Spec.Template.Spec.Containers[0].Resources = resources
 			changed = true
+		}
+
+		// Only update replicas if HPA is NOT enabled
+		if !hpaEnabled {
+			replicas := r.getNginxReplicas(bench)
+			if deploy.Spec.Replicas != nil && *deploy.Spec.Replicas != replicas {
+				logger.Info("Updating NGINX Deployment replicas", "deployment", deployName, "oldReplicas", *deploy.Spec.Replicas, "newReplicas", replicas)
+				deploy.Spec.Replicas = &replicas
+				changed = true
+			}
 		}
 
 		if changed {
@@ -260,6 +311,14 @@ func (r *FrappeBenchReconciler) ensureNginxDeployment(ctx context.Context, bench
 		return err
 	}
 
+	// Add annotation to indicate scaling mode
+	if hpaEnabled {
+		if deploy.Annotations == nil {
+			deploy.Annotations = make(map[string]string)
+		}
+		deploy.Annotations["frappe.io/scaling-mode"] = "hpa"
+	}
+
 	return r.Create(ctx, deploy)
 }
 
@@ -268,6 +327,14 @@ func (r *FrappeBenchReconciler) ensureSocketIO(ctx context.Context, bench *vyogo
 	if err := r.ensureSocketIOService(ctx, bench); err != nil {
 		return err
 	}
+
+	// Ensure HPA (Create/Update or Delete)
+	deployName := fmt.Sprintf("%s-socketio", bench.Name)
+	if err := r.ensureHPA(ctx, bench, deployName, bench.Spec.SocketIOAutoscaling); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to ensure HPA for SocketIO")
+		// Don't fail reconciliation for HPA errors
+	}
+
 	return r.ensureSocketIODeployment(ctx, bench)
 }
 
@@ -310,6 +377,9 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 	deployName := fmt.Sprintf("%s-socketio", bench.Name)
 	deploy := &appsv1.Deployment{}
 
+	// Determine if HPA is enabled for SocketIO
+	hpaEnabled := bench.Spec.SocketIOAutoscaling != nil && bench.Spec.SocketIOAutoscaling.Enabled
+
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 	if err == nil {
 		// Update existing deployment if image or resources have changed
@@ -326,6 +396,16 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 			logger.Info("Updating Socket.IO Deployment resources", "deployment", deployName)
 			deploy.Spec.Template.Spec.Containers[0].Resources = resources
 			changed = true
+		}
+
+		// Only update replicas if HPA is NOT enabled
+		if !hpaEnabled {
+			replicas := r.getSocketIOReplicas(bench)
+			if deploy.Spec.Replicas != nil && *deploy.Spec.Replicas != replicas {
+				logger.Info("Updating Socket.IO Deployment replicas", "deployment", deployName, "oldReplicas", *deploy.Spec.Replicas, "newReplicas", replicas)
+				deploy.Spec.Replicas = &replicas
+				changed = true
+			}
 		}
 
 		if changed {
@@ -372,6 +452,14 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 		Build()
 	if err != nil {
 		return err
+	}
+
+	// Add annotation to indicate scaling mode
+	if hpaEnabled {
+		if deploy.Annotations == nil {
+			deploy.Annotations = make(map[string]string)
+		}
+		deploy.Annotations["frappe.io/scaling-mode"] = "hpa"
 	}
 
 	return r.Create(ctx, deploy)

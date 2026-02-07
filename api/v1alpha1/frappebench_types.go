@@ -69,6 +69,18 @@ type FrappeBenchSpec struct {
 	// +optional
 	WorkerAutoscaling *WorkerAutoscalingConfig `json:"workerAutoscaling,omitempty"`
 
+	// GunicornAutoscaling defines HPA behavior for the Gunicorn web server
+	// +optional
+	GunicornAutoscaling *HPAConfig `json:"gunicornAutoscaling,omitempty"`
+
+	// SocketIOAutoscaling defines HPA behavior for the SocketIO service
+	// +optional
+	SocketIOAutoscaling *HPAConfig `json:"socketIOAutoscaling,omitempty"`
+
+	// NginxAutoscaling defines HPA behavior for the NGINX reverse proxy (HA)
+	// +optional
+	NginxAutoscaling *HPAConfig `json:"nginxAutoscaling,omitempty"`
+
 	// Security defines security context settings for all pods in this bench
 	// +optional
 	Security *SecurityConfig `json:"security,omitempty"`
@@ -97,6 +109,31 @@ type WorkerScalingStatus struct {
 
 	// KEDAManaged indicates if KEDA ScaledObject exists
 	KEDAManaged bool `json:"kedaManaged"`
+}
+
+// HPAConfig defines configuration for Horizontal Pod Autoscaling
+type HPAConfig struct {
+	// Enabled toggles autoscaling
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// MinReplicas is the lower limit for the number of replicas
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+
+	// MaxReplicas is the upper limit for the number of replicas
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	MaxReplicas int32 `json:"maxReplicas,omitempty"`
+
+	// TargetCPUUtilizationPercentage is the target average CPU utilization
+	// +optional
+	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty"`
+
+	// TargetMemoryUtilizationPercentage is the target average Memory utilization
+	// +optional
+	TargetMemoryUtilizationPercentage *int32 `json:"targetMemoryUtilizationPercentage,omitempty"`
 }
 
 // FrappeBenchStatus defines the observed state of FrappeBench
