@@ -50,7 +50,6 @@ func (r *FrappeBenchReconciler) getRedisImage(bench *vyogotechv1alpha1.FrappeBen
 
 // Replica getters
 
-
 // Resource getters
 
 func (r *FrappeBenchReconciler) getRedisResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
@@ -266,13 +265,13 @@ func (r *FrappeBenchReconciler) fillComponentDefaults(config *vyogotechv1alpha1.
 func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyogotechv1alpha1.ComponentAutoscaling {
 	defaults := map[string]*vyogotechv1alpha1.ComponentAutoscaling{
 		"nginx": {
-			Enabled:        boolPtr(false),
-			StaticReplicas: int32Ptr(1),
-			MinReplicas:    int32Ptr(1),
-			MaxReplicas:    int32Ptr(10),
-			CooldownPeriod: int32Ptr(60),
+			Enabled:         boolPtr(false),
+			StaticReplicas:  int32Ptr(1),
+			MinReplicas:     int32Ptr(1),
+			MaxReplicas:     int32Ptr(10),
+			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
-			Provider:       "hpa",
+			Provider:        "hpa",
 			HPA: &vyogotechv1alpha1.HPAScalingConfig{
 				Metric:                 "cpu",
 				TargetUtilization:      int32Ptr(70),
@@ -281,13 +280,13 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 			},
 		},
 		"gunicorn": {
-			Enabled:        boolPtr(false),
-			StaticReplicas: int32Ptr(1),
-			MinReplicas:    int32Ptr(2),
-			MaxReplicas:    int32Ptr(10),
-			CooldownPeriod: int32Ptr(60),
+			Enabled:         boolPtr(false),
+			StaticReplicas:  int32Ptr(1),
+			MinReplicas:     int32Ptr(2),
+			MaxReplicas:     int32Ptr(10),
+			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
-			Provider:       "hpa",
+			Provider:        "hpa",
 			HPA: &vyogotechv1alpha1.HPAScalingConfig{
 				Metric:                 "cpu",
 				TargetUtilization:      int32Ptr(70),
@@ -296,13 +295,13 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 			},
 		},
 		"socketio": {
-			Enabled:        boolPtr(false),
-			StaticReplicas: int32Ptr(1),
-			MinReplicas:    int32Ptr(1),
-			MaxReplicas:    int32Ptr(5),
-			CooldownPeriod: int32Ptr(60),
+			Enabled:         boolPtr(false),
+			StaticReplicas:  int32Ptr(1),
+			MinReplicas:     int32Ptr(1),
+			MaxReplicas:     int32Ptr(5),
+			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
-			Provider:       "hpa",
+			Provider:        "hpa",
 			HPA: &vyogotechv1alpha1.HPAScalingConfig{
 				Metric:                 "cpu",
 				TargetUtilization:      int32Ptr(70),
@@ -311,48 +310,48 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 			},
 		},
 		"scheduler": {
-			Enabled:        boolPtr(false),
-			StaticReplicas: int32Ptr(1),
-			MinReplicas:    int32Ptr(1),
-			MaxReplicas:    int32Ptr(1), // Always 1
-			CooldownPeriod: int32Ptr(60),
+			Enabled:         boolPtr(false),
+			StaticReplicas:  int32Ptr(1),
+			MinReplicas:     int32Ptr(1),
+			MaxReplicas:     int32Ptr(1), // Always 1
+			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
 			// No provider for scheduler
 		},
 		"worker-short": {
-			Enabled:        boolPtr(false),
-			StaticReplicas: int32Ptr(1),
-			MinReplicas:    int32Ptr(0),
-			MaxReplicas:    int32Ptr(10),
-			CooldownPeriod: int32Ptr(60),
+			Enabled:         boolPtr(false),
+			StaticReplicas:  int32Ptr(1),
+			MinReplicas:     int32Ptr(0),
+			MaxReplicas:     int32Ptr(10),
+			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
-			Provider:       "keda",
+			Provider:        "keda",
 			KEDA: &vyogotechv1alpha1.KEDAScalingConfig{
 				Trigger:     "redis",
 				TargetValue: "5",
 			},
 		},
 		"worker-long": {
-			Enabled:        boolPtr(false),
-			StaticReplicas: int32Ptr(1),
-			MinReplicas:    int32Ptr(0),
-			MaxReplicas:    int32Ptr(5),
-			CooldownPeriod: int32Ptr(60),
+			Enabled:         boolPtr(false),
+			StaticReplicas:  int32Ptr(1),
+			MinReplicas:     int32Ptr(0),
+			MaxReplicas:     int32Ptr(5),
+			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
-			Provider:       "keda",
+			Provider:        "keda",
 			KEDA: &vyogotechv1alpha1.KEDAScalingConfig{
 				Trigger:     "redis",
 				TargetValue: "2",
 			},
 		},
 		"worker-default": {
-			Enabled:        boolPtr(false),
-			StaticReplicas: int32Ptr(1),
-			MinReplicas:    int32Ptr(0),
-			MaxReplicas:    int32Ptr(5),
-			CooldownPeriod: int32Ptr(60),
+			Enabled:         boolPtr(false),
+			StaticReplicas:  int32Ptr(1),
+			MinReplicas:     int32Ptr(0),
+			MaxReplicas:     int32Ptr(5),
+			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
-			Provider:       "keda",
+			Provider:        "keda",
 			KEDA: &vyogotechv1alpha1.KEDAScalingConfig{
 				Trigger:     "redis",
 				TargetValue: "5",
@@ -366,11 +365,11 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 
 	// Safe fallback for unknown components
 	return &vyogotechv1alpha1.ComponentAutoscaling{
-		Enabled:        boolPtr(false),
-		StaticReplicas: int32Ptr(1),
-		MinReplicas:    int32Ptr(1),
-		MaxReplicas:    int32Ptr(10),
-		CooldownPeriod: int32Ptr(60),
+		Enabled:         boolPtr(false),
+		StaticReplicas:  int32Ptr(1),
+		MinReplicas:     int32Ptr(1),
+		MaxReplicas:     int32Ptr(10),
+		CooldownPeriod:  int32Ptr(60),
 		PollingInterval: int32Ptr(30),
 	}
 }
@@ -456,4 +455,3 @@ func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotec
 
 	return secCtx
 }
-

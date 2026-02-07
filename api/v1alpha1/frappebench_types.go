@@ -64,7 +64,6 @@ type FrappeBenchSpec struct {
 	// +optional
 	GitConfig *GitConfig `json:"gitConfig,omitempty"`
 
-
 	// Security defines security context settings for all pods in this bench
 	// +optional
 	Security *SecurityConfig `json:"security,omitempty"`
@@ -79,7 +78,6 @@ type FrappeBenchSpec struct {
 	// +optional
 	PodConfig *PodConfig `json:"podConfig,omitempty"`
 }
-
 
 // FrappeBenchStatus defines the observed state of FrappeBench
 type FrappeBenchStatus struct {
