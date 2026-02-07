@@ -8,15 +8,15 @@ on:
       - develop
       - feature/**
     paths-ignore:
-      - '*.md'
-      - '_config.yml'
-      - 'docs/**'
+      - "*.md"
+      - "_config.yml"
+      - "docs/**"
   pull_request:
-    branches: [ main, master, develop, feature/** ]
+    branches: [main, master, develop, feature/**]
     paths-ignore:
-      - '*.md'
-      - '_config.yml'
-      - 'docs/**'
+      - "*.md"
+      - "_config.yml"
+      - "docs/**"
   workflow_dispatch:
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: "1.22"
           cache: true
 
       - name: Install dependencies
@@ -39,6 +39,37 @@ jobs:
       - name: Run unit tests
         run: |
           go test ./api/... ./pkg/... ./controllers/... -v -coverprofile cover.out
+
+      - name: Run autoscaling-specific unit tests
+        run: |
+          echo "=== Running Autoscaling Unit Tests ==="
+          echo "Testing component autoscaling types..."
+          go test -v -run TestComponentAutoscaling ./controllers/ -coverprofile=autoscaling-cover.out
+
+          echo "Testing scaling provider interface..."
+          go test -v -run TestScalingProvider ./controllers/
+
+          echo "Testing KEDA provider..."
+          go test -v -run TestKEDAProvider ./controllers/
+
+          echo "Testing HPA provider..."
+          go test -v -run TestHPAProvider ./controllers/
+
+          echo "Testing component autoscaling helpers..."
+          go test -v -run "TestGetComponentAutoscaling|TestFillComponentDefaults|TestGetComponentReplicaCount" ./controllers/
+
+      - name: Lint autoscaling code
+        run: |
+          echo "=== Linting Autoscaling Code ==="
+          go vet ./controllers/scaling_provider.go ./controllers/keda_provider.go ./controllers/hpa_provider.go ./controllers/component_autoscaling_helpers.go ./api/v1alpha1/shared_types.go
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./cover.out,./autoscaling-cover.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
 
   docker-build:
     name: Build and Push Docker Image
@@ -49,7 +80,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -84,4 +115,3 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
-

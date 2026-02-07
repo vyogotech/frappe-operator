@@ -26,13 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -40,76 +34,80 @@ import (
 func (r *FrappeBenchReconciler) ensureWorkers(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
-	// Check KEDA availability once
-	kedaAvailable := r.isKEDAAvailable(ctx)
-	if !kedaAvailable {
-		logger.Info("KEDA not available, workers will use static replicas")
-	}
+	workerTypes := []string{"default", "long", "short"}
+	
+	for _, typeName := range workerTypes {
+		componentName := fmt.Sprintf("worker-%s", typeName)
+		queue := typeName
+		
+		// Get autoscaling config
+		config := r.getComponentAutoscaling(bench, componentName)
+		config = r.fillComponentDefaults(config, componentName)
 
-	workers := []struct {
-		name      string
-		queue     string
-		resources func(*vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements
-	}{
-		{"default", "default", r.getWorkerDefaultResources},
-		{"long", "long", r.getWorkerLongResources},
-		{"short", "short", r.getWorkerShortResources},
-	}
+		// Determine which provider to use
+		var provider ScalingProvider
+		if config.Enabled != nil && *config.Enabled && config.Provider != "" {
+			provider = resolveProvider(config.Provider, r.Client, r.Scheme)
+		}
 
-	for _, worker := range workers {
-		// Get autoscaling config for this worker
-		config := r.getWorkerAutoscalingConfig(bench, worker.name)
-		config = r.fillAutoscalingDefaults(config, worker.name)
+		providerAvailable := false
+		if provider != nil {
+			providerAvailable = provider.IsAvailable(ctx)
+		}
 
-		// Determine replica count based on scaling mode
-		replicas := r.getWorkerReplicaCount(config, kedaAvailable)
+		// Determine replica count
+		replicas := r.getComponentReplicaCount(config, providerAvailable)
 
-		// Create/update worker deployment
-		if err := r.ensureWorkerDeployment(ctx, bench, worker.name, worker.queue, replicas, worker.resources(bench), config, kedaAvailable); err != nil {
+		// Create/update deployment
+		deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)
+		if err := r.ensureWorkerDeployment(ctx, bench, componentName, queue, replicas, config, providerAvailable); err != nil {
 			return err
 		}
 
-		// Create/update ScaledObject if autoscaling is enabled
-		if err := r.ensureScaledObject(ctx, bench, worker.name, config); err != nil {
-			logger.Error(err, "Failed to ensure ScaledObject", "worker", worker.name)
-			// Don't fail the reconciliation, just log the error
+		// Handle scaling provider
+		if providerAvailable {
+			if err := provider.Ensure(ctx, bench, componentName, deployName, config); err != nil {
+				logger.Error(err, "Failed to ensure scaling for component", "component", componentName, "provider", provider.Name())
+			}
+		} else {
+			// Clean up both possible providers if autoscaling is disabled or provider not available
+			_ = resolveProvider("keda", r.Client, r.Scheme).Delete(ctx, bench, componentName)
+			_ = resolveProvider("hpa", r.Client, r.Scheme).Delete(ctx, bench, componentName)
 		}
 	}
 
 	return nil
 }
 
-func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, workerType, queue string, replicas int32, workerResources corev1.ResourceRequirements, config *vyogotechv1alpha1.WorkerAutoscaling, kedaAvailable bool) error {
+func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, componentName, queue string, replicas int32, config *vyogotechv1alpha1.ComponentAutoscaling, providerManaged bool) error {
 	logger := log.FromContext(ctx)
 
-	deployName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
+	deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)
 	deploy := &appsv1.Deployment{}
 
 	err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 
-	// Determine if this worker is managed by KEDA
-	kedaManaged := kedaAvailable && config.Enabled != nil && *config.Enabled
+	managedByProvider := providerManaged && config.Enabled != nil && *config.Enabled
+	workerResources := r.getWorkerResources(bench, componentName)
 
 	if err == nil {
-		// Deployment exists, update it if needed
 		changed := false
 		image := r.getBenchImage(ctx, bench)
 		if deploy.Spec.Template.Spec.Containers[0].Image != image {
-			logger.Info("Updating worker image", "worker", workerType, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
+			logger.Info("Updating worker image", "component", componentName, "oldImage", deploy.Spec.Template.Spec.Containers[0].Image, "newImage", image)
 			deploy.Spec.Template.Spec.Containers[0].Image = image
 			changed = true
 		}
 
-		// Only update replicas if NOT managed by KEDA (KEDA controls replicas)
-		if !kedaManaged && *deploy.Spec.Replicas != replicas {
-			logger.Info("Updating worker replicas", "worker", workerType, "oldReplicas", *deploy.Spec.Replicas, "newReplicas", replicas)
+		// Only update replicas if NOT managed by an external provider
+		if !managedByProvider && *deploy.Spec.Replicas != replicas {
+			logger.Info("Updating worker replicas", "component", componentName, "oldReplicas", *deploy.Spec.Replicas, "newReplicas", replicas)
 			deploy.Spec.Replicas = &replicas
 			changed = true
 		}
 
-		// Check resources
 		if !reflect.DeepEqual(deploy.Spec.Template.Spec.Containers[0].Resources, workerResources) {
-			logger.Info("Updating worker resources", "worker", workerType)
+			logger.Info("Updating worker resources", "component", componentName)
 			deploy.Spec.Template.Spec.Containers[0].Resources = workerResources
 			changed = true
 		}
@@ -124,18 +122,14 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 		return err
 	}
 
-	logger.Info("Creating Worker Deployment", "deployment", deployName, "queue", queue, "replicas", replicas, "kedaManaged", kedaManaged)
+	logger.Info("Creating Worker Deployment", "deployment", deployName, "queue", queue, "replicas", replicas, "managedByProvider", managedByProvider)
 
 	image := r.getBenchImage(ctx, bench)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 
-	// Add annotations to indicate scaling mode
 	annotations := map[string]string{}
-	if kedaManaged {
-		annotations["frappe.io/scaling-mode"] = "autoscaled"
-		annotations["keda.sh/managed-by"] = "keda"
-	} else {
-		annotations["frappe.io/scaling-mode"] = "static"
+	if managedByProvider {
+		annotations["frappe.io/managed-by-provider"] = config.Provider
 	}
 
 	container := resources.NewContainerBuilder("worker", image).
@@ -147,13 +141,12 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 		WithEnv("USER", "frappe").
 		Build()
 
-	// Apply Pod Config
 	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
 
 	deploy, err = resources.NewDeploymentBuilder(deployName, bench.Namespace).
 		WithLabels(extraLabels).
 		WithExtraPodLabels(extraLabels).
-		WithSelector(r.componentLabels(bench, fmt.Sprintf("worker-%s", workerType))).
+		WithSelector(r.componentLabels(bench, componentName)).
 		WithAnnotations(annotations).
 		WithReplicas(replicas).
 		WithNodeSelector(nodeSelector).
@@ -171,136 +164,13 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 	return r.Create(ctx, deploy)
 }
 
-// isKEDAAvailable checks if KEDA CRDs are installed
-func (r *FrappeBenchReconciler) isKEDAAvailable(ctx context.Context) bool {
-	// Create a minimal unstructured list to check if the resource exists
-	list := &metav1.PartialObjectMetadataList{}
-	list.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "keda.sh",
-		Version: "v1alpha1",
-		Kind:    "ScaledObject",
-	})
-
-	// Attempt to list - if this succeeds, KEDA is available
-	err := r.Client.List(ctx, list, client.Limit(1))
-
-	// meta.IsNoMatchError means the CRD doesn't exist
-	if meta.IsNoMatchError(err) {
-		return false
+func (r *FrappeBenchReconciler) getWorkerResources(bench *vyogotechv1alpha1.FrappeBench, componentName string) corev1.ResourceRequirements {
+	switch componentName {
+	case "worker-long":
+		return r.getWorkerLongResources(bench)
+	case "worker-short":
+		return r.getWorkerShortResources(bench)
+	default:
+		return r.getWorkerDefaultResources(bench)
 	}
-	if errors.IsNotFound(err) {
-		return false
-	}
-
-	// Any other error or success means KEDA is likely available
-	return true
-}
-
-// ensureScaledObject creates or updates a KEDA ScaledObject for a worker
-func (r *FrappeBenchReconciler) ensureScaledObject(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, workerType string, config *vyogotechv1alpha1.WorkerAutoscaling) error {
-	logger := log.FromContext(ctx)
-
-	// Skip if KEDA is not enabled for this worker
-	if config.Enabled == nil || !*config.Enabled {
-		// Clean up any existing ScaledObject
-		return r.deleteScaledObjectIfExists(ctx, bench, workerType)
-	}
-
-	// Check if KEDA is available
-	if !r.isKEDAAvailable(ctx) {
-		logger.Info("KEDA not available, skipping ScaledObject creation", "worker", workerType)
-		return nil
-	}
-
-	scaledObjectName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
-	deploymentName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
-	queueName := fmt.Sprintf("rq:queue:%s", workerType)
-
-	// Build the ScaledObject using unstructured
-	scaledObject := &unstructured.Unstructured{}
-	scaledObject.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "keda.sh",
-		Version: "v1alpha1",
-		Kind:    "ScaledObject",
-	})
-	scaledObject.SetName(scaledObjectName)
-	scaledObject.SetNamespace(bench.Namespace)
-	scaledObject.SetLabels(r.componentLabels(bench, fmt.Sprintf("worker-%s", workerType)))
-
-	// Build spec
-	spec := map[string]interface{}{
-		"scaleTargetRef": map[string]interface{}{
-			"apiVersion": "apps/v1",
-			"kind":       "Deployment",
-			"name":       deploymentName,
-		},
-		"minReplicaCount": int64(*config.MinReplicas),
-		"maxReplicaCount": int64(*config.MaxReplicas),
-		"cooldownPeriod":  int64(*config.CooldownPeriod),
-		"pollingInterval": int64(*config.PollingInterval),
-		"triggers": []interface{}{
-			map[string]interface{}{
-				"type": "redis",
-				"metadata": map[string]interface{}{
-					"address":              r.resolveRedisURL(ctx, bench),
-					"listName":             queueName,
-					"listLength":           fmt.Sprintf("%d", *config.QueueLength),
-					"enableTLS":            "false",
-					"databaseIndex":        "0",
-					"activationListLength": "1",
-				},
-			},
-		},
-	}
-
-	if err := unstructured.SetNestedField(scaledObject.Object, spec, "spec"); err != nil {
-		return fmt.Errorf("failed to set ScaledObject spec: %w", err)
-	}
-
-	// Set owner reference
-	if err := controllerutil.SetControllerReference(bench, scaledObject, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set owner reference: %w", err)
-	}
-
-	// Create or update
-	existing := &unstructured.Unstructured{}
-	existing.SetGroupVersionKind(scaledObject.GroupVersionKind())
-	err := r.Get(ctx, types.NamespacedName{Name: scaledObjectName, Namespace: bench.Namespace}, existing)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			logger.Info("Creating ScaledObject", "worker", workerType, "name", scaledObjectName)
-			return r.Create(ctx, scaledObject)
-		}
-		return err
-	}
-
-	// Update existing
-	scaledObject.SetResourceVersion(existing.GetResourceVersion())
-	logger.Info("Updating ScaledObject", "worker", workerType, "name", scaledObjectName)
-	return r.Update(ctx, scaledObject)
-}
-
-// deleteScaledObjectIfExists deletes a ScaledObject if it exists
-func (r *FrappeBenchReconciler) deleteScaledObjectIfExists(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, workerType string) error {
-	logger := log.FromContext(ctx)
-
-	scaledObjectName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
-
-	scaledObject := &unstructured.Unstructured{}
-	scaledObject.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "keda.sh",
-		Version: "v1alpha1",
-		Kind:    "ScaledObject",
-	})
-
-	err := r.Get(ctx, types.NamespacedName{Name: scaledObjectName, Namespace: bench.Namespace}, scaledObject)
-	if err != nil {
-		if meta.IsNoMatchError(err) || errors.IsNotFound(err) {
-			return nil // Already deleted or CRD doesn't exist
-		}
-		return err
-	}
-
-	logger.Info("Deleting ScaledObject", "worker", workerType, "name", scaledObjectName)
-	return r.Delete(ctx, scaledObject)
 }

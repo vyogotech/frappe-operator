@@ -57,13 +57,23 @@ spec:
     tag: v15.90.1
     pullPolicy: IfNotPresent
   
-  # Component replicas
-  componentReplicas:
-    gunicorn: 2
-    socketio: 1
-    workerDefault: 2
-    workerLong: 1
-    workerShort: 1
+  # Component autoscaling and replicas
+  componentAutoscaling:
+    gunicorn:
+      enabled: false
+      staticReplicas: 2
+    socketio:
+      enabled: false
+      staticReplicas: 1
+    worker-default:
+      enabled: false
+      staticReplicas: 2
+    worker-long:
+      enabled: false
+      staticReplicas: 1
+    worker-short:
+      enabled: false
+      staticReplicas: 1
   
   # Resource limits
   componentResources:

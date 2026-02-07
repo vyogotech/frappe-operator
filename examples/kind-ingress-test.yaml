@@ -30,11 +30,19 @@ spec:
     - name: erpnext
       source: image
   
-  componentReplicas:
-    gunicorn: 1
-    workerDefault: 0
-    workerShort: 0
-    workerLong: 0
+  componentAutoscaling:
+    gunicorn:
+      enabled: false
+      staticReplicas: 1
+    worker-default:
+      enabled: false
+      staticReplicas: 0
+    worker-short:
+      enabled: false
+      staticReplicas: 0
+    worker-long:
+      enabled: false
+      staticReplicas: 0
   
   redisConfig:
     type: redis

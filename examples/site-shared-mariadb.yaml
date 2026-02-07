@@ -7,18 +7,27 @@ metadata:
   name: shared-bench
   namespace: default
 spec:
-  version: "v15.41.2"
+  frappeVersion: "version-15"
   apps:
     - name: erpnext
-      source:
-        type: image
-  componentReplicas:
-    gunicorn: 2
-    scheduler: 1
-    workers:
-      default: 2
-      short: 1
-      long: 1
+      source: image
+  
+  componentAutoscaling:
+    gunicorn:
+      enabled: false
+      staticReplicas: 2
+    scheduler:
+      enabled: false
+      staticReplicas: 1
+    worker-default:
+      enabled: false
+      staticReplicas: 2
+    worker-short:
+      enabled: false
+      staticReplicas: 1
+    worker-long:
+      enabled: false
+      staticReplicas: 1
   storageSize: "10Gi"
 ---
 apiVersion: vyogo.tech/v1alpha1
