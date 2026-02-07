@@ -346,141 +346,75 @@ kubectl exec -it <site-pod> -- bench --site <site-name> \
 
 ## Scaling
 
-### Manual Scaling
+### Component Autoscaling (Unified API)
 
-Scale components manually:
+Frappe Operator provides a provider-agnostic autoscaling mechanism for all bench components (nginx, gunicorn, workers, etc.). You can choose between **HPA** (Horizontal Pod Autoscaler) and **KEDA** (Kubernetes Event-Driven Autoscaling).
 
-```bash
-# Scale gunicorn replicas
-kubectl patch frappebench prod-bench --type=merge -p '{
-  "spec": {
-    "componentReplicas": {
-      "gunicorn": 5,
-      "workerDefault": 3
-    }
-  }
-}'
+#### Managed Scaling
 
-# Verify scaling
-kubectl get pods -l bench=prod-bench
+Instead of manual `kubectl scale` commands, define your scaling policy in the `FrappeBench` CRD:
+
+```yaml
+spec:
+  componentAutoscaling:
+    gunicorn:
+      enabled: true
+      provider: hpa      # Use standard HPA for web traffic
+      minReplicas: 3
+      maxReplicas: 10
+      hpa:
+        metric: cpu
+        targetUtilization: 70
+    
+    worker-short:
+      enabled: true
+      provider: keda     # Use KEDA for queue-based scaling
+      minReplicas: 0     # Scale to zero when idle!
+      maxReplicas: 15
+      keda:
+        trigger: redis
+        targetValue: "5"
 ```
 
-### Worker Autoscaling with KEDA (Recommended)
+The operator will automatically manage the underlying `HorizontalPodAutoscaler` or `ScaledObject` resources for you.
 
-**NEW in v1.1.0**: KEDA-based autoscaling for background workers with scale-to-zero capability.
+### Worker Autoscaling with KEDA
 
-#### Prerequisites
-
-Install KEDA (done automatically by `install.sh`):
-
-```bash
-kubectl apply -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
-```
+For background workers, KEDA is the recommended provider as it can scale based on the number of jobs waiting in the Redis queue and supports scaling to zero.
 
 #### Configure Worker Autoscaling
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
-kind: FrappeBench
-metadata:
-  name: prod-bench
-  namespace: production
 spec:
-  frappeVersion: "version-15"
-  apps:
-    - name: erpnext
-      source: image
-  
-  # Worker autoscaling configuration
-  workerAutoscaling:
+  componentAutoscaling:
     # Short-running tasks - scale to zero when idle
-    short:
+    worker-short:
       enabled: true
-      minReplicas: 0        # Scale to zero to save resources
-      maxReplicas: 10       # Scale up to 10 workers under load
-      queueLength: 2        # Trigger: queue length per worker
-      pollingInterval: 10   # Check queue every 10 seconds
-      cooldownPeriod: 30    # Wait 30s before scaling down
+      provider: keda
+      minReplicas: 0        
+      maxReplicas: 10       
+      keda:
+        trigger: redis      # Triggered by Redis queue length
+        targetValue: "2"    # Target 2 jobs per worker
     
     # Long-running tasks - maintain minimum workers
-    long:
+    worker-long:
       enabled: true
-      minReplicas: 1        # Always have 1 worker available
+      provider: keda
+      minReplicas: 1        
       maxReplicas: 5
-      queueLength: 5
-      pollingInterval: 30
-      cooldownPeriod: 60
-    
-    # Default queue - static replicas (no autoscaling)
-    default:
-      enabled: false
-      staticReplicas: 2
+      keda:
+        trigger: redis
+        targetValue: "1"
 ```
 
-#### Monitor Autoscaling
+#### Monitor Autoscaling Status
+
+The operator reports the calculated scaling status in the `FrappeBench` status:
 
 ```bash
-# Check ScaledObjects
-kubectl get scaledobjects -n production
-
-# Check worker scaling status
-kubectl get frappebench prod-bench -o jsonpath='{.status.workerScaling}' | jq
-
-# Check KEDA HPA
-kubectl get hpa -n production
-
-# View queue lengths
-kubectl exec deployment/prod-bench-redis-queue -- redis-cli LLEN "rq:queue:short"
-kubectl exec deployment/prod-bench-redis-queue -- redis-cli LLEN "rq:queue:long"
+kubectl get frappebench prod-bench -o jsonpath='{.status.componentScaling}' | jq
 ```
-
-#### Autoscaling Benefits
-
-- **Cost Savings**: Workers scale to zero when idle
-- **Auto-scaling**: Automatically handle traffic spikes
-- **Queue-based**: Scales based on actual job queue length
-- **Configurable**: Fine-tune scaling behavior per queue
-
-### Horizontal Pod Autoscaling (HPA)
-
-Enable CPU/memory-based HPA for web components:
-
-```yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: prod-bench-gunicorn-hpa
-  namespace: production
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: prod-bench-gunicorn
-  minReplicas: 3
-  maxReplicas: 10
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80
-  behavior:
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-      - type: Percent
-        value: 50
-        periodSeconds: 60
-```
-
-> **Note**: For workers, use KEDA autoscaling (above) instead of HPA for queue-based scaling.
 
 ### Site reconciliation concurrency (100+ sites)
 
