@@ -200,7 +200,24 @@ jobs:
                     if [ -n "$INIT_JOB" ]; then
                       JOB_SUCCEEDED=$(kubectl get job test-keda-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
                       JOB_FAILED=$(kubectl get job test-keda-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
+                      # Fallback to 0 if empty
+                      [ -z "$JOB_SUCCEEDED" ] && JOB_SUCCEEDED=0
+                      [ -z "$JOB_FAILED" ] && JOB_FAILED=0
                       echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"
+                      
+                      if [ $((i % 5)) -eq 0 ]; then
+                        echo "Init Job Pod Status:"
+                        kubectl get pods -l job-name=test-keda-bench-init -n default || true
+                        echo "Init Job Logs snippet:"
+                        kubectl logs job/test-keda-bench-init -n default --tail=20 || true
+                      fi
+                      
+                      if [ "$JOB_FAILED" -ge 1 ]; then
+                        echo "ERROR: Initialization job failed!"
+                        kubectl describe job test-keda-bench-init -n default || true
+                        kubectl logs job/test-keda-bench-init -n default || true
+                        exit 1
+                      fi
                     fi
                     
                     if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Running" ]; then
@@ -388,7 +405,24 @@ jobs:
                     if [ -n "$INIT_JOB" ]; then
                       JOB_SUCCEEDED=$(kubectl get job test-hpa-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
                       JOB_FAILED=$(kubectl get job test-hpa-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
+                      # Fallback to 0 if empty
+                      [ -z "$JOB_SUCCEEDED" ] && JOB_SUCCEEDED=0
+                      [ -z "$JOB_FAILED" ] && JOB_FAILED=0
                       echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"
+                      
+                      if [ $((i % 5)) -eq 0 ]; then
+                        echo "Init Job Pod Status:"
+                        kubectl get pods -l job-name=test-hpa-bench-init -n default || true
+                        echo "Init Job Logs snippet:"
+                        kubectl logs job/test-hpa-bench-init -n default --tail=20 || true
+                      fi
+                      
+                      if [ "$JOB_FAILED" -ge 1 ]; then
+                        echo "ERROR: Initialization job failed!"
+                        kubectl describe job test-hpa-bench-init -n default || true
+                        kubectl logs job/test-hpa-bench-init -n default || true
+                        exit 1
+                      fi
                     fi
                     
                     if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Running" ]; then
@@ -550,19 +584,30 @@ jobs:
             - name: Verify KEDA ScaledObject Created
               run: |
                   echo "Waiting for bench initialization first..."
-                  for i in {1..40}; do
+                  for i in {1..60}; do
                     PHASE=$(kubectl get frappebench test-switch-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-                    echo "Bench Phase: $PHASE (iteration $i/40)"
+                    echo "Bench Phase: $PHASE (iteration $i/60)"
                     
                     # Check if init job exists and its status
                     INIT_JOB=$(kubectl get job test-switch-bench-init -n default --ignore-not-found -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
                     if [ -n "$INIT_JOB" ]; then
                       JOB_SUCCEEDED=$(kubectl get job test-switch-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
                       JOB_FAILED=$(kubectl get job test-switch-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
+                      # Fallback to 0 if empty
+                      [ -z "$JOB_SUCCEEDED" ] && JOB_SUCCEEDED=0
+                      [ -z "$JOB_FAILED" ] && JOB_FAILED=0
                       echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"
+                      
+                      if [ $((i % 5)) -eq 0 ]; then
+                        echo "Init Job Pod Status:"
+                        kubectl get pods -l job-name=test-switch-bench-init -n default || true
+                        echo "Init Job Logs snippet:"
+                        kubectl logs job/test-switch-bench-init -n default --tail=20 || true
+                      fi
                       
                       if [ "$JOB_FAILED" -ge 1 ]; then
                         echo "ERROR: Initialization job failed!"
+                        kubectl describe job test-switch-bench-init -n default || true
                         kubectl logs job/test-switch-bench-init -n default || true
                         exit 1
                       fi
