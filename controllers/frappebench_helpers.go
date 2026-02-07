@@ -261,6 +261,16 @@ func (r *FrappeBenchReconciler) fillComponentDefaults(config *vyogotechv1alpha1.
 	return result
 }
 
+// cleanupOtherProviders removes scaling resources from providers other than the current one
+func (r *FrappeBenchReconciler) cleanupOtherProviders(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, componentName string, currentProvider string) {
+	providers := []string{"keda", "hpa"}
+	for _, p := range providers {
+		if p != currentProvider {
+			_ = resolveProvider(p, r.Client, r.Scheme).Delete(ctx, bench, componentName)
+		}
+	}
+}
+
 // getComponentDefaults returns opinionated defaults per component
 func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyogotechv1alpha1.ComponentAutoscaling {
 	defaults := map[string]*vyogotechv1alpha1.ComponentAutoscaling{
