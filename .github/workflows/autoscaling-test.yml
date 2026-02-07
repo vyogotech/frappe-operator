@@ -140,7 +140,7 @@ jobs:
                     name: test-keda-bench
                     namespace: default
                   spec:
-                    frappeVersion: "15"
+                    frappeVersion: "v15"
                     apps:
                       - name: erpnext
                         source: image
@@ -341,7 +341,7 @@ jobs:
                     name: test-hpa-bench
                     namespace: default
                   spec:
-                    frappeVersion: "15"
+                    frappeVersion: "v15"
                     apps:
                       - name: erpnext
                         source: image
@@ -562,7 +562,7 @@ jobs:
                     name: test-switch-bench
                     namespace: default
                   spec:
-                    frappeVersion: "15"
+                    frappeVersion: "v15"
                     apps:
                       - name: erpnext
                         source: image
@@ -763,7 +763,7 @@ jobs:
                     name: test-fallback-bench
                     namespace: default
                   spec:
-                    frappeVersion: "15"
+                    frappeVersion: "v15"
                     apps:
                       - name: erpnext
                         source: image
