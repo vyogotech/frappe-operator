@@ -1,0 +1,1217 @@
+﻿2026-02-07T07:33:42.8827779Z Current runner version: '2.331.0'
+2026-02-07T07:33:42.8855608Z ##[group]Runner Image Provisioner
+2026-02-07T07:33:42.8856557Z Hosted Compute Agent
+2026-02-07T07:33:42.8857112Z Version: 20260123.484
+2026-02-07T07:33:42.8857724Z Commit: 6bd6555ca37d84114959e1c76d2c01448ff61c5d
+2026-02-07T07:33:42.8858441Z Build Date: 2026-01-23T19:41:17Z
+2026-02-07T07:33:42.8859154Z Worker ID: {bdab7032-e4e2-41d1-af32-9bd1910b1355}
+2026-02-07T07:33:42.8859935Z Azure Region: eastus2
+2026-02-07T07:33:42.8860503Z ##[endgroup]
+2026-02-07T07:33:42.8862928Z ##[group]Operating System
+2026-02-07T07:33:42.8863548Z Ubuntu
+2026-02-07T07:33:42.8864199Z 24.04.3
+2026-02-07T07:33:42.8864657Z LTS
+2026-02-07T07:33:42.8865140Z ##[endgroup]
+2026-02-07T07:33:42.8865598Z ##[group]Runner Image
+2026-02-07T07:33:42.8866289Z Image: ubuntu-24.04
+2026-02-07T07:33:42.8866813Z Version: 20260201.15.1
+2026-02-07T07:33:42.8868039Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260201.15/images/ubuntu/Ubuntu2404-Readme.md
+2026-02-07T07:33:42.8869506Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260201.15
+2026-02-07T07:33:42.8870506Z ##[endgroup]
+2026-02-07T07:33:42.8871602Z ##[group]GITHUB_TOKEN Permissions
+2026-02-07T07:33:42.8874136Z Contents: read
+2026-02-07T07:33:42.8874810Z Metadata: read
+2026-02-07T07:33:42.8875454Z Packages: read
+2026-02-07T07:33:42.8875930Z ##[endgroup]
+2026-02-07T07:33:42.8878233Z Secret source: Actions
+2026-02-07T07:33:42.8879219Z Prepare workflow directory
+2026-02-07T07:33:43.0203042Z Prepare all required actions
+2026-02-07T07:33:43.0242017Z Getting action download info
+2026-02-07T07:33:43.3190256Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-02-07T07:33:43.4365883Z Download action repository 'helm/kind-action@v1.8.0' (SHA:dda0770415bac9fc20092cacbc54aa298604d140)
+2026-02-07T07:33:43.7263321Z Download action repository 'azure/setup-helm@v3' (SHA:5119fcb9089d432beecbf79bb2c7915207344b78)
+2026-02-07T07:33:44.3801155Z Complete job name: E2E Test - KEDA Autoscaling
+2026-02-07T07:33:44.9721295Z ##[group]Run actions/checkout@v4
+2026-02-07T07:33:44.9722199Z with:
+2026-02-07T07:33:44.9722882Z   repository: vyogotech/frappe-operator
+2026-02-07T07:33:44.9723700Z   token: ***
+2026-02-07T07:33:44.9724110Z   ssh-strict: true
+2026-02-07T07:33:44.9724533Z   ssh-user: git
+2026-02-07T07:33:44.9724961Z   persist-credentials: true
+2026-02-07T07:33:44.9725435Z   clean: true
+2026-02-07T07:33:44.9725891Z   sparse-checkout-cone-mode: true
+2026-02-07T07:33:44.9726401Z   fetch-depth: 1
+2026-02-07T07:33:44.9726827Z   fetch-tags: false
+2026-02-07T07:33:44.9727254Z   show-progress: true
+2026-02-07T07:33:44.9727686Z   lfs: false
+2026-02-07T07:33:44.9728091Z   submodules: false
+2026-02-07T07:33:44.9728535Z   set-safe-directory: true
+2026-02-07T07:33:44.9729266Z ##[endgroup]
+2026-02-07T07:33:45.0839903Z Syncing repository: vyogotech/frappe-operator
+2026-02-07T07:33:45.0841765Z ##[group]Getting Git version info
+2026-02-07T07:33:45.0843025Z Working directory is '/home/runner/work/frappe-operator/frappe-operator'
+2026-02-07T07:33:45.0844183Z [command]/usr/bin/git version
+2026-02-07T07:33:45.0956051Z git version 2.52.0
+2026-02-07T07:33:45.0982662Z ##[endgroup]
+2026-02-07T07:33:45.0997353Z Temporarily overriding HOME='/home/runner/work/_temp/f86c304b-73d4-449c-a1cc-2dc9a2984fcc' before making global git config changes
+2026-02-07T07:33:45.0998813Z Adding repository directory to the temporary git global config as a safe directory
+2026-02-07T07:33:45.1003009Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/frappe-operator/frappe-operator
+2026-02-07T07:33:45.1044606Z Deleting the contents of '/home/runner/work/frappe-operator/frappe-operator'
+2026-02-07T07:33:45.1048149Z ##[group]Initializing the repository
+2026-02-07T07:33:45.1052103Z [command]/usr/bin/git init /home/runner/work/frappe-operator/frappe-operator
+2026-02-07T07:33:45.1170827Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-02-07T07:33:45.1173079Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-02-07T07:33:45.1174192Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-02-07T07:33:45.1175491Z hint: call:
+2026-02-07T07:33:45.1176029Z hint:
+2026-02-07T07:33:45.1176845Z hint: 	git config --global init.defaultBranch <name>
+2026-02-07T07:33:45.1177497Z hint:
+2026-02-07T07:33:45.1178136Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-02-07T07:33:45.1179118Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-02-07T07:33:45.1179895Z hint:
+2026-02-07T07:33:45.1180311Z hint: 	git branch -m <name>
+2026-02-07T07:33:45.1181031Z hint:
+2026-02-07T07:33:45.1182087Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-02-07T07:33:45.1183630Z Initialized empty Git repository in /home/runner/work/frappe-operator/frappe-operator/.git/
+2026-02-07T07:33:45.1188204Z [command]/usr/bin/git remote add origin https://github.com/vyogotech/frappe-operator
+2026-02-07T07:33:45.1234154Z ##[endgroup]
+2026-02-07T07:33:45.1234955Z ##[group]Disabling automatic garbage collection
+2026-02-07T07:33:45.1238076Z [command]/usr/bin/git config --local gc.auto 0
+2026-02-07T07:33:45.1269025Z ##[endgroup]
+2026-02-07T07:33:45.1269827Z ##[group]Setting up auth
+2026-02-07T07:33:45.1279042Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-02-07T07:33:45.1310139Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-02-07T07:33:45.1685356Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-02-07T07:33:45.1721177Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-02-07T07:33:45.1953296Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-02-07T07:33:45.1985485Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-02-07T07:33:45.2215725Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-02-07T07:33:45.2250032Z ##[endgroup]
+2026-02-07T07:33:45.2250871Z ##[group]Fetching the repository
+2026-02-07T07:33:45.2259216Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +1ae62012d6003dbaf614a7d036bf5a93f26fb12c:refs/remotes/pull/19/merge
+2026-02-07T07:33:46.0316969Z From https://github.com/vyogotech/frappe-operator
+2026-02-07T07:33:46.0319957Z  * [new ref]         1ae62012d6003dbaf614a7d036bf5a93f26fb12c -> pull/19/merge
+2026-02-07T07:33:46.0349889Z ##[endgroup]
+2026-02-07T07:33:46.0350825Z ##[group]Determining the checkout info
+2026-02-07T07:33:46.0352660Z ##[endgroup]
+2026-02-07T07:33:46.0357411Z [command]/usr/bin/git sparse-checkout disable
+2026-02-07T07:33:46.0399899Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-02-07T07:33:46.0426750Z ##[group]Checking out the ref
+2026-02-07T07:33:46.0430365Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/19/merge
+2026-02-07T07:33:46.2532677Z Note: switching to 'refs/remotes/pull/19/merge'.
+2026-02-07T07:33:46.2535598Z 
+2026-02-07T07:33:46.2536555Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-02-07T07:33:46.2538918Z changes and commit them, and you can discard any commits you make in this
+2026-02-07T07:33:46.2541195Z state without impacting any branches by switching back to a branch.
+2026-02-07T07:33:46.2542740Z 
+2026-02-07T07:33:46.2543619Z If you want to create a new branch to retain commits you create, you may
+2026-02-07T07:33:46.2545688Z do so (now or later) by using -c with the switch command. Example:
+2026-02-07T07:33:46.2547161Z 
+2026-02-07T07:33:46.2547482Z   git switch -c <new-branch-name>
+2026-02-07T07:33:46.2548046Z 
+2026-02-07T07:33:46.2548318Z Or undo this operation with:
+2026-02-07T07:33:46.2548813Z 
+2026-02-07T07:33:46.2549041Z   git switch -
+2026-02-07T07:33:46.2549439Z 
+2026-02-07T07:33:46.2550113Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-02-07T07:33:46.2551411Z 
+2026-02-07T07:33:46.2553089Z HEAD is now at 1ae6201 Merge be940b6496760b5c7d9d1a6d24a4fb1dfa2ab7ed into 4778ec7ebcb3ff0b44858766779c79fe77eef2ca
+2026-02-07T07:33:46.2557099Z ##[endgroup]
+2026-02-07T07:33:46.2592110Z [command]/usr/bin/git log -1 --format=%H
+2026-02-07T07:33:46.2615387Z 1ae62012d6003dbaf614a7d036bf5a93f26fb12c
+2026-02-07T07:33:46.4561064Z ##[group]Run helm/kind-action@v1.8.0
+2026-02-07T07:33:46.4562065Z with:
+2026-02-07T07:33:46.4562892Z   cluster_name: frappe-keda-e2e
+2026-02-07T07:33:46.4563781Z   version: v0.20.0
+2026-02-07T07:33:46.4564480Z   wait: 60s
+2026-02-07T07:33:46.4565134Z   verbosity: 0
+2026-02-07T07:33:46.4565829Z   kubectl_version: v1.26.4
+2026-02-07T07:33:46.4566666Z   ignore_failed_clean: false
+2026-02-07T07:33:46.4567491Z ##[endgroup]
+2026-02-07T07:33:46.4912596Z Installing kind...
+2026-02-07T07:33:46.6919423Z Adding kind directory to PATH...
+2026-02-07T07:33:46.6920952Z Installing kubectl...
+2026-02-07T07:33:46.9392629Z Adding kubectl directory to PATH...
+2026-02-07T07:33:46.9411244Z kind v0.20.0 go1.20.4 linux/amd64
+2026-02-07T07:33:46.9956081Z WARNING: This version information is deprecated and will be replaced with the output from kubectl version --short.  Use --output=yaml|json to get the full version.
+2026-02-07T07:33:46.9958671Z Client Version: version.Info{Major:"1", Minor:"26", GitVersion:"v1.26.4", GitCommit:"f89670c3aa4059d6999cb42e23ccb4f0b9a03979", GitTreeState:"clean", BuildDate:"2023-04-12T12:13:53Z", GoVersion:"go1.19.8", Compiler:"gc", Platform:"linux/amd64"}
+2026-02-07T07:33:46.9961451Z Kustomize Version: v4.5.7
+2026-02-07T07:33:46.9971199Z Creating kind cluster...
+2026-02-07T07:33:47.3799389Z Creating cluster "frappe-keda-e2e" ...
+2026-02-07T07:33:47.3800343Z  • Ensuring node image (kindest/node:v1.27.3) 🖼  ...
+2026-02-07T07:33:55.6508368Z  ✓ Ensuring node image (kindest/node:v1.27.3) 🖼
+2026-02-07T07:33:55.6509049Z  • Preparing nodes 📦   ...
+2026-02-07T07:33:57.7411302Z  ✓ Preparing nodes 📦 
+2026-02-07T07:33:57.7750529Z  • Writing configuration 📜  ...
+2026-02-07T07:33:57.9393102Z  ✓ Writing configuration 📜
+2026-02-07T07:33:57.9394519Z  • Starting control-plane 🕹️  ...
+2026-02-07T07:34:09.9167711Z  ✓ Starting control-plane 🕹️
+2026-02-07T07:34:09.9168449Z  • Installing CNI 🔌  ...
+2026-02-07T07:34:10.5262859Z  ✓ Installing CNI 🔌
+2026-02-07T07:34:10.5263505Z  • Installing StorageClass 💾  ...
+2026-02-07T07:34:10.9304239Z  ✓ Installing StorageClass 💾
+2026-02-07T07:34:10.9564211Z  • Waiting ≤ 1m0s for control-plane = Ready ⏳  ...
+2026-02-07T07:34:26.8053465Z  ✓ Waiting ≤ 1m0s for control-plane = Ready ⏳
+2026-02-07T07:34:26.8054108Z  • Ready after 16s 💚
+2026-02-07T07:34:26.9344004Z Set kubectl context to "kind-frappe-keda-e2e"
+2026-02-07T07:34:26.9344562Z You can now use your cluster with:
+2026-02-07T07:34:26.9344855Z 
+2026-02-07T07:34:26.9345073Z kubectl cluster-info --context kind-frappe-keda-e2e
+2026-02-07T07:34:26.9345444Z 
+2026-02-07T07:34:26.9346279Z Have a question, bug, or feature request? Let us know! https://kind.sigs.k8s.io/#community 🙂
+2026-02-07T07:34:26.9694437Z ##[group]Run IMAGE="ghcr.io/vyogotech/frappe-operator:test-keda"
+2026-02-07T07:34:26.9695088Z [36;1mIMAGE="ghcr.io/vyogotech/frappe-operator:test-keda"[0m
+2026-02-07T07:34:26.9695635Z [36;1mdocker build -t "$IMAGE" .[0m
+2026-02-07T07:34:26.9696195Z [36;1mkind load docker-image "$IMAGE" --name frappe-keda-e2e[0m
+2026-02-07T07:34:26.9696868Z [36;1mecho "OPERATOR_IMAGE=$IMAGE" >> $GITHUB_ENV[0m
+2026-02-07T07:34:26.9737150Z shell: /usr/bin/bash -e {0}
+2026-02-07T07:34:26.9737497Z ##[endgroup]
+2026-02-07T07:34:27.4052155Z #0 building with "default" instance using docker driver
+2026-02-07T07:34:27.4053221Z 
+2026-02-07T07:34:27.4053467Z #1 [internal] load build definition from Dockerfile
+2026-02-07T07:34:27.4053974Z #1 transferring dockerfile: 1.42kB done
+2026-02-07T07:34:27.4054600Z #1 WARN: FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 2)
+2026-02-07T07:34:27.4055211Z #1 DONE 0.0s
+2026-02-07T07:34:27.4055383Z 
+2026-02-07T07:34:27.4055698Z #2 [auth] library/golang:pull token for registry-1.docker.io
+2026-02-07T07:34:27.4062864Z #2 DONE 0.0s
+2026-02-07T07:34:27.4063086Z 
+2026-02-07T07:34:27.4064489Z #3 [internal] load metadata for docker.io/library/golang:1.24-alpine
+2026-02-07T07:34:27.8386251Z #3 DONE 0.6s
+2026-02-07T07:34:27.8386522Z 
+2026-02-07T07:34:27.8386829Z #4 [internal] load metadata for gcr.io/distroless/static:nonroot
+2026-02-07T07:34:27.9557170Z #4 DONE 0.7s
+2026-02-07T07:34:28.0729002Z 
+2026-02-07T07:34:28.0729498Z #5 [internal] load .dockerignore
+2026-02-07T07:34:28.0730303Z #5 transferring context: 360B done
+2026-02-07T07:34:28.0731315Z #5 DONE 0.0s
+2026-02-07T07:34:28.0731734Z 
+2026-02-07T07:34:28.0732239Z #6 [internal] load build context
+2026-02-07T07:34:28.0733184Z #6 transferring context: 700.29kB 0.0s done
+2026-02-07T07:34:28.0733670Z #6 DONE 0.0s
+2026-02-07T07:34:28.0733847Z 
+2026-02-07T07:34:28.0734550Z #7 [builder  1/10] FROM docker.io/library/golang:1.24-alpine@sha256:6b597b1078d050ed09eb75bc1942e1085ce2da15905190b4d01044f7bc612b81
+2026-02-07T07:34:28.0736373Z #7 resolve docker.io/library/golang:1.24-alpine@sha256:6b597b1078d050ed09eb75bc1942e1085ce2da15905190b4d01044f7bc612b81 done
+2026-02-07T07:34:28.0737851Z #7 sha256:6b597b1078d050ed09eb75bc1942e1085ce2da15905190b4d01044f7bc612b81 10.30kB / 10.30kB done
+2026-02-07T07:34:28.0738924Z #7 sha256:757779acac4af1b349a20f357c7296097b4a0b89da4ad0e370b339060077282a 1.92kB / 1.92kB done
+2026-02-07T07:34:28.0739920Z #7 sha256:ebe4e0721205a049b6806724e1ccb05c99e334b1dc1f59e0729b31130bce3aed 2.19kB / 2.19kB done
+2026-02-07T07:34:28.8726507Z #7 ...
+2026-02-07T07:34:28.8726740Z 
+2026-02-07T07:34:28.8727473Z #8 [stage-1 1/3] FROM gcr.io/distroless/static:nonroot@sha256:f9f84bd968430d7d35e8e6d55c40efb0b980829ec42920a49e60e65eac0d83fc
+2026-02-07T07:34:28.8728887Z #8 resolve gcr.io/distroless/static:nonroot@sha256:f9f84bd968430d7d35e8e6d55c40efb0b980829ec42920a49e60e65eac0d83fc done
+2026-02-07T07:34:28.8730236Z #8 sha256:d346af46627fd1e866892447238c7c7a727a9b63c37094a58708e81f7e5ade31 13.63kB / 13.63kB 0.2s done
+2026-02-07T07:34:28.8731437Z #8 sha256:210d88f2ba026d0c6f1a43a31d732668ff685635f2851e2d0f377b164fadede4 106.05kB / 106.05kB 0.2s done
+2026-02-07T07:34:28.8733085Z #8 sha256:f9f84bd968430d7d35e8e6d55c40efb0b980829ec42920a49e60e65eac0d83fc 1.51kB / 1.51kB done
+2026-02-07T07:34:28.8734218Z #8 sha256:f43f134f5d60bf7afb3db92f865db42514913f01a53b08cd59a1ac6534671077 2.11kB / 2.11kB done
+2026-02-07T07:34:28.8735327Z #8 sha256:68a7f4bcccedb1c4b8e4bbf930d44a9ed1a3def12725874e049e38a75b73b043 1.61kB / 1.61kB done
+2026-02-07T07:34:28.8736447Z #8 sha256:f61f270e56cb07fde8391e3e1e10c1efd73e7c0b55b2c38aa966f81333740c7c 332.58kB / 332.58kB 0.2s done
+2026-02-07T07:34:28.8737622Z #8 extracting sha256:210d88f2ba026d0c6f1a43a31d732668ff685635f2851e2d0f377b164fadede4 done
+2026-02-07T07:34:28.8738709Z #8 extracting sha256:d346af46627fd1e866892447238c7c7a727a9b63c37094a58708e81f7e5ade31 done
+2026-02-07T07:34:28.8741304Z #8 sha256:6c29fa69851d31d83c4dd6fc945a71ac4db00aa194e411c7f4474f0411771ed2 34.90kB / 34.90kB 0.4s done
+2026-02-07T07:34:28.8743573Z #8 sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212 188B / 188B 0.5s done
+2026-02-07T07:34:28.8745072Z #8 sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a 67B / 67B 0.5s done
+2026-02-07T07:34:28.8746288Z #8 extracting sha256:f61f270e56cb07fde8391e3e1e10c1efd73e7c0b55b2c38aa966f81333740c7c 0.1s done
+2026-02-07T07:34:28.8747414Z #8 sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112 80B / 80B 0.6s done
+2026-02-07T07:34:28.8749372Z #8 sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4 123B / 123B 0.6s done
+2026-02-07T07:34:28.8752738Z #8 sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296 162B / 162B 0.7s done
+2026-02-07T07:34:28.8754221Z #8 extracting sha256:6c29fa69851d31d83c4dd6fc945a71ac4db00aa194e411c7f4474f0411771ed2 done
+2026-02-07T07:34:28.8755315Z #8 extracting sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a done
+2026-02-07T07:34:28.8756392Z #8 extracting sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212 done
+2026-02-07T07:34:28.8757530Z #8 extracting sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4 done
+2026-02-07T07:34:28.8758658Z #8 extracting sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296 done
+2026-02-07T07:34:28.8759883Z #8 sha256:bdfd7f7e5bf6fc27e70b59101db21c3d8284d283884419dd5fe7020583bb79ca 136.99kB / 136.99kB 0.8s done
+2026-02-07T07:34:28.8761120Z #8 sha256:4aa0ea1413d37a58615488592a0b827ea4b2e48fa5a77cf707d0e35f025e613f 385B / 385B 0.8s done
+2026-02-07T07:34:28.8762342Z #8 sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795 311B / 311B 0.8s done
+2026-02-07T07:34:28.8763701Z #8 extracting sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112 done
+2026-02-07T07:34:28.8764833Z #8 extracting sha256:4aa0ea1413d37a58615488592a0b827ea4b2e48fa5a77cf707d0e35f025e613f done
+2026-02-07T07:34:28.8766126Z #8 extracting sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795 done
+2026-02-07T07:34:28.8767255Z #8 extracting sha256:bdfd7f7e5bf6fc27e70b59101db21c3d8284d283884419dd5fe7020583bb79ca done
+2026-02-07T07:34:28.8768049Z #8 DONE 0.9s
+2026-02-07T07:34:28.8768241Z 
+2026-02-07T07:34:28.8768955Z #7 [builder  1/10] FROM docker.io/library/golang:1.24-alpine@sha256:6b597b1078d050ed09eb75bc1942e1085ce2da15905190b4d01044f7bc612b81
+2026-02-07T07:34:28.8770322Z #7 sha256:589002ba0eaed121a1dbf42f6648f29e5be55d5c8a6ee0f8eaa0285cc21ac153 0B / 3.86MB 0.8s
+2026-02-07T07:34:28.8771432Z #7 extracting sha256:589002ba0eaed121a1dbf42f6648f29e5be55d5c8a6ee0f8eaa0285cc21ac153
+2026-02-07T07:34:28.8772707Z #7 sha256:8f78851c25d251496dd39ebce311b4d914a4a97c0ba1983039165a05fd96b925 0B / 296.08kB 0.9s
+2026-02-07T07:34:28.8773796Z #7 sha256:f7bdfd728ac2ad72d43b82689890dc698260d3a1049845f48fb3fb942df6c581 0B / 79.13MB 0.9s
+2026-02-07T07:34:28.8774865Z #7 sha256:c95d909b2488ff78a51d01ca745429e6d281e314006f231fe6e9f219cf5432ca 0B / 126B 0.9s
+2026-02-07T07:34:28.9773165Z #7 extracting sha256:589002ba0eaed121a1dbf42f6648f29e5be55d5c8a6ee0f8eaa0285cc21ac153 0.1s done
+2026-02-07T07:34:28.9774391Z #7 sha256:8f78851c25d251496dd39ebce311b4d914a4a97c0ba1983039165a05fd96b925 296.08kB / 296.08kB 0.9s done
+2026-02-07T07:34:28.9775547Z #7 sha256:f7bdfd728ac2ad72d43b82689890dc698260d3a1049845f48fb3fb942df6c581 28.43MB / 79.13MB 1.0s
+2026-02-07T07:34:28.9776766Z #7 sha256:c95d909b2488ff78a51d01ca745429e6d281e314006f231fe6e9f219cf5432ca 126B / 126B 0.9s done
+2026-02-07T07:34:28.9777966Z #7 sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 32B / 32B 1.0s done
+2026-02-07T07:34:29.1629168Z #7 sha256:f7bdfd728ac2ad72d43b82689890dc698260d3a1049845f48fb3fb942df6c581 54.53MB / 79.13MB 1.1s
+2026-02-07T07:34:29.1630595Z #7 extracting sha256:8f78851c25d251496dd39ebce311b4d914a4a97c0ba1983039165a05fd96b925 0.1s done
+2026-02-07T07:34:29.1631661Z #7 extracting sha256:f7bdfd728ac2ad72d43b82689890dc698260d3a1049845f48fb3fb942df6c581
+2026-02-07T07:34:29.2666524Z #7 sha256:f7bdfd728ac2ad72d43b82689890dc698260d3a1049845f48fb3fb942df6c581 79.13MB / 79.13MB 1.2s done
+2026-02-07T07:34:33.6703986Z #7 extracting sha256:f7bdfd728ac2ad72d43b82689890dc698260d3a1049845f48fb3fb942df6c581 4.4s done
+2026-02-07T07:34:34.2288231Z #7 extracting sha256:c95d909b2488ff78a51d01ca745429e6d281e314006f231fe6e9f219cf5432ca
+2026-02-07T07:34:34.4357653Z #7 extracting sha256:c95d909b2488ff78a51d01ca745429e6d281e314006f231fe6e9f219cf5432ca done
+2026-02-07T07:34:34.4358748Z #7 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 done
+2026-02-07T07:34:34.4359480Z #7 DONE 6.3s
+2026-02-07T07:34:34.4359946Z 
+2026-02-07T07:34:34.4360095Z #9 [builder  2/10] WORKDIR /workspace
+2026-02-07T07:34:34.4360480Z #9 DONE 0.0s
+2026-02-07T07:34:34.4360651Z 
+2026-02-07T07:34:34.4360796Z #10 [builder  3/10] COPY go.mod go.mod
+2026-02-07T07:34:34.4361035Z #10 DONE 0.0s
+2026-02-07T07:34:34.4361145Z 
+2026-02-07T07:34:34.4361229Z #11 [builder  4/10] COPY go.sum go.sum
+2026-02-07T07:34:34.4361473Z #11 DONE 0.0s
+2026-02-07T07:34:34.4361575Z 
+2026-02-07T07:34:34.4361753Z #12 [builder  5/10] RUN go mod download
+2026-02-07T07:34:37.8720358Z #12 DONE 3.6s
+2026-02-07T07:34:38.0397092Z 
+2026-02-07T07:34:38.0397565Z #13 [builder  6/10] COPY main.go main.go
+2026-02-07T07:34:38.0398082Z #13 DONE 0.0s
+2026-02-07T07:34:38.0398273Z 
+2026-02-07T07:34:38.0398439Z #14 [builder  7/10] COPY api/ api/
+2026-02-07T07:34:38.0398851Z #14 DONE 0.0s
+2026-02-07T07:34:38.0399047Z 
+2026-02-07T07:34:38.0399253Z #15 [builder  8/10] COPY controllers/ controllers/
+2026-02-07T07:34:38.0399726Z #15 DONE 0.0s
+2026-02-07T07:34:38.0399907Z 
+2026-02-07T07:34:38.0400096Z #16 [builder  9/10] COPY pkg/ pkg/
+2026-02-07T07:34:38.0400722Z #16 DONE 0.0s
+2026-02-07T07:34:38.0400913Z 
+2026-02-07T07:34:38.0403041Z #17 [builder 10/10] RUN --mount=type=cache,target=/root/.cache/go-build     --mount=type=cache,target=/go/pkg/mod     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o manager main.go
+2026-02-07T07:34:38.0406101Z #17 0.119 go: downloading github.com/openshift/api v0.0.0-20260114133223-6ab113cb7368
+2026-02-07T07:34:38.2070605Z #17 0.132 go: downloading k8s.io/apimachinery v0.34.1
+2026-02-07T07:34:38.2071278Z #17 0.136 go: downloading k8s.io/client-go v0.34.1
+2026-02-07T07:34:38.3020411Z #17 0.381 go: downloading sigs.k8s.io/controller-runtime v0.22.3
+2026-02-07T07:34:38.8846009Z #17 0.964 go: downloading k8s.io/api v0.34.1
+2026-02-07T07:34:39.0394013Z #17 0.968 go: downloading github.com/prometheus/client_golang v1.22.0
+2026-02-07T07:34:39.3131789Z #17 1.392 go: downloading github.com/gogo/protobuf v1.3.2
+2026-02-07T07:34:39.4193653Z #17 1.394 go: downloading k8s.io/klog/v2 v2.130.1
+2026-02-07T07:34:39.4196597Z #17 1.396 go: downloading sigs.k8s.io/structured-merge-diff/v6 v6.3.0
+2026-02-07T07:34:39.4197320Z #17 1.446 go: downloading github.com/evanphx/json-patch/v5 v5.9.11
+2026-02-07T07:34:39.4198061Z #17 1.446 go: downloading k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
+2026-02-07T07:34:39.4198744Z #17 1.464 go: downloading github.com/go-logr/logr v1.4.3
+2026-02-07T07:34:39.4199417Z #17 1.468 go: downloading github.com/evanphx/json-patch v5.9.0+incompatible
+2026-02-07T07:34:39.4200112Z #17 1.499 go: downloading github.com/go-logr/zapr v1.3.0
+2026-02-07T07:34:39.5479482Z #17 1.503 go: downloading go.uber.org/zap v1.27.0
+2026-02-07T07:34:39.5484205Z #17 1.568 go: downloading gomodules.xyz/jsonpatch/v2 v2.4.0
+2026-02-07T07:34:39.5484808Z #17 1.574 go: downloading gopkg.in/inf.v0 v0.9.1
+2026-02-07T07:34:39.5485337Z #17 1.595 go: downloading sigs.k8s.io/randfill v1.0.0
+2026-02-07T07:34:39.5490403Z #17 1.627 go: downloading github.com/beorn7/perks v1.0.1
+2026-02-07T07:34:39.6739770Z #17 1.645 go: downloading github.com/cespare/xxhash/v2 v2.3.0
+2026-02-07T07:34:39.6741161Z #17 1.662 go: downloading github.com/prometheus/client_model v0.6.1
+2026-02-07T07:34:39.6741866Z #17 1.664 go: downloading github.com/prometheus/common v0.62.0
+2026-02-07T07:34:39.6742676Z #17 1.687 go: downloading github.com/prometheus/procfs v0.15.1
+2026-02-07T07:34:39.6743607Z #17 1.687 go: downloading google.golang.org/protobuf v1.36.6
+2026-02-07T07:34:39.6744250Z #17 1.712 go: downloading github.com/google/gnostic-models v0.7.0
+2026-02-07T07:34:39.6745004Z #17 1.753 go: downloading github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
+2026-02-07T07:34:39.7875456Z #17 1.758 go: downloading golang.org/x/net v0.44.0
+2026-02-07T07:34:39.7876255Z #17 1.777 go: downloading sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8
+2026-02-07T07:34:39.7876952Z #17 1.822 go: downloading golang.org/x/oauth2 v0.28.0
+2026-02-07T07:34:39.7877488Z #17 1.867 go: downloading k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b
+2026-02-07T07:34:39.9138924Z #17 1.948 go: downloading github.com/json-iterator/go v1.1.12
+2026-02-07T07:34:39.9139572Z #17 1.993 go: downloading go.yaml.in/yaml/v2 v2.4.2
+2026-02-07T07:34:40.0274811Z #17 2.003 go: downloading go.uber.org/multierr v1.11.0
+2026-02-07T07:34:40.0275825Z #17 2.026 go: downloading github.com/fsnotify/fsnotify v1.9.0
+2026-02-07T07:34:40.0276444Z #17 2.044 go: downloading go.yaml.in/yaml/v3 v3.0.4
+2026-02-07T07:34:40.0276956Z #17 2.086 go: downloading golang.org/x/sys v0.36.0
+2026-02-07T07:34:40.0277511Z #17 2.086 go: downloading github.com/fxamacker/cbor/v2 v2.9.0
+2026-02-07T07:34:40.0278064Z #17 2.086 go: downloading golang.org/x/term v0.35.0
+2026-02-07T07:34:40.0278592Z #17 2.086 go: downloading golang.org/x/time v0.9.0
+2026-02-07T07:34:40.0278954Z #17 2.107 go: downloading github.com/google/uuid v1.6.0
+2026-02-07T07:34:40.1458461Z #17 2.110 go: downloading github.com/google/btree v1.1.3
+2026-02-07T07:34:40.1459479Z #17 2.126 go: downloading golang.org/x/sync v0.17.0
+2026-02-07T07:34:40.1483057Z #17 2.131 go: downloading sigs.k8s.io/yaml v1.6.0
+2026-02-07T07:34:40.1484045Z #17 2.131 go: downloading github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+2026-02-07T07:34:40.1487265Z #17 2.145 go: downloading github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee
+2026-02-07T07:34:40.1488204Z #17 2.157 go: downloading k8s.io/apiextensions-apiserver v0.34.1
+2026-02-07T07:34:40.1488883Z #17 2.159 go: downloading github.com/spf13/pflag v1.0.10
+2026-02-07T07:34:40.1489560Z #17 2.175 go: downloading github.com/go-openapi/jsonreference v0.21.0
+2026-02-07T07:34:40.1490247Z #17 2.194 go: downloading github.com/go-openapi/swag v0.23.0
+2026-02-07T07:34:40.1491030Z #17 2.200 go: downloading github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
+2026-02-07T07:34:40.1491813Z #17 2.225 go: downloading github.com/x448/float16 v0.8.4
+2026-02-07T07:34:40.2591223Z #17 2.232 go: downloading golang.org/x/text v0.29.0
+2026-02-07T07:34:40.2592178Z #17 2.338 go: downloading github.com/go-openapi/jsonpointer v0.21.0
+2026-02-07T07:34:40.3885185Z #17 2.356 go: downloading github.com/emicklei/go-restful/v3 v3.12.2
+2026-02-07T07:34:40.3885974Z #17 2.383 go: downloading github.com/mailru/easyjson v0.9.0
+2026-02-07T07:34:40.3886529Z #17 2.468 go: downloading gopkg.in/yaml.v3 v3.0.1
+2026-02-07T07:34:40.6129188Z #17 2.491 go: downloading github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
+2026-02-07T07:34:40.6129731Z #17 2.510 go: downloading github.com/josharian/intern v1.0.0
+2026-02-07T07:34:40.6130120Z #17 2.525 go: downloading gopkg.in/evanphx/json-patch.v4 v4.12.0
+2026-02-07T07:34:40.6130491Z #17 2.542 go: downloading github.com/pkg/errors v0.9.1
+2026-02-07T07:35:45.3248768Z #17 DONE 67.4s
+2026-02-07T07:35:45.5728891Z 
+2026-02-07T07:35:45.5729433Z #18 [stage-1 2/3] COPY --from=builder /workspace/manager .
+2026-02-07T07:35:45.5729982Z #18 DONE 0.1s
+2026-02-07T07:35:45.5730093Z 
+2026-02-07T07:35:45.5730178Z #19 exporting to image
+2026-02-07T07:35:45.5730397Z #19 exporting layers
+2026-02-07T07:35:46.0042305Z #19 exporting layers 0.6s done
+2026-02-07T07:35:46.0213144Z #19 writing image sha256:a5b369972e09bc237640125fb1697c52340bbd544a22877317637df596064129 done
+2026-02-07T07:35:46.0214052Z #19 naming to ghcr.io/vyogotech/frappe-operator:test-keda done
+2026-02-07T07:35:46.0214583Z #19 DONE 0.6s
+2026-02-07T07:35:46.0216731Z 
+2026-02-07T07:35:46.0217602Z  [33m1 warning found (use docker --debug to expand):
+2026-02-07T07:35:46.0218445Z [0m - FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 2)
+2026-02-07T07:35:46.1769428Z Image: "ghcr.io/vyogotech/frappe-operator:test-keda" with ID "sha256:a5b369972e09bc237640125fb1697c52340bbd544a22877317637df596064129" not yet present on node "frappe-keda-e2e-control-plane", loading...
+2026-02-07T07:35:47.0972721Z ##[group]Run azure/setup-helm@v3
+2026-02-07T07:35:47.0972984Z with:
+2026-02-07T07:35:47.0973148Z   version: latest
+2026-02-07T07:35:47.0973326Z env:
+2026-02-07T07:35:47.0973779Z   OPERATOR_IMAGE: ghcr.io/vyogotech/frappe-operator:test-keda
+2026-02-07T07:35:47.0974090Z ##[endgroup]
+2026-02-07T07:35:47.1518110Z ##[warning]Error while fetching latest Helm release: Error: [@octokit/auth-action] `GITHUB_TOKEN` variable is not set. It must be set on either `env:` or `with:`. See https://github.com/octokit/auth-action.js#createactionauth. Using default version v3.9.0
+2026-02-07T07:35:47.1528176Z ##[group]Downloading v3.9.0
+2026-02-07T07:35:47.3222658Z [command]/usr/bin/unzip -o -q /home/runner/work/_temp/d94aae30-14df-4f78-9797-7c7b2918cc1a
+2026-02-07T07:35:47.6941449Z ##[endgroup]
+2026-02-07T07:35:47.6945070Z Helm tool version 'v3.9.0' has been cached at /opt/hostedtoolcache/helm/3.9.0/x64/linux-amd64/helm
+2026-02-07T07:35:47.7312609Z ##[group]Run helm repo add keda https://kedacore.github.io/charts
+2026-02-07T07:35:47.7313107Z [36;1mhelm repo add keda https://kedacore.github.io/charts[0m
+2026-02-07T07:35:47.7313620Z [36;1mhelm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator[0m
+2026-02-07T07:35:47.7314067Z [36;1mhelm repo update[0m
+2026-02-07T07:35:47.7346374Z shell: /usr/bin/bash -e {0}
+2026-02-07T07:35:47.7346594Z env:
+2026-02-07T07:35:47.7346845Z   OPERATOR_IMAGE: ghcr.io/vyogotech/frappe-operator:test-keda
+2026-02-07T07:35:47.7347159Z ##[endgroup]
+2026-02-07T07:35:47.8208446Z "keda" has been added to your repositories
+2026-02-07T07:35:47.9054112Z "mariadb-operator" has been added to your repositories
+2026-02-07T07:35:47.9279757Z Hang tight while we grab the latest from your chart repositories...
+2026-02-07T07:35:47.9830023Z ...Successfully got an update from the "mariadb-operator" chart repository
+2026-02-07T07:35:47.9852991Z ...Successfully got an update from the "keda" chart repository
+2026-02-07T07:35:47.9854314Z Update Complete. ⎈Happy Helming!⎈
+2026-02-07T07:35:48.0102313Z ##[group]Run echo "Installing KEDA..."
+2026-02-07T07:35:48.0102998Z [36;1mecho "Installing KEDA..."[0m
+2026-02-07T07:35:48.0103278Z [36;1mhelm upgrade --install keda keda/keda \[0m
+2026-02-07T07:35:48.0103621Z [36;1m  --namespace frappe-operator-system \[0m
+2026-02-07T07:35:48.0103896Z [36;1m  --create-namespace \[0m
+2026-02-07T07:35:48.0104134Z [36;1m  --set crds.install=true \[0m
+2026-02-07T07:35:48.0104364Z [36;1m  --wait \[0m
+2026-02-07T07:35:48.0104550Z [36;1m  --timeout 10m[0m
+2026-02-07T07:35:48.0135506Z shell: /usr/bin/bash -e {0}
+2026-02-07T07:35:48.0135736Z env:
+2026-02-07T07:35:48.0135996Z   OPERATOR_IMAGE: ghcr.io/vyogotech/frappe-operator:test-keda
+2026-02-07T07:35:48.0136327Z ##[endgroup]
+2026-02-07T07:35:48.0187424Z Installing KEDA...
+2026-02-07T07:35:48.0510703Z Release "keda" does not exist. Installing it now.
+2026-02-07T07:36:15.2743407Z NAME: keda
+2026-02-07T07:36:15.2745297Z LAST DEPLOYED: Sat Feb  7 07:35:48 2026
+2026-02-07T07:36:15.2745914Z NAMESPACE: frappe-operator-system
+2026-02-07T07:36:15.2746296Z STATUS: deployed
+2026-02-07T07:36:15.2746574Z REVISION: 1
+2026-02-07T07:36:15.2746824Z TEST SUITE: None
+2026-02-07T07:36:15.2747090Z NOTES:
+2026-02-07T07:36:15.2753087Z :::^.     .::::^:     :::::::::::::::    .:::::::::.                   .^.                  
+2026-02-07T07:36:15.2753733Z 7???~   .^7????~.     7??????????????.   :?????????77!^.              .7?7.                 
+2026-02-07T07:36:15.2754331Z 7???~  ^7???7~.       ~!!!!!!!!!!!!!!.   :????!!!!7????7~.           .7???7.                
+2026-02-07T07:36:15.2754888Z 7???~^7????~.                            :????:    :~7???7.         :7?????7.               
+2026-02-07T07:36:15.2755466Z 7???7????!.           ::::::::::::.      :????:      .7???!        :7??77???7.              
+2026-02-07T07:36:15.2756033Z 7????????7:           7???????????~      :????:       :????:      :???7?5????7.             
+2026-02-07T07:36:15.2756678Z 7????!~????^          !77777777777^      :????:       :????:     ^???7?#P7????7.            
+2026-02-07T07:36:15.2757285Z 7???~  ^????~                            :????:      :7???!     ^???7J#@J7?????7.           
+2026-02-07T07:36:15.2757831Z 7???~   :7???!.                          :????:   .:~7???!.    ~???7Y&@#7777????7.          
+2026-02-07T07:36:15.2758846Z 7???~    .7???7:      !!!!!!!!!!!!!!!    :????7!!77????7^     ~??775@@@GJJYJ?????7.         
+2026-02-07T07:36:15.2759409Z 7???~     .!????^     7?????????????7.   :?????????7!~:      !????G@@@@@@@@5??????7:        
+2026-02-07T07:36:15.2759973Z ::::.       :::::     :::::::::::::::    .::::::::..        .::::JGGGB@@@&7:::::::::        
+2026-02-07T07:36:15.2760504Z                                                                       ?@@#~                  
+2026-02-07T07:36:15.2761055Z                                                                       P@B^                   
+2026-02-07T07:36:15.2761599Z                                                                     :&G:                    
+2026-02-07T07:36:15.2762143Z                                                                     !5.                     
+2026-02-07T07:36:15.2763236Z                                                                     .Kubernetes Event-driven Autoscaling (KEDA) - Application autoscaling made simple.
+2026-02-07T07:36:15.2763863Z 
+2026-02-07T07:36:15.2764070Z Get started by deploying Scaled Objects to your cluster:
+2026-02-07T07:36:15.2764701Z     - Information about Scaled Objects : https://keda.sh/docs/latest/concepts/
+2026-02-07T07:36:15.2765334Z     - Samples: https://github.com/kedacore/samples
+2026-02-07T07:36:15.2765642Z 
+2026-02-07T07:36:15.2765816Z Get information about the deployed ScaledObjects:
+2026-02-07T07:36:15.2766359Z   kubectl get scaledobject [--namespace <namespace>]
+2026-02-07T07:36:15.2766705Z 
+2026-02-07T07:36:15.2766864Z Get details about a deployed ScaledObject:
+2026-02-07T07:36:15.2767508Z   kubectl describe scaledobject <scaled-object-name> [--namespace <namespace>]
+2026-02-07T07:36:15.2768041Z 
+2026-02-07T07:36:15.2768605Z Get information about the deployed TriggerAuthentications:
+2026-02-07T07:36:15.2769283Z   kubectl get triggerauthentication [--namespace <namespace>]
+2026-02-07T07:36:15.2769715Z 
+2026-02-07T07:36:15.2769920Z Get details about a deployed TriggerAuthentication:
+2026-02-07T07:36:15.2770757Z   kubectl describe triggerauthentication <trigger-authentication-name> [--namespace <namespace>]
+2026-02-07T07:36:15.2771428Z 
+2026-02-07T07:36:15.2771788Z Get an overview of the Horizontal Pod Autoscalers (HPA) that KEDA is using behind the scenes:
+2026-02-07T07:36:15.2772672Z   kubectl get hpa [--all-namespaces] [--namespace <namespace>]
+2026-02-07T07:36:15.2773325Z -------------------------------------------------------------------------------------
+2026-02-07T07:36:15.2774667Z WARNING - Running on unsupported Kubernetes version "1.27". KEDA 2.19 is supported and tested on Kubernetes "1.32" or higher. See https://keda.sh/docs/latest/operate/cluster/ for details.
+2026-02-07T07:36:15.2775968Z -------------------------------------------------------------------------------------
+2026-02-07T07:36:15.2776387Z 
+2026-02-07T07:36:15.2776498Z Learn more about KEDA:
+2026-02-07T07:36:15.2776833Z - Documentation: https://keda.sh/
+2026-02-07T07:36:15.2777239Z - Support: https://keda.sh/support/
+2026-02-07T07:36:15.2777752Z - File an issue: https://github.com/kedacore/keda/issues/new/choose
+2026-02-07T07:36:15.3039469Z ##[group]Run echo "Verifying KEDA CRD..."
+2026-02-07T07:36:15.3039808Z [36;1mecho "Verifying KEDA CRD..."[0m
+2026-02-07T07:36:15.3040106Z [36;1mkubectl get crd scaledobjects.keda.sh || exit 1[0m
+2026-02-07T07:36:15.3040405Z [36;1mecho "KEDA CRD verified!"[0m
+2026-02-07T07:36:15.3071575Z shell: /usr/bin/bash -e {0}
+2026-02-07T07:36:15.3071806Z env:
+2026-02-07T07:36:15.3072061Z   OPERATOR_IMAGE: ghcr.io/vyogotech/frappe-operator:test-keda
+2026-02-07T07:36:15.3072489Z ##[endgroup]
+2026-02-07T07:36:15.3125649Z Verifying KEDA CRD...
+2026-02-07T07:36:15.3653095Z NAME                    CREATED AT
+2026-02-07T07:36:15.3653570Z scaledobjects.keda.sh   2026-02-07T07:35:48Z
+2026-02-07T07:36:15.3674849Z KEDA CRD verified!
+2026-02-07T07:36:15.3904747Z ##[group]Run helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+2026-02-07T07:36:15.3905588Z [36;1mhelm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \[0m
+2026-02-07T07:36:15.3906026Z [36;1m  --namespace frappe-operator-system \[0m
+2026-02-07T07:36:15.3906316Z [36;1m  --create-namespace \[0m
+2026-02-07T07:36:15.3906547Z [36;1m  --set crds.enabled=true \[0m
+2026-02-07T07:36:15.3906775Z [36;1m  --wait \[0m
+2026-02-07T07:36:15.3906958Z [36;1m  --timeout 10m[0m
+2026-02-07T07:36:15.3938803Z shell: /usr/bin/bash -e {0}
+2026-02-07T07:36:15.3939033Z env:
+2026-02-07T07:36:15.3939415Z   OPERATOR_IMAGE: ghcr.io/vyogotech/frappe-operator:test-keda
+2026-02-07T07:36:15.3939757Z ##[endgroup]
+2026-02-07T07:36:15.4352882Z Release "mariadb-operator" does not exist. Installing it now.
+2026-02-07T07:36:42.9907505Z NAME: mariadb-operator
+2026-02-07T07:36:42.9908106Z LAST DEPLOYED: Sat Feb  7 07:36:15 2026
+2026-02-07T07:36:42.9908623Z NAMESPACE: frappe-operator-system
+2026-02-07T07:36:42.9909013Z STATUS: deployed
+2026-02-07T07:36:42.9909310Z REVISION: 1
+2026-02-07T07:36:42.9909561Z TEST SUITE: None
+2026-02-07T07:36:42.9909822Z NOTES:
+2026-02-07T07:36:42.9910432Z mariadb-operator has been successfully deployed! 🦭
+2026-02-07T07:36:42.9910793Z 
+2026-02-07T07:36:42.9911008Z Not sure what to do next? 😅 Check out:
+2026-02-07T07:36:42.9911659Z https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/quickstart.md
+2026-02-07T07:36:43.0261432Z ##[group]Run REPO="ghcr.io/vyogotech/frappe-operator"
+2026-02-07T07:36:43.0261864Z [36;1mREPO="ghcr.io/vyogotech/frappe-operator"[0m
+2026-02-07T07:36:43.0262263Z [36;1mhelm upgrade --install frappe-operator ./helm/frappe-operator \[0m
+2026-02-07T07:36:43.0263126Z [36;1m  --set operator.image.repository="$REPO" \[0m
+2026-02-07T07:36:43.0263452Z [36;1m  --set operator.image.tag=test-keda \[0m
+2026-02-07T07:36:43.0263765Z [36;1m  --set operator.image.pullPolicy=Never \[0m
+2026-02-07T07:36:43.0264053Z [36;1m  --set mariadb.enabled=true \[0m
+2026-02-07T07:36:43.0264331Z [36;1m  --namespace frappe-operator-system \[0m
+2026-02-07T07:36:43.0264620Z [36;1m  --create-namespace \[0m
+2026-02-07T07:36:43.0264839Z [36;1m  --wait \[0m
+2026-02-07T07:36:43.0265028Z [36;1m  --timeout 10m[0m
+2026-02-07T07:36:43.0297304Z shell: /usr/bin/bash -e {0}
+2026-02-07T07:36:43.0297536Z env:
+2026-02-07T07:36:43.0297799Z   OPERATOR_IMAGE: ghcr.io/vyogotech/frappe-operator:test-keda
+2026-02-07T07:36:43.0298253Z ##[endgroup]
+2026-02-07T07:36:43.0729227Z Release "frappe-operator" does not exist. Installing it now.
+2026-02-07T07:36:56.2948037Z NAME: frappe-operator
+2026-02-07T07:36:56.2963214Z LAST DEPLOYED: Sat Feb  7 07:36:43 2026
+2026-02-07T07:36:56.2964017Z NAMESPACE: frappe-operator-system
+2026-02-07T07:36:56.2964603Z STATUS: deployed
+2026-02-07T07:36:56.2965094Z REVISION: 1
+2026-02-07T07:36:56.2965510Z TEST SUITE: None
+2026-02-07T07:36:56.2965933Z NOTES:
+2026-02-07T07:36:56.2966786Z 🎉 Frappe Operator v3.0.0 has been successfully installed!
+2026-02-07T07:36:56.2967367Z 
+2026-02-07T07:36:56.3007353Z ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026-02-07T07:36:56.3007732Z 
+2026-02-07T07:36:56.3007954Z 📋 INSTALLATION SUMMARY:
+2026-02-07T07:36:56.3008199Z 
+2026-02-07T07:36:56.3008376Z Operator Namespace: frappe-operator-system
+2026-02-07T07:36:56.3008853Z Release Name: frappe-operator
+2026-02-07T07:36:56.3009228Z Chart Version: 3.0.0
+2026-02-07T07:36:56.3009424Z 
+2026-02-07T07:36:56.3009823Z ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026-02-07T07:36:56.3010175Z 
+2026-02-07T07:36:56.3010351Z ✅ WHAT WAS INSTALLED:
+2026-02-07T07:36:56.3010836Z   ✓ MariaDB Operator (for database provisioning)
+2026-02-07T07:36:56.3011525Z   ✓ MariaDB instance: frappe-mariadb (frappe-operator-system)
+2026-02-07T07:36:56.3012137Z   ✓ Frappe Operator CRDs
+2026-02-07T07:36:56.3012747Z   ✓ Frappe Operator Controller
+2026-02-07T07:36:56.3013155Z   ✓ RBAC permissions
+2026-02-07T07:36:56.3013346Z 
+2026-02-07T07:36:56.3013664Z ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026-02-07T07:36:56.3014481Z 
+2026-02-07T07:36:56.3014672Z 🚀 GETTING STARTED:
+2026-02-07T07:36:56.3014859Z 
+2026-02-07T07:36:56.3015002Z 1. Verify operator is running:
+2026-02-07T07:36:56.3015344Z    
+2026-02-07T07:36:56.3015661Z    kubectl get pods -n frappe-operator-system
+2026-02-07T07:36:56.3015992Z 
+2026-02-07T07:36:56.3016117Z 2. Check installed CRDs:
+2026-02-07T07:36:56.3016441Z    
+2026-02-07T07:36:56.3016743Z    kubectl get crds | grep vyogo.tech
+2026-02-07T07:36:56.3017056Z 
+2026-02-07T07:36:56.3017183Z 3. Verify MariaDB is ready:
+2026-02-07T07:36:56.3017509Z    
+2026-02-07T07:36:56.3017899Z    kubectl get mariadb frappe-mariadb -n frappe-operator-system
+2026-02-07T07:36:56.3018812Z    kubectl wait --for=condition=Ready mariadb/frappe-mariadb -n frappe-operator-system --timeout=300s
+2026-02-07T07:36:56.3019507Z 
+2026-02-07T07:36:56.3019659Z 4. Deploy your first Frappe site:
+2026-02-07T07:36:56.3019940Z 
+2026-02-07T07:36:56.3020090Z    Create a file named my-site.yaml:
+2026-02-07T07:36:56.3020470Z    
+2026-02-07T07:36:56.3020727Z    ---
+2026-02-07T07:36:56.3021009Z    apiVersion: vyogo.tech/v1alpha1
+2026-02-07T07:36:56.3021398Z    kind: FrappeBench
+2026-02-07T07:36:56.3021700Z    metadata:
+2026-02-07T07:36:56.3021974Z      name: my-bench
+2026-02-07T07:36:56.3022277Z      namespace: default
+2026-02-07T07:36:56.3022764Z    spec:
+2026-02-07T07:36:56.3023052Z      frappeVersion: "version-15"
+2026-02-07T07:36:56.3023806Z      apps:
+2026-02-07T07:36:56.3024087Z        - name: erpnext
+2026-02-07T07:36:56.3024385Z          source: image
+2026-02-07T07:36:56.3024684Z    ---
+2026-02-07T07:36:56.3024962Z    apiVersion: vyogo.tech/v1alpha1
+2026-02-07T07:36:56.3025346Z    kind: FrappeSite
+2026-02-07T07:36:56.3025638Z    metadata:
+2026-02-07T07:36:56.3025898Z      name: my-site
+2026-02-07T07:36:56.3026189Z      namespace: default
+2026-02-07T07:36:56.3026499Z    spec:
+2026-02-07T07:36:56.3026760Z      benchRef:
+2026-02-07T07:36:56.3027039Z        name: my-bench
+2026-02-07T07:36:56.3027371Z        namespace: default
+2026-02-07T07:36:56.3027731Z      siteName: my-site.example.com
+2026-02-07T07:36:56.3028091Z      dbConfig:
+2026-02-07T07:36:56.3028381Z        provider: mariadb
+2026-02-07T07:36:56.3028715Z        mode: shared
+2026-02-07T07:36:56.3029001Z        mariadbRef:
+2026-02-07T07:36:56.3029317Z          name: frappe-mariadb
+2026-02-07T07:36:56.3029717Z          namespace: frappe-operator-system
+2026-02-07T07:36:56.3030183Z      domain: my-site.example.com
+2026-02-07T07:36:56.3030541Z      ingress:
+2026-02-07T07:36:56.3030819Z        enabled: true
+2026-02-07T07:36:56.3031136Z      ingressClassName: nginx
+2026-02-07T07:36:56.3031395Z 
+2026-02-07T07:36:56.3031509Z    Then apply:
+2026-02-07T07:36:56.3031784Z    
+2026-02-07T07:36:56.3032060Z    kubectl apply -f my-site.yaml
+2026-02-07T07:36:56.3032310Z 
+2026-02-07T07:36:56.3108527Z 5. Monitor deployment:
+2026-02-07T07:36:56.3108980Z    
+2026-02-07T07:36:56.3109319Z    kubectl get frappebench,frappesite -w
+2026-02-07T07:36:56.3109652Z 
+2026-02-07T07:36:56.3109807Z 6. Get auto-generated admin password:
+2026-02-07T07:36:56.3110237Z    
+2026-02-07T07:36:56.3110724Z    kubectl get secret my-site-admin -o jsonpath='{.data.password}' | base64 -d
+2026-02-07T07:36:56.3111257Z 
+2026-02-07T07:36:56.3111746Z ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026-02-07T07:36:56.3112098Z 
+2026-02-07T07:36:56.3112304Z 📚 DOCUMENTATION:
+2026-02-07T07:36:56.3114837Z 
+2026-02-07T07:36:56.3115363Z • Full Documentation: https://vyogotech.github.io/frappe-operator/
+2026-02-07T07:36:56.3116348Z • Examples: https://github.com/vyogotech/frappe-operator/tree/main/examples
+2026-02-07T07:36:56.3117292Z • GitHub: https://github.com/vyogotech/frappe-operator
+2026-02-07T07:36:56.3118113Z • Issues: https://github.com/vyogotech/frappe-operator/issues
+2026-02-07T07:36:56.3118568Z 
+2026-02-07T07:36:56.3118945Z ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026-02-07T07:36:56.3119362Z 
+2026-02-07T07:36:56.3119750Z 🔐 SECURITY FEATURES (v1.0.0):
+2026-02-07T07:36:56.3120003Z 
+2026-02-07T07:36:56.3121044Z • ✅ Zero hardcoded passwords - all credentials auto-generated
+2026-02-07T07:36:56.3121749Z • ✅ Per-site database isolation via MariaDB Operator
+2026-02-07T07:36:56.3122542Z • ✅ Kubernetes Secrets for credential storage
+2026-02-07T07:36:56.3123156Z • ✅ Declarative database provisioning with RBAC
+2026-02-07T07:36:56.3123514Z 
+2026-02-07T07:36:56.3123879Z ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026-02-07T07:36:56.3124247Z 
+2026-02-07T07:36:56.3124554Z 💡 TIP: To access your site locally, use port-forward:
+2026-02-07T07:36:56.3124918Z 
+2026-02-07T07:36:56.3125124Z    kubectl port-forward svc/my-bench-nginx 8080:8080
+2026-02-07T07:36:56.3125594Z    
+2026-02-07T07:36:56.3125957Z    Then open http://localhost:8080 in your browser.
+2026-02-07T07:36:56.3126315Z 
+2026-02-07T07:36:56.3126654Z ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026-02-07T07:36:56.3127009Z 
+2026-02-07T07:36:56.3127202Z Thank you for using Frappe Operator! ⭐
+2026-02-07T07:36:56.3127744Z If you find it useful, please give us a star on GitHub!
+2026-02-07T07:36:56.3128108Z 
+2026-02-07T07:36:56.3128334Z Built with ❤️ by Vyogo Technologies
+2026-02-07T07:36:56.3530554Z ##[group]Run cat <<EOF | kubectl apply -f -
+2026-02-07T07:36:56.3530922Z [36;1mcat <<EOF | kubectl apply -f -[0m
+2026-02-07T07:36:56.3531187Z [36;1mapiVersion: vyogo.tech/v1alpha1[0m
+2026-02-07T07:36:56.3531436Z [36;1mkind: FrappeBench[0m
+2026-02-07T07:36:56.3531644Z [36;1mmetadata:[0m
+2026-02-07T07:36:56.3531834Z [36;1m  name: test-keda-bench[0m
+2026-02-07T07:36:56.3532066Z [36;1m  namespace: default[0m
+2026-02-07T07:36:56.3532274Z [36;1mspec:[0m
+2026-02-07T07:36:56.3532756Z [36;1m  frappeVersion: "v15"[0m
+2026-02-07T07:36:56.3533014Z [36;1m  apps:[0m
+2026-02-07T07:36:56.3533198Z [36;1m    - name: erpnext[0m
+2026-02-07T07:36:56.3533406Z [36;1m      source: image[0m
+2026-02-07T07:36:56.3533607Z [36;1m  [0m
+2026-02-07T07:36:56.3533772Z [36;1m  redisConfig:[0m
+2026-02-07T07:36:56.3533968Z [36;1m    type: redis[0m
+2026-02-07T07:36:56.3534174Z [36;1m  [0m
+2026-02-07T07:36:56.3534345Z [36;1m  componentAutoscaling:[0m
+2026-02-07T07:36:56.3534607Z [36;1m    worker-short:[0m
+2026-02-07T07:36:56.3534813Z [36;1m      enabled: true[0m
+2026-02-07T07:36:56.3535021Z [36;1m      provider: keda[0m
+2026-02-07T07:36:56.3535228Z [36;1m      minReplicas: 0[0m
+2026-02-07T07:36:56.3535434Z [36;1m      maxReplicas: 3[0m
+2026-02-07T07:36:56.3535640Z [36;1m      cooldownPeriod: 30[0m
+2026-02-07T07:36:56.3535875Z [36;1m      pollingInterval: 15[0m
+2026-02-07T07:36:56.3536091Z [36;1m      keda:[0m
+2026-02-07T07:36:56.3536352Z [36;1m        trigger: redis[0m
+2026-02-07T07:36:56.3536694Z [36;1m        targetValue: "2"[0m
+2026-02-07T07:36:56.3536905Z [36;1m    [0m
+2026-02-07T07:36:56.3537074Z [36;1m    worker-long:[0m
+2026-02-07T07:36:56.3537274Z [36;1m      enabled: true[0m
+2026-02-07T07:36:56.3537476Z [36;1m      provider: keda[0m
+2026-02-07T07:36:56.3537676Z [36;1m      minReplicas: 0[0m
+2026-02-07T07:36:56.3537916Z [36;1m      maxReplicas: 2[0m
+2026-02-07T07:36:56.3538142Z [36;1m      cooldownPeriod: 60[0m
+2026-02-07T07:36:56.3538416Z [36;1m      pollingInterval: 30[0m
+2026-02-07T07:36:56.3538865Z [36;1m      keda:[0m
+2026-02-07T07:36:56.3539214Z [36;1m        trigger: redis[0m
+2026-02-07T07:36:56.3539608Z [36;1m        targetValue: "1"[0m
+2026-02-07T07:36:56.3539965Z [36;1m    [0m
+2026-02-07T07:36:56.3540273Z [36;1m    worker-default:[0m
+2026-02-07T07:36:56.3540611Z [36;1m      enabled: false[0m
+2026-02-07T07:36:56.3540931Z [36;1m      staticReplicas: 1[0m
+2026-02-07T07:36:56.3541327Z [36;1m    [0m
+2026-02-07T07:36:56.3541542Z [36;1m    nginx:[0m
+2026-02-07T07:36:56.3541745Z [36;1m      enabled: false[0m
+2026-02-07T07:36:56.3541949Z [36;1m      staticReplicas: 1[0m
+2026-02-07T07:36:56.3542256Z [36;1m    [0m
+2026-02-07T07:36:56.3542711Z [36;1m    gunicorn:[0m
+2026-02-07T07:36:56.3542915Z [36;1m      enabled: false[0m
+2026-02-07T07:36:56.3543123Z [36;1m      staticReplicas: 1[0m
+2026-02-07T07:36:56.3543565Z [36;1m    [0m
+2026-02-07T07:36:56.3543731Z [36;1m    scheduler:[0m
+2026-02-07T07:36:56.3543929Z [36;1m      enabled: false[0m
+2026-02-07T07:36:56.3544136Z [36;1m      staticReplicas: 1[0m
+2026-02-07T07:36:56.3544336Z [36;1mEOF[0m
+2026-02-07T07:36:56.3575580Z shell: /usr/bin/bash -e {0}
+2026-02-07T07:36:56.3575809Z env:
+2026-02-07T07:36:56.3576066Z   OPERATOR_IMAGE: ghcr.io/vyogotech/frappe-operator:test-keda
+2026-02-07T07:36:56.3576379Z ##[endgroup]
+2026-02-07T07:36:57.0531284Z frappebench.vyogo.tech/test-keda-bench created
+2026-02-07T07:36:57.0911666Z ##[group]Run echo "Waiting for bench initialization first..."
+2026-02-07T07:36:57.0912145Z [36;1mecho "Waiting for bench initialization first..."[0m
+2026-02-07T07:36:57.0912717Z [36;1mfor i in {1..60}; do[0m
+2026-02-07T07:36:57.0913236Z [36;1m  PHASE=$(kubectl get frappebench test-keda-bench -n default -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")[0m
+2026-02-07T07:36:57.0913819Z [36;1m  echo "Bench Phase: $PHASE (iteration $i/60)"[0m
+2026-02-07T07:36:57.0914113Z [36;1m  [0m
+2026-02-07T07:36:57.0914319Z [36;1m  # Check if init job exists and its status[0m
+2026-02-07T07:36:57.0914913Z [36;1m  INIT_JOB=$(kubectl get job test-keda-bench-init -n default --ignore-not-found -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")[0m
+2026-02-07T07:36:57.0915496Z [36;1m  if [ -n "$INIT_JOB" ]; then[0m
+2026-02-07T07:36:57.0916070Z [36;1m    JOB_SUCCEEDED=$(kubectl get job test-keda-bench-init -n default -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")[0m
+2026-02-07T07:36:57.0916862Z [36;1m    JOB_FAILED=$(kubectl get job test-keda-bench-init -n default -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")[0m
+2026-02-07T07:36:57.0917371Z [36;1m    # Fallback to 0 if empty[0m
+2026-02-07T07:36:57.0917635Z [36;1m    [ -z "$JOB_SUCCEEDED" ] && JOB_SUCCEEDED=0[0m
+2026-02-07T07:36:57.0917919Z [36;1m    [ -z "$JOB_FAILED" ] && JOB_FAILED=0[0m
+2026-02-07T07:36:57.0918256Z [36;1m    echo "Init Job - Succeeded: $JOB_SUCCEEDED, Failed: $JOB_FAILED"[0m
+2026-02-07T07:36:57.0918584Z [36;1m    [0m
+2026-02-07T07:36:57.0918759Z [36;1m    if [ $((i % 5)) -eq 0 ]; then[0m
+2026-02-07T07:36:57.0919019Z [36;1m      echo "Init Job Pod Status:"[0m
+2026-02-07T07:36:57.0919383Z [36;1m      kubectl get pods -l job-name=test-keda-bench-init -n default || true[0m
+2026-02-07T07:36:57.0919760Z [36;1m      echo "Init Job Logs snippet:"[0m
+2026-02-07T07:36:57.0920114Z [36;1m      kubectl logs job/test-keda-bench-init -n default --tail=20 || true[0m
+2026-02-07T07:36:57.0920460Z [36;1m    fi[0m
+2026-02-07T07:36:57.0920622Z [36;1m    [0m
+2026-02-07T07:36:57.0920800Z [36;1m    if [ "$JOB_FAILED" -ge 1 ]; then[0m
+2026-02-07T07:36:57.0921076Z [36;1m      echo "ERROR: Initialization job failed!"[0m
+2026-02-07T07:36:57.0921439Z [36;1m      kubectl describe job test-keda-bench-init -n default || true[0m
+2026-02-07T07:36:57.0921854Z [36;1m      kubectl logs job/test-keda-bench-init -n default || true[0m
+2026-02-07T07:36:57.0922167Z [36;1m      exit 1[0m
+2026-02-07T07:36:57.0922338Z [36;1m    fi[0m
+2026-02-07T07:36:57.0922717Z [36;1m  fi[0m
+2026-02-07T07:36:57.0922882Z [36;1m  [0m
+2026-02-07T07:36:57.0923111Z [36;1m  if [ "$PHASE" == "Ready" ] || [ "$PHASE" == "Running" ]; then[0m
+2026-02-07T07:36:57.0923505Z [36;1m    echo "Bench initialized, now checking for ScaledObjects..."[0m
+2026-02-07T07:36:57.0923812Z [36;1m    break[0m
+2026-02-07T07:36:57.0923981Z [36;1m  fi[0m
+2026-02-07T07:36:57.0924140Z [36;1m  sleep 10[0m
+2026-02-07T07:36:57.0924328Z [36;1mdone[0m
+2026-02-07T07:36:57.0924483Z [36;1m[0m
+2026-02-07T07:36:57.0924723Z [36;1mecho "Now waiting for KEDA ScaledObjects to be created..."[0m
+2026-02-07T07:36:57.0925072Z [36;1mfor i in {1..40}; do[0m
+2026-02-07T07:36:57.0925484Z [36;1m  SCALED_OBJECTS=$(kubectl get scaledobjects -n default --no-headers 2>/dev/null | wc -l || echo 0)[0m
+2026-02-07T07:36:57.0926024Z [36;1m  echo "ScaledObjects found: $SCALED_OBJECTS (iteration $i/40)"[0m
+2026-02-07T07:36:57.0926607Z [36;1m  if [ "$SCALED_OBJECTS" -ge 2 ]; then[0m
+2026-02-07T07:36:57.0926895Z [36;1m    echo "SUCCESS: Workers scaled by KEDA!"[0m
+2026-02-07T07:36:57.0927201Z [36;1m    kubectl get scaledobjects -n default -o wide[0m
+2026-02-07T07:36:57.0927473Z [36;1m    exit 0[0m
+2026-02-07T07:36:57.0927661Z [36;1m  fi[0m
+2026-02-07T07:36:57.0927825Z [36;1m  sleep 5[0m
+2026-02-07T07:36:57.0927995Z [36;1mdone[0m
+2026-02-07T07:36:57.0928241Z [36;1mecho "ERROR: KEDA ScaledObjects not created within timeout"[0m
+2026-02-07T07:36:57.0928744Z [36;1mecho "Bench status:"[0m
+2026-02-07T07:36:57.0929070Z [36;1mkubectl get frappebench test-keda-bench -n default -o yaml || true[0m
+2026-02-07T07:36:57.0929409Z [36;1mexit 1[0m
+2026-02-07T07:36:57.0965032Z shell: /usr/bin/bash -e {0}
+2026-02-07T07:36:57.0965414Z env:
+2026-02-07T07:36:57.0965852Z   OPERATOR_IMAGE: ghcr.io/vyogotech/frappe-operator:test-keda
+2026-02-07T07:36:57.0966412Z ##[endgroup]
+2026-02-07T07:36:57.1030378Z Waiting for bench initialization first...
+2026-02-07T07:36:57.1622337Z Bench Phase: Initializing (iteration 1/60)
+2026-02-07T07:36:57.4012519Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:37:07.4793961Z Bench Phase: Initializing (iteration 2/60)
+2026-02-07T07:37:07.7120577Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:37:17.7876271Z Bench Phase: Initializing (iteration 3/60)
+2026-02-07T07:37:18.0318750Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:37:28.0928637Z Bench Phase: Initializing (iteration 4/60)
+2026-02-07T07:37:28.2593849Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:37:38.3184808Z Bench Phase: Initializing (iteration 5/60)
+2026-02-07T07:37:38.4810493Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:37:38.4812651Z Init Job Pod Status:
+2026-02-07T07:37:38.5312241Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:37:38.5313346Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          41s
+2026-02-07T07:37:38.5330328Z Init Job Logs snippet:
+2026-02-07T07:37:38.6033366Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:37:48.6631431Z Bench Phase: Initializing (iteration 6/60)
+2026-02-07T07:37:48.8283305Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:37:58.8855875Z Bench Phase: Initializing (iteration 7/60)
+2026-02-07T07:37:59.0499127Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:38:09.1031420Z Bench Phase: Initializing (iteration 8/60)
+2026-02-07T07:38:09.2632301Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:38:19.3244452Z Bench Phase: Initializing (iteration 9/60)
+2026-02-07T07:38:19.4876449Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:38:29.5459657Z Bench Phase: Initializing (iteration 10/60)
+2026-02-07T07:38:29.7514045Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:38:29.7514801Z Init Job Pod Status:
+2026-02-07T07:38:29.8029543Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:38:29.8031096Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          92s
+2026-02-07T07:38:29.8056847Z Init Job Logs snippet:
+2026-02-07T07:38:29.8663547Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:38:39.9251992Z Bench Phase: Initializing (iteration 11/60)
+2026-02-07T07:38:40.0886499Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:38:50.1654222Z Bench Phase: Initializing (iteration 12/60)
+2026-02-07T07:38:50.3310673Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:39:00.3882753Z Bench Phase: Initializing (iteration 13/60)
+2026-02-07T07:39:00.5520079Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:39:10.6084959Z Bench Phase: Initializing (iteration 14/60)
+2026-02-07T07:39:10.7776384Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:39:20.8305327Z Bench Phase: Initializing (iteration 15/60)
+2026-02-07T07:39:21.0045118Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:39:21.0046768Z Init Job Pod Status:
+2026-02-07T07:39:21.0564433Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:39:21.0565292Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          2m24s
+2026-02-07T07:39:21.0583159Z Init Job Logs snippet:
+2026-02-07T07:39:21.1164553Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:39:31.1724063Z Bench Phase: Initializing (iteration 16/60)
+2026-02-07T07:39:31.3289164Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:39:41.3857909Z Bench Phase: Initializing (iteration 17/60)
+2026-02-07T07:39:41.5577567Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:39:51.6134602Z Bench Phase: Initializing (iteration 18/60)
+2026-02-07T07:39:51.7746545Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:40:01.8302128Z Bench Phase: Initializing (iteration 19/60)
+2026-02-07T07:40:01.9901181Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:40:12.0435810Z Bench Phase: Initializing (iteration 20/60)
+2026-02-07T07:40:12.2068621Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:40:12.2068940Z Init Job Pod Status:
+2026-02-07T07:40:12.2631145Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:40:12.2632000Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          3m15s
+2026-02-07T07:40:12.2653953Z Init Job Logs snippet:
+2026-02-07T07:40:12.3212143Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:40:22.3809411Z Bench Phase: Initializing (iteration 21/60)
+2026-02-07T07:40:22.5408252Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:40:32.5954880Z Bench Phase: Initializing (iteration 22/60)
+2026-02-07T07:40:32.7578148Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:40:42.8182079Z Bench Phase: Initializing (iteration 23/60)
+2026-02-07T07:40:42.9772838Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:40:53.0362839Z Bench Phase: Initializing (iteration 24/60)
+2026-02-07T07:40:53.1992185Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:41:03.2566310Z Bench Phase: Initializing (iteration 25/60)
+2026-02-07T07:41:03.4180956Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:41:03.4182829Z Init Job Pod Status:
+2026-02-07T07:41:03.4704870Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:41:03.4705407Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          4m6s
+2026-02-07T07:41:03.4724295Z Init Job Logs snippet:
+2026-02-07T07:41:03.5329901Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:41:13.5893086Z Bench Phase: Initializing (iteration 26/60)
+2026-02-07T07:41:13.7505616Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:41:23.8050527Z Bench Phase: Initializing (iteration 27/60)
+2026-02-07T07:41:23.9646754Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:41:34.0195753Z Bench Phase: Initializing (iteration 28/60)
+2026-02-07T07:41:34.1726201Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:41:44.2263747Z Bench Phase: Initializing (iteration 29/60)
+2026-02-07T07:41:44.3871524Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:41:54.4474604Z Bench Phase: Initializing (iteration 30/60)
+2026-02-07T07:41:54.6080762Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:41:54.6081209Z Init Job Pod Status:
+2026-02-07T07:41:54.6621248Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:41:54.6621956Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          4m57s
+2026-02-07T07:41:54.6640391Z Init Job Logs snippet:
+2026-02-07T07:41:54.7206104Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:42:04.7773540Z Bench Phase: Initializing (iteration 31/60)
+2026-02-07T07:42:04.9415532Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:42:14.9980034Z Bench Phase: Initializing (iteration 32/60)
+2026-02-07T07:42:15.1676450Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:42:25.2221580Z Bench Phase: Initializing (iteration 33/60)
+2026-02-07T07:42:25.3913230Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:42:35.4501822Z Bench Phase: Initializing (iteration 34/60)
+2026-02-07T07:42:35.6130104Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:42:45.6686100Z Bench Phase: Initializing (iteration 35/60)
+2026-02-07T07:42:45.8285376Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:42:45.8286932Z Init Job Pod Status:
+2026-02-07T07:42:45.8818098Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:42:45.8818892Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          5m48s
+2026-02-07T07:42:45.8838358Z Init Job Logs snippet:
+2026-02-07T07:42:45.9447861Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:42:56.0036756Z Bench Phase: Initializing (iteration 36/60)
+2026-02-07T07:42:56.1660083Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:43:06.2224269Z Bench Phase: Initializing (iteration 37/60)
+2026-02-07T07:43:06.3751177Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:43:16.4321115Z Bench Phase: Initializing (iteration 38/60)
+2026-02-07T07:43:16.5980150Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:43:26.6542068Z Bench Phase: Initializing (iteration 39/60)
+2026-02-07T07:43:26.8185126Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:43:36.8768861Z Bench Phase: Initializing (iteration 40/60)
+2026-02-07T07:43:37.0434327Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:43:37.0434727Z Init Job Pod Status:
+2026-02-07T07:43:37.0996612Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:43:37.1003872Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          6m40s
+2026-02-07T07:43:37.1024587Z Init Job Logs snippet:
+2026-02-07T07:43:37.1607990Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:43:47.2222100Z Bench Phase: Initializing (iteration 41/60)
+2026-02-07T07:43:47.3927415Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:43:57.4498266Z Bench Phase: Initializing (iteration 42/60)
+2026-02-07T07:43:57.6190159Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:44:07.6748632Z Bench Phase: Initializing (iteration 43/60)
+2026-02-07T07:44:07.8374034Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:44:17.8961287Z Bench Phase: Initializing (iteration 44/60)
+2026-02-07T07:44:18.0525177Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:44:28.1103610Z Bench Phase: Initializing (iteration 45/60)
+2026-02-07T07:44:28.2760259Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:44:28.2760736Z Init Job Pod Status:
+2026-02-07T07:44:28.3272084Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:44:28.3273277Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          7m31s
+2026-02-07T07:44:28.3291673Z Init Job Logs snippet:
+2026-02-07T07:44:28.3850868Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:44:38.4424895Z Bench Phase: Initializing (iteration 46/60)
+2026-02-07T07:44:38.6064238Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:44:48.6608325Z Bench Phase: Initializing (iteration 47/60)
+2026-02-07T07:44:48.8247632Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:44:58.8822753Z Bench Phase: Initializing (iteration 48/60)
+2026-02-07T07:44:59.0519502Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:45:09.1077423Z Bench Phase: Initializing (iteration 49/60)
+2026-02-07T07:45:09.2701839Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:45:19.3255482Z Bench Phase: Initializing (iteration 50/60)
+2026-02-07T07:45:19.4890294Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:45:19.4890840Z Init Job Pod Status:
+2026-02-07T07:45:19.5409453Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:45:19.5409966Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          8m22s
+2026-02-07T07:45:19.5427262Z Init Job Logs snippet:
+2026-02-07T07:45:19.5989430Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:45:29.6586031Z Bench Phase: Initializing (iteration 51/60)
+2026-02-07T07:45:29.8234355Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:45:39.8767825Z Bench Phase: Initializing (iteration 52/60)
+2026-02-07T07:45:40.0390913Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:45:50.0955458Z Bench Phase: Initializing (iteration 53/60)
+2026-02-07T07:45:50.2569053Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:46:00.3134557Z Bench Phase: Initializing (iteration 54/60)
+2026-02-07T07:46:00.4786132Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:46:10.5355967Z Bench Phase: Initializing (iteration 55/60)
+2026-02-07T07:46:10.7067297Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:46:10.7067732Z Init Job Pod Status:
+2026-02-07T07:46:10.7659385Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:46:10.7660107Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          9m13s
+2026-02-07T07:46:10.7682177Z Init Job Logs snippet:
+2026-02-07T07:46:10.8282602Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:46:20.8870273Z Bench Phase: Initializing (iteration 56/60)
+2026-02-07T07:46:21.0506124Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:46:31.1065887Z Bench Phase: Initializing (iteration 57/60)
+2026-02-07T07:46:31.2695089Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:46:41.3261999Z Bench Phase: Initializing (iteration 58/60)
+2026-02-07T07:46:41.4899319Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:46:51.5460783Z Bench Phase: Initializing (iteration 59/60)
+2026-02-07T07:46:51.7200248Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:47:01.7761478Z Bench Phase: Initializing (iteration 60/60)
+2026-02-07T07:47:01.9422640Z Init Job - Succeeded: 0, Failed: 0
+2026-02-07T07:47:01.9423173Z Init Job Pod Status:
+2026-02-07T07:47:01.9933577Z NAME                         READY   STATUS                       RESTARTS   AGE
+2026-02-07T07:47:01.9934312Z test-keda-bench-init-9z7wv   0/1     CreateContainerConfigError   0          10m
+2026-02-07T07:47:01.9952534Z Init Job Logs snippet:
+2026-02-07T07:47:02.0593113Z Error from server (BadRequest): container "bench-init" in pod "test-keda-bench-init-9z7wv" is waiting to start: CreateContainerConfigError
+2026-02-07T07:47:12.0627070Z Now waiting for KEDA ScaledObjects to be created...
+2026-02-07T07:47:12.1193246Z ScaledObjects found: 0 (iteration 1/40)
+2026-02-07T07:47:17.1770219Z ScaledObjects found: 0 (iteration 2/40)
+2026-02-07T07:47:22.2319296Z ScaledObjects found: 0 (iteration 3/40)
+2026-02-07T07:47:27.2854893Z ScaledObjects found: 0 (iteration 4/40)
+2026-02-07T07:47:32.3396855Z ScaledObjects found: 0 (iteration 5/40)
+2026-02-07T07:47:37.3956139Z ScaledObjects found: 0 (iteration 6/40)
+2026-02-07T07:47:42.4515093Z ScaledObjects found: 0 (iteration 7/40)
+2026-02-07T07:47:47.5051764Z ScaledObjects found: 0 (iteration 8/40)
+2026-02-07T07:47:52.5629773Z ScaledObjects found: 0 (iteration 9/40)
+2026-02-07T07:47:57.6176865Z ScaledObjects found: 0 (iteration 10/40)
+2026-02-07T07:48:02.6744647Z ScaledObjects found: 0 (iteration 11/40)
+2026-02-07T07:48:07.7309695Z ScaledObjects found: 0 (iteration 12/40)
+2026-02-07T07:48:12.7889402Z ScaledObjects found: 0 (iteration 13/40)
+2026-02-07T07:48:17.8462012Z ScaledObjects found: 0 (iteration 14/40)
+2026-02-07T07:48:22.9007237Z ScaledObjects found: 0 (iteration 15/40)
+2026-02-07T07:48:27.9593537Z ScaledObjects found: 0 (iteration 16/40)
+2026-02-07T07:48:33.0180353Z ScaledObjects found: 0 (iteration 17/40)
+2026-02-07T07:48:38.0728690Z ScaledObjects found: 0 (iteration 18/40)
+2026-02-07T07:48:43.1450983Z ScaledObjects found: 0 (iteration 19/40)
+2026-02-07T07:48:48.2013297Z ScaledObjects found: 0 (iteration 20/40)
+2026-02-07T07:48:53.2578199Z ScaledObjects found: 0 (iteration 21/40)
+2026-02-07T07:48:58.3116562Z ScaledObjects found: 0 (iteration 22/40)
+2026-02-07T07:49:03.3676438Z ScaledObjects found: 0 (iteration 23/40)
+2026-02-07T07:49:08.4261910Z ScaledObjects found: 0 (iteration 24/40)
+2026-02-07T07:49:13.4823990Z ScaledObjects found: 0 (iteration 25/40)
+2026-02-07T07:49:18.5381229Z ScaledObjects found: 0 (iteration 26/40)
+2026-02-07T07:49:23.5970141Z ScaledObjects found: 0 (iteration 27/40)
+2026-02-07T07:49:28.6534759Z ScaledObjects found: 0 (iteration 28/40)
+2026-02-07T07:49:33.7088101Z ScaledObjects found: 0 (iteration 29/40)
+2026-02-07T07:49:38.7655802Z ScaledObjects found: 0 (iteration 30/40)
+2026-02-07T07:49:43.8244205Z ScaledObjects found: 0 (iteration 31/40)
+2026-02-07T07:49:48.8795974Z ScaledObjects found: 0 (iteration 32/40)
+2026-02-07T07:49:53.9384983Z ScaledObjects found: 0 (iteration 33/40)
+2026-02-07T07:49:58.9941353Z ScaledObjects found: 0 (iteration 34/40)
+2026-02-07T07:50:04.0520539Z ScaledObjects found: 0 (iteration 35/40)
+2026-02-07T07:50:09.1078741Z ScaledObjects found: 0 (iteration 36/40)
+2026-02-07T07:50:14.1599607Z ScaledObjects found: 0 (iteration 37/40)
+2026-02-07T07:50:19.2184782Z ScaledObjects found: 0 (iteration 38/40)
+2026-02-07T07:50:24.2770709Z ScaledObjects found: 0 (iteration 39/40)
+2026-02-07T07:50:29.3360656Z ScaledObjects found: 0 (iteration 40/40)
+2026-02-07T07:50:34.3376654Z ERROR: KEDA ScaledObjects not created within timeout
+2026-02-07T07:50:34.3378640Z Bench status:
+2026-02-07T07:50:34.3952157Z apiVersion: vyogo.tech/v1alpha1
+2026-02-07T07:50:34.3954207Z kind: FrappeBench
+2026-02-07T07:50:34.3954522Z metadata:
+2026-02-07T07:50:34.3954784Z   annotations:
+2026-02-07T07:50:34.3955154Z     frappe.tech/storage-access-mode: ReadWriteOnce
+2026-02-07T07:50:34.3955773Z     kubectl.kubernetes.io/last-applied-configuration: |
+2026-02-07T07:50:34.3960807Z       {"apiVersion":"vyogo.tech/v1alpha1","kind":"FrappeBench","metadata":{"annotations":{},"name":"test-keda-bench","namespace":"default"},"spec":{"apps":[{"name":"erpnext","source":"image"}],"componentAutoscaling":{"gunicorn":{"enabled":false,"staticReplicas":1},"nginx":{"enabled":false,"staticReplicas":1},"scheduler":{"enabled":false,"staticReplicas":1},"worker-default":{"enabled":false,"staticReplicas":1},"worker-long":{"cooldownPeriod":60,"enabled":true,"keda":{"targetValue":"1","trigger":"redis"},"maxReplicas":2,"minReplicas":0,"pollingInterval":30,"provider":"keda"},"worker-short":{"cooldownPeriod":30,"enabled":true,"keda":{"targetValue":"2","trigger":"redis"},"maxReplicas":3,"minReplicas":0,"pollingInterval":15,"provider":"keda"}},"frappeVersion":"v15","redisConfig":{"type":"redis"}}}
+2026-02-07T07:50:34.3965590Z   creationTimestamp: "2026-02-07T07:36:57Z"
+2026-02-07T07:50:34.3965985Z   finalizers:
+2026-02-07T07:50:34.3966273Z   - vyogo.tech/bench-finalizer
+2026-02-07T07:50:34.3966604Z   generation: 1
+2026-02-07T07:50:34.3966867Z   name: test-keda-bench
+2026-02-07T07:50:34.3967179Z   namespace: default
+2026-02-07T07:50:34.3967476Z   resourceVersion: "1217"
+2026-02-07T07:50:34.3967820Z   uid: 238dcbb1-f7dd-4af3-b851-c34851228168
+2026-02-07T07:50:34.3968185Z spec:
+2026-02-07T07:50:34.3968412Z   apps:
+2026-02-07T07:50:34.3968649Z   - name: erpnext
+2026-02-07T07:50:34.3968922Z     source: image
+2026-02-07T07:50:34.3969230Z   componentAutoscaling:
+2026-02-07T07:50:34.3969545Z     gunicorn:
+2026-02-07T07:50:34.3969816Z       cooldownPeriod: 60
+2026-02-07T07:50:34.3970135Z       enabled: false
+2026-02-07T07:50:34.3970446Z       maxReplicas: 10
+2026-02-07T07:50:34.3970749Z       minReplicas: 1
+2026-02-07T07:50:34.3971062Z       pollingInterval: 30
+2026-02-07T07:50:34.3971393Z       provider: hpa
+2026-02-07T07:50:34.3971694Z       staticReplicas: 1
+2026-02-07T07:50:34.3972001Z     nginx:
+2026-02-07T07:50:34.3973019Z       cooldownPeriod: 60
+2026-02-07T07:50:34.3973360Z       enabled: false
+2026-02-07T07:50:34.3973666Z       maxReplicas: 10
+2026-02-07T07:50:34.3973980Z       minReplicas: 1
+2026-02-07T07:50:34.3974291Z       pollingInterval: 30
+2026-02-07T07:50:34.3974633Z       provider: hpa
+2026-02-07T07:50:34.3974931Z       staticReplicas: 1
+2026-02-07T07:50:34.3975252Z     scheduler:
+2026-02-07T07:50:34.3975537Z       cooldownPeriod: 60
+2026-02-07T07:50:34.3975852Z       enabled: false
+2026-02-07T07:50:34.3976131Z       maxReplicas: 10
+2026-02-07T07:50:34.3976668Z       minReplicas: 1
+2026-02-07T07:50:34.3976952Z       pollingInterval: 30
+2026-02-07T07:50:34.3977295Z       provider: hpa
+2026-02-07T07:50:34.3977922Z       staticReplicas: 1
+2026-02-07T07:50:34.3978245Z     worker-default:
+2026-02-07T07:50:34.3978672Z       cooldownPeriod: 60
+2026-02-07T07:50:34.3978991Z       enabled: false
+2026-02-07T07:50:34.3979289Z       maxReplicas: 10
+2026-02-07T07:50:34.3979576Z       minReplicas: 1
+2026-02-07T07:50:34.3979904Z       pollingInterval: 30
+2026-02-07T07:50:34.3980224Z       provider: hpa
+2026-02-07T07:50:34.3980500Z       staticReplicas: 1
+2026-02-07T07:50:34.3980802Z     worker-long:
+2026-02-07T07:50:34.3981097Z       cooldownPeriod: 60
+2026-02-07T07:50:34.3981396Z       enabled: true
+2026-02-07T07:50:34.3982716Z       keda:
+2026-02-07T07:50:34.3983015Z         targetValue: "1"
+2026-02-07T07:50:34.3983344Z         trigger: redis
+2026-02-07T07:50:34.3983701Z       maxReplicas: 2
+2026-02-07T07:50:34.3984017Z       minReplicas: 0
+2026-02-07T07:50:34.3984353Z       pollingInterval: 30
+2026-02-07T07:50:34.3984709Z       provider: keda
+2026-02-07T07:50:34.3985067Z       staticReplicas: 1
+2026-02-07T07:50:34.3985394Z     worker-short:
+2026-02-07T07:50:34.3985694Z       cooldownPeriod: 30
+2026-02-07T07:50:34.3986066Z       enabled: true
+2026-02-07T07:50:34.3986392Z       keda:
+2026-02-07T07:50:34.3986642Z         targetValue: "2"
+2026-02-07T07:50:34.3986987Z         trigger: redis
+2026-02-07T07:50:34.3987331Z       maxReplicas: 3
+2026-02-07T07:50:34.3987631Z       minReplicas: 0
+2026-02-07T07:50:34.3987948Z       pollingInterval: 15
+2026-02-07T07:50:34.3988215Z       provider: keda
+2026-02-07T07:50:34.3988413Z       staticReplicas: 1
+2026-02-07T07:50:34.3988606Z   frappeVersion: v15
+2026-02-07T07:50:34.3988916Z   redisConfig:
+2026-02-07T07:50:34.3989091Z     type: redis
+2026-02-07T07:50:34.3989282Z   storageSize: 10Gi
+2026-02-07T07:50:34.3989458Z status:
+2026-02-07T07:50:34.3989731Z   conditions:
+2026-02-07T07:50:34.3989967Z   - lastTransitionTime: "2026-02-07T07:36:57Z"
+2026-02-07T07:50:34.3990254Z     message: Starting reconciliation
+2026-02-07T07:50:34.3990622Z     observedGeneration: 1
+2026-02-07T07:50:34.3990833Z     reason: Reconciling
+2026-02-07T07:50:34.3991022Z     status: "True"
+2026-02-07T07:50:34.3991195Z     type: Progressing
+2026-02-07T07:50:34.3991532Z   phase: Initializing
+2026-02-07T07:50:34.3996261Z ##[error]Process completed with exit code 1.
+2026-02-07T07:50:34.4514743Z ##[group]Run echo "KEDA Operator Logs:"
+2026-02-07T07:50:34.4515098Z [36;1mecho "KEDA Operator Logs:"[0m
+2026-02-07T07:50:34.4515579Z [36;1mkubectl logs -n frappe-operator-system -l app.kubernetes.io/name=keda-operator --tail=100 || true[0m
+2026-02-07T07:50:34.4516037Z [36;1m[0m
+2026-02-07T07:50:34.4516214Z [36;1mecho "Frappe Operator Logs:"[0m
+2026-02-07T07:50:34.4516879Z [36;1mkubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=100 || true[0m
+2026-02-07T07:50:34.4560241Z shell: /usr/bin/bash -e {0}
+2026-02-07T07:50:34.4560481Z env:
+2026-02-07T07:50:34.4560744Z   OPERATOR_IMAGE: ghcr.io/vyogotech/frappe-operator:test-keda
+2026-02-07T07:50:34.4561065Z ##[endgroup]
+2026-02-07T07:50:34.4616874Z KEDA Operator Logs:
+2026-02-07T07:50:34.5294881Z 2026-02-07T07:35:53Z	INFO	setup	maxprocs: Updating GOMAXPROCS=1: determined from CPU quota
+2026-02-07T07:50:34.5295816Z 2026-02-07T07:35:53Z	INFO	setup	Starting manager
+2026-02-07T07:50:34.5296430Z 2026-02-07T07:35:53Z	INFO	setup	KEDA Version: 2.19.0
+2026-02-07T07:50:34.5297503Z 2026-02-07T07:35:53Z	INFO	setup	Git Commit: 3f88d60ae92f1174f67738f079f96ec17eeee77f
+2026-02-07T07:50:34.5298154Z 2026-02-07T07:35:53Z	INFO	setup	Go Version: go1.25.6
+2026-02-07T07:50:34.5298671Z 2026-02-07T07:35:53Z	INFO	setup	Go OS/Arch: linux/amd64
+2026-02-07T07:50:34.5299350Z 2026-02-07T07:35:53Z	INFO	setup	Running on Kubernetes 1.27	{"version": "v1.27.3"}
+2026-02-07T07:50:34.5300239Z 2026-02-07T07:35:53Z	INFO	setup	WARNING: KEDA 2.19.0 hasn't been tested on Kubernetes v1.27.3
+2026-02-07T07:50:34.5301172Z 2026-02-07T07:35:53Z	INFO	setup	You can check recommended versions on https://keda.sh
+2026-02-07T07:50:34.5302104Z 2026-02-07T07:35:53Z	INFO	starting server	{"name": "health probe", "addr": "[::]:8081"}
+2026-02-07T07:50:34.5303542Z I0207 07:35:53.261644       1 leaderelection.go:257] attempting to acquire leader lease frappe-operator-system/operator.keda.sh...
+2026-02-07T07:50:34.5304927Z I0207 07:36:08.731064       1 leaderelection.go:271] successfully acquired lease frappe-operator-system/operator.keda.sh
+2026-02-07T07:50:34.5306711Z 2026-02-07T07:36:08Z	INFO	Starting EventSource	{"controller": "scaledobject", "controllerGroup": "keda.sh", "controllerKind": "ScaledObject", "source": "kind source: *v2.HorizontalPodAutoscaler"}
+2026-02-07T07:50:34.5309089Z 2026-02-07T07:36:08Z	INFO	Starting EventSource	{"controller": "triggerauthentication", "controllerGroup": "keda.sh", "controllerKind": "TriggerAuthentication", "source": "kind source: *v1alpha1.TriggerAuthentication"}
+2026-02-07T07:50:34.5311280Z 2026-02-07T07:36:08Z	INFO	Starting EventSource	{"controller": "scaledobject", "controllerGroup": "keda.sh", "controllerKind": "ScaledObject", "source": "kind source: *v1alpha1.ScaledObject"}
+2026-02-07T07:50:34.5313390Z 2026-02-07T07:36:08Z	INFO	Starting EventSource	{"controller": "scaledjob", "controllerGroup": "keda.sh", "controllerKind": "ScaledJob", "source": "kind source: *v1alpha1.ScaledJob"}
+2026-02-07T07:50:34.5315614Z 2026-02-07T07:36:08Z	INFO	Starting EventSource	{"controller": "cloudeventsource", "controllerGroup": "eventing.keda.sh", "controllerKind": "CloudEventSource", "source": "kind source: *v1alpha1.CloudEventSource"}
+2026-02-07T07:50:34.5318111Z 2026-02-07T07:36:08Z	INFO	Starting EventSource	{"controller": "clustertriggerauthentication", "controllerGroup": "keda.sh", "controllerKind": "ClusterTriggerAuthentication", "source": "kind source: *v1alpha1.ClusterTriggerAuthentication"}
+2026-02-07T07:50:34.5320777Z 2026-02-07T07:36:08Z	INFO	Starting EventSource	{"controller": "clustercloudeventsource", "controllerGroup": "eventing.keda.sh", "controllerKind": "ClusterCloudEventSource", "source": "kind source: *v1alpha1.ClusterCloudEventSource"}
+2026-02-07T07:50:34.5323228Z 2026-02-07T07:36:08Z	INFO	Starting Controller	{"controller": "scaledobject", "controllerGroup": "keda.sh", "controllerKind": "ScaledObject"}
+2026-02-07T07:50:34.5325125Z 2026-02-07T07:36:08Z	INFO	Starting workers	{"controller": "scaledobject", "controllerGroup": "keda.sh", "controllerKind": "ScaledObject", "worker count": 5}
+2026-02-07T07:50:34.5326172Z 2026-02-07T07:36:08Z	INFO	Starting Controller	{"controller": "triggerauthentication", "controllerGroup": "keda.sh", "controllerKind": "TriggerAuthentication"}
+2026-02-07T07:50:34.5327302Z 2026-02-07T07:36:08Z	INFO	Starting workers	{"controller": "triggerauthentication", "controllerGroup": "keda.sh", "controllerKind": "TriggerAuthentication", "worker count": 1}
+2026-02-07T07:50:34.5328374Z 2026-02-07T07:36:08Z	INFO	Starting Controller	{"controller": "clustertriggerauthentication", "controllerGroup": "keda.sh", "controllerKind": "ClusterTriggerAuthentication"}
+2026-02-07T07:50:34.5329506Z 2026-02-07T07:36:08Z	INFO	Starting workers	{"controller": "clustertriggerauthentication", "controllerGroup": "keda.sh", "controllerKind": "ClusterTriggerAuthentication", "worker count": 1}
+2026-02-07T07:50:34.5330510Z 2026-02-07T07:36:08Z	INFO	Starting Controller	{"controller": "scaledjob", "controllerGroup": "keda.sh", "controllerKind": "ScaledJob"}
+2026-02-07T07:50:34.5331542Z 2026-02-07T07:36:08Z	INFO	Starting workers	{"controller": "scaledjob", "controllerGroup": "keda.sh", "controllerKind": "ScaledJob", "worker count": 1}
+2026-02-07T07:50:34.5332902Z 2026-02-07T07:36:08Z	INFO	Starting Controller	{"controller": "cloudeventsource", "controllerGroup": "eventing.keda.sh", "controllerKind": "CloudEventSource"}
+2026-02-07T07:50:34.5333917Z 2026-02-07T07:36:08Z	INFO	Starting workers	{"controller": "cloudeventsource", "controllerGroup": "eventing.keda.sh", "controllerKind": "CloudEventSource", "worker count": 1}
+2026-02-07T07:50:34.5334984Z 2026-02-07T07:36:08Z	INFO	Starting Controller	{"controller": "clustercloudeventsource", "controllerGroup": "eventing.keda.sh", "controllerKind": "ClusterCloudEventSource"}
+2026-02-07T07:50:34.5336374Z 2026-02-07T07:36:08Z	INFO	Starting workers	{"controller": "clustercloudeventsource", "controllerGroup": "eventing.keda.sh", "controllerKind": "ClusterCloudEventSource", "worker count": 1}
+2026-02-07T07:50:34.5337183Z 2026-02-07T07:36:08Z	INFO	cert-rotation	starting cert rotator controller
+2026-02-07T07:50:34.5337587Z 2026-02-07T07:36:08Z	INFO	cert-rotation	no cert refresh needed
+2026-02-07T07:50:34.5337947Z 2026-02-07T07:36:08Z	INFO	cert-rotation	no cert refresh needed
+2026-02-07T07:50:34.5338894Z 2026-02-07T07:36:08Z	INFO	cert-rotation	Ensuring CA cert	{"name": "v1beta1.external.metrics.k8s.io", "gvk": "apiregistration.k8s.io/v1, Kind=APIService", "name": "v1beta1.external.metrics.k8s.io", "gvk": "apiregistration.k8s.io/v1, Kind=APIService"}
+2026-02-07T07:50:34.5339860Z 2026-02-07T07:36:08Z	INFO	cert-rotation	certs are ready in /certs
+2026-02-07T07:50:34.5340903Z 2026-02-07T07:36:08Z	INFO	cert-rotation	Ensuring CA cert	{"name": "keda-admission", "gvk": "admissionregistration.k8s.io/v1, Kind=ValidatingWebhookConfiguration", "name": "keda-admission", "gvk": "admissionregistration.k8s.io/v1, Kind=ValidatingWebhookConfiguration"}
+2026-02-07T07:50:34.5341934Z 2026-02-07T07:36:08Z	INFO	cert-rotation	no cert refresh needed
+2026-02-07T07:50:34.5343035Z 2026-02-07T07:36:08Z	INFO	cert-rotation	Ensuring CA cert	{"name": "v1beta1.external.metrics.k8s.io", "gvk": "apiregistration.k8s.io/v1, Kind=APIService", "name": "v1beta1.external.metrics.k8s.io", "gvk": "apiregistration.k8s.io/v1, Kind=APIService"}
+2026-02-07T07:50:34.5345165Z 2026-02-07T07:36:08Z	INFO	cert-rotation	Ensuring CA cert	{"name": "keda-admission", "gvk": "admissionregistration.k8s.io/v1, Kind=ValidatingWebhookConfiguration", "name": "keda-admission", "gvk": "admissionregistration.k8s.io/v1, Kind=ValidatingWebhookConfiguration"}
+2026-02-07T07:50:34.5346846Z 2026-02-07T07:36:10Z	INFO	cert-rotation	CA certs are injected to webhooks
+2026-02-07T07:50:34.5347360Z 2026-02-07T07:36:10Z	INFO	grpc_server	Starting Metrics Service gRPC Server	{"address": ":9666"}
+2026-02-07T07:50:34.5347885Z Frappe Operator Logs:
+2026-02-07T07:50:34.6456026Z 2026-02-07T07:46:27Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "acda43a4-b76b-4c64-b292-5ec1a5b259f3", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6466370Z 2026-02-07T07:46:27Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "acda43a4-b76b-4c64-b292-5ec1a5b259f3", "enabled": false}
+2026-02-07T07:50:34.6472840Z 2026-02-07T07:46:27Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "acda43a4-b76b-4c64-b292-5ec1a5b259f3", "count": 1}
+2026-02-07T07:50:34.6477357Z 2026-02-07T07:46:27Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "acda43a4-b76b-4c64-b292-5ec1a5b259f3"}
+2026-02-07T07:50:34.6481459Z 2026-02-07T07:46:37Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "45308b20-4a91-4a1e-aa0a-34e203811ac4", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6485636Z 2026-02-07T07:46:37Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "45308b20-4a91-4a1e-aa0a-34e203811ac4", "enabled": false}
+2026-02-07T07:50:34.6489540Z 2026-02-07T07:46:37Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "45308b20-4a91-4a1e-aa0a-34e203811ac4", "count": 1}
+2026-02-07T07:50:34.6493610Z 2026-02-07T07:46:37Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "45308b20-4a91-4a1e-aa0a-34e203811ac4"}
+2026-02-07T07:50:34.6497779Z 2026-02-07T07:46:47Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "388140a9-a5eb-48f7-9963-53c56f9b1903", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6501833Z 2026-02-07T07:46:47Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "388140a9-a5eb-48f7-9963-53c56f9b1903", "enabled": false}
+2026-02-07T07:50:34.6506219Z 2026-02-07T07:46:47Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "388140a9-a5eb-48f7-9963-53c56f9b1903", "count": 1}
+2026-02-07T07:50:34.6510403Z 2026-02-07T07:46:47Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "388140a9-a5eb-48f7-9963-53c56f9b1903"}
+2026-02-07T07:50:34.6514604Z 2026-02-07T07:46:57Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "7390811e-372d-4cd7-8dc7-e258b8fabe64", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6518555Z 2026-02-07T07:46:57Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "7390811e-372d-4cd7-8dc7-e258b8fabe64", "enabled": false}
+2026-02-07T07:50:34.6522333Z 2026-02-07T07:46:57Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "7390811e-372d-4cd7-8dc7-e258b8fabe64", "count": 1}
+2026-02-07T07:50:34.6526723Z 2026-02-07T07:46:57Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "7390811e-372d-4cd7-8dc7-e258b8fabe64"}
+2026-02-07T07:50:34.6530908Z 2026-02-07T07:47:07Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "fdbadfc1-88e7-478f-85c1-ba1e0f5817a4", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6535148Z 2026-02-07T07:47:07Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "fdbadfc1-88e7-478f-85c1-ba1e0f5817a4", "enabled": false}
+2026-02-07T07:50:34.6539341Z 2026-02-07T07:47:07Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "fdbadfc1-88e7-478f-85c1-ba1e0f5817a4", "count": 1}
+2026-02-07T07:50:34.6543624Z 2026-02-07T07:47:07Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "fdbadfc1-88e7-478f-85c1-ba1e0f5817a4"}
+2026-02-07T07:50:34.6547800Z 2026-02-07T07:47:17Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "b0e720c3-82d1-493d-892d-fb254b323a20", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6551845Z 2026-02-07T07:47:17Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "b0e720c3-82d1-493d-892d-fb254b323a20", "enabled": false}
+2026-02-07T07:50:34.6556366Z 2026-02-07T07:47:17Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "b0e720c3-82d1-493d-892d-fb254b323a20", "count": 1}
+2026-02-07T07:50:34.6560423Z 2026-02-07T07:47:17Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "b0e720c3-82d1-493d-892d-fb254b323a20"}
+2026-02-07T07:50:34.6564796Z 2026-02-07T07:47:27Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "6707e704-60a1-48b3-b987-33f43933d64a", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6568732Z 2026-02-07T07:47:27Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "6707e704-60a1-48b3-b987-33f43933d64a", "enabled": false}
+2026-02-07T07:50:34.6573095Z 2026-02-07T07:47:27Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "6707e704-60a1-48b3-b987-33f43933d64a", "count": 1}
+2026-02-07T07:50:34.6576952Z 2026-02-07T07:47:27Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "6707e704-60a1-48b3-b987-33f43933d64a"}
+2026-02-07T07:50:34.6581101Z 2026-02-07T07:47:37Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "40ad639c-da6d-4fe6-b265-bf6154cfb124", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6585414Z 2026-02-07T07:47:37Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "40ad639c-da6d-4fe6-b265-bf6154cfb124", "enabled": false}
+2026-02-07T07:50:34.6589310Z 2026-02-07T07:47:37Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "40ad639c-da6d-4fe6-b265-bf6154cfb124", "count": 1}
+2026-02-07T07:50:34.6593430Z 2026-02-07T07:47:37Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "40ad639c-da6d-4fe6-b265-bf6154cfb124"}
+2026-02-07T07:50:34.6597589Z 2026-02-07T07:47:47Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "b0d19012-e71c-4aa7-8d81-14c2a8fb9ee4", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6601917Z 2026-02-07T07:47:47Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "b0d19012-e71c-4aa7-8d81-14c2a8fb9ee4", "enabled": false}
+2026-02-07T07:50:34.6605995Z 2026-02-07T07:47:47Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "b0d19012-e71c-4aa7-8d81-14c2a8fb9ee4", "count": 1}
+2026-02-07T07:50:34.6609898Z 2026-02-07T07:47:47Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "b0d19012-e71c-4aa7-8d81-14c2a8fb9ee4"}
+2026-02-07T07:50:34.6614334Z 2026-02-07T07:47:57Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "09377eb6-a4a2-4fc3-a546-ece656ca4009", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6618824Z 2026-02-07T07:47:57Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "09377eb6-a4a2-4fc3-a546-ece656ca4009", "enabled": false}
+2026-02-07T07:50:34.6622877Z 2026-02-07T07:47:57Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "09377eb6-a4a2-4fc3-a546-ece656ca4009", "count": 1}
+2026-02-07T07:50:34.6626832Z 2026-02-07T07:47:57Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "09377eb6-a4a2-4fc3-a546-ece656ca4009"}
+2026-02-07T07:50:34.6631015Z 2026-02-07T07:48:07Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "10e54a0f-6437-4c9f-90fa-709c5a614cc7", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6635280Z 2026-02-07T07:48:07Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "10e54a0f-6437-4c9f-90fa-709c5a614cc7", "enabled": false}
+2026-02-07T07:50:34.6639305Z 2026-02-07T07:48:07Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "10e54a0f-6437-4c9f-90fa-709c5a614cc7", "count": 1}
+2026-02-07T07:50:34.6643436Z 2026-02-07T07:48:07Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "10e54a0f-6437-4c9f-90fa-709c5a614cc7"}
+2026-02-07T07:50:34.6647817Z 2026-02-07T07:48:17Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "9a986cd3-7241-4734-a6ff-c3b657e5bc07", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6651920Z 2026-02-07T07:48:17Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "9a986cd3-7241-4734-a6ff-c3b657e5bc07", "enabled": false}
+2026-02-07T07:50:34.6656057Z 2026-02-07T07:48:17Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "9a986cd3-7241-4734-a6ff-c3b657e5bc07", "count": 1}
+2026-02-07T07:50:34.6659991Z 2026-02-07T07:48:17Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "9a986cd3-7241-4734-a6ff-c3b657e5bc07"}
+2026-02-07T07:50:34.6664734Z 2026-02-07T07:48:27Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "8970ac4a-2b05-474d-a975-f7f7cd962cfc", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6668839Z 2026-02-07T07:48:27Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "8970ac4a-2b05-474d-a975-f7f7cd962cfc", "enabled": false}
+2026-02-07T07:50:34.6672898Z 2026-02-07T07:48:27Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "8970ac4a-2b05-474d-a975-f7f7cd962cfc", "count": 1}
+2026-02-07T07:50:34.6676842Z 2026-02-07T07:48:27Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "8970ac4a-2b05-474d-a975-f7f7cd962cfc"}
+2026-02-07T07:50:34.6681019Z 2026-02-07T07:48:37Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "84a93f92-eb11-4a13-9944-415407f64ad3", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6685293Z 2026-02-07T07:48:37Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "84a93f92-eb11-4a13-9944-415407f64ad3", "enabled": false}
+2026-02-07T07:50:34.6689121Z 2026-02-07T07:48:37Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "84a93f92-eb11-4a13-9944-415407f64ad3", "count": 1}
+2026-02-07T07:50:34.6693419Z 2026-02-07T07:48:37Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "84a93f92-eb11-4a13-9944-415407f64ad3"}
+2026-02-07T07:50:34.6697639Z 2026-02-07T07:48:47Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "7019ebb8-0a71-47f4-807f-50fd18eed238", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6701745Z 2026-02-07T07:48:47Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "7019ebb8-0a71-47f4-807f-50fd18eed238", "enabled": false}
+2026-02-07T07:50:34.6706097Z 2026-02-07T07:48:47Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "7019ebb8-0a71-47f4-807f-50fd18eed238", "count": 1}
+2026-02-07T07:50:34.6710263Z 2026-02-07T07:48:47Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "7019ebb8-0a71-47f4-807f-50fd18eed238"}
+2026-02-07T07:50:34.6714610Z 2026-02-07T07:48:57Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "59d987eb-c389-4100-9d37-bb24c47e0d18", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6718695Z 2026-02-07T07:48:57Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "59d987eb-c389-4100-9d37-bb24c47e0d18", "enabled": false}
+2026-02-07T07:50:34.6722708Z 2026-02-07T07:48:57Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "59d987eb-c389-4100-9d37-bb24c47e0d18", "count": 1}
+2026-02-07T07:50:34.6726591Z 2026-02-07T07:48:57Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "59d987eb-c389-4100-9d37-bb24c47e0d18"}
+2026-02-07T07:50:34.6730788Z 2026-02-07T07:49:07Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "197053ac-ec69-4fab-99ed-ab5d67cc4915", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6735160Z 2026-02-07T07:49:07Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "197053ac-ec69-4fab-99ed-ab5d67cc4915", "enabled": false}
+2026-02-07T07:50:34.6739254Z 2026-02-07T07:49:07Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "197053ac-ec69-4fab-99ed-ab5d67cc4915", "count": 1}
+2026-02-07T07:50:34.6743636Z 2026-02-07T07:49:07Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "197053ac-ec69-4fab-99ed-ab5d67cc4915"}
+2026-02-07T07:50:34.6746327Z 2026-02-07T07:49:17Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "28e99fd3-7764-4959-8661-fd8084a01d3f", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6748856Z 2026-02-07T07:49:17Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "28e99fd3-7764-4959-8661-fd8084a01d3f", "enabled": false}
+2026-02-07T07:50:34.6751472Z 2026-02-07T07:49:17Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "28e99fd3-7764-4959-8661-fd8084a01d3f", "count": 1}
+2026-02-07T07:50:34.6754179Z 2026-02-07T07:49:17Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "28e99fd3-7764-4959-8661-fd8084a01d3f"}
+2026-02-07T07:50:34.6757191Z 2026-02-07T07:49:27Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "55144014-3f82-4b00-b5c7-169ae954cb40", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6760023Z 2026-02-07T07:49:27Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "55144014-3f82-4b00-b5c7-169ae954cb40", "enabled": false}
+2026-02-07T07:50:34.6762097Z 2026-02-07T07:49:27Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "55144014-3f82-4b00-b5c7-169ae954cb40", "count": 1}
+2026-02-07T07:50:34.6764457Z 2026-02-07T07:49:27Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "55144014-3f82-4b00-b5c7-169ae954cb40"}
+2026-02-07T07:50:34.6766624Z 2026-02-07T07:49:37Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "597507cb-f23a-46f8-85d3-5ddd3b0b2b2b", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6769148Z 2026-02-07T07:49:37Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "597507cb-f23a-46f8-85d3-5ddd3b0b2b2b", "enabled": false}
+2026-02-07T07:50:34.6771192Z 2026-02-07T07:49:37Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "597507cb-f23a-46f8-85d3-5ddd3b0b2b2b", "count": 1}
+2026-02-07T07:50:34.6773389Z 2026-02-07T07:49:37Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "597507cb-f23a-46f8-85d3-5ddd3b0b2b2b"}
+2026-02-07T07:50:34.6775775Z 2026-02-07T07:49:47Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "5bc8c9b4-d248-4c09-b47a-d7dd54990a14", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6778367Z 2026-02-07T07:49:47Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "5bc8c9b4-d248-4c09-b47a-d7dd54990a14", "enabled": false}
+2026-02-07T07:50:34.6780392Z 2026-02-07T07:49:47Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "5bc8c9b4-d248-4c09-b47a-d7dd54990a14", "count": 1}
+2026-02-07T07:50:34.6782756Z 2026-02-07T07:49:47Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "5bc8c9b4-d248-4c09-b47a-d7dd54990a14"}
+2026-02-07T07:50:34.6785134Z 2026-02-07T07:49:57Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "4a1bee12-be17-488b-9064-f73424385135", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6787888Z 2026-02-07T07:49:57Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "4a1bee12-be17-488b-9064-f73424385135", "enabled": false}
+2026-02-07T07:50:34.6789904Z 2026-02-07T07:49:57Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "4a1bee12-be17-488b-9064-f73424385135", "count": 1}
+2026-02-07T07:50:34.6791947Z 2026-02-07T07:49:57Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "4a1bee12-be17-488b-9064-f73424385135"}
+2026-02-07T07:50:34.6794426Z 2026-02-07T07:50:07Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "a7f13bd1-73e9-4f19-9741-be481a019a9e", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6797186Z 2026-02-07T07:50:07Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "a7f13bd1-73e9-4f19-9741-be481a019a9e", "enabled": false}
+2026-02-07T07:50:34.6799226Z 2026-02-07T07:50:07Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "a7f13bd1-73e9-4f19-9741-be481a019a9e", "count": 1}
+2026-02-07T07:50:34.6801268Z 2026-02-07T07:50:07Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "a7f13bd1-73e9-4f19-9741-be481a019a9e"}
+2026-02-07T07:50:34.6803878Z 2026-02-07T07:50:17Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "314dd59f-634c-4fc5-82dd-18bf39769aa7", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6806007Z 2026-02-07T07:50:17Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "314dd59f-634c-4fc5-82dd-18bf39769aa7", "enabled": false}
+2026-02-07T07:50:34.6808851Z 2026-02-07T07:50:17Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "314dd59f-634c-4fc5-82dd-18bf39769aa7", "count": 1}
+2026-02-07T07:50:34.6810913Z 2026-02-07T07:50:17Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "314dd59f-634c-4fc5-82dd-18bf39769aa7"}
+2026-02-07T07:50:34.6813175Z 2026-02-07T07:50:27Z	INFO	Reconciling FrappeBench	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "60e60e97-0561-4324-960f-ed5815420b05", "name": "test-keda-bench", "namespace": "default"}
+2026-02-07T07:50:34.6815296Z 2026-02-07T07:50:27Z	INFO	Git configuration	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "60e60e97-0561-4324-960f-ed5815420b05", "enabled": false}
+2026-02-07T07:50:34.6817295Z 2026-02-07T07:50:27Z	INFO	FPM repositories configured	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "60e60e97-0561-4324-960f-ed5815420b05", "count": 1}
+2026-02-07T07:50:34.6819490Z 2026-02-07T07:50:27Z	INFO	Bench initialization in progress, requeueing	{"controller": "frappebench", "controllerGroup": "vyogo.tech", "controllerKind": "FrappeBench", "FrappeBench": {"name":"test-keda-bench","namespace":"default"}, "namespace": "default", "name": "test-keda-bench", "reconcileID": "60e60e97-0561-4324-960f-ed5815420b05"}
+2026-02-07T07:50:34.7572133Z Post job cleanup.
+2026-02-07T07:50:34.7989620Z Deleting cluster "frappe-keda-e2e" ...
+2026-02-07T07:50:38.3849881Z Deleted nodes: ["frappe-keda-e2e-control-plane"]
+2026-02-07T07:50:38.4956449Z Post job cleanup.
+2026-02-07T07:50:38.5921646Z [command]/usr/bin/git version
+2026-02-07T07:50:38.5968720Z git version 2.52.0
+2026-02-07T07:50:38.6013385Z Temporarily overriding HOME='/home/runner/work/_temp/c9714dbf-7453-4db2-bcf6-eee49e0b799d' before making global git config changes
+2026-02-07T07:50:38.6014764Z Adding repository directory to the temporary git global config as a safe directory
+2026-02-07T07:50:38.6019685Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/frappe-operator/frappe-operator
+2026-02-07T07:50:38.6056318Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-02-07T07:50:38.6089811Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-02-07T07:50:38.6326652Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-02-07T07:50:38.6348226Z http.https://github.com/.extraheader
+2026-02-07T07:50:38.6361451Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-02-07T07:50:38.6393358Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-02-07T07:50:38.6619852Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-02-07T07:50:38.6654966Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-02-07T07:50:38.6993872Z Cleaning up orphan processes
