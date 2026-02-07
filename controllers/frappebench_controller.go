@@ -593,14 +593,19 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 // getBenchImage returns the image to use for the bench
 // Priority: 1. bench.spec.imageConfig, 2. operator ConfigMap defaults, 3. hardcoded constants
 func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+	version := bench.Spec.FrappeVersion
+	if version != "" && version != "latest" && !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+
 	// Priority 1: Check bench-level ImageConfig override
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
 		image := bench.Spec.ImageConfig.Repository
 		if bench.Spec.ImageConfig.Tag != "" {
 			image = fmt.Sprintf("%s:%s", image, bench.Spec.ImageConfig.Tag)
-		} else if bench.Spec.FrappeVersion != "" {
+		} else if version != "" {
 			// If tag not specified but version is, use version as tag
-			image = fmt.Sprintf("%s:%s", image, bench.Spec.FrappeVersion)
+			image = fmt.Sprintf("%s:%s", image, version)
 		}
 		return image
 	}
@@ -610,11 +615,11 @@ func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogot
 	if err == nil && operatorConfig != nil {
 		if defaultImage, ok := operatorConfig.Data["defaultFrappeImage"]; ok && defaultImage != "" {
 			// If version is specified, replace tag in default image
-			if bench.Spec.FrappeVersion != "" && bench.Spec.FrappeVersion != "latest" {
+			if version != "" && version != "latest" {
 				// Extract repository from default image and append version tag
 				parts := strings.Split(defaultImage, ":")
 				if len(parts) == 2 {
-					return fmt.Sprintf("%s:%s", parts[0], bench.Spec.FrappeVersion)
+					return fmt.Sprintf("%s:%s", parts[0], version)
 				}
 			}
 			return defaultImage
@@ -622,8 +627,8 @@ func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogot
 	}
 
 	// Priority 3: Fall back to constants with version
-	if bench.Spec.FrappeVersion != "" && bench.Spec.FrappeVersion != "latest" {
-		return fmt.Sprintf("docker.io/frappe/erpnext:%s", bench.Spec.FrappeVersion)
+	if version != "" && version != "latest" {
+		return fmt.Sprintf("docker.io/frappe/erpnext:%s", version)
 	}
 	return constants.DefaultFrappeImage
 }
@@ -729,7 +734,7 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 
 	// Determine phase and conditions
 	isReady := false
-	if bench.Status.Phase == "" || (bench.Status.Phase != "Provisioning" && bench.Status.Phase != "Ready") {
+	if bench.Status.Phase == "" || (bench.Status.Phase != "Provisioning" && bench.Status.Phase != "Ready" && bench.Status.Phase != "Initializing") {
 		bench.Status.Phase = "Provisioning"
 		r.setCondition(bench, metav1.Condition{
 			Type:    "Ready",
