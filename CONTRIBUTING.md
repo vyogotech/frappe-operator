@@ -233,6 +233,48 @@ INTEGRATION_TEST=true go test -v -count=1 ./test/integration/...
 
 The E2E workflow (`.github/workflows/e2e-test.yml`) runs integration tests inside the Kind cluster after installing the operator, then runs the full E2E suite (bench/site deploy, platform detection, metrics, etc.).
 
+### Autoscaling Tests
+
+The project includes a comprehensive autoscaling test suite with configurable parameters. These tests validate KEDA and HPA autoscaling functionality.
+
+```bash
+# Run autoscaling tests (requires Docker/Podman and Kind)
+./test-autoscaling-helm.sh all
+
+# Run specific test types
+./test-autoscaling-helm.sh keda          # Test KEDA autoscaling
+./test-autoscaling-helm.sh hpa           # Test HPA autoscaling  
+./test-autoscaling-helm.sh provider-switch # Test provider switching
+
+# Use custom configuration
+./test-autoscaling-helm.sh --config my-config.conf all
+
+# Override specific parameters
+./test-autoscaling-helm.sh --cluster-name my-cluster --namespace test-ns keda
+```
+
+#### Configuration
+
+Autoscaling tests use a flexible configuration system (`test-config.conf`) to eliminate hardcoded values:
+
+```bash
+# Generate test manifests from configuration
+./generate-test-manifests.sh
+
+# Test configuration functionality
+./test-configuration.sh
+```
+
+See [CONFIGURATION.md](CONFIGURATION.md) for complete configuration documentation.
+
+#### CI Integration
+
+The autoscaling test suite runs in CI via `.github/workflows/autoscaling-test.yml` with:
+- Unit tests for autoscaling components
+- E2E tests for KEDA and HPA providers
+- Provider switching validation
+- Graceful fallback scenarios
+
 ### Writing Tests
 
 ```go
