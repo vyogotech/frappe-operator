@@ -89,7 +89,11 @@ Check the [`examples/`](examples/) directory for ready-to-use configurations:
 - **[worker-autoscaling.yaml](examples/worker-autoscaling.yaml)** - KEDA-based autoscaling
 - **[scheduled-sitebackup.yaml](examples/scheduled-sitebackup.yaml)** - Automated backups
 - **[advanced-pod-config.yaml](examples/advanced-pod-config.yaml)** - Custom labels, geo-tagging, and affinity
+- **[test-keda-bench.yaml](examples/test-keda-bench.yaml)** - Generated KEDA test manifest
+- **[test-hpa-bench.yaml](examples/test-hpa-bench.yaml)** - Generated HPA test manifest
 - And [many more](examples/)...
+
+> **Note**: Test manifests are generated from configuration. See [CONFIGURATION.md](CONFIGURATION.md) for customization.
 
 ## Custom Resources
 
@@ -123,6 +127,29 @@ Check the [`examples/`](examples/) directory for ready-to-use configurations:
 - 🐛 **[GitHub Issues](https://github.com/vyogotech/frappe-operator/issues)** - Report bugs
 - 📖 **[Documentation](https://vyogotech.github.io/frappe-operator/)** - Complete guides
 - 🌐 **[Frappe Forum](https://discuss.frappe.io/)** - Frappe community
+
+## Development & Testing
+
+### Quick Test Setup
+
+```bash
+# Run unit tests
+make test
+
+# Run integration tests  
+make integration-test
+
+# Test autoscaling functionality (configurable)
+./test-autoscaling-helm.sh all
+
+# Customize test configuration
+cp test-config.conf my-config.conf
+./test-autoscaling-helm.sh --config my-config.conf keda
+```
+
+### Configuration System
+
+The project uses a flexible configuration system for testing that eliminates hardcoded values. See [CONFIGURATION.md](CONFIGURATION.md) for complete documentation.
 
 ## Contributing
 

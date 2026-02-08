@@ -1,4 +1,5 @@
 # Simple FrappeBench with KEDA autoscaling for E2E testing
+# Generated from configuration: /home/varun/projects/frappe-operator/test-config.conf
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
