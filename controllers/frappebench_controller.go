@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -113,7 +114,8 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	operatorConfig, err := r.getOperatorConfig(ctx, bench.Namespace)
 	if err != nil {
 		logger.Error(err, "Failed to get operator config")
-		// Continue with defaults
+	} else if operatorConfig == nil {
+		logger.Info("Operator config not found, using defaults")
 	}
 
 	// Determine Git enabled status
@@ -415,16 +417,31 @@ func (r *FrappeBenchReconciler) updateStatus(ctx context.Context, bench *vyogote
 }
 
 // getOperatorConfig retrieves the operator-level configuration
-func (r *FrappeBenchReconciler) getOperatorConfig(ctx context.Context, namespace string) (*corev1.ConfigMap, error) {
+func (r *FrappeBenchReconciler) getOperatorConfig(ctx context.Context, _ string) (*corev1.ConfigMap, error) {
 	if r.Client == nil {
 		return nil, fmt.Errorf("client not initialized")
 	}
+
+	// Get operator namespace from env or default
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		namespace = "frappe-operator-system"
+	}
+
 	configMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      "frappe-operator-config",
-		Namespace: "frappe-operator-system", // Operator namespace
+		Namespace: namespace,
 	}, configMap)
-	return configMap, err
+
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil // Return nil config, no error (use defaults)
+		}
+		return nil, err
+	}
+
+	return configMap, nil
 }
 
 // isGitEnabled determines if Git is enabled based on operator and bench config
