@@ -1,0 +1,26 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: scaling-bench
+spec:
+  frappeVersion: "15"
+  componentAutoscaling:
+    gunicorn:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 3
+    nginx:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 2
+      provider: keda
+  storageSize: 2Gi
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: scaling-site
+spec:
+  benchRef:
+    name: scaling-bench
+  siteName: scaling.test.local
