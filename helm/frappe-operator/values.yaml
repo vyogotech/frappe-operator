@@ -160,7 +160,7 @@ operatorConfig:
 # Default MariaDB instance for Frappe sites
 mariadb:
   # Enable creation of a default shared MariaDB instance
-  enabled: true
+  enabled: false
   
   # MariaDB instance name
   name: frappe-mariadb
