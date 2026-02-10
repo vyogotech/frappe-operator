@@ -147,6 +147,7 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
         echo "Database Provider: $DB_PROVIDER"
         echo "Database Name: $DB_NAME"
         echo "Database Host: $DB_HOST:$DB_PORT"
+        echo "Apps to Install: ${APPS_TO_INSTALL:-none}"
         echo "=========================================="
 
         mkdir -p "sites/$SITE_NAME/logs"
@@ -167,6 +168,19 @@ EOF
         echo "Running bench migrate..."
         bench --site "$SITE_NAME" migrate
         echo "✓ Bench migrate completed"
+
+        # Install requested apps if skipInit is true
+        if [[ $APPS_TO_INSTALL_COUNT -gt 0 ]]; then
+            echo "Installing requested apps..."
+            for app in $APPS_TO_INSTALL; do
+                if [[ -d "apps/$app" ]]; then
+                    echo "Installing app: $app"
+                    # We use || true because sometimes apps are already installed but not in tabInstalled App
+                    # and install-app handles it, but we don't want to crash the init job if one fails
+                    bench --site "$SITE_NAME" install-app "$app" || echo "⚠ WARNING: Failed to install $app, it might already be installed."
+                fi
+            done
+        fi
         
         SITE_CREATION_EXIT_CODE=0
     elif [[ "$goto_update_config" -eq 0 ]]; then
@@ -257,9 +271,17 @@ EOF
     else
         echo "=========================================="
         echo "Site already exists - skipping site creation"
-        echo "Will update site_config.json only"
-        echo "Note: Apps cannot be installed after site creation"
+        echo "Checking for new apps to install..."
         echo "=========================================="
+        
+        if [[ $APPS_TO_INSTALL_COUNT -gt 0 ]]; then
+            for app in $APPS_TO_INSTALL; do
+                if [[ -d "apps/$app" ]]; then
+                    echo "Ensuring app is installed: $app"
+                    bench --site "$SITE_NAME" install-app "$app" || echo "Notice: $app might already be installed"
+                fi
+            done
+        fi
     fi
 else
     echo "ERROR: Unsupported DB provider: $DB_PROVIDER"
