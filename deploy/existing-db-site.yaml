@@ -9,8 +9,10 @@ spec:
     name: external-redis-bench
   dbConfig:
     provider: external
-    host: frappe-mariadb.mariadb.svc.cluster.local
+    host: 64.227.178.150
     port: "3306"
     connectionSecretRef:
       name: external-mariadb-creds
   skipInit: true
+  apps:
+    - erpnext
