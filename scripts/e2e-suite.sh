@@ -79,6 +79,9 @@ if [ "$SCENARIO" == "external" ]; then
 fi
 
 # 5. Install Frappe Operator
+log "Building Helm dependencies..."
+helm dependency update ./helm/frappe-operator
+
 log "Installing Frappe Operator..."
 helm upgrade --install frappe-operator ./helm/frappe-operator \
   --namespace $OPERATOR_NAMESPACE \
