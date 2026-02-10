@@ -8,7 +8,7 @@ operator:
   replicaCount: 1
   
   image:
-    repository: ghcr.io/rmallam/frappe-operator
+    repository: ghcr.io/vyogotech/frappe-operator
     pullPolicy: Always
     tag: "v3.0.0"
   
