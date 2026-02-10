@@ -92,7 +92,7 @@ kubectl apply -f site-shared-mariadb.yaml
 - `site-dedicated-mariadb.yaml` - Site with dedicated MariaDB (enterprise)
 
 ### Advanced Examples  
-- `autoscaling-bench.yaml` - **NEW**: Bench with KEDA-based worker autoscaling (scale-to-zero)
+- `autoscaling-bench.yaml` - **NEW**: Bench with provider-agnostic autoscaling (KEDA for workers, HPA for nginx)
 - `advanced-pod-config.yaml` - **NEW**: Advanced Pod Configuration (Labels, Geo-tagging, Affinity)
 - `hybrid-bench.yaml` - Bench with hybrid app installation
 - `fpm-bench.yaml` - Bench using FPM packages
@@ -108,11 +108,11 @@ Key configuration options:
 - `frappeVersion` - Frappe version (e.g., "version-15", "version-14")
 - `imageConfig` - Custom container images
 - `apps` - List of apps to install
-- `componentReplicas` - Replica counts for each component (static)
-- `workerAutoscaling` - **NEW**: KEDA-based autoscaling for background workers
-  - `short` - Short-running tasks (scale-to-zero capable)
-  - `long` - Long-running tasks (minimum replicas configurable)
-  - `default` - Default queue workers (static or autoscaled)
+- `componentAutoscaling` - **NEW**: Provider-agnostic autoscaling for all components
+  - `nginx`, `gunicorn`, `socketio`, `worker-short`, `worker-long`, `worker-default`
+  - `enabled`, `provider` (keda/hpa), `minReplicas`, `maxReplicas`, `staticReplicas`
+  - `keda` - KEDA specific config (trigger, targetValue, metadata)
+  - `hpa` - HPA specific config (metric, targetUtilization)
 - `podConfig` - **NEW**: Advanced pod configuration
   - `labels` - Custom labels for all pods
   - `geoTag` - Simplified region/zone configuration (sets topology labels and affinity)
@@ -193,8 +193,8 @@ kubectl logs deployment/<bench-name>-worker-long
 # Check ScaledObjects (KEDA)
 kubectl get scaledobjects
 
-# Check worker scaling status
-kubectl get frappebench <bench-name> -o jsonpath='{.status.workerScaling}' | jq
+# Check component scaling status
+kubectl get frappebench <bench-name> -o jsonpath='{.status.componentScaling}' | jq
 
 # Check HPA created by KEDA
 kubectl get hpa

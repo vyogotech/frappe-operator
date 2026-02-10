@@ -1,0 +1,71 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: autoscaling-keda-bench
+  namespace: frappe
+spec:
+  frappeVersion: "15.0.0"
+  imageConfig:
+    repository: ghcr.io/rmallam/frappe_docker
+    tag: sha-7bc7484
+    pullPolicy: Always
+  
+  # External Redis configuration
+  redisConfig:
+    type: redis
+    external: true
+    host: redis-external.redis.svc.cluster.local
+    port: 6379
+    connectionSecretRef:
+      name: external-redis-creds
+  
+  # Autoscaling configuration (KEDA Example)
+  componentAutoscaling:
+    # Gunicorn scaling using KEDA CPU trigger
+    # This proves KEDA works for standard metrics too
+    gunicorn:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 5
+      provider: keda
+      cooldownPeriod: 60
+      pollingInterval: 15
+      keda:
+        trigger: cpu
+        targetValue: "75" # Percentage as string
+    
+    # Worker scaling using KEDA CPU trigger (Simple example)
+    # Note: Production setups should ideally use Redis Queue trigger
+    workerDefault:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 5
+      provider: keda
+      cooldownPeriod: 30
+      pollingInterval: 15
+      keda:
+        trigger: cpu
+        targetValue: "75"
+    
+    nginx:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 3
+      provider: keda
+      keda:
+        trigger: cpu
+        targetValue: "80"
+    
+    workerShort:
+      enabled: false
+      staticReplicas: 1
+
+    workerLong:
+      enabled: false
+      staticReplicas: 1
+      
+    socketio:
+      enabled: false
+      staticReplicas: 1
+  
+  storageSize: 2Gi

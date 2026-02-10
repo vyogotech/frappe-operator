@@ -32,13 +32,22 @@ spec:
     pullSecrets:
       - name: string
   
-  # Optional: Replica counts for components
-  componentReplicas:
-    gunicorn: int32
-    socketio: int32
-    workerDefault: int32
-    workerLong: int32
-    workerShort: int32
+  # Optional: Autoscaling and replica configuration for components
+  # Map keys: nginx, gunicorn, socketio, scheduler, worker-default, worker-long, worker-short
+  # +optional
+  componentAutoscaling:
+    <component-name>:
+      enabled: bool
+      staticReplicas: int32
+      minReplicas: int32
+      maxReplicas: int32
+      provider: string    # keda or hpa
+      keda:
+        trigger: string   # cpu, memory, redis
+        targetValue: string
+      hpa:
+        metric: string    # cpu or memory
+        targetUtilization: int32
   
   # Optional: Resource requirements for components
   componentResources:
@@ -121,14 +130,24 @@ Container image configuration.
 - **`pullPolicy`** (string): Image pull policy - `Always`, `Never`, or `IfNotPresent`
 - **`pullSecrets`** (array): Secrets for private registries
 
-#### `componentReplicas` (optional)
-Replica counts for each component.
+#### `componentAutoscaling` (optional)
+Autoscaling and replica configuration for each component.
 
-- **`gunicorn`** (int32): Number of gunicorn replicas (default: 1, min: 1)
-- **`socketio`** (int32): Number of socketio replicas (default: 1, min: 1)
-- **`workerDefault`** (int32): Number of default worker replicas (default: 1, min: 0)
-- **`workerLong`** (int32): Number of long worker replicas (default: 1, min: 0)
-- **`workerShort`** (int32): Number of short worker replicas (default: 1, min: 0)
+- **`enabled`** (bool): Whether to enable autoscaling for this component. If false, uses `staticReplicas`.
+- **`staticReplicas`** (int32): Fixed number of replicas when autoscaling is disabled.
+- **`minReplicas`** (int32): Minimum number of replicas when autoscaling is enabled (supports 0 for workers).
+- **`maxReplicas`** (int32): Maximum number of replicas when autoscaling is enabled.
+- **`provider`** (string): Scaling backend - `hpa` (default) or `keda`.
+
+##### `keda` (optional)
+KEDA-specific configuration.
+- **`trigger`** (string): `cpu`, `memory`, or `redis` (for workers).
+- **`targetValue`** (string): Threshold for the trigger (e.g., `"70"` for CPU, `"5"` for Redis queue).
+
+##### `hpa` (optional)
+HPA-specific configuration.
+- **`metric`** (string): `cpu` or `memory`.
+- **`targetUtilization`** (int32): Target percentage (1-100).
 
 #### `componentResources` (optional)
 Resource requirements for each component.
@@ -790,9 +809,17 @@ metadata:
 spec:
   frappeVersion: "version-15"
   appsJSON: '["erpnext", "hrms"]'
-  componentReplicas:
-    gunicorn: 3
-    workerDefault: 2
+  componentAutoscaling:
+    gunicorn:
+      enabled: true
+      provider: hpa
+      minReplicas: 3
+      maxReplicas: 10
+    worker-short:
+      enabled: true
+      provider: keda
+      minReplicas: 0
+      maxReplicas: 5
   componentResources:
     gunicorn:
       requests: {cpu: "1", memory: "2Gi"}

@@ -8,15 +8,15 @@ on:
       - develop
       - feature/**
     paths-ignore:
-      - '*.md'
-      - '_config.yml'
-      - 'docs/**'
+      - "*.md"
+      - "_config.yml"
+      - "docs/**"
   pull_request:
-    branches: [ main, master, develop, feature/** ]
+    branches: [main, master, develop, feature/**]
     paths-ignore:
-      - '*.md'
-      - '_config.yml'
-      - 'docs/**'
+      - "*.md"
+      - "_config.yml"
+      - "docs/**"
   workflow_dispatch:
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: "1.22"
           cache: true
 
       - name: Install dependencies
@@ -39,6 +39,20 @@ jobs:
       - name: Run unit tests
         run: |
           go test ./api/... ./pkg/... ./controllers/... -v -coverprofile cover.out
+
+      - name: Lint autoscaling code
+        run: |
+          echo "=== Linting Autoscaling Code ==="
+          go vet ./controllers/...
+          go vet ./api/v1alpha1/...
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./cover.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
 
   docker-build:
     name: Build and Push Docker Image
@@ -49,7 +63,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -84,4 +98,3 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
-

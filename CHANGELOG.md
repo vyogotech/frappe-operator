@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Added
+- **Provider-Agnostic Autoscaling**: Deep refactor of the autoscaling system to support multiple scaling backends (KEDA and HPA) through a unified `componentAutoscaling` API.
+- **HPA Scaling Provider**: Support for standard Kubernetes Horizontal Pod Autoscaler for CPU and Memory metrics.
+- **Enhanced KEDA Provider**: Improved Scaling-to-Zero support and Redis queue length triggers for background workers.
+- **Autoscaling Test Suite**: Comprehensive unit and E2E testing framework for autoscaling components, including provider-switching and graceful fallback scenarios.
+- **Scaling Status Observability**: Added `componentScaling` status map to `FrappeBench` for real-time visibility into scaling modes and replica counts.
+
+### Changed
+- **API: Unified Autoscaling**: Replaced legacy `workerAutoscaling`, `nginxAutoscaling`, and `componentReplicas` with a unified `componentAutoscaling` map in `FrappeBenchSpec`.
+- **Default Scaling Provider**: Default autoscaling provider is now `hpa` for improved out-of-the-box compatibility on all platforms (including OpenShift).
 - **FrappeSite stability tests**: Fixed fake client not finding shared MariaDB CR by creating the MariaDB via `fakeClient.Create()` in test setup (matching `frappesite_jobs_test.go`), so reconciliation tests no longer fail with "shared MariaDB instance 'frappe-mariadb' not found".
 - **Security context test (non-OpenShift)**: Made the test deterministic by using explicit `bench.Spec.Security` overrides instead of env vars (`FRAPPE_DEFAULT_UID`/`FRAPPE_DEFAULT_GID`), avoiding flakiness from test order or environment.
 - **Integration Test Tags**: Corrected `FrappeVersion` tags from `v15` to `version-15` in integration tests to match official Docker images.

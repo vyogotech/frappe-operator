@@ -8,6 +8,7 @@
 # Test binary, built with `go test -c`
 *.test
 .cursor
+.azure
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
@@ -161,6 +162,7 @@ dist/
 test-*.yaml
 debug-*.yaml
 !config/samples/test-*.yaml
+!examples/test-*.yaml
 
 # Local development databases
 *.db

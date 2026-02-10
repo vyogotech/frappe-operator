@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -68,6 +70,7 @@ const frappeBenchFinalizer = "vyogo.tech/bench-finalizer"
 //+kubebuilder:rbac:groups=keda.sh,resources=scaledobjects,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=keda.sh,resources=scaledobjects/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=keda.sh,resources=scaledobjects/finalizers,verbs=update
+//+kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop
@@ -94,6 +97,11 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return result, err
 	} else if !result.IsZero() {
 		return result, nil
+	}
+
+	// Set initial phase if empty
+	if bench.Status.Phase == "" {
+		bench.Status.Phase = "Initializing"
 	}
 
 	// Set progressing condition at start
@@ -166,6 +174,7 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 	r.Recorder.Event(bench, corev1.EventTypeNormal, "Initialized", "Bench initialization completed")
+	logger.Info("Bench initialization completed, proceeding to create resources")
 
 	// Ensure Redis
 	if err := r.ensureRedis(ctx, bench); err != nil {
@@ -215,9 +224,9 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	r.Recorder.Event(bench, corev1.EventTypeNormal, "WorkersReady", "Worker deployments created")
 
-	// Update worker scaling status
-	if err := r.updateWorkerScalingStatus(ctx, bench); err != nil {
-		logger.Error(err, "Failed to update worker scaling status")
+	// Update component scaling status
+	if err := r.updateComponentScalingStatus(ctx, bench); err != nil {
+		logger.Error(err, "Failed to update component scaling status")
 		// Don't fail the reconciliation, just log the error
 	}
 
@@ -480,6 +489,10 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 		if job.Status.Succeeded > 0 {
 			return true, nil
 		}
+		// If job failed, report it early
+		if job.Status.Failed > 0 {
+			return false, fmt.Errorf("bench initialization job %s failed", jobName)
+		}
 		return false, nil
 	}
 	if !errors.IsNotFound(err) {
@@ -521,6 +534,16 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 							Image:   r.getBenchImage(ctx, bench),
 							Command: []string{"bash", "-c"},
 							Args:    []string{initScript},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("512Mi"),
+								},
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("1000m"),
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",
@@ -573,14 +596,24 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 // getBenchImage returns the image to use for the bench
 // Priority: 1. bench.spec.imageConfig, 2. operator ConfigMap defaults, 3. hardcoded constants
 func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+	version := bench.Spec.FrappeVersion
+	// Only add 'v' prefix to numeric versions (e.g., "15" -> "v15", but "develop" stays "develop")
+	if version != "" && version != "latest" && !strings.HasPrefix(version, "v") {
+		// Check if version is numeric (e.g., "15", "14", "16.0.0")
+		isNumeric, _ := regexp.MatchString(`^[\d.]+$`, version)
+		if isNumeric {
+			version = "v" + version
+		}
+	}
+
 	// Priority 1: Check bench-level ImageConfig override
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
 		image := bench.Spec.ImageConfig.Repository
 		if bench.Spec.ImageConfig.Tag != "" {
 			image = fmt.Sprintf("%s:%s", image, bench.Spec.ImageConfig.Tag)
-		} else if bench.Spec.FrappeVersion != "" {
+		} else if version != "" {
 			// If tag not specified but version is, use version as tag
-			image = fmt.Sprintf("%s:%s", image, bench.Spec.FrappeVersion)
+			image = fmt.Sprintf("%s:%s", image, version)
 		}
 		return image
 	}
@@ -590,11 +623,11 @@ func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogot
 	if err == nil && operatorConfig != nil {
 		if defaultImage, ok := operatorConfig.Data["defaultFrappeImage"]; ok && defaultImage != "" {
 			// If version is specified, replace tag in default image
-			if bench.Spec.FrappeVersion != "" && bench.Spec.FrappeVersion != "latest" {
+			if version != "" && version != "latest" {
 				// Extract repository from default image and append version tag
 				parts := strings.Split(defaultImage, ":")
 				if len(parts) == 2 {
-					return fmt.Sprintf("%s:%s", parts[0], bench.Spec.FrappeVersion)
+					return fmt.Sprintf("%s:%s", parts[0], version)
 				}
 			}
 			return defaultImage
@@ -602,8 +635,8 @@ func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogot
 	}
 
 	// Priority 3: Fall back to constants with version
-	if bench.Spec.FrappeVersion != "" && bench.Spec.FrappeVersion != "latest" {
-		return fmt.Sprintf("docker.io/frappe/erpnext:%s", bench.Spec.FrappeVersion)
+	if version != "" && version != "latest" {
+		return fmt.Sprintf("docker.io/frappe/erpnext:%s", version)
 	}
 	return constants.DefaultFrappeImage
 }
@@ -626,41 +659,48 @@ func (r *FrappeBenchReconciler) parseAppsJSON(appsJSON string) []vyogotechv1alph
 	return apps
 }
 
-// updateBenchStatus updates the FrappeBench status
-// updateWorkerScalingStatus updates the status with current worker scaling information
-func (r *FrappeBenchReconciler) updateWorkerScalingStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+// updateComponentScalingStatus updates the status with current component scaling information
+func (r *FrappeBenchReconciler) updateComponentScalingStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
-	if bench.Status.WorkerScaling == nil {
-		bench.Status.WorkerScaling = make(map[string]vyogotechv1alpha1.WorkerScalingStatus)
+	if bench.Status.ComponentScaling == nil {
+		bench.Status.ComponentScaling = make(map[string]*vyogotechv1alpha1.ComponentScalingStatus)
 	}
 
-	kedaAvailable := r.isKEDAAvailable(ctx)
-	workerTypes := []string{"default", "long", "short"}
+	components := []string{"gunicorn", "nginx", "socketio", "worker-default", "worker-long", "worker-short"}
 
-	for _, workerType := range workerTypes {
-		// Get the deployment
-		deployName := fmt.Sprintf("%s-worker-%s", bench.Name, workerType)
+	for _, componentName := range components {
+		deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)
 		deploy := &appsv1.Deployment{}
 		err := r.Get(ctx, types.NamespacedName{Name: deployName, Namespace: bench.Namespace}, deploy)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				continue // Worker not created yet
+				continue
 			}
-			logger.Error(err, "Failed to get worker deployment", "worker", workerType)
+			logger.Error(err, "Failed to get deployment for status update", "component", componentName)
 			continue
 		}
 
 		// Get autoscaling config
-		config := r.getWorkerAutoscalingConfig(bench, workerType)
-		config = r.fillAutoscalingDefaults(config, workerType)
+		config := r.getComponentAutoscaling(bench, componentName)
+		config = r.fillComponentDefaults(config, componentName)
 
-		// Determine mode and replicas
+		// Resolve provider and check availability
+		var provider ScalingProvider
+		if config.Enabled != nil && *config.Enabled && config.Provider != "" {
+			provider = resolveProvider(config.Provider, r.Client, r.Scheme)
+		}
+
+		providerAvailable := false
+		if provider != nil {
+			providerAvailable = provider.IsAvailable(ctx)
+		}
+
 		mode := "static"
-		kedaManaged := false
-		if kedaAvailable && config.Enabled != nil && *config.Enabled {
+		providerManaged := false
+		if providerAvailable && config.Enabled != nil && *config.Enabled {
 			mode = "autoscaled"
-			kedaManaged = true
+			providerManaged = true
 		}
 
 		currentReplicas := int32(0)
@@ -674,15 +714,15 @@ func (r *FrappeBenchReconciler) updateWorkerScalingStatus(ctx context.Context, b
 		}
 
 		// Update status
-		bench.Status.WorkerScaling[workerType] = vyogotechv1alpha1.WorkerScalingStatus{
+		bench.Status.ComponentScaling[componentName] = &vyogotechv1alpha1.ComponentScalingStatus{
 			Mode:            mode,
 			CurrentReplicas: currentReplicas,
 			DesiredReplicas: desiredReplicas,
-			KEDAManaged:     kedaManaged,
+			ProviderManaged: providerManaged,
 		}
 	}
 
-	return nil // Status will be updated in updateBenchStatus
+	return nil
 }
 
 func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, gitEnabled bool, fpmRepos []vyogotechv1alpha1.FPMRepository) error {
@@ -702,7 +742,7 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 
 	// Determine phase and conditions
 	isReady := false
-	if bench.Status.Phase == "" || (bench.Status.Phase != "Provisioning" && bench.Status.Phase != "Ready") {
+	if bench.Status.Phase == "" || (bench.Status.Phase != "Provisioning" && bench.Status.Phase != "Ready" && bench.Status.Phase != "Initializing") {
 		bench.Status.Phase = "Provisioning"
 		r.setCondition(bench, metav1.Condition{
 			Type:    "Ready",
