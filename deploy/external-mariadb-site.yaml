@@ -5,11 +5,11 @@ metadata:
   namespace: frappe
 spec:
   benchRef:
-    name: external-redis-bench
+    name: autoscaling-hpa-bench
   siteName: external-mock.apps.crc.testing
   dbConfig:
     provider: external
-    host: frappe-mariadb.mariadb.svc.cluster.local
+    host: 64.227.178.150
     port: "3306"
     connectionSecretRef:
       name: external-mariadb-creds

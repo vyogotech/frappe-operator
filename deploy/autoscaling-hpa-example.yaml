@@ -56,7 +56,7 @@ spec:
     workerShort:
       enabled: false # Static replicas
       staticReplicas: 1
-
+    
     workerLong:
       enabled: false
       staticReplicas: 1
