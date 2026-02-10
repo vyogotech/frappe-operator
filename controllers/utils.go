@@ -164,7 +164,7 @@ func getDefaultGID() *int64 {
 }
 
 // getDefaultFSGroup returns the default FSGroup for security contexts
-// Defaults to 0 (root group for OpenShift arbitrary UID support) but can be overridden via FRAPPE_DEFAULT_FSGROUP env var
+// Defaults to 1001 (Frappe standard) but can be overridden via FRAPPE_DEFAULT_FSGROUP env var
 func getDefaultFSGroup() *int64 {
 	value := os.Getenv("FRAPPE_DEFAULT_FSGROUP")
 	if value == "" {

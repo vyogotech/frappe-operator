@@ -219,7 +219,7 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 		}
 	})
 
-	t.Run("getGunicornReplicas", func(t *testing.T) {
+	t.Run("getComponentReplicaCount", func(t *testing.T) {
 		bench := &vyogotechv1alpha1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
 			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
@@ -227,51 +227,15 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
 
-		replicas := r.getGunicornReplicas(bench)
-		if replicas <= 0 {
-			t.Error("Expected positive replica count")
-		}
-	})
+		components := []string{"gunicorn", "nginx", "socketio", "worker-default", "worker-short", "worker-long"}
 
-	t.Run("getNginxReplicas", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
-			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
-		}
-		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
-		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
-
-		replicas := r.getNginxReplicas(bench)
-		if replicas <= 0 {
-			t.Error("Expected positive replica count")
-		}
-	})
-
-	t.Run("getSocketIOReplicas", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
-			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
-		}
-		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
-		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
-
-		replicas := r.getSocketIOReplicas(bench)
-		if replicas <= 0 {
-			t.Error("Expected positive replica count")
-		}
-	})
-
-	t.Run("getWorkerDefaultReplicas", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
-			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
-		}
-		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
-		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
-
-		replicas := r.getWorkerDefaultReplicas(bench)
-		if replicas <= 0 {
-			t.Error("Expected positive replica count")
+		for _, comp := range components {
+			config := r.getComponentAutoscaling(bench, comp)
+			config = r.fillComponentDefaults(config, comp)
+			replicas := r.getComponentReplicaCount(config, false)
+			if replicas <= 0 {
+				t.Errorf("Expected positive replica count for %s", comp)
+			}
 		}
 	})
 
@@ -370,34 +334,6 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 		ctx := r.getContainerSecurityContext(context.TODO(), bench)
 		if ctx == nil {
 			t.Error("Expected non-nil security context")
-		}
-	})
-
-	t.Run("getWorkerLongReplicas", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
-			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
-		}
-		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
-		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
-
-		replicas := r.getWorkerLongReplicas(bench)
-		if replicas <= 0 {
-			t.Error("Expected positive replica count")
-		}
-	})
-
-	t.Run("getWorkerShortReplicas", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
-			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
-		}
-		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
-		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
-
-		replicas := r.getWorkerShortReplicas(bench)
-		if replicas <= 0 {
-			t.Error("Expected positive replica count")
 		}
 	})
 

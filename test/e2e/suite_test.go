@@ -41,7 +41,7 @@ func init() {
 	cwd, _ := os.Getwd()
 	// Navigate up from test/e2e
 	binPath := filepath.Join(cwd, "..", "..", "bin", "k8s")
-	
+
 	filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.Name() == "etcd" && !info.IsDir() {
 			os.Setenv("KUBEBUILDER_ASSETS", filepath.Dir(path))
@@ -81,6 +81,9 @@ func init() {
 }
 
 func TestE2E(t *testing.T) {
+	if os.Getenv("E2E_TEST") != "true" {
+		t.Skip("Skipping E2E tests. Set E2E_TEST=true to run.")
+	}
 	if skipE2ETests {
 		t.Skip("Skipping E2E tests: envtest control plane not available")
 	}

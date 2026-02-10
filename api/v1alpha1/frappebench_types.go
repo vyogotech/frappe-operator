@@ -24,9 +24,10 @@ type FrappeBenchSpec struct {
 	// +optional
 	ImageConfig *ImageConfig `json:"imageConfig,omitempty"`
 
-	// ComponentReplicas defines replica counts for each component
+	// ComponentAutoscaling defines scaling configuration for all components
+	// Map keys are component names: nginx, gunicorn, socketio, scheduler, worker-default, worker-long, worker-short
 	// +optional
-	ComponentReplicas *ComponentReplicas `json:"componentReplicas,omitempty"`
+	ComponentAutoscaling map[string]*ComponentAutoscaling `json:"componentAutoscaling,omitempty"`
 
 	// ComponentResources defines resource requirements for each component
 	// +optional
@@ -63,12 +64,6 @@ type FrappeBenchSpec struct {
 	// +optional
 	GitConfig *GitConfig `json:"gitConfig,omitempty"`
 
-	// WorkerAutoscaling defines KEDA-based or static scaling for workers
-	// Requires KEDA 2.x+ for autoscaling features
-	// If KEDA not available, gracefully falls back to static replicas
-	// +optional
-	WorkerAutoscaling *WorkerAutoscalingConfig `json:"workerAutoscaling,omitempty"`
-
 	// Security defines security context settings for all pods in this bench
 	// +optional
 	Security *SecurityConfig `json:"security,omitempty"`
@@ -82,21 +77,6 @@ type FrappeBenchSpec struct {
 	// PodConfig defines advanced pod configuration for all bench components
 	// +optional
 	PodConfig *PodConfig `json:"podConfig,omitempty"`
-}
-
-// WorkerScalingStatus reports the scaling status of a worker
-type WorkerScalingStatus struct {
-	// Mode: "autoscaled" or "static"
-	Mode string `json:"mode"`
-
-	// CurrentReplicas is the actual running replica count
-	CurrentReplicas int32 `json:"currentReplicas"`
-
-	// DesiredReplicas is the desired count
-	DesiredReplicas int32 `json:"desiredReplicas"`
-
-	// KEDAManaged indicates if KEDA ScaledObject exists
-	KEDAManaged bool `json:"kedaManaged"`
 }
 
 // FrappeBenchStatus defines the observed state of FrappeBench
@@ -125,9 +105,10 @@ type FrappeBenchStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// WorkerScaling reports scaling mode per worker type
+	// ComponentScaling reports scaling status for all components
+	// Map keys match component names from spec.componentAutoscaling
 	// +optional
-	WorkerScaling map[string]WorkerScalingStatus `json:"workerScaling,omitempty"`
+	ComponentScaling map[string]*ComponentScalingStatus `json:"componentScaling,omitempty"`
 }
 
 //+kubebuilder:object:root=true

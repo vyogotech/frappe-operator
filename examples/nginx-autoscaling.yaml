@@ -1,0 +1,72 @@
+# Example: FrappeBench with Advanced Component Autoscaling
+# Demonstrates mixing HPA (for web) and KEDA (for workers) in a single bench
+
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: advanced-autoscale-bench
+  namespace: frappe
+spec:
+  frappeVersion: "version-15"
+  
+  apps:
+    - name: erpnext
+      source: image
+
+  # Unified Component Autoscaling API
+  componentAutoscaling:
+    # Nginx: Standard HPA (CPU-based)
+    nginx:
+      enabled: true
+      provider: hpa
+      minReplicas: 2
+      maxReplicas: 10
+      hpa:
+        metric: cpu
+        targetUtilization: 70
+
+    # Gunicorn: Standard HPA (Memory-based)
+    gunicorn:
+      enabled: true
+      provider: hpa
+      minReplicas: 2
+      maxReplicas: 8
+      hpa:
+        metric: memory
+        targetUtilization: 80
+
+    # Short Workers: KEDA (Redis queue-based) with Scale-to-Zero
+    worker-short:
+      enabled: true
+      provider: keda
+      minReplicas: 0        # Save costs by scaling to zero when idle
+      maxReplicas: 20
+      pollingInterval: 15
+      cooldownPeriod: 60
+      keda:
+        trigger: redis
+        targetValue: "5"    # Scale up when queue length exceeds 5
+
+    # Long Workers: KEDA (Redis queue-based)
+    worker-long:
+      enabled: true
+      provider: keda
+      minReplicas: 1        # Maintain at least 1 for heavy background tasks
+      maxReplicas: 5
+      keda:
+        trigger: redis
+        targetValue: "2"
+
+    # Default/Scheduler Worker: Static Replicas (No autoscaling)
+    worker-default:
+      enabled: false
+      staticReplicas: 1
+
+  # Resource limits (Required for HPA CPU/Memory scaling)
+  componentResources:
+    nginx:
+      requests: {cpu: "100m", memory: "128Mi"}
+      limits: {cpu: "500m", memory: "256Mi"}
+    gunicorn:
+      requests: {cpu: "500m", memory: "1Gi"}
+      limits: {cpu: "1000m", memory: "2Gi"}

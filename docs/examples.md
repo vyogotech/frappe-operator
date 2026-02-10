@@ -13,7 +13,7 @@ Real-world deployment patterns and configuration examples for Frappe Operator.
 - [Enterprise Setup](#enterprise-setup)
 - [Custom Domains](#custom-domains)
 - [High Availability](#high-availability)
-- [Worker Autoscaling](#worker-autoscaling) **⚡ NEW**
+- [Component Autoscaling](#component-autoscaling) **⚡ NEW**
 - [Site Backup Management](#site-backup-management) **⚡ NEW**
 - [External Database Support](#external-database-support) **⚡ NEW**
 - [Resource Scaling](#resource-scaling)
@@ -77,6 +77,7 @@ spec:
 ```
 
 **Access:**
+
 ```bash
 kubectl port-forward service/dev-bench-nginx 8080:8080
 # Add to /etc/hosts: 127.0.0.1 mysite.local
@@ -101,19 +102,19 @@ metadata:
 spec:
   frappeVersion: "version-15"
   appsJSON: '["erpnext", "hrms"]'
-  
+
   imageConfig:
     repository: frappe/erpnext
     tag: v15.0.0
     pullPolicy: IfNotPresent
-  
+
   componentReplicas:
     gunicorn: 3
     socketio: 2
     workerDefault: 2
     workerLong: 2
     workerShort: 1
-  
+
   componentResources:
     gunicorn:
       requests:
@@ -157,7 +158,7 @@ spec:
       limits:
         cpu: "500m"
         memory: "1Gi"
-  
+
   redisConfig:
     type: dragonfly
     maxMemory: "4gb"
@@ -178,13 +179,13 @@ metadata:
 spec:
   benchRef:
     name: prod-bench
-  
+
   siteName: "erp.example.com"
   domain: "erp.example.com"
-  
+
   adminPasswordSecretRef:
     name: erp-admin-password
-  
+
   dbConfig:
     mode: dedicated
     storageSize: "100Gi"
@@ -195,7 +196,7 @@ spec:
       limits:
         cpu: "2"
         memory: "8Gi"
-  
+
   ingress:
     enabled: true
     className: "nginx"
@@ -238,26 +239,26 @@ metadata:
 spec:
   frappeVersion: "version-15"
   appsJSON: '["erpnext", "hrms"]'
-  
+
   # Automatic domain assignment
   domainConfig:
     suffix: ".myplatform.com"
-  
+
   componentReplicas:
     gunicorn: 5
     socketio: 3
     workerDefault: 5
     workerLong: 3
     workerShort: 2
-  
+
   componentResources:
     gunicorn:
-      requests: {cpu: "1", memory: "2Gi"}
-      limits: {cpu: "2", memory: "4Gi"}
+      requests: { cpu: "1", memory: "2Gi" }
+      limits: { cpu: "2", memory: "4Gi" }
     workerDefault:
-      requests: {cpu: "500m", memory: "1Gi"}
-      limits: {cpu: "1", memory: "2Gi"}
-  
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "1", memory: "2Gi" }
+
   redisConfig:
     type: dragonfly
     maxMemory: "8gb"
@@ -272,7 +273,7 @@ metadata:
 spec:
   benchRef:
     name: saas-bench
-  siteName: "customer1"  # Results in: customer1.myplatform.com
+  siteName: "customer1" # Results in: customer1.myplatform.com
   dbConfig:
     mode: shared
     mariadbRef:
@@ -294,7 +295,7 @@ metadata:
 spec:
   benchRef:
     name: saas-bench
-  siteName: "customer2"  # Results in: customer2.myplatform.com
+  siteName: "customer2" # Results in: customer2.myplatform.com
   dbConfig:
     mode: shared
     mariadbRef:
@@ -321,8 +322,8 @@ spec:
     mode: dedicated
     storageSize: "200Gi"
     resources:
-      requests: {cpu: "2", memory: "8Gi"}
-      limits: {cpu: "4", memory: "16Gi"}
+      requests: { cpu: "2", memory: "8Gi" }
+      limits: { cpu: "4", memory: "16Gi" }
   ingress:
     enabled: true
     className: "nginx"
@@ -349,29 +350,29 @@ metadata:
 spec:
   frappeVersion: "version-15"
   appsJSON: '["erpnext", "hrms", "custom_app"]'
-  
+
   imageConfig:
     repository: acmecorp.azurecr.io/frappe-custom
     tag: v15-acme-1.0.0
     pullPolicy: Always
     pullSecrets:
       - name: acr-credentials
-  
+
   componentReplicas:
     gunicorn: 10
     socketio: 5
     workerDefault: 10
     workerLong: 5
     workerShort: 3
-  
+
   componentResources:
     gunicorn:
-      requests: {cpu: "2", memory: "4Gi"}
-      limits: {cpu: "4", memory: "8Gi"}
+      requests: { cpu: "2", memory: "4Gi" }
+      limits: { cpu: "4", memory: "8Gi" }
     workerDefault:
-      requests: {cpu: "1", memory: "2Gi"}
-      limits: {cpu: "2", memory: "4Gi"}
-  
+      requests: { cpu: "1", memory: "2Gi" }
+      limits: { cpu: "2", memory: "4Gi" }
+
   redisConfig:
     type: dragonfly
     maxMemory: "16gb"
@@ -386,15 +387,15 @@ metadata:
 spec:
   benchRef:
     name: acme-corp-bench
-  
+
   siteName: "erp.acme.com"
   domain: "erp.acme.com"
-  
+
   dbConfig:
-    mode: external  # Using Azure Database for MySQL
+    mode: external # Using Azure Database for MySQL
     connectionSecretRef:
       name: azure-mysql-credentials
-  
+
   ingress:
     enabled: true
     className: "nginx"
@@ -505,7 +506,7 @@ metadata:
 spec:
   frappeVersion: "version-15"
   appsJSON: '["erpnext", "hrms"]'
-  
+
   # Start with moderate replicas
   componentReplicas:
     gunicorn: 5
@@ -513,18 +514,18 @@ spec:
     workerDefault: 3
     workerLong: 2
     workerShort: 2
-  
+
   componentResources:
     gunicorn:
-      requests: {cpu: "1", memory: "2Gi"}
-      limits: {cpu: "2", memory: "4Gi"}
+      requests: { cpu: "1", memory: "2Gi" }
+      limits: { cpu: "2", memory: "4Gi" }
     socketio:
-      requests: {cpu: "500m", memory: "1Gi"}
-      limits: {cpu: "1", memory: "2Gi"}
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "1", memory: "2Gi" }
     workerDefault:
-      requests: {cpu: "500m", memory: "1Gi"}
-      limits: {cpu: "1", memory: "2Gi"}
-  
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "1", memory: "2Gi" }
+
   redisConfig:
     type: dragonfly
     maxMemory: "8gb"
@@ -539,12 +540,12 @@ spec:
   benchRef:
     name: ha-bench
   siteName: "erp.example.com"
-  
+
   dbConfig:
     mode: external
     connectionSecretRef:
-      name: rds-mariadb-galera  # AWS RDS with multi-AZ
-  
+      name: rds-mariadb-galera # AWS RDS with multi-AZ
+
   ingress:
     enabled: true
     className: "nginx"
@@ -566,18 +567,18 @@ spec:
   minReplicas: 5
   maxReplicas: 20
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
 
 ---
 # HPA for workers
@@ -594,31 +595,34 @@ spec:
   minReplicas: 3
   maxReplicas: 15
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 75
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
 ```
 
 ---
 
-## Worker Autoscaling
+## Component Autoscaling
 
-### KEDA-Based Autoscaling with Scale-to-Zero
+### Provider-Agnostic Autoscaling for All Components
 
-**⚡ NEW in v1.1.0**: Automatically scale background workers based on Redis queue length, with scale-to-zero support for cost savings.
+**⚡ NEW in v3.0.0**: Unified autoscaling for web components (HPA) and workers (KEDA) with provider abstraction.
 
 #### Prerequisites
 
-KEDA is automatically installed by `install.sh`. For manual installation:
+**HPA**: Built-in to Kubernetes ✅  
+**KEDA**: Automatically installed by `install.sh`, or manual installation:
 
 ```bash
 kubectl apply -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
 ```
 
-#### Production Setup with Autoscaling
+#### Production Setup with Full Autoscaling
+
+This example shows autoscaling for **all components** - web (HPA) and workers (KEDA):
 
 ```yaml
 ---
@@ -634,46 +638,90 @@ spec:
       source: image
     - name: hrms
       source: image
-  
+
   redisConfig:
     type: redis
-  
-  # Worker autoscaling configuration
-  workerAutoscaling:
-    # Short queue - scale to zero when idle
-    short:
+
+  # Component autoscaling - unified configuration for all components
+  componentAutoscaling:
+    # NGINX - HPA based on CPU utilization
+    nginx:
       enabled: true
-      minReplicas: 0        # Scale to zero to save costs
-      maxReplicas: 10       # Scale up to 10 workers under load
-      queueLength: 2        # Trigger: 2 jobs per worker
-      pollingInterval: 10   # Check queue every 10 seconds
-      cooldownPeriod: 30    # Wait 30s before scaling down
-    
-    # Long queue - maintain minimum workers
-    long:
+      provider: hpa # Kubernetes built-in HPA
+      minReplicas: 2
+      maxReplicas: 10
+      hpa:
+        metric: cpu # cpu or memory
+        targetUtilization: 70 # Scale when CPU > 70%
+        scaleUpStabilization: 0 # Scale up immediately
+        scaleDownStabilization: 300 # Wait 5min before scaling down
+
+    # Gunicorn - HPA based on memory utilization
+    gunicorn:
       enabled: true
-      minReplicas: 1        # Always have 1 worker available
-      maxReplicas: 5        # Maximum 5 workers
-      queueLength: 5        # Trigger: 5 jobs per worker
-      pollingInterval: 30   # Check queue every 30 seconds
-      cooldownPeriod: 60    # Wait 60s before scaling down
-    
-    # Default queue - static replicas (no autoscaling)
-    default:
-      enabled: false        # Disable autoscaling
-      staticReplicas: 2     # Always maintain 2 workers
-  
-  # Resources for autoscaled workers
+      provider: hpa
+      minReplicas: 3
+      maxReplicas: 15
+      hpa:
+        metric: memory
+        targetUtilization: 80
+        scaleUpStabilization: 0
+        scaleDownStabilization: 300
+
+    # Socket.IO - static replicas (no autoscaling)
+    socketio:
+      enabled: false
+      staticReplicas: 2
+
+    # Short workers - KEDA with scale-to-zero
+    worker-short:
+      enabled: true
+      provider: keda # KEDA for queue-based scaling
+      minReplicas: 0 # Scale to zero to save costs
+      maxReplicas: 10
+      pollingInterval: 10 # Check queue every 10s
+      cooldownPeriod: 30 # Wait 30s before scaling down
+      keda:
+        trigger: redis # Monitor Redis queue
+        targetValue: "2" # 2 jobs per worker
+
+    # Long workers - KEDA with minimum replicas
+    worker-long:
+      enabled: true
+      provider: keda
+      minReplicas: 1 # Always have 1 worker
+      maxReplicas: 5
+      pollingInterval: 30
+      cooldownPeriod: 60
+      keda:
+        trigger: redis
+        targetValue: "5" # 5 jobs per worker
+
+    # Default workers - static replicas
+    worker-default:
+      enabled: false
+      staticReplicas: 2
+
+  # Resources for components
   componentResources:
+    nginx:
+      requests: { cpu: "200m", memory: "256Mi" }
+      limits: { cpu: "500m", memory: "512Mi" }
+    gunicorn:
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "2", memory: "2Gi" }
+    socketio:
+      requests: { cpu: "200m", memory: "512Mi" }
+      limits: { cpu: "1", memory: "1Gi" }
     workerShort:
-      requests: {cpu: "500m", memory: "1Gi"}
-      limits: {cpu: "1", memory: "2Gi"}
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "1", memory: "2Gi" }
     workerLong:
-      requests: {cpu: "1", memory: "2Gi"}
-      limits: {cpu: "2", memory: "4Gi"}
+      requests: { cpu: "1", memory: "2Gi" }
+      limits: { cpu: "2", memory: "4Gi" }
     workerDefault:
-      requests: {cpu: "500m", memory: "1Gi"}
-      limits: {cpu: "1", memory: "2Gi"}
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "1", memory: "2Gi" }
 
 ---
 apiVersion: vyogo.tech/v1alpha1
@@ -691,7 +739,9 @@ spec:
   domain: "app.example.com"
 ```
 
-#### Development Setup with Aggressive Scale-to-Zero
+#### Cost-Optimized Development Setup
+
+Aggressive scale-to-zero for development environments to minimize costs:
 
 ```yaml
 apiVersion: vyogo.tech/v1alpha1
@@ -704,30 +754,39 @@ spec:
   apps:
     - name: erpnext
       source: image
-  
+
   # All workers scale to zero when idle
-  workerAutoscaling:
-    short:
+  componentAutoscaling:
+    worker-short:
       enabled: true
+      provider: keda
       minReplicas: 0
       maxReplicas: 3
-      queueLength: 1        # Scale up quickly
-      pollingInterval: 5    # Check frequently
-      cooldownPeriod: 10    # Scale down fast
-    long:
+      pollingInterval: 5 # Check frequently
+      cooldownPeriod: 10 # Scale down fast
+      keda:
+        trigger: redis
+        targetValue: "1" # Scale up quickly
+    worker-long:
       enabled: true
-      minReplicas: 0        # Also scale to zero
+      provider: keda
+      minReplicas: 0 # Also scale to zero
       maxReplicas: 2
-      queueLength: 1
       pollingInterval: 10
       cooldownPeriod: 20
-    default:
+      keda:
+        trigger: redis
+        targetValue: "1"
+    worker-default:
       enabled: true
+      provider: keda
       minReplicas: 0
       maxReplicas: 2
-      queueLength: 1
       pollingInterval: 5
       cooldownPeriod: 10
+      keda:
+        trigger: redis
+        targetValue: "1"
 ```
 
 #### Monitoring Autoscaling
@@ -736,17 +795,17 @@ spec:
 # Check ScaledObjects created by KEDA
 kubectl get scaledobjects -n production
 
-# Check worker scaling status
-kubectl get frappebench autoscaling-bench -o jsonpath='{.status.workerScaling}' | jq
+# Check component scaling status
+kubectl get frappebench autoscaling-bench -o jsonpath='{.status.componentScaling}' | jq
 
-# View current HPA status (created by KEDA)
+# View current HPA status
 kubectl get hpa -n production
 
 # Check queue lengths
-kubectl exec -n production deployment/autoscaling-bench-redis-queue -- \
+kubectl exec -n production deployment/autoscaling-bench-redis -- \
   redis-cli LLEN "rq:queue:short"
 
-kubectl exec -n production deployment/autoscaling-bench-redis-queue -- \
+kubectl exec -n production deployment/autoscaling-bench-redis -- \
   redis-cli LLEN "rq:queue:long"
 
 # Watch worker pods scaling
@@ -763,16 +822,21 @@ kubectl get pods -n production -l component=worker-short -w
 
 #### Configuration Parameters
 
-| Parameter | Description | Default | Recommended |
-|-----------|-------------|---------|-------------|
-| `enabled` | Enable KEDA autoscaling | `false` | `true` for production |
-| `minReplicas` | Minimum workers (0 for scale-to-zero) | `1` | `0` for dev, `1+` for prod |
-| `maxReplicas` | Maximum workers | `10` | Based on load |
-| `queueLength` | Jobs per worker threshold | `5` | `2-5` for short, `5-10` for long |
-| `pollingInterval` | Queue check frequency (seconds) | `30` | `10-30` |
-| `cooldownPeriod` | Wait before scale down (seconds) | `300` | `30-60` for short, `60-300` for long |
+| Parameter               | Description                            | Default | Recommended                          |
+| ----------------------- | -------------------------------------- | ------- | ------------------------------------ |
+| `enabled`               | Enable autoscaling                     | `false` | `true` for production                |
+| `provider`              | Scaling provider (keda or hpa)         | `hpa`   | `keda` for workers, `hpa` for web    |
+| `minReplicas`           | Minimum replicas (0 for scale-to-zero) | `1`     | `0` for dev, `1+` for prod           |
+| `maxReplicas`           | Maximum replicas                       | `10`    | Based on load                        |
+| `staticReplicas`        | Fixed replicas when disabled           | `1`     | Based on component                   |
+| `pollingInterval`       | Metric check frequency (seconds)       | `30`    | `10-30`                              |
+| `cooldownPeriod`        | Wait before scale down (seconds)       | `60`    | `30-60` for workers                  |
+| `keda.trigger`          | KEDA trigger type (cpu/memory/redis)   | `cpu`   | `redis` for workers                  |
+| `keda.targetValue`      | Jobs per worker threshold              | `"5"`   | `"2-5"` for short, `"5-10"` for long |
+| `hpa.metric`            | HPA metric type (cpu/memory)           | `cpu`   | `cpu` for web                        |
+| `hpa.targetUtilization` | Target percentage (1-100)              | `70`    | `70-80`                              |
 
- > **Note**: For traditional CPU/memory-based HPA, see the [High Availability](#high-availability) section above.
+> **Note**: The new `componentAutoscaling` API replaces the deprecated `workerAutoscaling` API from v1.x.
 
 ---
 
@@ -815,10 +879,10 @@ kind: SiteBackup
 metadata:
   name: demo-site-backup
 spec:
-  site: "demo.example.com"  # Must match FrappeSite
-  withFiles: true           # Include private/public files
-  compress: true            # Compress backup files
-  verbose: true             # Enable verbose output
+  site: "demo.example.com" # Must match FrappeSite
+  withFiles: true # Include private/public files
+  compress: true # Compress backup files
+  verbose: true # Enable verbose output
 ```
 
 ### Scheduled Daily Backup
@@ -833,7 +897,7 @@ metadata:
   name: demo-site-daily-backup
 spec:
   site: "demo.example.com"
-  schedule: "0 2 * * *"    # Daily at 2 AM
+  schedule: "0 2 * * *" # Daily at 2 AM
   withFiles: true
   compress: true
 ```
@@ -886,11 +950,11 @@ spec:
   compress: true
 
   # Custom backup paths
-  backupPath: "/backups/daily"           # Main backup directory
-  backupPathDB: "/backups/db"             # Database files
-  backupPathConf: "/backups/config"       # Configuration files
-  backupPathFiles: "/backups/public"      # Public files
-  backupPathPrivateFiles: "/backups/private"  # Private files
+  backupPath: "/backups/daily" # Main backup directory
+  backupPathDB: "/backups/db" # Database files
+  backupPathConf: "/backups/config" # Configuration files
+  backupPathFiles: "/backups/public" # Public files
+  backupPathPrivateFiles: "/backups/private" # Private files
 ```
 
 ### Monitoring Backup Status
@@ -914,29 +978,29 @@ kubectl get cronjob demo-site-daily-backup-backup
 
 ### Backup Configuration Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `site` | Target site name | Required |
-| `schedule` | Cron expression for recurring backups | One-time |
-| `withFiles` | Include private/public files | `false` |
-| `compress` | Compress backup files | `false` |
-| `backupPath` | Main backup directory | Default |
-| `backupPathDB` | Database files path | Default |
-| `backupPathConf` | Config files path | Default |
-| `backupPathFiles` | Public files path | Default |
-| `backupPathPrivateFiles` | Private files path | Default |
-| `include` | DocTypes to include | All |
-| `exclude` | DocTypes to exclude | None |
-| `ignoreBackupConf` | Ignore backup config | `false` |
-| `verbose` | Verbose output | `false` |
+| Option                   | Description                           | Default  |
+| ------------------------ | ------------------------------------- | -------- |
+| `site`                   | Target site name                      | Required |
+| `schedule`               | Cron expression for recurring backups | One-time |
+| `withFiles`              | Include private/public files          | `false`  |
+| `compress`               | Compress backup files                 | `false`  |
+| `backupPath`             | Main backup directory                 | Default  |
+| `backupPathDB`           | Database files path                   | Default  |
+| `backupPathConf`         | Config files path                     | Default  |
+| `backupPathFiles`        | Public files path                     | Default  |
+| `backupPathPrivateFiles` | Private files path                    | Default  |
+| `include`                | DocTypes to include                   | All      |
+| `exclude`                | DocTypes to exclude                   | None     |
+| `ignoreBackupConf`       | Ignore backup config                  | `false`  |
+| `verbose`                | Verbose output                        | `false`  |
 
 ### Backup Status Fields
 
 ```yaml
 status:
-  phase: "Succeeded"           # Pending, Running, Succeeded, Failed
-  lastBackup: "2024-01-15T02:00:00Z"  # Last successful backup
-  lastBackupJob: "demo-site-backup-backup-abc123"  # Job/CronJob name
+  phase: "Succeeded" # Pending, Running, Succeeded, Failed
+  lastBackup: "2024-01-15T02:00:00Z" # Last successful backup
+  lastBackupJob: "demo-site-backup-backup-abc123" # Job/CronJob name
   message: "Backup completed successfully"
 ```
 
@@ -1082,27 +1146,27 @@ metadata:
 spec:
   frappeVersion: "version-15"
   appsJSON: '["erpnext"]'
-  
+
   componentReplicas:
     gunicorn: 1
     socketio: 1
     workerDefault: 1
     workerLong: 1
     workerShort: 1
-  
+
   componentResources:
     gunicorn:
-      requests: {cpu: "200m", memory: "256Mi"}
-      limits: {cpu: "500m", memory: "512Mi"}
+      requests: { cpu: "200m", memory: "256Mi" }
+      limits: { cpu: "500m", memory: "512Mi" }
     socketio:
-      requests: {cpu: "100m", memory: "128Mi"}
-      limits: {cpu: "200m", memory: "256Mi"}
+      requests: { cpu: "100m", memory: "128Mi" }
+      limits: { cpu: "200m", memory: "256Mi" }
     scheduler:
-      requests: {cpu: "100m", memory: "128Mi"}
-      limits: {cpu: "200m", memory: "256Mi"}
+      requests: { cpu: "100m", memory: "128Mi" }
+      limits: { cpu: "200m", memory: "256Mi" }
     workerDefault:
-      requests: {cpu: "200m", memory: "256Mi"}
-      limits: {cpu: "400m", memory: "512Mi"}
+      requests: { cpu: "200m", memory: "256Mi" }
+      limits: { cpu: "400m", memory: "512Mi" }
 ```
 
 #### Medium Tier (Small Production)
@@ -1115,27 +1179,27 @@ metadata:
 spec:
   frappeVersion: "version-15"
   appsJSON: '["erpnext", "hrms"]'
-  
+
   componentReplicas:
     gunicorn: 3
     socketio: 2
     workerDefault: 2
     workerLong: 1
     workerShort: 1
-  
+
   componentResources:
     gunicorn:
-      requests: {cpu: "500m", memory: "512Mi"}
-      limits: {cpu: "1", memory: "1Gi"}
+      requests: { cpu: "500m", memory: "512Mi" }
+      limits: { cpu: "1", memory: "1Gi" }
     socketio:
-      requests: {cpu: "250m", memory: "256Mi"}
-      limits: {cpu: "500m", memory: "512Mi"}
+      requests: { cpu: "250m", memory: "256Mi" }
+      limits: { cpu: "500m", memory: "512Mi" }
     scheduler:
-      requests: {cpu: "250m", memory: "256Mi"}
-      limits: {cpu: "500m", memory: "512Mi"}
+      requests: { cpu: "250m", memory: "256Mi" }
+      limits: { cpu: "500m", memory: "512Mi" }
     workerDefault:
-      requests: {cpu: "500m", memory: "512Mi"}
-      limits: {cpu: "1", memory: "1Gi"}
+      requests: { cpu: "500m", memory: "512Mi" }
+      limits: { cpu: "1", memory: "1Gi" }
 ```
 
 #### Large Tier (Production)
@@ -1148,27 +1212,27 @@ metadata:
 spec:
   frappeVersion: "version-15"
   appsJSON: '["erpnext", "hrms"]'
-  
+
   componentReplicas:
     gunicorn: 5
     socketio: 3
     workerDefault: 5
     workerLong: 3
     workerShort: 2
-  
+
   componentResources:
     gunicorn:
-      requests: {cpu: "1", memory: "2Gi"}
-      limits: {cpu: "2", memory: "4Gi"}
+      requests: { cpu: "1", memory: "2Gi" }
+      limits: { cpu: "2", memory: "4Gi" }
     socketio:
-      requests: {cpu: "500m", memory: "1Gi"}
-      limits: {cpu: "1", memory: "2Gi"}
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "1", memory: "2Gi" }
     scheduler:
-      requests: {cpu: "500m", memory: "1Gi"}
-      limits: {cpu: "1", memory: "2Gi"}
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "1", memory: "2Gi" }
     workerDefault:
-      requests: {cpu: "1", memory: "2Gi"}
-      limits: {cpu: "2", memory: "4Gi"}
+      requests: { cpu: "1", memory: "2Gi" }
+      limits: { cpu: "2", memory: "4Gi" }
 ```
 
 ---
@@ -1177,24 +1241,24 @@ spec:
 
 All examples are available in the repository under `examples/`:
 
-| File | Description |
-|------|-------------|
-| `minimal-bench-and-site.yaml` | Minimal setup for quick testing |
-| `autoscaling-bench.yaml` | **⚡ NEW**: KEDA-based worker autoscaling with scale-to-zero |
-| `production-bench.yaml` | Production-ready bench configuration |
-| `production-site.yaml` | Production site with TLS |
-| `multi-tenant-bench.yaml` | Bench for multiple customer sites |
-| `multi-tenant-sites.yaml` | Multiple sites on shared bench |
-| `enterprise-setup.yaml` | Complete enterprise configuration |
-| `high-availability-bench.yaml` | HA setup with multiple replicas |
-| `dedicated-db-site.yaml` | Site with dedicated database |
-| `custom-domain-site.yaml` | Custom domain configuration |
-| `custom-image-bench.yaml` | Using custom container images |
-| `resource-tiers.yaml` | Small/Medium/Large resource tiers |
-| `basic-sitebackup.yaml` | **⚡ NEW**: One-time site backup |
-| `scheduled-sitebackup.yaml` | **⚡ NEW**: Scheduled daily backup |
-| `sitebackup-with-options.yaml` | **⚡ NEW**: Backup with files and compression |
-| `sitebackup-selective.yaml` | **⚡ NEW**: Selective DocType backup |
+| File                           | Description                                                  |
+| ------------------------------ | ------------------------------------------------------------ |
+| `minimal-bench-and-site.yaml`  | Minimal setup for quick testing                              |
+| `autoscaling-bench.yaml`       | **⚡ NEW**: KEDA-based worker autoscaling with scale-to-zero |
+| `production-bench.yaml`        | Production-ready bench configuration                         |
+| `production-site.yaml`         | Production site with TLS                                     |
+| `multi-tenant-bench.yaml`      | Bench for multiple customer sites                            |
+| `multi-tenant-sites.yaml`      | Multiple sites on shared bench                               |
+| `enterprise-setup.yaml`        | Complete enterprise configuration                            |
+| `high-availability-bench.yaml` | HA setup with multiple replicas                              |
+| `dedicated-db-site.yaml`       | Site with dedicated database                                 |
+| `custom-domain-site.yaml`      | Custom domain configuration                                  |
+| `custom-image-bench.yaml`      | Using custom container images                                |
+| `resource-tiers.yaml`          | Small/Medium/Large resource tiers                            |
+| `basic-sitebackup.yaml`        | **⚡ NEW**: One-time site backup                             |
+| `scheduled-sitebackup.yaml`    | **⚡ NEW**: Scheduled daily backup                           |
+| `sitebackup-with-options.yaml` | **⚡ NEW**: Backup with files and compression                |
+| `sitebackup-selective.yaml`    | **⚡ NEW**: Selective DocType backup                         |
 
 ### Applying Examples
 
@@ -1258,4 +1322,3 @@ kubectl delete frappebench <name>
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
 - **[API Reference](api-reference.md)** - Complete field specifications
 - **[Browse All Examples](https://github.com/vyogotech/frappe-operator/tree/main/examples)** - View all example files
-
