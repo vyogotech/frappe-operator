@@ -1,0 +1,33 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: advanced-bench
+spec:
+  frappeVersion: "15"
+  componentResources:
+    nginx:
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+  podConfig:
+    labels:
+      e2e-test: "advanced"
+  security:
+    podSecurityContext:
+      runAsUser: 1000
+  storageSize: 2Gi
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: advanced-site
+spec:
+  benchRef:
+    name: advanced-bench
+  siteName: advanced.test.local
+  podConfig:
+    annotations:
+      e2e-test-phase: "init"

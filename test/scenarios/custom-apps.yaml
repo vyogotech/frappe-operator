@@ -1,0 +1,22 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: apps-bench
+spec:
+  frappeVersion: "15"
+  apps:
+    - name: erpnext
+      # Source is image because we use the production image which has it pre-built
+      source: image
+  storageSize: 2Gi
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: apps-site
+spec:
+  benchRef:
+    name: apps-bench
+  siteName: apps.test.local
+  apps:
+    - erpnext
