@@ -83,9 +83,13 @@ log "Building Helm dependencies..."
 helm dependency update ./helm/frappe-operator
 
 log "Installing Frappe Operator..."
+# We disable the mariadb-operator and keda sub-charts because we installed them independently
+# in steps 2 and 3 to ensure CRDs and standalone releases are properly managed.
 helm upgrade --install frappe-operator ./helm/frappe-operator \
   --namespace $OPERATOR_NAMESPACE \
   --set mariadb.enabled=true \
+  --set mariadb-operator.enabled=false \
+  --set keda.enabled=false \
   --wait --timeout 5m
 
 # 6. Apply Scenario Manifest
