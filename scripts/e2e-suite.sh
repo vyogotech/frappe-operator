@@ -46,6 +46,9 @@ helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
   --create-namespace \
   --set crds.enabled=true
 
+log "Waiting for MariaDB Operator to be ready..."
+kubectl rollout status deployment/mariadb-operator -n $OPERATOR_NAMESPACE --timeout=2m
+
 # 3. Install KEDA (for scaling scenarios)
 if [ "$SCENARIO" == "scaling" ]; then
     log "Installing KEDA..."
@@ -54,6 +57,9 @@ if [ "$SCENARIO" == "scaling" ]; then
     helm upgrade --install keda keda/keda \
       --namespace $OPERATOR_NAMESPACE \
       --set crds.install=true
+    
+    log "Waiting for KEDA to be ready..."
+    kubectl rollout status deployment/keda-operator -n $OPERATOR_NAMESPACE --timeout=2m
 fi
 
 # 4. Setup External Mocks (for external scenario)
