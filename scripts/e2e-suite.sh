@@ -44,8 +44,7 @@ helm repo update
 helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
   --namespace $OPERATOR_NAMESPACE \
   --create-namespace \
-  --set crds.enabled=true \
-  --wait --timeout 5m
+  --set crds.enabled=true
 
 # 3. Install KEDA (for scaling scenarios)
 if [ "$SCENARIO" == "scaling" ]; then
@@ -54,8 +53,7 @@ if [ "$SCENARIO" == "scaling" ]; then
     helm repo update
     helm upgrade --install keda keda/keda \
       --namespace $OPERATOR_NAMESPACE \
-      --set crds.install=true \
-      --wait --timeout 5m
+      --set crds.install=true
 fi
 
 # 4. Setup External Mocks (for external scenario)
@@ -89,8 +87,7 @@ helm upgrade --install frappe-operator ./helm/frappe-operator \
   --namespace $OPERATOR_NAMESPACE \
   --set mariadb.enabled=true \
   --set mariadb-operator.enabled=false \
-  --set keda.enabled=false \
-  --wait --timeout 5m
+  --set keda.enabled=false 
 
 # 6. Apply Scenario Manifest
 log "Applying scenario: $SCENARIO..."
