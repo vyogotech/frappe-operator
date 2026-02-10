@@ -108,8 +108,8 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run unit tests (excludes test/ subdirectory).
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./api/... ./pkg/... ./controllers/... -coverprofile cover.out
+test: manifests generate fmt vet envtest ## Run unit tests (includes root package and all modules, excludes test/ subdirectory).
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: manifests generate fmt vet envtest ## Run integration tests (requires a real cluster).
@@ -138,7 +138,7 @@ e2e-test: manifests generate docker-build ## Run end-to-end tests.
 	make deploy IMG=$(IMG)
 	kubectl wait --for=condition=available --timeout=300s deployment/frappe-operator-controller-manager -n frappe-operator-system
 	# Run e2e tests
-	go test ./test/e2e/... -v -ginkgo.v
+	E2E_TEST=true go test ./test/e2e/... -v -ginkgo.v
 
 ##@ Build
 

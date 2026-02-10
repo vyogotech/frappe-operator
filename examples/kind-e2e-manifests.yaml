@@ -47,16 +47,16 @@ spec:
       source: image
   redisConfig:
     type: redis
-  workerAutoscaling:
-    short:
-      enabled: false
-      staticReplicas: 0
-    long:
-      enabled: false
-      staticReplicas: 0
-    default:
+  componentAutoscaling:
+    worker-default:
       enabled: false
       staticReplicas: 1
+    worker-short:
+      enabled: false
+      staticReplicas: 0
+    worker-long:
+      enabled: false
+      staticReplicas: 0
   # E2E: custom labels so "Verify Advanced Pod Configuration" can check propagation (operator applies podConfig at create time)
   podConfig:
     labels:

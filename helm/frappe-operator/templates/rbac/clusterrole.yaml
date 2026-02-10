@@ -210,5 +210,18 @@ rules:
   - get
   - patch
   - update
+# Autoscaling (HPA)
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 {{- end }}
 
