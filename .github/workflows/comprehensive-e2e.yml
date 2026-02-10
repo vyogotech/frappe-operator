@@ -1,0 +1,90 @@
+name: Comprehensive E2E Tests
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'helm/**'
+      - 'controllers/**'
+      - 'api/**'
+      - 'scripts/**'
+      - 'test/**'
+      - '.github/workflows/comprehensive-e2e.yml'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-operator:
+    name: Build Operator Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build operator binary
+        run: make build
+      - name: Build container image
+        run: docker build -t ghcr.io/rmallam/frappe-operator:local-e2e -f Dockerfile .
+      - name: Save image
+        run: docker save ghcr.io/rmallam/frappe-operator:local-e2e | gzip > operator-image.tar.gz
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-image
+          path: operator-image.tar.gz
+          retention-days: 1
+
+  e2e-test-matrix:
+    name: E2E (${{ matrix.platform }} / ${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    needs: build-operator
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [kind, openshift]
+        scenario: [basic, external, scaling, custom-apps, advanced-config]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: e2e-${{ matrix.platform }}-${{ matrix.scenario }}
+
+      - name: Download operator image
+        uses: actions/download-artifact@v4
+        with:
+          name: operator-image
+
+      - name: Load image into Kind
+        run: |
+          docker load < operator-image.tar.gz
+          kind load docker-image ghcr.io/rmallam/frappe-operator:local-e2e --name e2e-${{ matrix.platform }}-${{ matrix.scenario }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: Run E2E Suite
+        run: |
+          chmod +x scripts/e2e-suite.sh
+          ./scripts/e2e-suite.sh --platform ${{ matrix.platform }} --scenario ${{ matrix.scenario }}
+        env:
+          OPERATOR_IMAGE: ghcr.io/rmallam/frappe-operator:local-e2e
+
+      - name: Capture logs on failure
+        if: failure()
+        run: |
+          echo "=== Operator Logs ==="
+          kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=200 || true
+          echo "=== Resource Status ==="
+          kubectl get frappebench,frappesite -A || true
+          echo "=== Pod Status ==="
+          kubectl get pods -A || true
+          echo "=== Events ==="
+          kubectl get events -A --sort-by='.lastTimestamp' | tail -n 50 || true
