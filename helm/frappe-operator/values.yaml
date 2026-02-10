@@ -88,7 +88,7 @@ rbac:
 mariadb-operator:
   enabled: true
   crds:
-    enabled: false
+    enabled: true
   # MariaDB Operator will be installed as a subchart
   # See: https://github.com/mariadb-operator/mariadb-operator
   
@@ -100,7 +100,7 @@ mariadb-operator:
 keda:
   enabled: true
   crds:
-    install: false
+    install: true
   # KEDA will be installed as a subchart for worker autoscaling
   # See: https://keda.sh/
 
