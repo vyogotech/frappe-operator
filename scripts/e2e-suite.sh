@@ -91,7 +91,7 @@ log "Installing Frappe Operator..."
 # in steps 2 and 3 to ensure CRDs and standalone releases are properly managed.
 helm upgrade --install frappe-operator ./helm/frappe-operator \
   --namespace $OPERATOR_NAMESPACE \
-  --set mariadb.enabled=true \
+  --set mariadb.enabled=false \
   --set mariadb-operator.enabled=false \
   --set keda.enabled=false 
 
