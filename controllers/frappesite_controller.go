@@ -96,9 +96,11 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Early-exit guard
 	// Commented out to allow annotation-based triggers (which don't increment Generation)
 	// if site.Status.Phase == vyogotechv1alpha1.FrappeSitePhaseReady && site.Status.ObservedGeneration == site.Generation {
-	// 	logger.V(1).Info("Site is Ready and spec unchanged, skipping reconciliation")
-	// 	return ctrl.Result{}, nil
-	// }
+	// 	logger.V(1).Info("Site is Ready	// Handle simple generation skip or annotation trigger check
+	if site.Generation == site.Status.ObservedGeneration &&
+		site.Annotations["frappe.io/site-version"] == site.Status.ObservedSiteVersion {
+		return ctrl.Result{}, nil
+	}
 
 	// Handle deletion
 	if site.GetDeletionTimestamp() != nil {
@@ -275,6 +277,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Finalize status
 	site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseReady
 	site.Status.ObservedGeneration = site.Generation
+	site.Status.ObservedSiteVersion = site.Annotations["frappe.io/site-version"]
 	site.Status.SiteURL = fmt.Sprintf("http://%s", domain)
 	if site.Spec.TLS.Enabled {
 		site.Status.SiteURL = fmt.Sprintf("https://%s", domain)
