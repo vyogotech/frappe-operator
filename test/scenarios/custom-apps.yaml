@@ -4,6 +4,10 @@ metadata:
   name: apps-bench
 spec:
   frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+    pullPolicy: Always
   apps:
     - name: erpnext
       # Source is image because we use the production image which has it pre-built

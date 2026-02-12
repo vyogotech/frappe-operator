@@ -4,6 +4,10 @@ metadata:
   name: advanced-bench
 spec:
   frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+    pullPolicy: Always
   componentResources:
     nginx:
       limits:

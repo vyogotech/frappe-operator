@@ -4,6 +4,10 @@ metadata:
   name: scaling-bench
 spec:
   frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+    pullPolicy: Always
   componentAutoscaling:
     gunicorn:
       enabled: true
