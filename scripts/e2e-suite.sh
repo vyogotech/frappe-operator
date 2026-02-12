@@ -37,72 +37,62 @@ if [ "$PLATFORM" == "openshift" ]; then
     sleep 5
 fi
 
-# 2. Install MariaDB Operator (Dependency)
-log "Installing MariaDB Operator..."
-helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
-helm repo update
-helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
-  --namespace $OPERATOR_NAMESPACE \
-  --create-namespace \
-  --set crds.enabled=true
+# 2. (Removed independent MariaDB/KEDA installation - now handled by Frappe Operator chart)
 
-log "Waiting for MariaDB Operator to be ready..."
-kubectl rollout status deployment/mariadb-operator -n $OPERATOR_NAMESPACE --timeout=2m
-
-# 3. Install KEDA (for scaling scenarios)
-if [ "$SCENARIO" == "scaling" ]; then
-    log "Installing KEDA..."
-    helm repo add keda https://kedacore.github.io/charts
-    helm repo update
-    helm upgrade --install keda keda/keda \
-      --namespace $OPERATOR_NAMESPACE \
-      --set crds.install=true
-    
-    log "Waiting for KEDA to be ready..."
-    kubectl rollout status deployment/keda-operator -n $OPERATOR_NAMESPACE --timeout=2m
-fi
+# 3. Setup Scenario Namespace
+log "Creating scenario namespace: $NAMESPACE"
+kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace mariadb --dry-run=client -o yaml | kubectl apply -f -
 
 # 4. Setup External Mocks (for external scenario)
 if [ "$SCENARIO" == "external" ]; then
     log "Deploying mock external MariaDB and Redis..."
     
     # Deploy a simple Redis
-    kubectl create deployment redis-external --image=redis:alpine
-    kubectl expose deployment redis-external --port=6379
-    kubectl create secret generic external-redis-creds --from-literal=redis-password="" --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create deployment redis-external --image=redis:alpine -n $NAMESPACE
+    kubectl expose deployment redis-external --port=6379 -n $NAMESPACE
+    kubectl create secret generic external-redis-creds --from-literal=redis-password="" --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
 
     # Deploy a simple MariaDB
-    kubectl create deployment mariadb-external --image=mariadb:10.6 --port=3306
-    kubectl set env deployment/mariadb-external MARIADB_ROOT_PASSWORD=frappe
-    kubectl expose deployment mariadb-external --port=3306
-    kubectl create secret generic external-mariadb-creds --from-literal=root-password=frappe --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create deployment mariadb-external --image=mariadb:10.6 --port=3306 -n $NAMESPACE
+    kubectl set env deployment/mariadb-external MARIADB_ROOT_PASSWORD=frappe -n $NAMESPACE
+    kubectl expose deployment mariadb-external --port=3306 -n $NAMESPACE
+    kubectl create secret generic external-mariadb-creds --from-literal=root-password=frappe --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
     
     log "Waiting for external mocks to be ready..."
-    kubectl rollout status deployment/redis-external --timeout=2m
-    kubectl rollout status deployment/mariadb-external --timeout=2m
+    kubectl rollout status deployment/redis-external -n $NAMESPACE --timeout=2m
+    kubectl rollout status deployment/mariadb-external -n $NAMESPACE --timeout=2m
 fi
 
-# 5. Install Frappe Operator
+# 5. Install Frappe Operator (Unified with MariaDB & KEDA)
 log "Building Helm dependencies..."
 helm dependency update ./helm/frappe-operator
 
-log "Installing Frappe Operator..."
-# We disable the mariadb-operator and keda sub-charts because we installed them independently
-# in steps 2 and 3 to ensure CRDs and standalone releases are properly managed.
+log "Installing Frappe Operator (with MariaDB and KEDA dependencies)..."
 helm upgrade --install frappe-operator ./helm/frappe-operator \
   --namespace $OPERATOR_NAMESPACE \
-  --set mariadb.enabled=false \
-  --set mariadb-operator.enabled=false \
-  --set keda.enabled=false 
+  --create-namespace \
+  --set mariadb-operator.enabled=true \
+  --set keda.enabled=true
 
-# 6. Apply Scenario Manifest
+log "Waiting for MariaDB Operator to be ready..."
+kubectl rollout status deployment/frappe-operator-mariadb-operator -n $OPERATOR_NAMESPACE --timeout=2m
+log "Waiting for KEDA to be ready..."
+kubectl rollout status deployment/frappe-operator-keda-operator -n $OPERATOR_NAMESPACE --timeout=2m
+
+# 6. Apply scenario-independent MariaDB Instance
+log "Applying MariaDB instance from deploy/mariadb.yaml..."
+kubectl apply -f deploy/mariadb.yaml
+
+# 7. Apply Scenario Manifest
 log "Applying scenario: $SCENARIO..."
 MANIFEST="test/scenarios/${SCENARIO}.yaml"
 if [ ! -f "$MANIFEST" ]; then error "Scenario manifest $MANIFEST not found"; fi
 
-kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
-# Substitute placeholder image if present (standard CI practice)
-sed -e "s|ghcr.io/rmallam/frappe_docker|${OPERATOR_IMAGE:-ghcr.io/rmallam/frappe_docker}|g" "$MANIFEST" | kubectl apply -n $NAMESPACE -f -
+# Substitute placeholder image if present (updated to vyogotech)
+sed -e "s|ghcr.io/rmallam/frappe_docker|${OPERATOR_IMAGE:-ghcr.io/vyogotech/frappe_base}|g" \
+    -e "s|ghcr.io/rmallam/frappe-operator|ghcr.io/vyogotech/frappe-operator|g" \
+    "$MANIFEST" | kubectl apply -n $NAMESPACE -f -
 
 # 7. Verification Loop
 log "Waiting for resources to reach Ready phase..."

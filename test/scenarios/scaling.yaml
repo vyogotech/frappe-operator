@@ -24,3 +24,8 @@ spec:
   benchRef:
     name: scaling-bench
   siteName: scaling.test.local
+  dbConfig:
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: mariadb

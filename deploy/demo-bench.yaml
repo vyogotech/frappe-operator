@@ -10,7 +10,7 @@ spec:
     podSecurityContext: {}
 
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
+    repository: ghcr.io/vyogotech/frappe_base
     tag: sha-c39d75f
     pullPolicy: Always
   

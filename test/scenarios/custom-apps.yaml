@@ -18,5 +18,10 @@ spec:
   benchRef:
     name: apps-bench
   siteName: apps.test.local
+  dbConfig:
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: mariadb
   apps:
     - erpnext
