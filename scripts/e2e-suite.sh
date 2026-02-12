@@ -70,7 +70,7 @@ helm dependency update ./helm/frappe-operator
 
 log "Installing Frappe Operator (with MariaDB and KEDA dependencies)..."
 # If OPERATOR_IMAGE is provided (e.g. from CI), split it into repo and tag for Helm
-HELM_OPTS=("--set" "mariadb-operator.enabled=true" "--set" "keda.enabled=true" "--set" "operator.image.pullPolicy=Always")
+HELM_OPTS=("--set" "mariadb-operator.enabled=true" "--set" "keda.enabled=true" "--set" "operator.image.pullPolicy=IfNotPresent")
 if [ -n "$OPERATOR_IMAGE" ]; then
     IFS=':' read -ra ADDR <<< "$OPERATOR_IMAGE"
     HELM_OPTS+=("--set" "operator.image.repository=${ADDR[0]}")
