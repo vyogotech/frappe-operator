@@ -1371,6 +1371,10 @@ spec:
                   recently observed FrappeSite spec
                 format: int64
                 type: integer
+              observedSiteVersion:
+                description: ObservedSiteVersion reflects the frappe.io/site-version
+                  annotation value most recently processed
+                type: string
               phase:
                 description: Phase is the current phase
                 type: string
