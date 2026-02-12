@@ -1,10 +1,10 @@
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
 metadata:
-  name: vyogotech
+  name: brainwise
   namespace: frappe
 spec:
-  siteName: vyogo.apps-crc.testing
+  siteName: brainwise.apps-crc.testing
   benchRef:
     name: bench-test
     namespace: frappe

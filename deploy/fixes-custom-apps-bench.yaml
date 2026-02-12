@@ -6,8 +6,8 @@ metadata:
 spec:
   frappeVersion: "15.0.0"
   imageConfig:
-    repository: ghcr.io/vyogotech/frappe_base
-    tag: latest
+    repository: ghcr.io/vyogotech/frappe_custom_apps
+    tag: sha-7132d7d
     pullPolicy: Always
   storageSize: 2Gi
 
@@ -35,4 +35,3 @@ spec:
     socketio:
       enabled: false
       staticReplicas: 0
-

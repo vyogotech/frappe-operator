@@ -1,12 +1,12 @@
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeSite
 metadata:
-  name: external-mock-site
+  name: vyogodemo
   namespace: frappe
 spec:
-  siteName: brainwise.vyogo.tech
+  siteName: vyogo1.apps.crc.testing
   benchRef:
-    name: autoscaling-hpa-bench
+    name: vyogobench
   dbConfig:
     provider: external
     host: 64.227.178.150
@@ -15,6 +15,6 @@ spec:
       name: external-mariadb-creds
   skipInit: true
   apps:
-    - erpnext
-    - brainwise
-    - xyz
+   - brainwise
+
+
