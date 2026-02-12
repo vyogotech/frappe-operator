@@ -93,12 +93,19 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.Recorder.Event(site, corev1.EventTypeNormal, "FinalizerAdded", "Finalizer added to FrappeSite")
 	}
 
-	// Early-exit guard
-	// Commented out to allow annotation-based triggers (which don't increment Generation)
-	// if site.Status.Phase == vyogotechv1alpha1.FrappeSitePhaseReady && site.Status.ObservedGeneration == site.Generation {
-	// 	logger.V(1).Info("Site is Ready	// Handle simple generation skip or annotation trigger check
-	if site.Generation == site.Status.ObservedGeneration &&
-		site.Annotations["frappe.io/site-version"] == site.Status.ObservedSiteVersion {
+	// Handle simple generation skip or annotation trigger check
+	// We only skip if the site is already Ready and neither spec nor site-version annotation changed.
+	// This ensures we don't block deletions, state transitions, or initial reconciliations.
+	siteVersion := ""
+	if site.Annotations != nil {
+		siteVersion = site.Annotations["frappe.io/site-version"]
+	}
+
+	if site.DeletionTimestamp == nil &&
+		site.Status.Phase == vyogotechv1alpha1.FrappeSitePhaseReady &&
+		site.Generation == site.Status.ObservedGeneration &&
+		siteVersion == site.Status.ObservedSiteVersion {
+		logger.V(1).Info("Site is Ready and spec/version unchanged, skipping reconciliation")
 		return ctrl.Result{}, nil
 	}
 
