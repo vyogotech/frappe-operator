@@ -37,16 +37,15 @@ else
     goto_update_config=0
 fi
 
-# Link apps.txt to site path for bench to find it
-# The apps.txt is in the sites directory, but bench expects it in the root
-echo "Debug: Current directory is $(pwd)"
-echo "Debug: Contents of $(pwd):"
-ls -la
-if [ -f sites/apps.txt ]; then
-    echo "Debug: sites/apps.txt found, creating link..."
+# Force update apps.txt to ensure it reflects current image state
+# The apps directory in the container is the source of truth
+if [ -d "apps" ]; then
+    echo "Updating apps.txt from container image..."
+    ls -1 apps > sites/apps.txt || echo "Warning: Failed to update apps.txt"
+    # Create symlink if needed (bench expects apps.txt in root)
     ln -sf sites/apps.txt apps.txt || cp sites/apps.txt apps.txt || echo "Warning: Failed to create apps.txt in root"
 else
-    echo "Warning: sites/apps.txt not found!"
+    echo "Warning: apps directory not found in container!"
 fi
 ls -l apps.txt || true
 
@@ -270,15 +269,20 @@ EOF
         echo "=========================================="
     else
         echo "=========================================="
-        echo "Site already exists - skipping site creation"
-        echo "Checking for new apps to install..."
+        echo "Site already exists - Running Maintenance"
         echo "=========================================="
         
+        echo "1. Running bench migrate..."
+        bench --site "$SITE_NAME" migrate
+        echo "✓ Migration completed."
+        
+        echo "2. Installing new apps..."
         if [[ $APPS_TO_INSTALL_COUNT -gt 0 ]]; then
             for app in $APPS_TO_INSTALL; do
                 if [[ -d "apps/$app" ]]; then
                     echo "Ensuring app is installed: $app"
-                    bench --site "$SITE_NAME" install-app "$app" || echo "Notice: $app might already be installed"
+                    # install-app usually fails if already installed, so allow failure but log it
+                    bench --site "$SITE_NAME" install-app "$app" || echo "Note: $app installation skipped (might be already installed)"
                 fi
             done
         fi
@@ -302,7 +306,9 @@ EOF
 if [ -d "/home/frappe/assets_cache" ]; then
     echo "Syncing pre-built assets from image to PVC..."
     mkdir -p sites/assets
-    cp -rn /home/frappe/assets_cache/* sites/assets/ || true
+    # Use -R to copy recursively. We want to overwrite old assets with new ones from the image.
+    # But we don't want to delete files (unless we use rsync --delete which might be risky or unavailable)
+    cp -R /home/frappe/assets_cache/* sites/assets/ || echo "Warning: Failed to sync assets"
 fi
 
 echo "Site $SITE_NAME created successfully!"

@@ -1,7 +1,7 @@
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
-  name: autoscaling-hpa-bench
+  name: vyogo-bench
   namespace: frappe
 spec:
   frappeVersion: "15.0.0"
@@ -14,7 +14,7 @@ spec:
   redisConfig:
     type: redis
     external: true
-    host: 10.12.30.20
+    host: 64.227.178.150
     port: 6379
     connectionSecretRef:
       name: external-redis-creds
@@ -56,7 +56,7 @@ spec:
     workerShort:
       enabled: false # Static replicas
       staticReplicas: 1
-    
+
     workerLong:
       enabled: false
       staticReplicas: 1
