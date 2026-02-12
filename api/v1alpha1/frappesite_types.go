@@ -152,6 +152,10 @@ type FrappeSiteStatus struct {
 	// ObservedGeneration reflects the generation of the most recently observed FrappeSite spec
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// ObservedSiteVersion reflects the frappe.io/site-version annotation value most recently processed
+	// +optional
+	ObservedSiteVersion string `json:"observedSiteVersion,omitempty"`
 }
 
 //+kubebuilder:object:root=true
