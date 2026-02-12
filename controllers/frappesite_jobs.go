@@ -41,8 +41,32 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	jobName := fmt.Sprintf("%s-init", site.Name)
 	job := &batchv1.Job{}
 
+	// Check for site version annotation
+	versionAnnotation := "frappe.io/site-version"
+	siteVersionVal := site.Annotations[versionAnnotation]
+	logger.Info("Checking site version annotation", "siteVersion", siteVersionVal)
+
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: site.Namespace}, job)
 	if err == nil {
+		// Job exists
+		jobVersionVal := job.Annotations[versionAnnotation]
+		logger.Info("Job exists, checking version annotations", "jobName", jobName, "jobVersion", jobVersionVal, "siteVersion", siteVersionVal)
+
+		// Check if a specific version or update is requested
+		if siteVersionVal != "" {
+			if siteVersionVal != jobVersionVal {
+				logger.Info("Version change detected, deleting init job for update", "old", jobVersionVal, "new", siteVersionVal)
+				if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+					return false, fmt.Errorf("failed to delete init job for update: %w", err)
+				}
+				// Requeue to create new job
+				return false, nil
+			}
+			logger.Info("Version values match, no action needed")
+		} else {
+			logger.Info("No version annotation requested")
+		}
+
 		// Job exists, check if it completed
 		if job.Status.Succeeded > 0 {
 			logger.Info("Site initialization job completed successfully", "job", jobName)
@@ -161,10 +185,17 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		Build()
 
+	// Prepare job annotations
+	jobAnnotations := map[string]string{}
+	if siteVersionVal != "" {
+		jobAnnotations[versionAnnotation] = siteVersionVal
+	}
+
 	// Build the job
 	job = resources.NewJobBuilder(jobName, site.Namespace).
 		WithLabels(extraLabels).
 		WithExtraPodLabels(extraLabels).
+		WithAnnotations(jobAnnotations).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).
 		WithTolerations(tolerations).
