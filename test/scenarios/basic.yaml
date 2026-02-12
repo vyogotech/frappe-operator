@@ -4,6 +4,10 @@ metadata:
   name: basic-bench
 spec:
   frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+    pullPolicy: Always
   # Image is substituted by the test script/workflow
   storageSize: 2Gi
 ---

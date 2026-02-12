@@ -69,11 +69,20 @@ log "Building Helm dependencies..."
 helm dependency update ./helm/frappe-operator
 
 log "Installing Frappe Operator (with MariaDB and KEDA dependencies)..."
+# If OPERATOR_IMAGE is provided (e.g. from CI), split it into repo and tag for Helm
+HELM_OPTS=("--set" "mariadb-operator.enabled=true" "--set" "keda.enabled=true" "--set" "operator.image.pullPolicy=Always")
+if [ -n "$OPERATOR_IMAGE" ]; then
+    IFS=':' read -ra ADDR <<< "$OPERATOR_IMAGE"
+    HELM_OPTS+=("--set" "operator.image.repository=${ADDR[0]}")
+    if [ -n "${ADDR[1]}" ]; then
+        HELM_OPTS+=("--set" "operator.image.tag=${ADDR[1]}")
+    fi
+fi
+
 helm upgrade --install frappe-operator ./helm/frappe-operator \
   --namespace $OPERATOR_NAMESPACE \
   --create-namespace \
-  --set mariadb-operator.enabled=true \
-  --set keda.enabled=true
+  "${HELM_OPTS[@]}"
 
 log "Waiting for MariaDB Operator to be ready..."
 kubectl rollout status deployment/frappe-operator-mariadb-operator -n $OPERATOR_NAMESPACE --timeout=2m
@@ -89,10 +98,18 @@ log "Applying scenario: $SCENARIO..."
 MANIFEST="test/scenarios/${SCENARIO}.yaml"
 if [ ! -f "$MANIFEST" ]; then error "Scenario manifest $MANIFEST not found"; fi
 
-# Substitute placeholder image if present (updated to vyogotech)
-sed -e "s|ghcr.io/rmallam/frappe_docker|${OPERATOR_IMAGE:-ghcr.io/vyogotech/frappe_base}|g" \
-    -e "s|ghcr.io/rmallam/frappe-operator|ghcr.io/vyogotech/frappe-operator|g" \
-    "$MANIFEST" | kubectl apply -n $NAMESPACE -f -
+# If BENCH_IMAGE is provided, inject it into the manifest placeholder
+if [ -n "$BENCH_IMAGE" ]; then
+    IFS=':' read -ra ADDR <<< "$BENCH_IMAGE"
+    REPO="${ADDR[0]}"
+    TAG="${ADDR[1]:-latest}"
+    log "Injecting bench image: $REPO:$TAG"
+    sed -e "s|repository: ghcr.io/vyogotech/frappe_base|repository: $REPO|g" \
+        -e "s|tag: latest|tag: $TAG|g" \
+        "$MANIFEST" | kubectl apply -n $NAMESPACE -f -
+else
+    kubectl apply -n $NAMESPACE -f "$MANIFEST"
+fi
 
 # 7. Verification Loop
 log "Waiting for resources to reach Ready phase..."
