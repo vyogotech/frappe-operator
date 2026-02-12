@@ -78,7 +78,7 @@ helm upgrade --install frappe-operator ./helm/frappe-operator \
 log "Waiting for MariaDB Operator to be ready..."
 kubectl rollout status deployment/frappe-operator-mariadb-operator -n $OPERATOR_NAMESPACE --timeout=2m
 log "Waiting for KEDA to be ready..."
-kubectl rollout status deployment/frappe-operator-keda-operator -n $OPERATOR_NAMESPACE --timeout=2m
+kubectl rollout status deployment/keda-operator -n $OPERATOR_NAMESPACE --timeout=2m
 
 # 6. Apply scenario-independent MariaDB Instance
 log "Applying MariaDB instance from deploy/mariadb.yaml..."
