@@ -94,10 +94,11 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Early-exit guard
-	if site.Status.Phase == vyogotechv1alpha1.FrappeSitePhaseReady && site.Status.ObservedGeneration == site.Generation {
-		logger.V(1).Info("Site is Ready and spec unchanged, skipping reconciliation")
-		return ctrl.Result{}, nil
-	}
+	// Commented out to allow annotation-based triggers (which don't increment Generation)
+	// if site.Status.Phase == vyogotechv1alpha1.FrappeSitePhaseReady && site.Status.ObservedGeneration == site.Generation {
+	// 	logger.V(1).Info("Site is Ready and spec unchanged, skipping reconciliation")
+	// 	return ctrl.Result{}, nil
+	// }
 
 	// Handle deletion
 	if site.GetDeletionTimestamp() != nil {
