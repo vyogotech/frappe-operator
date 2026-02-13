@@ -37,6 +37,19 @@ if [ "$PLATFORM" == "openshift" ]; then
     sleep 5
 fi
 
+# 1b. Install Metrics Server for KIND (required for HPA/Scaling)
+if [ "$PLATFORM" == "kind" ]; then
+    log "Installing Metrics Server for KIND..."
+    kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+    
+    # Patch metrics-server to allow insecure TLS (required for KIND)
+    kubectl patch deployment metrics-server -n kube-system --type='json' \
+      -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+    
+    log "Waiting for metrics-server to be ready..."
+    kubectl rollout status deployment/metrics-server -n kube-system --timeout=2m || true
+fi
+
 # 2. (Removed independent MariaDB/KEDA installation - now handled by Frappe Operator chart)
 
 # 3. Setup Scenario Namespace
