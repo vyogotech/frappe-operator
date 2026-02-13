@@ -223,6 +223,7 @@ EOF
           --no-setup-db \
           --admin-password="$ADMIN_PASSWORD" \
           $INSTALL_APP_ARG \
+          --force \
           --verbose \
           "$SITE_NAME" 2>&1)
         SITE_CREATION_EXIT_CODE=$?

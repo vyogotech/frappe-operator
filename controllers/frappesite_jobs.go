@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"io"
+	"strings"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -106,6 +109,11 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 						"phase", pod.Status.Phase,
 						"reason", pod.Status.Reason,
 						"message", pod.Status.Message)
+
+					// Fetch and log pod logs for debugging
+					if logs, err := r.GetPodLogs(ctx, pod.Namespace, pod.Name); err == nil {
+						fmt.Printf("--- Logs for failed pod %s ---\n%s\n---------------------------\n", pod.Name, logs)
+					}
 
 					// Update status with failure information
 					if len(site.Spec.Apps) > 0 {
@@ -391,4 +399,28 @@ func (r *FrappeSiteReconciler) resolveRedisURL(ctx context.Context, bench *vyogo
 		return fmt.Sprintf(":%s@%s:%d", password, host, port)
 	}
 	return fmt.Sprintf("%s:%d", host, port)
+}
+
+// GetPodLogs retrieves logs from a pod
+func (r *FrappeSiteReconciler) GetPodLogs(ctx context.Context, namespace, podName string) (string, error) {
+	clientset, err := kubernetes.NewForConfig(r.Config)
+	if err != nil {
+		return "", err
+	}
+
+	podLogOpts := &corev1.PodLogOptions{}
+	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, podLogOpts)
+	podLogs, err := req.Stream(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer podLogs.Close()
+
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
