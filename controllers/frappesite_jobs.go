@@ -257,8 +257,11 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 		// Job doesn't exist, create it
 		logger.Info("Creating site deletion job", "job", jobName)
 
+		// Resolve DB Config
+		dbConfig := r.resolveDBConfig(site, bench)
+
 		// Get MariaDB root credentials for deletion
-		rootUser, rootPassword, err := r.getMariaDBRootCredentials(ctx, site)
+		rootUser, rootPassword, err := r.getMariaDBRootCredentials(ctx, site, dbConfig)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				logger.Info("MariaDB instance not found, skipping site deletion job")

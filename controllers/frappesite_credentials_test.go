@@ -55,7 +55,7 @@ func TestFrappeSiteReconciler_getMariaDBRootCredentials(t *testing.T) {
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site, secret).Build()
 		r := &FrappeSiteReconciler{Client: client, Scheme: scheme}
 
-		user, pass, err := r.getMariaDBRootCredentials(context.TODO(), site)
+		user, pass, err := r.getMariaDBRootCredentials(context.TODO(), site, site.Spec.DBConfig)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -110,7 +110,7 @@ func TestFrappeSiteReconciler_getMariaDBRootCredentials(t *testing.T) {
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site, mariadb, secret).Build()
 		r := &FrappeSiteReconciler{Client: client, Scheme: scheme}
 
-		user, pass, err := r.getMariaDBRootCredentials(context.TODO(), site)
+		user, pass, err := r.getMariaDBRootCredentials(context.TODO(), site, site.Spec.DBConfig)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -317,7 +317,7 @@ func TestFrappeSiteReconciler_getMariaDBRootCredentials_Dedicated(t *testing.T) 
 			DBConfig: vyogotechv1alpha1.DatabaseConfig{Mode: "dedicated"},
 		},
 	}
-	user, pass, err := r.getMariaDBRootCredentials(ctx, site)
+	user, pass, err := r.getMariaDBRootCredentials(ctx, site, site.Spec.DBConfig)
 	if err != nil {
 		t.Fatalf("getMariaDBRootCredentials: %v", err)
 	}

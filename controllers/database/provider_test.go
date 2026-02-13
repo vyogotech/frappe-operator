@@ -106,8 +106,6 @@ func TestMariaDBProvider_IsReady_NoDatabaseCR(t *testing.T) {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
-	p := NewMariaDBProvider(client, scheme)
-	ctx := context.Background()
 	site := &vyogotechv1alpha1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"},
 		Spec: vyogotechv1alpha1.FrappeSiteSpec{
@@ -115,6 +113,8 @@ func TestMariaDBProvider_IsReady_NoDatabaseCR(t *testing.T) {
 			DBConfig: vyogotechv1alpha1.DatabaseConfig{Mode: "shared"},
 		},
 	}
+	p := NewMariaDBProvider(site.Spec.DBConfig, client, scheme)
+	ctx := context.Background()
 	ready, err := p.IsReady(ctx, site)
 	if err != nil {
 		t.Fatalf("IsReady: %v", err)
