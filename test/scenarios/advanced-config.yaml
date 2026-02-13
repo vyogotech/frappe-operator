@@ -19,9 +19,6 @@ spec:
   podConfig:
     labels:
       e2e-test: "advanced"
-  security:
-    podSecurityContext:
-      runAsUser: 1000
   storageSize: 2Gi
 ---
 apiVersion: vyogo.tech/v1alpha1
@@ -32,6 +29,3 @@ spec:
   benchRef:
     name: advanced-bench
   siteName: advanced.test.local
-  podConfig:
-    annotations:
-      e2e-test-phase: "init"
