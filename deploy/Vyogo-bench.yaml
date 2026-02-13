@@ -7,7 +7,7 @@ spec:
   frappeVersion: "15.0.0"
   imageConfig:
     repository: ghcr.io/vyogotech/frappe_base
-    tag: sha-7bc7484
+    tag: latest
     pullPolicy: Always
   
   # External Redis configuration
