@@ -435,6 +435,11 @@ func (r *FrappeBenchReconciler) getRedisPodSecurityContext(bench *vyogotechv1alp
 		secCtx.RunAsUser = &redisUID
 		secCtx.RunAsGroup = &redisUID
 		secCtx.FSGroup = &redisUID
+	} else {
+		// On OpenShift, if we don't provide a numeric UID, we must omit RunAsNonRoot
+		// to avoid "image will run as root" validation error for named users.
+		// OpenShift's SCC will still enforce non-root execution.
+		secCtx.RunAsNonRoot = nil
 	}
 
 	return secCtx
@@ -461,6 +466,11 @@ func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotec
 		redisUID := int64(999)
 		secCtx.RunAsUser = &redisUID
 		secCtx.RunAsGroup = &redisUID
+	} else {
+		// On OpenShift, if we don't provide a numeric UID, we must omit RunAsNonRoot
+		// to avoid "image will run as root" validation error for named users.
+		// OpenShift's SCC will still enforce non-root execution.
+		secCtx.RunAsNonRoot = nil
 	}
 
 	return secCtx
