@@ -140,7 +140,7 @@ func (r *FrappeSiteReconciler) isOpenShiftPlatform(ctx context.Context) bool {
 func getDefaultUID() *int64 {
 	value := os.Getenv("FRAPPE_DEFAULT_UID")
 	if value == "" {
-		return nil
+		return int64Ptr(1000)
 	}
 	uid, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
@@ -154,7 +154,7 @@ func getDefaultUID() *int64 {
 func getDefaultGID() *int64 {
 	value := os.Getenv("FRAPPE_DEFAULT_GID")
 	if value == "" {
-		return nil
+		return int64Ptr(0)
 	}
 	gid, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
@@ -168,7 +168,7 @@ func getDefaultGID() *int64 {
 func getDefaultFSGroup() *int64 {
 	value := os.Getenv("FRAPPE_DEFAULT_FSGROUP")
 	if value == "" {
-		return nil
+		return int64Ptr(1000)
 	}
 	fsGroup, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
