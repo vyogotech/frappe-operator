@@ -21,12 +21,13 @@ import (
 func TestGetDefaultSecurityValues(t *testing.T) {
 	t.Run("GetDefaultUID", func(t *testing.T) {
 		os.Unsetenv("FRAPPE_DEFAULT_UID")
-		if getDefaultUID() != nil {
-			t.Error("Expected nil when env not set")
+		uid := getDefaultUID()
+		if uid == nil || *uid != 1000 {
+			t.Errorf("Expected default 1000, got %v", uid)
 		}
 
 		os.Setenv("FRAPPE_DEFAULT_UID", "2000")
-		uid := getDefaultUID()
+		uid = getDefaultUID()
 		if uid == nil || *uid != 2000 {
 			t.Errorf("Expected 2000, got %v", uid)
 		}
@@ -35,12 +36,13 @@ func TestGetDefaultSecurityValues(t *testing.T) {
 
 	t.Run("GetDefaultGID", func(t *testing.T) {
 		os.Unsetenv("FRAPPE_DEFAULT_GID")
-		if getDefaultGID() != nil {
-			t.Error("Expected nil when env not set")
+		gid := getDefaultGID()
+		if gid == nil || *gid != 0 {
+			t.Errorf("Expected default 0, got %v", gid)
 		}
 
 		os.Setenv("FRAPPE_DEFAULT_GID", "3000")
-		gid := getDefaultGID()
+		gid = getDefaultGID()
 		if gid == nil || *gid != 3000 {
 			t.Errorf("Expected 3000, got %v", gid)
 		}
@@ -145,11 +147,12 @@ func TestGetEnvAsInt64(t *testing.T) {
 
 func TestGetDefaultFSGroup(t *testing.T) {
 	os.Unsetenv("FRAPPE_DEFAULT_FSGROUP")
-	if getDefaultFSGroup() != nil {
-		t.Error("expected nil when env not set")
+	g := getDefaultFSGroup()
+	if g == nil || *g != 1000 {
+		t.Errorf("expected 1000, got %v", g)
 	}
 	os.Setenv("FRAPPE_DEFAULT_FSGROUP", "2000")
-	g := getDefaultFSGroup()
+	g = getDefaultFSGroup()
 	if g == nil || *g != 2000 {
 		t.Errorf("expected 2000, got %v", g)
 	}

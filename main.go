@@ -145,6 +145,10 @@ func main() {
 
 	// Detect OpenShift
 	isOpenShift := controllers.IsRouteAPIAvailable(mgr.GetConfig())
+	if os.Getenv("FRAPPE_IS_OPENSHIFT") != "" {
+		isOpenShift = os.Getenv("FRAPPE_IS_OPENSHIFT") == "true"
+	}
+
 	if isOpenShift {
 		setupLog.Info("OpenShift platform detected")
 	} else {

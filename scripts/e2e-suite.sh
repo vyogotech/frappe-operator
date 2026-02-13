@@ -43,12 +43,22 @@ if ! kubectl get apiservice v1beta1.metrics.k8s.io &>/dev/null; then
     log "Metrics API not found. Installing Metrics Server..."
     kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
     
-    # Patch metrics-server to allow insecure TLS (required for KIND and local environments)
+    # Patch metrics-server to allow insecure TLS and set address types (required for KIND)
     kubectl patch deployment metrics-server -n kube-system --type='json' \
-      -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+      -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}, {"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-preferred-address-types=InternalIP"}]'
     
-    log "Waiting for metrics-server to be ready..."
+    log "Waiting for metrics-server deployment to be ready..."
     kubectl rollout status deployment/metrics-server -n kube-system --timeout=2m || true
+    
+    log "Waiting for Metrics API availability (kubectl get --raw /apis/metrics.k8s.io/v1beta1)..."
+    for i in {1..15}; do
+        if kubectl get --raw /apis/metrics.k8s.io/v1beta1 &>/dev/null; then
+            log "Metrics API is now available."
+            break
+        fi
+        echo -n "."
+        sleep 10
+    done
 else
     log "Metrics API already available."
 fi
