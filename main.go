@@ -165,6 +165,7 @@ func main() {
 	if err = (&controllers.FrappeSiteReconciler{
 		Client:                  mgr.GetClient(),
 		Scheme:                  mgr.GetScheme(),
+		Config:                  mgr.GetConfig(),
 		Recorder:                mgr.GetEventRecorderFor("frappesite-controller"),
 		IsOpenShift:             isOpenShift,
 		MaxConcurrentReconciles: maxSiteReconciles,
