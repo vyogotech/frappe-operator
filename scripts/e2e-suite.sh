@@ -55,9 +55,9 @@ if [ "$SCENARIO" == "external" ]; then
 
     # Deploy a simple MariaDB
     kubectl create deployment mariadb-external --image=mariadb:10.6 --port=3306 -n $NAMESPACE
-    kubectl set env deployment/mariadb-external MARIADB_ROOT_PASSWORD=frappe -n $NAMESPACE
+    kubectl set env deployment/mariadb-external MARIADB_ROOT_PASSWORD=frappe MARIADB_DATABASE=external_test_local -n $NAMESPACE
     kubectl expose deployment mariadb-external --port=3306 -n $NAMESPACE
-    kubectl create secret generic external-mariadb-creds --from-literal=username=root --from-literal=password=frappe --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
+    kubectl create secret generic external-mariadb-creds --from-literal=username=root --from-literal=password=frappe --from-literal=database=external_test_local --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
     
     log "Waiting for external mocks to be ready..."
     kubectl rollout status deployment/redis-external -n $NAMESPACE --timeout=2m
