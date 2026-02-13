@@ -29,3 +29,5 @@ spec:
   benchRef:
     name: advanced-bench
   siteName: advanced.test.local
+  dbConfig:
+    mode: dedicated
