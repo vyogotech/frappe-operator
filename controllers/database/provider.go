@@ -69,13 +69,13 @@ func NewProvider(config vyogotechv1alpha1.DatabaseConfig, client client.Client, 
 
 	switch providerType {
 	case "mariadb":
-		return NewMariaDBProvider(client, scheme), nil
+		return NewMariaDBProvider(config, client, scheme), nil
 	case "postgres":
 		return nil, fmt.Errorf("PostgreSQL provider not yet implemented - planned for v1.1.0")
 	case "sqlite":
 		return NewSQLiteProvider(client, scheme), nil
 	case "external":
-		inner := NewExternalProvider(client)
+		inner := NewExternalProvider(config, client)
 		cb := circuitbreaker.New(circuitbreaker.DefaultConfig("external-db"))
 		return NewCircuitBreakerProvider(inner, cb), nil
 	default:
