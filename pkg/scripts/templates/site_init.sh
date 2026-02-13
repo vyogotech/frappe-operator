@@ -4,6 +4,8 @@
 set -e
 umask 0002
 
+echo "DEBUG: Running site_init.sh version $(date)"
+
 # Setup user for OpenShift compatibility (fixes getpwuid() error)
 if ! whoami &>/dev/null; then
   export USER=frappe
@@ -123,8 +125,13 @@ else
 	echo "=========================================="
 fi
 
-# Run bench new-site with provider-specific database configuration
-if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
+# run bench new-site with provider-specific database configuration
+if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]] || [[ "$DB_PROVIDER" == "external" ]]; then
+    # Map 'external' to 'mariadb' (engine) for script logic if it leaked through
+    if [[ "$DB_PROVIDER" == "external" ]]; then
+        DB_PROVIDER="mariadb"
+    fi
+
 	# For MariaDB and PostgreSQL: use pre-provisioned database with dedicated credentials
 	# These are mounted from secret volumes, not environment variables
 	DB_HOST=$(cat /tmp/site-secrets/db_host)
@@ -138,15 +145,36 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
 		exit 1
 	fi
 
+    # Strategy: If DB_USER != DB_NAME and bench doesn't support --db-user,
+    # or if we explicitly want to skip standard init (e.g. for external managed DBs),
+    # we use the manual config + migrate path which is much more reliable.
+    
+    USE_MANUAL_CONFIG=0
     if [[ "$SKIP_INIT" == "true" ]]; then
+        USE_MANUAL_CONFIG=1
+    fi
+
+    # Check bench capabilities
+    SUPPORTS_DB_USER=0
+    if bench new-site --help | grep -qE "db-user|mariadb-user"; then
+        SUPPORTS_DB_USER=1
+    fi
+
+    if [[ "$DB_USER" != "$DB_NAME" && "$SUPPORTS_DB_USER" -eq 0 ]]; then
+        echo "⚠ User '$DB_USER' differs from DB '$DB_NAME' but bench lacks --db-user support."
+        echo "  Switching to manual configuration path for reliable connection."
+        USE_MANUAL_CONFIG=1
+    fi
+
+    if [[ "$USE_MANUAL_CONFIG" -eq 1 ]]; then
         echo "=========================================="
-        echo "SKIP_INIT is true - Registering Existing Site"
+        echo "Manual Site Configuration (Migration Path)"
         echo "=========================================="
         echo "Site Name: $SITE_NAME"
         echo "Database Provider: $DB_PROVIDER"
         echo "Database Name: $DB_NAME"
+        echo "Database User: $DB_USER"
         echo "Database Host: $DB_HOST:$DB_PORT"
-        echo "Apps to Install: ${APPS_TO_INSTALL:-none}"
         echo "=========================================="
 
         mkdir -p "sites/$SITE_NAME/logs"
@@ -158,7 +186,7 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
  "db_password": "$DB_PASSWORD",
  "db_type": "$DB_PROVIDER",
  "db_host": "$DB_HOST",
- "db_port": $DB_PORT,
+ "db_port": $((DB_PORT)),
  "db_user": "$DB_USER"
 }
 EOF
@@ -193,15 +221,16 @@ EOF
         echo "Apps to install: ${APPS_TO_INSTALL:-none}"
         echo "=========================================="
         
-        # Check if bench version supports --db-user flag
+        # Check if bench version supports --db-user flag AND if it's needed
         DB_USER_FLAG=""
-        if bench new-site --help | grep -q " --db-user"; then
-            echo "✓ Detected support for --db-user flag"
-            DB_USER_FLAG="--db-user=$DB_USER"
-        elif [[ "$DB_USER" != "$DB_NAME" ]]; then
-            echo "⚠ WARNING: Your bench version does not support --db-user. Using DB_NAME as username."
-        else
-            echo "✓ Bench version does not support --db-user, but DB_USER matches DB_NAME. Proceeding."
+        if [[ "$DB_USER" != "$DB_NAME" ]]; then
+            if [[ "$SUPPORTS_DB_USER" -eq 1 ]]; then
+                echo "✓ Detected support for --db-user flag (User differs from DB Name)"
+                DB_USER_FLAG="--db-user=$DB_USER"
+            else
+                echo "⚠ User '$DB_USER' differs from DB '$DB_NAME' but bench lacks --db-user support."
+                echo "  Process may fail if database user is not the same as database name."
+            fi
         fi
 
         echo ""
@@ -273,6 +302,23 @@ EOF
         echo "Site already exists - Running Maintenance"
         echo "=========================================="
         
+        # Ensure site_config.json has the correct DB credentials before migrating
+        # using bench set-config ensure proper formatting and handling
+        if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
+             echo "Regenerating site_config.json with current credentials..."
+             cat > "sites/$SITE_NAME/site_config.json" <<EOF
+{
+ "db_name": "$DB_NAME",
+ "db_password": "$DB_PASSWORD",
+ "db_type": "$DB_PROVIDER",
+ "db_host": "$DB_HOST",
+ "db_port": $((DB_PORT)),
+ "db_user": "$DB_USER"
+}
+EOF
+             echo "✓ Updated site_config.json"
+        fi
+
         echo "1. Running bench migrate..."
         bench --site "$SITE_NAME" migrate
         echo "✓ Migration completed."
