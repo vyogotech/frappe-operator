@@ -362,6 +362,7 @@ config['db_name'] = db_name
 config['db_user'] = db_user
 config['db_password'] = db_password
 config['db_host'] = db_host
+config['db_port'] = int(db_port) if db_port.isdigit() else db_port
 config['db_type'] = db_provider
 
 # Ensure directory exists
