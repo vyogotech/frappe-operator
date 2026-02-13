@@ -51,13 +51,13 @@ if [ "$SCENARIO" == "external" ]; then
     # Deploy a simple Redis
     kubectl create deployment redis-external --image=redis:alpine -n $NAMESPACE
     kubectl expose deployment redis-external --port=6379 -n $NAMESPACE
-    kubectl create secret generic external-redis-creds --from-literal=redis-password="" --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
+    kubectl create secret generic external-redis-creds --from-literal=password="" --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
 
     # Deploy a simple MariaDB
     kubectl create deployment mariadb-external --image=mariadb:10.6 --port=3306 -n $NAMESPACE
     kubectl set env deployment/mariadb-external MARIADB_ROOT_PASSWORD=frappe -n $NAMESPACE
     kubectl expose deployment mariadb-external --port=3306 -n $NAMESPACE
-    kubectl create secret generic external-mariadb-creds --from-literal=root-password=frappe --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
+    kubectl create secret generic external-mariadb-creds --from-literal=username=root --from-literal=password=frappe --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
     
     log "Waiting for external mocks to be ready..."
     kubectl rollout status deployment/redis-external -n $NAMESPACE --timeout=2m
