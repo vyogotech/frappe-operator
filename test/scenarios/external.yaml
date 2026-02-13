@@ -28,6 +28,6 @@ spec:
   dbConfig:
     provider: external
     host: mariadb-external
-    port: 3306
+    port: "3306"
     connectionSecretRef:
       name: external-mariadb-creds
