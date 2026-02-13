@@ -64,13 +64,15 @@ var (
 
 // MariaDBProviderUnstructured implements database provisioning using unstructured objects
 type MariaDBProviderUnstructured struct {
+	config vyogotechv1alpha1.DatabaseConfig
 	client client.Client
 	scheme *runtime.Scheme
 }
 
 // NewMariaDBProvider creates a new MariaDB provider using unstructured objects
-func NewMariaDBProvider(client client.Client, scheme *runtime.Scheme) Provider {
+func NewMariaDBProvider(config vyogotechv1alpha1.DatabaseConfig, client client.Client, scheme *runtime.Scheme) Provider {
 	return &MariaDBProviderUnstructured{
+		config: config,
 		client: client,
 		scheme: scheme,
 	}
@@ -253,16 +255,16 @@ func (p *MariaDBProviderUnstructured) Cleanup(ctx context.Context, site *vyogote
 
 func (p *MariaDBProviderUnstructured) getMariaDBInstance(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
 	// Check if user specified a MariaDB reference
-	if site.Spec.DBConfig.MariaDBRef != nil {
-		ns := site.Spec.DBConfig.MariaDBRef.Namespace
+	if p.config.MariaDBRef != nil {
+		ns := p.config.MariaDBRef.Namespace
 		if ns == "" {
 			ns = site.Namespace
 		}
-		return site.Spec.DBConfig.MariaDBRef.Name, ns, nil
+		return p.config.MariaDBRef.Name, ns, nil
 	}
 
 	// Mode determines how we find/create MariaDB instance
-	mode := site.Spec.DBConfig.Mode
+	mode := p.config.Mode
 	if mode == "" {
 		mode = "shared" // Default
 	}
@@ -319,8 +321,8 @@ func (p *MariaDBProviderUnstructured) createDedicatedMariaDB(ctx context.Context
 
 	// Create dedicated MariaDB instance
 	storageSize := "10Gi"
-	if site.Spec.DBConfig.StorageSize != nil {
-		storageSize = site.Spec.DBConfig.StorageSize.String()
+	if p.config.StorageSize != nil {
+		storageSize = p.config.StorageSize.String()
 	}
 
 	// Generate root password
@@ -346,8 +348,8 @@ func (p *MariaDBProviderUnstructured) createDedicatedMariaDB(ctx context.Context
 
 	// Determine MariaDB image
 	mariadbImage := "mariadb:10.11"
-	if site.Spec.DBConfig.Image != "" {
-		mariadbImage = site.Spec.DBConfig.Image
+	if p.config.Image != "" {
+		mariadbImage = p.config.Image
 	}
 
 	mariadb := &unstructured.Unstructured{

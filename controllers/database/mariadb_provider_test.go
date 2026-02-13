@@ -42,7 +42,7 @@ func init() {
 
 func TestMariaDBProviderUnstructured_IsReady_NoDatabaseCR(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(testScheme).Build()
-	p := NewMariaDBProvider(client, testScheme).(*MariaDBProviderUnstructured)
+	p := NewMariaDBProvider(vyogotechv1alpha1.DatabaseConfig{}, client, testScheme).(*MariaDBProviderUnstructured)
 	ctx := context.Background()
 	site := &vyogotechv1alpha1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "mysite", Namespace: "default"},
@@ -92,7 +92,7 @@ func TestMariaDBProvider_IsReady_AllReady(t *testing.T) {
 	}
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(dbObj, userObj, grantObj).Build()
-	p := NewMariaDBProvider(client, testScheme).(*MariaDBProviderUnstructured)
+	p := NewMariaDBProvider(vyogotechv1alpha1.DatabaseConfig{}, client, testScheme).(*MariaDBProviderUnstructured)
 	ctx := context.Background()
 	site := &vyogotechv1alpha1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: siteName, Namespace: ns},
@@ -124,7 +124,7 @@ func TestMariaDBProvider_GetCredentials(t *testing.T) {
 	}
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(userObj, secret).Build()
-	p := NewMariaDBProvider(client, testScheme).(*MariaDBProviderUnstructured)
+	p := NewMariaDBProvider(vyogotechv1alpha1.DatabaseConfig{}, client, testScheme).(*MariaDBProviderUnstructured)
 	ctx := context.Background()
 	site := &vyogotechv1alpha1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: siteName, Namespace: ns},
@@ -139,7 +139,7 @@ func TestMariaDBProvider_GetCredentials(t *testing.T) {
 
 func TestMariaDBProvider_GetCredentials_UserNotFound(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(testScheme).Build()
-	p := NewMariaDBProvider(client, testScheme).(*MariaDBProviderUnstructured)
+	p := NewMariaDBProvider(vyogotechv1alpha1.DatabaseConfig{}, client, testScheme).(*MariaDBProviderUnstructured)
 	ctx := context.Background()
 	site := &vyogotechv1alpha1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "mysite", Namespace: "default"},
@@ -152,7 +152,7 @@ func TestMariaDBProvider_GetCredentials_UserNotFound(t *testing.T) {
 
 func TestMariaDBProvider_Cleanup(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(testScheme).Build()
-	p := NewMariaDBProvider(client, testScheme).(*MariaDBProviderUnstructured)
+	p := NewMariaDBProvider(vyogotechv1alpha1.DatabaseConfig{}, client, testScheme).(*MariaDBProviderUnstructured)
 	ctx := context.Background()
 	site := &vyogotechv1alpha1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "mysite", Namespace: "default"},
@@ -185,7 +185,7 @@ func TestMariaDBProvider_EnsureDatabase_MariaDBRef(t *testing.T) {
 	}
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(mariadb, site).Build()
-	p := NewMariaDBProvider(client, testScheme).(*MariaDBProviderUnstructured)
+	p := NewMariaDBProvider(site.Spec.DBConfig, client, testScheme).(*MariaDBProviderUnstructured)
 	ctx := context.Background()
 
 	info, err := p.EnsureDatabase(ctx, site)
@@ -223,7 +223,6 @@ func TestMariaDBProvider_EnsureDatabase_MariaDBRef(t *testing.T) {
 
 func TestMariaDBProvider_EnsureDatabase_SharedMode_NoMariaDB(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(testScheme).Build()
-	p := NewMariaDBProvider(client, testScheme).(*MariaDBProviderUnstructured)
 	ctx := context.Background()
 	site := &vyogotechv1alpha1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "mysite", Namespace: "default"},
@@ -232,6 +231,7 @@ func TestMariaDBProvider_EnsureDatabase_SharedMode_NoMariaDB(t *testing.T) {
 			DBConfig: vyogotechv1alpha1.DatabaseConfig{Mode: "shared"},
 		},
 	}
+	p := NewMariaDBProvider(site.Spec.DBConfig, client, testScheme).(*MariaDBProviderUnstructured)
 	_, err := p.EnsureDatabase(ctx, site)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "shared MariaDB")

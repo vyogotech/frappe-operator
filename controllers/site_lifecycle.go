@@ -284,8 +284,8 @@ func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotec
 }
 
 // getMariaDBRootCredentials retrieves root credentials for database operations
-func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
-	if site.Spec.DBConfig.Mode == "dedicated" {
+func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, dbConfig vyogotechv1alpha1.DatabaseConfig) (string, string, error) {
+	if dbConfig.Mode == "dedicated" {
 		secretName := fmt.Sprintf("%s-mariadb-root", site.Name)
 		secret := &corev1.Secret{}
 		err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: site.Namespace}, secret)
@@ -299,13 +299,13 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 		return "root", string(password), nil
 	}
 
-	if site.Spec.DBConfig.Mode == "shared" {
+	if dbConfig.Mode == "shared" {
 		mariadbName := "frappe-mariadb"
 		mariadbNamespace := site.Namespace
-		if site.Spec.DBConfig.MariaDBRef != nil {
-			mariadbName = site.Spec.DBConfig.MariaDBRef.Name
-			if site.Spec.DBConfig.MariaDBRef.Namespace != "" {
-				mariadbNamespace = site.Spec.DBConfig.MariaDBRef.Namespace
+		if dbConfig.MariaDBRef != nil {
+			mariadbName = dbConfig.MariaDBRef.Name
+			if dbConfig.MariaDBRef.Namespace != "" {
+				mariadbNamespace = dbConfig.MariaDBRef.Namespace
 			}
 		}
 
@@ -341,7 +341,7 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 		return "root", string(password), nil
 	}
 
-	return "", "", fmt.Errorf("unsupported database mode: %s", site.Spec.DBConfig.Mode)
+	return "", "", fmt.Errorf("unsupported database mode: %s", dbConfig.Mode)
 }
 
 // getRequeueAttempt returns the current requeue attempt from the site annotation
