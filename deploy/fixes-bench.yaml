@@ -1,14 +1,16 @@
 apiVersion: vyogo.tech/v1alpha1
 kind: FrappeBench
 metadata:
-  name: bench-test
+  name: central-bench
   namespace: frappe
 spec:
   frappeVersion: "15.0.0"
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-7bc7484
+    repository: ghcr.io/vyogotech/central-site
+    tag: latest
     pullPolicy: Always
+    pullSecrets:
+      - name: ghcr-secret
   storageSize: 2Gi
 
   # Apps to install
