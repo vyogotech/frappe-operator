@@ -471,6 +471,11 @@ func (p *MariaDBProviderUnstructured) ensureUserCR(ctx context.Context, site *vy
 					"namespace": mariadbNamespace,
 				},
 				"name": dbUser,
+				// Allow connections from any pod IP across all cluster nodes.
+				// Without this, mariadb-operator may create the user with a
+				// restrictive host, causing OperationalError 1045 for pods on
+				// nodes other than the one hosting the MariaDB pod.
+				"host": "%",
 				"passwordSecretKeyRef": map[string]interface{}{
 					"name": passwordSecretName,
 					"key":  "password",
@@ -529,9 +534,12 @@ func (p *MariaDBProviderUnstructured) ensureGrantCR(ctx context.Context, site *v
 					"CREATE ROUTINE", "ALTER ROUTINE",
 					"EVENT", "TRIGGER",
 				},
-				"database":    dbName,
-				"table":       "*",
-				"username":    dbUser,
+				"database": dbName,
+				"table":    "*",
+				"username": dbUser,
+				// Must match the host in the User CR so MySQL resolves the grant
+				// correctly for cross-node pod connections.
+				"host":        "%",
 				"grantOption": false, // Prevent privilege escalation
 			},
 		},

@@ -259,7 +259,10 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Initialize Site
 	siteReady, err := r.ensureSiteInitialized(ctx, site, bench, domain, dbInfo, dbCreds)
 	if err != nil {
-		return r.failReconciliation(ctx, site, fmt.Sprintf("Site initialization failed: %v", err), "SiteInitializationFailed")
+		// Permanent init job failure: mark Failed and stop requeueing.
+		// Returning a non-nil error here would cause controller-runtime to
+		// immediately requeue forever. Use failTerminal instead.
+		return r.failTerminal(ctx, site, fmt.Sprintf("Site initialization failed: %v", err), "SiteInitializationFailed")
 	}
 
 	if !siteReady {
@@ -324,6 +327,24 @@ func (r *FrappeSiteReconciler) failReconciliation(ctx context.Context, site *vyo
 	r.Recorder.Event(site, corev1.EventTypeWarning, reason, msg)
 	_ = r.updateStatus(ctx, site)
 	return ctrl.Result{}, fmt.Errorf("%s", msg)
+}
+
+// failTerminal marks the site Failed and returns without requeueing.
+// Use this for permanent, unrecoverable failures (e.g. init job backoff exhausted)
+// where returning a non-nil error would cause controller-runtime to loop forever.
+func (r *FrappeSiteReconciler) failTerminal(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, msg, reason string) (ctrl.Result, error) {
+	site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
+	r.setCondition(site, metav1.Condition{
+		Type:    "Ready",
+		Status:  metav1.ConditionFalse,
+		Reason:  reason,
+		Message: msg,
+	})
+	r.Recorder.Event(site, corev1.EventTypeWarning, reason, msg)
+	_ = r.updateStatus(ctx, site)
+	// Return nil error — the site is Failed and no further action is possible
+	// until the user intervenes (e.g. deletes the failed job to trigger a retry).
+	return ctrl.Result{}, nil
 }
 
 func (r *FrappeSiteReconciler) setCondition(site *vyogotechv1alpha1.FrappeSite, condition metav1.Condition) {
