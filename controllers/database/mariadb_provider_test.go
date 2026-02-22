@@ -236,3 +236,103 @@ func TestMariaDBProvider_EnsureDatabase_SharedMode_NoMariaDB(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "shared MariaDB")
 }
+
+// TestEnsureUserCR_HostWildcard verifies that the User CR is created with
+// host: "%" so that pods on any cluster node can connect to MariaDB, preventing
+// OperationalError 1045 from cross-node pod IPs (10.42.x.x Flannel addresses).
+func TestEnsureUserCR_HostWildcard(t *testing.T) {
+	ns := "default"
+	siteName := "mysite"
+	mariadbName := "frappe-mariadb"
+
+	site := &vyogotechv1alpha1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: siteName, Namespace: ns},
+		Spec:       vyogotechv1alpha1.FrappeSiteSpec{SiteName: "mysite.local"},
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(site).Build()
+	p := NewMariaDBProvider(vyogotechv1alpha1.DatabaseConfig{}, fakeClient, testScheme).(*MariaDBProviderUnstructured)
+	ctx := context.Background()
+
+	_, err := p.ensureUserCR(ctx, site, mariadbName, ns, "mysite_user")
+	require.NoError(t, err)
+
+	// Retrieve the created User CR and verify host field
+	userCR := &unstructured.Unstructured{}
+	userCR.SetGroupVersionKind(UserGVK)
+	err = fakeClient.Get(ctx, types.NamespacedName{Name: siteName + "-user", Namespace: ns}, userCR)
+	require.NoError(t, err)
+
+	host, found, err := unstructured.NestedString(userCR.Object, "spec", "host")
+	require.NoError(t, err)
+	require.True(t, found, "spec.host must be present in User CR")
+	assert.Equal(t, "%", host,
+		"User CR host must be '%' for cross-node pod access; node-local host causes OperationalError 1045")
+}
+
+// TestEnsureGrantCR_HostWildcard verifies that the Grant CR is created with
+// host: "%" matching the User CR, so MySQL resolves the grant for cross-node pods.
+func TestEnsureGrantCR_HostWildcard(t *testing.T) {
+	ns := "default"
+	siteName := "mysite"
+	mariadbName := "frappe-mariadb"
+
+	site := &vyogotechv1alpha1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: siteName, Namespace: ns},
+		Spec:       vyogotechv1alpha1.FrappeSiteSpec{SiteName: "mysite.local"},
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(site).Build()
+	p := NewMariaDBProvider(vyogotechv1alpha1.DatabaseConfig{}, fakeClient, testScheme).(*MariaDBProviderUnstructured)
+	ctx := context.Background()
+
+	err := p.ensureGrantCR(ctx, site, mariadbName, ns, siteName+"_db", siteName+"_user")
+	require.NoError(t, err)
+
+	// Retrieve the created Grant CR and verify host field
+	grantCR := &unstructured.Unstructured{}
+	grantCR.SetGroupVersionKind(GrantGVK)
+	err = fakeClient.Get(ctx, types.NamespacedName{Name: siteName + "-grant", Namespace: ns}, grantCR)
+	require.NoError(t, err)
+
+	host, found, err := unstructured.NestedString(grantCR.Object, "spec", "host")
+	require.NoError(t, err)
+	require.True(t, found, "spec.host must be present in Grant CR")
+	assert.Equal(t, "%", host,
+		"Grant CR host must be '%' to match User CR host; mismatch causes MySQL to reject connections")
+}
+
+// TestEnsureUserAndGrantCR_HostsMatch verifies that User and Grant CRs
+// have the same host value, which is required for MySQL to apply the grant.
+func TestEnsureUserAndGrantCR_HostsMatch(t *testing.T) {
+	ns := "default"
+	siteName := "mysite"
+	mariadbName := "frappe-mariadb"
+
+	site := &vyogotechv1alpha1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: siteName, Namespace: ns},
+		Spec:       vyogotechv1alpha1.FrappeSiteSpec{SiteName: "mysite.local"},
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(site).Build()
+	p := NewMariaDBProvider(vyogotechv1alpha1.DatabaseConfig{}, fakeClient, testScheme).(*MariaDBProviderUnstructured)
+	ctx := context.Background()
+
+	_, err := p.ensureUserCR(ctx, site, mariadbName, ns, siteName+"_user")
+	require.NoError(t, err)
+	err = p.ensureGrantCR(ctx, site, mariadbName, ns, siteName+"_db", siteName+"_user")
+	require.NoError(t, err)
+
+	userCR := &unstructured.Unstructured{}
+	userCR.SetGroupVersionKind(UserGVK)
+	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: siteName + "-user", Namespace: ns}, userCR))
+
+	grantCR := &unstructured.Unstructured{}
+	grantCR.SetGroupVersionKind(GrantGVK)
+	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: siteName + "-grant", Namespace: ns}, grantCR))
+
+	userHost, _, _ := unstructured.NestedString(userCR.Object, "spec", "host")
+	grantHost, _, _ := unstructured.NestedString(grantCR.Object, "spec", "host")
+	assert.Equal(t, userHost, grantHost,
+		"User CR host (%q) and Grant CR host (%q) must match", userHost, grantHost)
+}

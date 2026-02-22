@@ -90,18 +90,36 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		}
 
 		if job.Status.Failed > 0 {
-			logger.Error(nil, "Site initialization job failed", "job", jobName, "failedCount", job.Status.Failed)
-			r.Recorder.Event(site, corev1.EventTypeWarning, "SiteInitializationFailed",
-				fmt.Sprintf("Site initialization job failed after %d attempt(s)", job.Status.Failed))
+			// Check whether the job has permanently failed (backoff limit exhausted)
+			// or is still retrying pods. A permanently failed job has a "Failed"
+			// condition with status True set by the Job controller.
+			jobPermanentlyFailed := false
+			for _, cond := range job.Status.Conditions {
+				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+					jobPermanentlyFailed = true
+					break
+				}
+			}
 
-			// Try to get pod logs for error details
+			if !jobPermanentlyFailed {
+				// Transient failure — job is still within backoffLimit, let it retry.
+				logger.Info("Site initialization job has pod failures but is still retrying",
+					"job", jobName, "failedCount", job.Status.Failed)
+				return false, nil
+			}
+
+			// Permanent failure — backoff limit exhausted.
+			logger.Error(nil, "Site initialization job permanently failed", "job", jobName, "failedCount", job.Status.Failed)
+			r.Recorder.Event(site, corev1.EventTypeWarning, "SiteInitializationFailed",
+				fmt.Sprintf("Site initialization job permanently failed after %d attempt(s)", job.Status.Failed))
+
+			// Collect pod logs for debugging
 			podList := &corev1.PodList{}
 			listOpts := []client.ListOption{
 				client.InNamespace(site.Namespace),
 				client.MatchingLabels{"job-name": jobName},
 			}
 			if err := r.List(ctx, podList, listOpts...); err == nil && len(podList.Items) > 0 {
-				// Check the most recent pod for error messages
 				pod := podList.Items[len(podList.Items)-1]
 				if pod.Status.Phase == corev1.PodFailed {
 					logger.Error(nil, "Site initialization pod failed",
@@ -110,12 +128,10 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 						"reason", pod.Status.Reason,
 						"message", pod.Status.Message)
 
-					// Fetch and log pod logs for debugging
 					if logs, err := r.GetPodLogs(ctx, pod.Namespace, pod.Name); err == nil {
 						fmt.Printf("--- Logs for failed pod %s ---\n%s\n---------------------------\n", pod.Name, logs)
 					}
 
-					// Update status with failure information
 					if len(site.Spec.Apps) > 0 {
 						site.Status.AppInstallationStatus = fmt.Sprintf("Failed to install apps: %s", pod.Status.Message)
 						r.Recorder.Event(site, corev1.EventTypeWarning, "AppInstallationFailed",
@@ -124,7 +140,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 				}
 			}
 
-			return false, fmt.Errorf("site initialization job failed")
+			return false, fmt.Errorf("site initialization job permanently failed after %d attempt(s): backoff limit exhausted", job.Status.Failed)
 		}
 		// Job is still running
 		logger.Info("Site initialization job in progress", "job", jobName)

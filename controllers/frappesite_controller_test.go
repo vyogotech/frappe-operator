@@ -141,6 +141,71 @@ var _ = Describe("FrappeSite Controller", func() {
 		})
 	})
 
+	Describe("Terminal Failure Handling (failTerminal)", func() {
+		It("should mark site phase as Failed", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			_, _ = reconciler.failTerminal(ctx, site, "init job exhausted backoff", "SiteInitializationFailed")
+
+			Expect(site.Status.Phase).To(Equal(vyogotechv1alpha1.FrappeSitePhaseFailed))
+		})
+
+		It("should return nil error so controller-runtime does not requeue", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			result, err := reconciler.failTerminal(ctx, site, "init job exhausted backoff", "SiteInitializationFailed")
+
+			// nil error = no automatic requeue by controller-runtime
+			Expect(err).NotTo(HaveOccurred(), "failTerminal must return nil error to stop the requeue loop")
+			Expect(result).To(Equal(ctrl.Result{}))
+		})
+
+		It("should set Ready condition to False with the supplied reason", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			_, _ = reconciler.failTerminal(ctx, site, "backoff exhausted", "SiteInitializationFailed")
+
+			readyCond := meta.FindStatusCondition(site.Status.Conditions, "Ready")
+			Expect(readyCond).NotTo(BeNil())
+			Expect(readyCond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(readyCond.Reason).To(Equal("SiteInitializationFailed"))
+			Expect(readyCond.Message).To(ContainSubstring("backoff exhausted"))
+		})
+
+		It("should emit a Warning event with the failure reason", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			_, _ = reconciler.failTerminal(ctx, site, "init job exhausted backoff", "SiteInitializationFailed")
+
+			Eventually(fakeRecorder.Events).Should(Receive(ContainSubstring("SiteInitializationFailed")))
+		})
+	})
+
+	Describe("Transient Failure Handling (failReconciliation)", func() {
+		It("should return a non-nil error to trigger controller-runtime requeue", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			_, err := reconciler.failReconciliation(ctx, site, "database unavailable", "DatabaseFailed")
+
+			Expect(err).To(HaveOccurred(), "failReconciliation must return non-nil error so controller-runtime requeues")
+			Expect(err.Error()).To(ContainSubstring("database unavailable"))
+		})
+
+		It("should mark site phase as Failed", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			_, _ = reconciler.failReconciliation(ctx, site, "database unavailable", "DatabaseFailed")
+
+			Expect(site.Status.Phase).To(Equal(vyogotechv1alpha1.FrappeSitePhaseFailed))
+		})
+	})
+
 	Describe("SetupWithManager", func() {
 		It("succeeds when MaxConcurrentReconciles is set", func() {
 			if skipControllerTests {

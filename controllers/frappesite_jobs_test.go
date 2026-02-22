@@ -147,4 +147,112 @@ var _ = Describe("FrappeSite Jobs", func() {
 			Expect(job.Spec.Template.Spec.Volumes).To(HaveLen(2)) // sites PVC + secrets secret
 		})
 	})
+
+	Describe("Init Job Failure Detection", func() {
+		var (
+			dbInfo  *database.DatabaseInfo
+			dbCreds *database.DatabaseCredentials
+		)
+
+		BeforeEach(func() {
+			dbInfo = &database.DatabaseInfo{Provider: "mariadb", Name: "test"}
+			dbCreds = &database.DatabaseCredentials{Username: "test", Password: "test"}
+		})
+
+		It("should return (false, nil) for transient failure — job still retrying, no JobFailed condition", func() {
+			// Job has pod failures but backoffLimit not yet exhausted:
+			// no batchv1.JobFailed condition is present.
+			transientJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      site.Name + "-init",
+					Namespace: namespace,
+					Labels:    map[string]string{"site": site.Name},
+				},
+				Status: batchv1.JobStatus{
+					Failed: 2,
+					// Deliberately no JobFailed condition — still within backoffLimit.
+				},
+			}
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Create(ctx, transientJob)).To(Succeed())
+
+			done, err := reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Expect(err).NotTo(HaveOccurred(), "transient failure should not surface as an error")
+			Expect(done).To(BeFalse())
+		})
+
+		It("should return (false, error) for permanent failure — JobFailed condition True", func() {
+			// Job has exceeded backoffLimit: Job controller sets JobFailed condition.
+			failedJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      site.Name + "-init",
+					Namespace: namespace,
+					Labels:    map[string]string{"site": site.Name},
+				},
+				Status: batchv1.JobStatus{
+					Failed: 4,
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:    batchv1.JobFailed,
+							Status:  corev1.ConditionTrue,
+							Reason:  "BackoffLimitExceeded",
+							Message: "Job has reached the specified backoff limit",
+						},
+					},
+				},
+			}
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Create(ctx, failedJob)).To(Succeed())
+
+			done, err := reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Expect(err).To(HaveOccurred(), "permanent failure must be returned as an error")
+			Expect(err.Error()).To(ContainSubstring("permanently failed"))
+			Expect(done).To(BeFalse())
+		})
+
+		It("should return (true, nil) when job succeeded", func() {
+			succeededJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      site.Name + "-init",
+					Namespace: namespace,
+					Labels:    map[string]string{"site": site.Name},
+				},
+				Status: batchv1.JobStatus{
+					Succeeded: 1,
+				},
+			}
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Create(ctx, succeededJob)).To(Succeed())
+
+			done, err := reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(done).To(BeTrue())
+		})
+
+		It("should return (false, nil) and emit a Warning event on permanent failure", func() {
+			// Permanent failure event should be recorded via the Recorder.
+			failedJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      site.Name + "-init",
+					Namespace: namespace,
+					Labels:    map[string]string{"site": site.Name},
+				},
+				Status: batchv1.JobStatus{
+					Failed: 3,
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobFailed,
+							Status: corev1.ConditionTrue,
+							Reason: "BackoffLimitExceeded",
+						},
+					},
+				},
+			}
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Create(ctx, failedJob)).To(Succeed())
+
+			_, _ = reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Eventually(fakeRecorder.Events).Should(Receive(ContainSubstring("SiteInitializationFailed")))
+		})
+	})
 })
