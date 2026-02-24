@@ -97,6 +97,15 @@ mariadb-operator:
   #   enabled: false
 
 # KEDA (Kubernetes Event Driven Autoscaler) dependency
+# Default: enabled: true — for standalone installs (kind, dev clusters, novice users)
+#          where no cluster-level KEDA is present.
+#
+# Managed clusters (e.g. production): set keda.enabled: false via your values override
+# or Helm --set so that KEDA is not duplicated alongside a cluster-managed installation.
+# Duplicate KEDA installations conflict over cluster-scoped CRDs and ClusterRoles,
+# causing RBAC errors and informer sync timeouts in both operators.
+#
+# Controlled by Chart.yaml condition: keda.enabled — setting false skips the subchart entirely.
 keda:
   enabled: true
   crds:
@@ -137,7 +146,7 @@ operatorConfig:
   # Default image configuration
   # These defaults are used when not specified in bench.spec.imageConfig
   # Individual benches can override these in their spec.imageConfig
-  defaultFrappeImage: "docker.io/frappe/erpnext:latest"
+  defaultFrappeImage: "ghcr.io/vyogotech/frappe_base:latest"
   defaultMariaDBImage: "docker.io/library/mariadb:10.6"
   defaultPostgresImage: "docker.io/library/postgres:15-alpine"
   defaultRedisImage: "docker.io/library/redis:7-alpine"
