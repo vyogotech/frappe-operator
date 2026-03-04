@@ -6,7 +6,7 @@ metadata:
 spec:
   frappeVersion: "15.0.0"
   imageConfig:
-    repository: ghcr.io/vyogotech/central-site
+    repository: ghcr.io/atxinvox/central-site
     tag: latest
     pullPolicy: Always
     pullSecrets:
