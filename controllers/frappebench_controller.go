@@ -528,6 +528,16 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
 					SecurityContext: r.getPodSecurityContext(ctx, bench),
+					ImagePullSecrets: func() []corev1.LocalObjectReference {
+						if bench.Spec.ImageConfig != nil && len(bench.Spec.ImageConfig.PullSecrets) > 0 {
+							secrets := make([]corev1.LocalObjectReference, len(bench.Spec.ImageConfig.PullSecrets))
+							for i, s := range bench.Spec.ImageConfig.PullSecrets {
+								secrets[i] = corev1.LocalObjectReference{Name: s.Name}
+							}
+							return secrets
+						}
+						return nil
+					}(),
 					Containers: []corev1.Container{
 						{
 							Name:    "bench-init",
