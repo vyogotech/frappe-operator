@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -109,6 +111,15 @@ func (r *FrappeSiteReconciler) ensureAdminPassword(ctx context.Context, site *vy
 	return adminPassword, nil
 }
 
+// generateFernetKey generates a secure 32-byte URL-safe base64 encoded Fernet key
+func (r *FrappeSiteReconciler) generateFernetKey() (string, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes for fernet key: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(key), nil
+}
+
 // ensureInitSecrets creates a Secret containing all initialization credentials
 func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string, redisAddress string) error {
 	logger := log.FromContext(ctx)
@@ -173,6 +184,79 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 	if dbCreds != nil {
 		secretData["db_user"] = []byte(dbCreds.Username)
 		secretData["db_password"] = []byte(dbCreds.Password)
+	}
+
+	// Auto-generate encryption key secret if one wasn't provided
+	if site.Spec.EncryptionKeySecretRef == nil {
+		generatedKeyName := fmt.Sprintf("%s-encryption-key", site.Name)
+		var existingEncSecret corev1.Secret
+		err := r.Get(ctx, types.NamespacedName{Name: generatedKeyName, Namespace: site.Namespace}, &existingEncSecret)
+
+		if err != nil && errors.IsNotFound(err) {
+			// Generate new Fernet key
+			fernetKey, err := r.generateFernetKey()
+			if err != nil {
+				logger.Error(err, "Failed to generate fernet encryption key")
+				return err
+			}
+
+			newEncSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      generatedKeyName,
+					Namespace: site.Namespace,
+					Labels: map[string]string{
+						"app":  "frappe",
+						"site": site.Name,
+					},
+				},
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{
+					"encryption_key": []byte(fernetKey),
+				},
+			}
+
+			if err := controllerutil.SetControllerReference(site, newEncSecret, r.Scheme); err != nil {
+				return err
+			}
+
+			if err := r.Create(ctx, newEncSecret); err != nil {
+				return fmt.Errorf("failed to create auto-generated encryption key secret: %w", err)
+			}
+			logger.Info("Created auto-generated encryption key secret", "secret", generatedKeyName)
+		} else if err != nil {
+			return err
+		}
+
+		// Self-populate the Spec ref temporarily just for this reconciliation cycle so we fetch and mount it below
+		site.Spec.EncryptionKeySecretRef = &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{Name: generatedKeyName},
+			Key:                  "encryption_key",
+		}
+	}
+
+	// Fetch custom encryption key if provided
+	if site.Spec.EncryptionKeySecretRef != nil {
+		var encSecret corev1.Secret
+		encSecretName := types.NamespacedName{
+			Name:      site.Spec.EncryptionKeySecretRef.Name,
+			Namespace: site.Namespace,
+		}
+		if err := r.Get(ctx, encSecretName, &encSecret); err != nil {
+			logger.Error(err, "Failed to get encryption key secret", "secretName", encSecretName)
+			return err
+		}
+		key := site.Spec.EncryptionKeySecretRef.Key
+		if key == "" {
+			key = "encryption_key"
+		}
+		if val, ok := encSecret.Data[key]; ok {
+			secretData["encryption_key"] = val
+			logger.Info("Using external encryption key from secret", "secret", encSecretName.Name)
+		} else {
+			err := fmt.Errorf("key %s not found in encryption key secret %s", key, encSecretName.Name)
+			logger.Error(err, "Invalid encryption key secret configuration")
+			return err
+		}
 	}
 
 	// Create or update the secret
@@ -388,11 +472,11 @@ func (r *FrappeSiteReconciler) getSiteInitResources(bench *vyogotechv1alpha1.Fra
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("128Mi"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("500m"),
-			corev1.ResourceMemory: resource.MustParse("256Mi"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 	}
 }
@@ -402,11 +486,11 @@ func (r *FrappeSiteReconciler) getSiteDeleteResources(bench *vyogotechv1alpha1.F
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("128Mi"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("500m"),
-			corev1.ResourceMemory: resource.MustParse("256Mi"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 	}
 }

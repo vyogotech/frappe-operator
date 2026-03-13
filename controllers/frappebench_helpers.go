@@ -41,6 +41,24 @@ func (r *FrappeBenchReconciler) componentLabels(bench *vyogotechv1alpha1.FrappeB
 
 // Image getters
 
+func (r *FrappeBenchReconciler) getImagePullSecrets(bench *vyogotechv1alpha1.FrappeBench) []corev1.LocalObjectReference {
+	if bench.Spec.ImageConfig != nil && len(bench.Spec.ImageConfig.PullSecrets) > 0 {
+		secrets := make([]corev1.LocalObjectReference, len(bench.Spec.ImageConfig.PullSecrets))
+		for i, s := range bench.Spec.ImageConfig.PullSecrets {
+			secrets[i] = corev1.LocalObjectReference{Name: s.Name}
+		}
+		return secrets
+	}
+	return nil
+}
+
+func (r *FrappeBenchReconciler) getImagePullPolicy(bench *vyogotechv1alpha1.FrappeBench) corev1.PullPolicy {
+	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.PullPolicy != "" {
+		return bench.Spec.ImageConfig.PullPolicy
+	}
+	return corev1.PullPolicy("") // Leave empty so Kubernetes defaults apply
+}
+
 func (r *FrappeBenchReconciler) getRedisImage(bench *vyogotechv1alpha1.FrappeBench) string {
 	if bench.Spec.RedisConfig != nil && bench.Spec.RedisConfig.Image != "" {
 		return bench.Spec.RedisConfig.Image

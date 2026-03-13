@@ -27,6 +27,85 @@ DB_PROVIDER=$(cat /tmp/site-secrets/db_provider)
 APPS_TO_INSTALL=$(cat /tmp/site-secrets/apps_to_install 2>/dev/null || echo "")
 REDIS_ADDRESS=$(cat /tmp/site-secrets/redis_address)
 SKIP_INIT=$(cat /tmp/site-secrets/skip_init 2>/dev/null || echo "false")
+ENCRYPTION_KEY=$(cat /tmp/site-secrets/encryption_key 2>/dev/null || echo "")
+
+# Centralized function to intelligently merge site_config.json without destroying existing keys
+update_site_config_json() {
+    echo "Intelligently updating site_config.json..."
+    python3 << 'PYTHON_SCRIPT'
+import json, os
+
+# Read from secret files mounted at /tmp/site-secrets
+with open('/tmp/site-secrets/site_name', 'r') as f:
+    site_name = f.read().strip()
+with open('/tmp/site-secrets/domain', 'r') as f:
+    domain = f.read().strip()
+try:
+    with open('/tmp/site-secrets/redis_address', 'r') as f:
+        redis_address = f.read().strip()
+except FileNotFoundError:
+    redis_address = ""
+with open('/tmp/site-secrets/db_host', 'r') as f:
+    db_host = f.read().strip()
+with open('/tmp/site-secrets/db_port', 'r') as f:
+    db_port = f.read().strip()
+with open('/tmp/site-secrets/db_name', 'r') as f:
+    db_name = f.read().strip()
+with open('/tmp/site-secrets/db_user', 'r') as f:
+    db_user = f.read().strip()
+with open('/tmp/site-secrets/db_password', 'r') as f:
+    db_password = f.read().strip()
+with open('/tmp/site-secrets/db_provider', 'r') as f:
+    db_provider = f.read().strip()
+
+try:
+    with open('/tmp/site-secrets/encryption_key', 'r') as f:
+        encryption_key = f.read().strip()
+except FileNotFoundError:
+    encryption_key = ""
+
+site_path = f"/home/frappe/frappe-bench/sites/{site_name}"
+config_file = os.path.join(site_path, "site_config.json")
+
+# Ensure directories exist
+os.makedirs(site_path, exist_ok=True)
+os.makedirs(os.path.join(site_path, "logs"), exist_ok=True)
+
+# Read or initialize config
+try:
+    with open(config_file, 'r') as f:
+        config = json.load(f)
+except FileNotFoundError:
+    config = {}
+
+# Update with resolved domain and redis configuration
+if domain:
+    config['host_name'] = domain
+if redis_address:
+    config['redis_cache'] = f"redis://{redis_address}"
+    config['redis_queue'] = f"redis://{redis_address}"
+
+# Explicitly add database credentials for self-healing
+config['db_name'] = db_name
+config['db_user'] = db_user
+config['db_password'] = db_password
+config['db_host'] = db_host
+config['db_port'] = int(db_port) if db_port.isdigit() else db_port
+config['db_type'] = db_provider
+
+# If an external encryption_key was securely provided, inject it
+if encryption_key:
+    config['encryption_key'] = encryption_key
+
+# Write back reliably
+with open(config_file, 'w') as f:
+    json.dump(config, f, indent=2)
+
+print(f"✓ Updated site_config.json successfully for {site_name}")
+PYTHON_SCRIPT
+}
+
+# --- Initialization Flow --- 
 
 echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
@@ -179,18 +258,8 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]] || [[
 
         mkdir -p "sites/$SITE_NAME/logs"
         
-        # Create site_config.json manually so bench migrate can run
-        cat > "sites/$SITE_NAME/site_config.json" <<EOF
-{
- "db_name": "$DB_NAME",
- "db_password": "$DB_PASSWORD",
- "db_type": "$DB_PROVIDER",
- "db_host": "$DB_HOST",
- "db_port": $((DB_PORT)),
- "db_user": "$DB_USER"
-}
-EOF
-        echo "✓ Created/Updated manual site_config.json"
+        # Merge credentials into site_config.json safely before migrating
+        update_site_config_json
         
         echo "Running bench migrate..."
         bench --site "$SITE_NAME" migrate
@@ -303,20 +372,9 @@ EOF
         echo "=========================================="
         
         # Ensure site_config.json has the correct DB credentials before migrating
-        # using bench set-config ensure proper formatting and handling
+        # using bench set-config or our python helper to ensure proper formatting and handling
         if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
-             echo "Regenerating site_config.json with current credentials..."
-             cat > "sites/$SITE_NAME/site_config.json" <<EOF
-{
- "db_name": "$DB_NAME",
- "db_password": "$DB_PASSWORD",
- "db_type": "$DB_PROVIDER",
- "db_host": "$DB_HOST",
- "db_port": $((DB_PORT)),
- "db_user": "$DB_USER"
-}
-EOF
-             echo "✓ Updated site_config.json"
+             update_site_config_json
         fi
 
         echo "1. Running bench migrate..."
@@ -360,71 +418,10 @@ fi
 
 echo "Site $SITE_NAME created successfully!"
 
-# Update site_config.json with domain and Redis configuration using Python
-echo "Updating site_config.json with domain and Redis"
-python3 << 'PYTHON_SCRIPT'
-import json, os
+# Final pass: Ensure site_config.json is up-to-date with domain and Redis configuration
+echo "Finalizing site configuration for domain: $DOMAIN and Redis: $REDIS_ADDRESS"
+update_site_config_json
 
-# Read from secret files mounted at /tmp/site-secrets
-with open('/tmp/site-secrets/site_name', 'r') as f:
-    site_name = f.read().strip()
-with open('/tmp/site-secrets/domain', 'r') as f:
-    domain = f.read().strip()
-with open('/tmp/site-secrets/bench_name', 'r') as f:
-    bench_name = f.read().strip()
-with open('/tmp/site-secrets/redis_address', 'r') as f:
-    redis_address = f.read().strip()
-with open('/tmp/site-secrets/db_host', 'r') as f:
-    db_host = f.read().strip()
-with open('/tmp/site-secrets/db_port', 'r') as f:
-    db_port = f.read().strip()
-with open('/tmp/site-secrets/db_name', 'r') as f:
-    db_name = f.read().strip()
-with open('/tmp/site-secrets/db_user', 'r') as f:
-    db_user = f.read().strip()
-with open('/tmp/site-secrets/db_password', 'r') as f:
-    db_password = f.read().strip()
-with open('/tmp/site-secrets/db_provider', 'r') as f:
-    db_provider = f.read().strip()
-
-site_path = f"/home/frappe/frappe-bench/sites/{site_name}"
-config_file = os.path.join(site_path, "site_config.json")
-
-# Read or initialize config
-try:
-    with open(config_file, 'r') as f:
-        config = json.load(f)
-except FileNotFoundError:
-    config = {}
-
-# Update with resolved domain
-config['host_name'] = domain
-
-# Add Redis configuration for this site
-config['redis_cache'] = f"redis://{redis_address}"
-config['redis_queue'] = f"redis://{redis_address}"
-
-# Explicitly add database credentials for self-healing
-config['db_name'] = db_name
-config['db_user'] = db_user
-config['db_password'] = db_password
-config['db_host'] = db_host
-config['db_port'] = int(db_port) if db_port.isdigit() else db_port
-config['db_type'] = db_provider
-
-# Ensure directory exists
-os.makedirs(site_path, exist_ok=True)
-
-# Ensure logs directory exists
-os.makedirs(os.path.join(site_path, "logs"), exist_ok=True)
-
-# Write back
-with open(config_file, 'w') as f:
-    json.dump(config, f, indent=2)
-
-print(f"Updated site_config.json for domain: {domain}")
-print(f"Redis address: {redis_address}")
-PYTHON_SCRIPT
 
 echo "Site initialization complete!"
 

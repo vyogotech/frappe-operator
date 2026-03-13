@@ -100,6 +100,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 	redisImage := r.getRedisImage(bench)
 
 	container := resources.NewContainerBuilder("redis", redisImage).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithCommand("redis-server").
 		WithArgs("--save", "", "--appendonly", "no", "--stop-writes-on-bgsave-error", "no").
 		WithPort("redis", 6379).
@@ -111,6 +112,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 		WithLabels(r.benchLabels(bench)).
 		WithSelector(r.componentLabels(bench, fmt.Sprintf("redis-%s", role))).
 		WithServiceName(stsName).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithPodSecurityContext(r.getRedisPodSecurityContext(bench)).
 		WithContainer(container).
