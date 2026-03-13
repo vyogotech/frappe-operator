@@ -251,10 +251,26 @@ func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1alpha1.S
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
 					},
+					ImagePullSecrets: func() []corev1.LocalObjectReference {
+						if bench.Spec.ImageConfig != nil && len(bench.Spec.ImageConfig.PullSecrets) > 0 {
+							secrets := make([]corev1.LocalObjectReference, len(bench.Spec.ImageConfig.PullSecrets))
+							for i, s := range bench.Spec.ImageConfig.PullSecrets {
+								secrets[i] = corev1.LocalObjectReference{Name: s.Name}
+							}
+							return secrets
+						}
+						return nil
+					}(),
 					Containers: []corev1.Container{
 						{
-							Name:    "restore",
-							Image:   r.getBenchImage(bench),
+							Name:  "restore",
+							Image: r.getBenchImage(bench),
+							ImagePullPolicy: func() corev1.PullPolicy {
+								if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.PullPolicy != "" {
+									return bench.Spec.ImageConfig.PullPolicy
+								}
+								return corev1.PullPolicy("")
+							}(),
 							Command: []string{"bash", "-c"},
 							Args:    []string{r.buildRestoreScript(siteRestore)},
 							VolumeMounts: []corev1.VolumeMount{

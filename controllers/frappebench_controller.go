@@ -540,10 +540,11 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 					}(),
 					Containers: []corev1.Container{
 						{
-							Name:    "bench-init",
-							Image:   r.getBenchImage(ctx, bench),
-							Command: []string{"bash", "-c"},
-							Args:    []string{initScript},
+							Name:            "bench-init",
+							Image:           r.getBenchImage(ctx, bench),
+							ImagePullPolicy: r.getImagePullPolicy(bench),
+							Command:         []string{"bash", "-c"},
+							Args:            []string{initScript},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("100m"),
