@@ -225,6 +225,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 	}
 
 	container := resources.NewContainerBuilder("gunicorn", image).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithPort("http", 8000).
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
@@ -240,6 +241,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, componentName)).
 		WithAnnotations(annotations).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).
@@ -345,6 +347,7 @@ func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotec
 	}
 
 	container := resources.NewContainerBuilder("nginx", image).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithArgs("nginx-entrypoint.sh").
 		WithPort("http", 8080).
 		WithEnv("BACKEND", fmt.Sprintf("%s:8000", gunicornSvc)).
@@ -366,6 +369,7 @@ func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotec
 		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, componentName)).
 		WithAnnotations(annotations).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).
@@ -465,6 +469,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 	}
 
 	container := resources.NewContainerBuilder("socketio", image).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithArgs("node", "/home/frappe/frappe-bench/apps/frappe/socketio.js").
 		WithPort("socketio", 9000).
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
@@ -481,6 +486,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, componentName)).
 		WithAnnotations(annotations).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).
@@ -554,6 +560,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 
 	container := resources.NewContainerBuilder("scheduler", image).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithArgs("bench", "schedule").
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
@@ -568,6 +575,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 		WithLabels(extraLabels).
 		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, componentName)).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).

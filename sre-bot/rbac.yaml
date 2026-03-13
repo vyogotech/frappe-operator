@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sre-bot
+  namespace: sre-bot-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sre-bot-viewer
+rules:
+  # The bot needs widespread read access to debug the cluster globally
+  - apiGroups: ["", "apps", "batch", "extensions", "networking.k8s.io", "vyogo.tech"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+  # Access to read logs from pods specifically
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sre-bot-viewer-binding
+subjects:
+  - kind: ServiceAccount
+    name: sre-bot
+    namespace: sre-bot-system
+roleRef:
+  kind: ClusterRole
+  name: sre-bot-viewer
+  apiGroup: rbac.authorization.k8s.io

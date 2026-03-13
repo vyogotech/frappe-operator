@@ -61,6 +61,15 @@ kubectl port-forward svc/basic-bench-nginx 8080:8080
 # Open http://localhost:8080
 ```
 
+### Triggering a Site Update for a New Image
+
+If you have updated the image in your `FrappeBench` (e.g. pushed a new tag to the registry) and need the operator to re-run the initialization job to pick it up, simply update or increment the `frappe.io/site-version` annotation on your `FrappeSite`:
+
+```bash
+kubectl annotate frappesite basic-site frappe.io/site-version="v2" --overwrite
+```
+This signals the operator to delete the old `bench-init` job and spin up a new one using the updated `ImageConfig`.
+
 **That's it!** You now have a running Frappe site.
 
 ## Documentation

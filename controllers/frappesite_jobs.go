@@ -200,6 +200,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 
 	// Build the container
 	container := resources.NewContainerBuilder("site-init", r.getBenchImage(ctx, bench)).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithCommand("bash", "-c").
 		WithArgs(initScript).
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
@@ -220,6 +221,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		WithLabels(extraLabels).
 		WithExtraPodLabels(extraLabels).
 		WithAnnotations(jobAnnotations).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).
 		WithTolerations(tolerations).
@@ -337,6 +339,7 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 
 		// Build the container
 		container := resources.NewContainerBuilder("site-delete", r.getBenchImage(ctx, bench)).
+			WithImagePullPolicy(r.getImagePullPolicy(bench)).
 			WithCommand("bash", "-c").
 			WithArgs(deleteScript).
 			WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
@@ -350,6 +353,7 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 		job = resources.NewJobBuilder(jobName, site.Namespace).
 			WithLabels(extraLabels).
 			WithExtraPodLabels(extraLabels).
+			WithImagePullSecrets(r.getImagePullSecrets(bench)).
 			WithNodeSelector(nodeSelector).
 			WithAffinity(affinity).
 			WithTolerations(tolerations).
