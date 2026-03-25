@@ -391,6 +391,16 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]] || [[
                 fi
             done
         fi
+        
+        echo "3. Syncing Admin Password..."
+        if [[ -n "$ADMIN_PASSWORD" ]]; then
+            bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
+            echo "✓ Admin password synchronized with Kubernetes Secret."
+        fi
+
+        echo "4. Clearing Site Cache..."
+        bench --site "$SITE_NAME" clear-cache
+        echo "✓ Site cache cleared (CSS/JS hashes reset)."
     fi
 else
     echo "ERROR: Unsupported DB provider: $DB_PROVIDER"
