@@ -241,6 +241,7 @@ func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1alpha1.S
 			},
 		},
 		Spec: batchv1.JobSpec{
+			BackoffLimit: int32Ptr(1),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,

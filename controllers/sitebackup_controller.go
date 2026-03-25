@@ -310,6 +310,7 @@ func (r *SiteBackupReconciler) buildBackupJob(siteBackup *vyogotechv1alpha1.Site
 			},
 		},
 		Spec: batchv1.JobSpec{
+			BackoffLimit: int32Ptr(1),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -390,6 +391,7 @@ func (r *SiteBackupReconciler) buildBackupCronJob(siteBackup *vyogotechv1alpha1.
 			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
+					BackoffLimit: int32Ptr(1),
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							RestartPolicy: corev1.RestartPolicyNever,
