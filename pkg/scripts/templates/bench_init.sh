@@ -42,6 +42,7 @@ fi
 # Create or update common_site_config.json
 echo "Creating common_site_config.json..."
 cat > sites/common_site_config.json <<EOF
+{
   "redis_cache": "redis://{{.RedisCacheAddress}}",
   "redis_queue": "redis://{{.RedisQueueAddress}}",
   "socketio_port": 9000
