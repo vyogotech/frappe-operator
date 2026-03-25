@@ -164,7 +164,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 				Recorder: fakeRecorder,
 			}
 
-			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost-cache:6379", "localhost-queue:6379")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify secret was created
@@ -209,7 +209,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 				Recorder: fakeRecorder,
 			}
 
-			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost-cache:6379", "localhost-queue:6379")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify secret was created
@@ -253,7 +253,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 				Recorder: fakeRecorder,
 			}
 
-			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost-cache:6379", "localhost-queue:6379")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify secret was created with only valid apps
@@ -301,7 +301,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 				Recorder: fakeRecorder,
 			}
 
-			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost-cache:6379", "localhost-queue:6379")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify event was emitted
@@ -687,7 +687,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 			dbInfo := &database.DatabaseInfo{Provider: "mariadb", Host: "host", Port: "3306", Name: "db"}
 			dbCreds := &database.DatabaseCredentials{Username: "user", Password: "pass"}
 
-			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost-cache:6379", "localhost-queue:6379")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify event contains app information
