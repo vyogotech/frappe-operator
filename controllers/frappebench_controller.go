@@ -517,8 +517,9 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 	logger.Info("Creating bench init job", "job", jobName)
 
 	initScript, err := scripts.RenderScript(scripts.BenchInit, scripts.BenchInitData{
-		BenchName:    bench.Name,
-		RedisAddress: r.resolveRedisURL(ctx, bench),
+		BenchName:         bench.Name,
+		RedisCacheAddress: r.resolveRedisCacheURL(ctx, bench),
+		RedisQueueAddress: r.resolveRedisQueueURL(ctx, bench),
 	})
 	if err != nil {
 		return false, fmt.Errorf("failed to render bench init script: %w", err)

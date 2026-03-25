@@ -85,13 +85,14 @@ func RenderScript(name ScriptName, data interface{}) (string, error) {
 
 // SiteInitData provides data for site initialization script
 type SiteInitData struct {
-	SiteName      string
-	Domain        string
-	BenchName     string
-	DBProvider    string
-	AppsToInstall []string
-	RedisAddress  string
-	SkipInit      bool
+	SiteName          string
+	Domain            string
+	BenchName         string
+	DBProvider        string
+	AppsToInstall     []string
+	RedisCacheAddress string
+	RedisQueueAddress string
+	SkipInit          bool
 }
 
 // SiteDeleteData provides data for site deletion script
@@ -101,8 +102,9 @@ type SiteDeleteData struct {
 
 // BenchInitData provides data for bench initialization script
 type BenchInitData struct {
-	BenchName    string
-	RedisAddress string
+	BenchName         string
+	RedisCacheAddress string
+	RedisQueueAddress string
 }
 
 // SiteBackupData provides data for site backup script

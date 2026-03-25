@@ -121,7 +121,7 @@ func (r *FrappeSiteReconciler) generateFernetKey() (string, error) {
 }
 
 // ensureInitSecrets creates a Secret containing all initialization credentials
-func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string, redisAddress string) error {
+func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string, redisCacheAddress string, redisQueueAddress string) error {
 	logger := log.FromContext(ctx)
 
 	secretName := fmt.Sprintf("%s-init-secrets", site.Name)
@@ -165,14 +165,15 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
-		"site_name":       []byte(site.Spec.SiteName),
-		"domain":          []byte(domain),
-		"admin_password":  []byte(adminPassword),
-		"bench_name":      []byte(bench.Name),
-		"db_provider":     []byte(dbProvider),
-		"apps_to_install": []byte(appsToInstall),
-		"redis_address":   []byte(redisAddress),
-		"skip_init":       []byte(strconv.FormatBool(site.Spec.SkipInit)),
+		"site_name":           []byte(site.Spec.SiteName),
+		"domain":              []byte(domain),
+		"admin_password":      []byte(adminPassword),
+		"bench_name":          []byte(bench.Name),
+		"db_provider":         []byte(dbProvider),
+		"apps_to_install":     []byte(appsToInstall),
+		"redis_cache_address": []byte(redisCacheAddress),
+		"redis_queue_address": []byte(redisQueueAddress),
+		"skip_init":           []byte(strconv.FormatBool(site.Spec.SkipInit)),
 	}
 
 	// Add database credentials

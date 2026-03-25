@@ -25,7 +25,8 @@ ADMIN_PASSWORD=$(cat /tmp/site-secrets/admin_password)
 BENCH_NAME=$(cat /tmp/site-secrets/bench_name)
 DB_PROVIDER=$(cat /tmp/site-secrets/db_provider)
 APPS_TO_INSTALL=$(cat /tmp/site-secrets/apps_to_install 2>/dev/null || echo "")
-REDIS_ADDRESS=$(cat /tmp/site-secrets/redis_address)
+REDIS_CACHE_ADDRESS=$(cat /tmp/site-secrets/redis_cache_address 2>/dev/null || echo "")
+REDIS_QUEUE_ADDRESS=$(cat /tmp/site-secrets/redis_queue_address 2>/dev/null || echo "")
 SKIP_INIT=$(cat /tmp/site-secrets/skip_init 2>/dev/null || echo "false")
 ENCRYPTION_KEY=$(cat /tmp/site-secrets/encryption_key 2>/dev/null || echo "")
 
@@ -41,10 +42,15 @@ with open('/tmp/site-secrets/site_name', 'r') as f:
 with open('/tmp/site-secrets/domain', 'r') as f:
     domain = f.read().strip()
 try:
-    with open('/tmp/site-secrets/redis_address', 'r') as f:
-        redis_address = f.read().strip()
+    with open('/tmp/site-secrets/redis_cache_address', 'r') as f:
+        redis_cache_address = f.read().strip()
 except FileNotFoundError:
-    redis_address = ""
+    redis_cache_address = ""
+try:
+    with open('/tmp/site-secrets/redis_queue_address', 'r') as f:
+        redis_queue_address = f.read().strip()
+except FileNotFoundError:
+    redis_queue_address = ""
 with open('/tmp/site-secrets/db_host', 'r') as f:
     db_host = f.read().strip()
 with open('/tmp/site-secrets/db_port', 'r') as f:
@@ -81,9 +87,10 @@ except FileNotFoundError:
 # Update with resolved domain and redis configuration
 if domain:
     config['host_name'] = domain
-if redis_address:
-    config['redis_cache'] = f"redis://{redis_address}"
-    config['redis_queue'] = f"redis://{redis_address}"
+if redis_cache_address:
+    config['redis_cache'] = f"redis://{redis_cache_address}"
+if redis_queue_address:
+    config['redis_queue'] = f"redis://{redis_queue_address}"
 
 # Explicitly add database credentials for self-healing
 config['db_name'] = db_name
@@ -411,8 +418,8 @@ fi
 echo "Creating common_site_config.json..."
 cat > sites/common_site_config.json <<EOF
 {
-  "redis_cache": "redis://${REDIS_ADDRESS}",
-  "redis_queue": "redis://${REDIS_ADDRESS}",
+  "redis_cache": "redis://${REDIS_CACHE_ADDRESS}",
+  "redis_queue": "redis://${REDIS_QUEUE_ADDRESS}",
   "socketio_port": 9000
 }
 EOF
@@ -429,7 +436,7 @@ fi
 echo "Site $SITE_NAME created successfully!"
 
 # Final pass: Ensure site_config.json is up-to-date with domain and Redis configuration
-echo "Finalizing site configuration for domain: $DOMAIN and Redis: $REDIS_ADDRESS"
+echo "Finalizing site configuration for domain: $DOMAIN and Redis Cache: $REDIS_CACHE_ADDRESS / Queue: $REDIS_QUEUE_ADDRESS"
 update_site_config_json
 
 
