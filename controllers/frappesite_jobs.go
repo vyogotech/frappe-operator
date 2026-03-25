@@ -232,6 +232,8 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		WithOwner(site, r.Scheme).
 		MustBuild()
 
+	job.Spec.BackoffLimit = int32Ptr(1)
+
 	if err := r.Create(ctx, job); err != nil {
 		return false, err
 	}
@@ -363,6 +365,8 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 			WithSecretVolume("deletion-secret", deletionSecretName, resources.Int32Ptr(0400)).
 			WithOwner(site, r.Scheme).
 			MustBuild()
+
+		job.Spec.BackoffLimit = int32Ptr(1)
 
 		if err := r.Create(ctx, job); err != nil {
 			return fmt.Errorf("failed to create site deletion job: %w", err)
