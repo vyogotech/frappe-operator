@@ -485,7 +485,21 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: bench.Namespace}, job)
 	if err == nil {
-		// Job exists, check status
+		// Job exists, first check if the FrappeBench image tag has been updated
+		expectedImage := r.getBenchImage(ctx, bench)
+		if len(job.Spec.Template.Spec.Containers) > 0 {
+			currentImage := job.Spec.Template.Spec.Containers[0].Image
+			if currentImage != expectedImage {
+				logger.Info("Bench image updated, deleting old init job to re-sync assets", "oldImage", currentImage, "newImage", expectedImage)
+				if deleteErr := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); deleteErr != nil {
+					return false, deleteErr
+				}
+				// Return false so controller requeues and recreates the job on the next loop
+				return false, nil
+			}
+		}
+
+		// Job exists and is up to date, check status
 		if job.Status.Succeeded > 0 {
 			return true, nil
 		}
