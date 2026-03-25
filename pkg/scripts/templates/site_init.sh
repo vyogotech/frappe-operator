@@ -119,8 +119,15 @@ echo "Domain: $DOMAIN"
 
 # If the site directory already exists, skip creation but update config
 if [[ -d "/home/frappe/frappe-bench/sites/$SITE_NAME" ]]; then
-    echo "Site $SITE_NAME already exists; skipping new-site and updating config."
-    goto_update_config=1
+    if [[ -f "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete" ]]; then
+        echo "Site $SITE_NAME already exists and is initialized; skipping new-site and updating config."
+        goto_update_config=1
+    else
+        echo "Warning: Site directory exists but .init_complete is missing! A previous new-site attempt failed halfway."
+        echo "Cleaning up directory to allow bench new-site to recreate it cleanly..."
+        rm -rf "/home/frappe/frappe-bench/sites/$SITE_NAME"
+        goto_update_config=0
+    fi
 else
     goto_update_config=0
 fi
@@ -440,6 +447,7 @@ echo "Finalizing site configuration for domain: $DOMAIN and Redis Cache: $REDIS_
 update_site_config_json
 
 
+touch "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete"
 echo "Site initialization complete!"
 
 # Exit success regardless of whether new-site ran
