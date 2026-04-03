@@ -128,8 +128,8 @@ jobs:
               echo "🚀 Pushing to secondary repository: $OTHER_REPO..."
               # Use x-access-token method to avoid credential storage
               git remote add secondary "https://x-access-token:${PAT_TOKEN}@github.com/$OTHER_REPO.git"
-              git push secondary HEAD:refs/heads/$TARGET_BRANCH
-              echo "✅ Pushed to both repositories"
+              git push secondary HEAD:refs/heads/$TARGET_BRANCH || echo "⚠️ Failed to push to secondary repository: $OTHER_REPO, continuing..."
+              echo "✅ Primary repository push completed."
             else
               echo "ℹ️  PAT_TOKEN not found. Skipping push to secondary repository."
               echo "💡 TIP: add a PAT_TOKEN secret to push to both rmallam and vyogotech automatically."
