@@ -5,6 +5,9 @@ on:
     branches:
       - main
       - release
+  workflow_run:
+    workflows: ["Publish Helm Chart"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -19,9 +22,17 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # For workflow_run: only deploy if the triggering run succeeded and came from
+    # the same repository (not a fork), to prevent untrusted code execution.
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # For workflow_run, check out the head branch of the triggering run so
+          # Pages is built from the branch where chart files were committed.
+          # For push/workflow_dispatch the ref is left empty (uses event default).
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || '' }}
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
