@@ -97,10 +97,25 @@ jobs:
           else
             echo "📝 Committing changes..."
             git commit -m "chore: publish Helm chart v${{ steps.version.outputs.version }}"
-            
-            echo "🚀 Pushing to current repository..."
-            git push origin ${{ github.ref_name }}
-            
+
+            # For release events github.ref_name is the tag (e.g. v3.1.0); push the
+            # helm-repo changes to the release branch so docs.yml is triggered.
+            if [ "${{ github.event_name }}" == "release" ]; then
+              TARGET_BRANCH="release"
+            else
+              TARGET_BRANCH="${{ github.ref_name }}"
+            fi
+
+            echo "🚀 Pushing to branch: $TARGET_BRANCH..."
+            if [ -n "$PAT_TOKEN" ]; then
+              echo "🔐 Using PAT_TOKEN for primary repository push so downstream push-triggered workflows can run..."
+              git remote set-url origin "https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git"
+            else
+              echo "ℹ️  PAT_TOKEN not found for primary repository push."
+              echo "⚠️  Falling back to the default origin credentials; downstream push-triggered workflows may not run."
+            fi
+            git push origin HEAD:refs/heads/$TARGET_BRANCH
+
             # If PAT_TOKEN is available, also push to the other repository
             if [ -n "$PAT_TOKEN" ]; then
               OTHER_REPO=""
@@ -109,11 +124,11 @@ jobs:
               else
                 OTHER_REPO="rmallam/frappe-operator"
               fi
-              
+
               echo "🚀 Pushing to secondary repository: $OTHER_REPO..."
               # Use x-access-token method to avoid credential storage
               git remote add secondary "https://x-access-token:${PAT_TOKEN}@github.com/$OTHER_REPO.git"
-              git push secondary ${{ github.ref_name }}
+              git push secondary HEAD:refs/heads/$TARGET_BRANCH
               echo "✅ Pushed to both repositories"
             else
               echo "ℹ️  PAT_TOKEN not found. Skipping push to secondary repository."
