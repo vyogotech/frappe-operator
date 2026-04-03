@@ -103,7 +103,7 @@ jobs:
             if [ "${{ github.event_name }}" == "release" ]; then
               TARGET_BRANCH="release"
             elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-              TARGET_BRANCH="main"
+              TARGET_BRANCH="${{ github.ref_name }}"
             else
               TARGET_BRANCH="${{ github.ref_name }}"
             fi
