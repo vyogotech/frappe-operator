@@ -41,7 +41,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: [kind, openshift]
-        scenario: [basic, external, scaling, custom-apps, advanced-config]
+        scenario: [basic, external, scaling, custom-apps, advanced-config, backup-restore]
     steps:
       - uses: actions/checkout@v4
 
