@@ -151,8 +151,19 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     echo "Current Status: Bench=$BENCH_PHASE, Site=$SITE_PHASE ($ELAPSED/$TIMEOUT)"
     
     if [ "$BENCH_PHASE" == "Ready" ] && [ "$SITE_PHASE" == "Ready" ]; then
-        log "✅ SUCCESS: All resources are Ready!"
-        break
+        if [ "$SCENARIO" == "backup-restore" ]; then
+            BACKUP_PHASE=$(kubectl get sitebackup -n $NAMESPACE -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "Unknown")
+            echo "Backup Status: $BACKUP_PHASE"
+            if [ "$BACKUP_PHASE" == "Completed" ]; then
+                log "✅ SUCCESS: All resources are Ready and Backup is Completed!"
+                break
+            elif [ "$BACKUP_PHASE" == "Failed" ]; then
+                error "FAILED: SiteBackup reached Failed phase."
+            fi
+        else
+            log "✅ SUCCESS: All resources are Ready!"
+            break
+        fi
     fi
     
     if [ "$BENCH_PHASE" == "Failed" ] || [ "$SITE_PHASE" == "Failed" ]; then

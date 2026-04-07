@@ -1,0 +1,83 @@
+name: Validate Example Manifests
+
+on:
+  push:
+    paths:
+      - 'examples/**'
+      - 'deploy/**'
+      - 'api/**'
+      - 'config/crd/**'
+      - '.github/workflows/validate-manifests.yml'
+  pull_request:
+    paths:
+      - 'examples/**'
+      - 'deploy/**'
+      - 'api/**'
+      - 'config/crd/**'
+      - '.github/workflows/validate-manifests.yml'
+
+jobs:
+  validate:
+    name: Structural Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Setup Kind
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: manifest-validation
+          
+      - name: Install Operator CRDs
+        run: |
+          make manifests
+          make install
+          
+      - name: Apply core prerequisites
+        run: |
+          kubectl create namespace frappe
+          # We might need mariadb and keda CRDs to successfully dry-run test files that reference them
+          # Install mariadb CRDs
+          kubectl apply -f https://github.com/mariadb-operator/mariadb-operator/releases/latest/download/crds.yaml
+          
+      - name: Validate examples/ (Server Dry Run)
+        run: |
+          for file in examples/*.yaml; do
+            echo "---"
+            echo "Validating $file"
+            
+            # Skip pure templates containing unexpanded domain bindings that would fail normal syntax checks
+            if [[ "$file" == *"template"* ]]; then
+               echo "Skipping template file $file"
+               continue
+            fi
+            
+            # Ensure specified namespaces exist before structural dry run applies the object
+            if grep -q "namespace:" "$file"; then
+              ns=$(awk '/namespace:/ {print $2}' "$file" | head -1)
+              kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - || true
+            fi
+            
+            # Perform structurally bounded dry-run compilation against the active API server
+            kubectl apply -f "$file" --dry-run=server || exit 1
+          done
+          
+      - name: Validate deploy/ (Server Dry Run)
+        run: |
+          for file in deploy/*.yaml; do
+            echo "---"
+            echo "Validating $file"
+            
+            if grep -q "namespace:" "$file"; then
+              ns=$(awk '/namespace:/ {print $2}' "$file" | head -1)
+              kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - || true
+            fi
+            
+            kubectl apply -f "$file" --dry-run=server || exit 1
+          done
