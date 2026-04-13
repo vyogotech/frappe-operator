@@ -11,7 +11,7 @@ spec:
   # Use custom image
   imageConfig:
     repository: ghcr.io/vyogotech/frappe_base
-    tag: sha-850f0c8@sha256:82044fdf3f69b3c95d389db331768dac17bc31ead04a49a0d45c332397f3923d
+    tag: v3.1.0
     pullPolicy: Always
 
   # Apps to install

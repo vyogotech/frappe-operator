@@ -100,6 +100,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 	redisImage := r.getRedisImage(bench)
 
 	container := resources.NewContainerBuilder("redis", redisImage).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithCommand("redis-server").
 		WithArgs("--save", "", "--appendonly", "no", "--stop-writes-on-bgsave-error", "no").
 		WithPort("redis", 6379).
@@ -111,6 +112,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 		WithLabels(r.benchLabels(bench)).
 		WithSelector(r.componentLabels(bench, fmt.Sprintf("redis-%s", role))).
 		WithServiceName(stsName).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithPodSecurityContext(r.getRedisPodSecurityContext(bench)).
 		WithContainer(container).
@@ -132,14 +134,52 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 	return r.Update(ctx, sts)
 }
 
-// resolveRedisURL returns the Redis connection URL for the bench
-func (r *FrappeBenchReconciler) resolveRedisURL(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+// resolveRedisCacheURL returns the Redis cache connection URL for the bench
+func (r *FrappeBenchReconciler) resolveRedisCacheURL(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
 	// Default internal Redis URL
 	host := fmt.Sprintf("%s-redis-cache", bench.Name)
 	port := int32(6379)
 	password := ""
 
 	// If external Redis is configured, resolve host, port, and password
+	if bench.Spec.RedisConfig != nil && bench.Spec.RedisConfig.External {
+		if bench.Spec.RedisConfig.Host != "" {
+			host = bench.Spec.RedisConfig.Host
+		}
+		if bench.Spec.RedisConfig.Port > 0 {
+			port = bench.Spec.RedisConfig.Port
+		}
+
+		// Resolve password from secret if provided
+		if bench.Spec.RedisConfig.ConnectionSecretRef != nil {
+			secret := &corev1.Secret{}
+			err := r.Get(ctx, types.NamespacedName{
+				Name:      bench.Spec.RedisConfig.ConnectionSecretRef.Name,
+				Namespace: bench.Namespace,
+			}, secret)
+			if err == nil {
+				if p, ok := secret.Data["password"]; ok {
+					password = string(p)
+				}
+			}
+		}
+	}
+
+	if password != "" {
+		return fmt.Sprintf(":%s@%s:%d", password, host, port)
+	}
+	return fmt.Sprintf("%s:%d", host, port)
+}
+
+// resolveRedisQueueURL returns the Redis queue connection URL for the bench
+func (r *FrappeBenchReconciler) resolveRedisQueueURL(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+	// Default internal Redis URL
+	host := fmt.Sprintf("%s-redis-queue", bench.Name)
+	port := int32(6379)
+	password := ""
+
+	// If external Redis is configured, resolve host, port, and password
+	// (usually external configurations share the same endpoint for cache and queue)
 	if bench.Spec.RedisConfig != nil && bench.Spec.RedisConfig.External {
 		if bench.Spec.RedisConfig.Host != "" {
 			host = bench.Spec.RedisConfig.Host

@@ -295,7 +295,7 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 		}
 	})
 
-	t.Run("resolveRedisURL", func(t *testing.T) {
+	t.Run("resolveRedisCacheURL", func(t *testing.T) {
 		bench := &vyogotechv1alpha1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
 			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
@@ -303,7 +303,7 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
 
-		addr := r.resolveRedisURL(context.TODO(), bench)
+		addr := r.resolveRedisCacheURL(context.TODO(), bench)
 		if addr == "" {
 			t.Error("Expected non-empty Redis address")
 		}
