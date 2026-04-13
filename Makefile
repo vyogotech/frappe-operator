@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 2.6.3
+VERSION ?= 3.1.0
 CONTAINER_TOOL ?= podman
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -139,6 +139,13 @@ e2e-test: manifests generate docker-build ## Run end-to-end tests.
 	kubectl wait --for=condition=available --timeout=300s deployment/frappe-operator-controller-manager -n frappe-operator-system
 	# Run e2e tests
 	E2E_TEST=true go test ./test/e2e/... -v -ginkgo.v
+
+##@ Release
+
+.PHONY: bump-version
+bump-version: ## Automatically bump the operator version across the repo (e.g. make bump-version VERSION=3.2.0)
+	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is not set. Use make bump-version VERSION=X.Y.Z"; exit 1; fi
+	./scripts/bump-version.sh "$(VERSION)"
 
 ##@ Build
 

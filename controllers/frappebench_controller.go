@@ -485,7 +485,21 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: bench.Namespace}, job)
 	if err == nil {
-		// Job exists, check status
+		// Job exists, first check if the FrappeBench image tag has been updated
+		expectedImage := r.getBenchImage(ctx, bench)
+		if len(job.Spec.Template.Spec.Containers) > 0 {
+			currentImage := job.Spec.Template.Spec.Containers[0].Image
+			if currentImage != expectedImage {
+				logger.Info("Bench image updated, deleting old init job to re-sync assets", "oldImage", currentImage, "newImage", expectedImage)
+				if deleteErr := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); deleteErr != nil {
+					return false, deleteErr
+				}
+				// Return false so controller requeues and recreates the job on the next loop
+				return false, nil
+			}
+		}
+
+		// Job exists and is up to date, check status
 		if job.Status.Succeeded > 0 {
 			return true, nil
 		}
@@ -503,8 +517,9 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 	logger.Info("Creating bench init job", "job", jobName)
 
 	initScript, err := scripts.RenderScript(scripts.BenchInit, scripts.BenchInitData{
-		BenchName:    bench.Name,
-		RedisAddress: r.resolveRedisURL(ctx, bench),
+		BenchName:         bench.Name,
+		RedisCacheAddress: r.resolveRedisCacheURL(ctx, bench),
+		RedisQueueAddress: r.resolveRedisQueueURL(ctx, bench),
 	})
 	if err != nil {
 		return false, fmt.Errorf("failed to render bench init script: %w", err)
@@ -524,16 +539,28 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 			Namespace: bench.Namespace,
 		},
 		Spec: batchv1.JobSpec{
+			BackoffLimit: int32Ptr(1),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
 					SecurityContext: r.getPodSecurityContext(ctx, bench),
+					ImagePullSecrets: func() []corev1.LocalObjectReference {
+						if bench.Spec.ImageConfig != nil && len(bench.Spec.ImageConfig.PullSecrets) > 0 {
+							secrets := make([]corev1.LocalObjectReference, len(bench.Spec.ImageConfig.PullSecrets))
+							for i, s := range bench.Spec.ImageConfig.PullSecrets {
+								secrets[i] = corev1.LocalObjectReference{Name: s.Name}
+							}
+							return secrets
+						}
+						return nil
+					}(),
 					Containers: []corev1.Container{
 						{
-							Name:    "bench-init",
-							Image:   r.getBenchImage(ctx, bench),
-							Command: []string{"bash", "-c"},
-							Args:    []string{initScript},
+							Name:            "bench-init",
+							Image:           r.getBenchImage(ctx, bench),
+							ImagePullPolicy: r.getImagePullPolicy(bench),
+							Command:         []string{"bash", "-c"},
+							Args:            []string{initScript},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("100m"),

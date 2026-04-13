@@ -573,6 +573,11 @@ func (in *FrappeSiteSpec) DeepCopyInto(out *FrappeSiteSpec) {
 		*out = new(corev1.SecretReference)
 		**out = **in
 	}
+	if in.EncryptionKeySecretRef != nil {
+		in, out := &in.EncryptionKeySecretRef, &out.EncryptionKeySecretRef
+		*out = new(corev1.SecretKeySelector)
+		(*in).DeepCopyInto(*out)
+	}
 	in.DBConfig.DeepCopyInto(&out.DBConfig)
 	out.TLS = in.TLS
 	if in.Ingress != nil {

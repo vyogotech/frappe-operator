@@ -5,7 +5,7 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-    branches: [main, master]
+    branches: [main, master, release]
   workflow_dispatch:
 
 jobs:
@@ -126,6 +126,11 @@ jobs:
           echo "Installing OpenShift Route CRD to mock platform..."
           kubectl apply -f https://raw.githubusercontent.com/openshift/router/main/deploy/route_crd.yaml
           sleep 5
+
+      - name: Update Helm dependencies
+        run: |
+          cd helm/frappe-operator
+          helm dependency update
 
       - name: Install Frappe Operator
         run: |

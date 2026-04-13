@@ -68,7 +68,7 @@ spec:
     spec:
       containers:
       - name: manager
-        image: vyogo.tech/frappe-operator:latest
+        image: vyogo.tech/frappe-operator:3.1.0
         env:
         - name: FRAPPE_DEFAULT_UID
           value: "2000"        # Changes default for ALL benches
@@ -157,7 +157,7 @@ spec:
     spec:
       containers:
       - name: manager
-        image: vyogo.tech/frappe-operator:latest
+        image: vyogo.tech/frappe-operator:3.1.0
         env:
         - name: FRAPPE_DEFAULT_UID
           value: "1000"  # All benches default to UID 1000

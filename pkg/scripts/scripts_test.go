@@ -161,8 +161,9 @@ func TestRenderScript(t *testing.T) {
 	}
 	// BenchInitData
 	benchData := BenchInitData{
-		BenchName:    "e2e-bench",
-		RedisAddress: "e2e-bench-redis-cache:6379",
+		BenchName:         "e2e-bench",
+		RedisCacheAddress: "e2e-bench-redis-cache:6379",
+		RedisQueueAddress: "e2e-bench-redis-queue:6379",
 	}
 	benchContent, err := RenderScript(BenchInit, benchData)
 	if err != nil {
