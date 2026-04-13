@@ -40,6 +40,11 @@ type FrappeSiteSpec struct {
 	// +optional
 	AdminPasswordSecretRef *corev1.SecretReference `json:"adminPasswordSecretRef,omitempty"`
 
+	// EncryptionKeySecretRef references a Secret containing an external encryption_key
+	// Key must be "encryption_key" in the referenced secret
+	// +optional
+	EncryptionKeySecretRef *corev1.SecretKeySelector `json:"encryptionKeySecretRef,omitempty"`
+
 	// DBConfig defines database configuration for this site
 	// +optional
 	DBConfig DatabaseConfig `json:"dbConfig,omitempty"`

@@ -1,0 +1,19 @@
+FROM node:22-bookworm
+
+# Install OpenClaw globally
+RUN npm install -g openclaw@latest
+
+# Pre-install MCP Server Kubernetes
+RUN npm install -g mcp-server-kubernetes
+
+# Create non-root user (important for OpenShift)
+RUN addgroup --system claw && adduser --system --ingroup claw claw
+
+WORKDIR /home/claw
+
+# Copy config or let it be mounted via ConfigMap
+# Note: we use /home/claw/.openclaw as our base volume mount in Kubernetes
+USER claw
+
+ENTRYPOINT ["openclaw"]
+CMD ["gateway", "--bind", "lan", "--allow-unconfigured", "--port", "18789"]

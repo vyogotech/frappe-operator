@@ -133,6 +133,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 	}
 
 	container := resources.NewContainerBuilder("worker", image).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithArgs("bench", "worker", "--queue", queue).
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
@@ -148,6 +149,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, componentName)).
 		WithAnnotations(annotations).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).

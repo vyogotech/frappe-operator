@@ -43,8 +43,8 @@ fi
 echo "Creating common_site_config.json..."
 cat > sites/common_site_config.json <<EOF
 {
-  "redis_cache": "redis://{{.RedisAddress}}",
-  "redis_queue": "redis://{{.RedisAddress}}",
+  "redis_cache": "redis://{{.RedisCacheAddress}}",
+  "redis_queue": "redis://{{.RedisQueueAddress}}",
   "socketio_port": 9000
 }
 EOF
@@ -53,8 +53,8 @@ EOF
 if [ -d "/home/frappe/assets_cache" ]; then
     echo "Syncing pre-built assets from image to PVC..."
     mkdir -p sites/assets
-    # Use -n to not overwrite existing files, preserving permissions where possible
-    cp -rn /home/frappe/assets_cache/* sites/assets/ || true
+    # Use -R to overwrite existing files, ensuring new assets and config maps are applied
+    cp -R /home/frappe/assets_cache/* sites/assets/ || true
 fi
 
 echo "Bench configuration complete"

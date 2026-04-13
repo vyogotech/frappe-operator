@@ -1,0 +1,33 @@
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: backup-bench
+spec:
+  frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+    pullPolicy: Always
+  storageSize: 2Gi
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: backup-site
+spec:
+  benchRef:
+    name: backup-bench
+  siteName: backup.test.local
+  adminPasswordSecretRef:
+    name: backup-site-admin-password
+    key: password
+    generate: true
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: test-backup
+spec:
+  site: backup.test.local
+  withFiles: true
+  compress: true
