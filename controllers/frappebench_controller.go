@@ -38,8 +38,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -104,17 +106,21 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		bench.Status.Phase = "Initializing"
 	}
 
-	// Set progressing condition at start
-	r.setCondition(bench, metav1.Condition{
-		Type:    "Progressing",
-		Status:  metav1.ConditionTrue,
-		Reason:  "Reconciling",
-		Message: "Starting reconciliation",
-	})
-	if err := r.updateStatus(ctx, bench); err != nil {
-		logger.Error(err, "Failed to update status")
-		r.Recorder.Event(bench, corev1.EventTypeWarning, "StatusUpdateFailed", fmt.Sprintf("Failed to update status: %v", err))
-		return ctrl.Result{}, err
+	// Only set Progressing when not already in that state to avoid
+	// triggering watch events that re-enqueue immediately.
+	progressing := meta.FindStatusCondition(bench.Status.Conditions, "Progressing")
+	if progressing == nil || progressing.Status != metav1.ConditionTrue {
+		r.setCondition(bench, metav1.Condition{
+			Type:    "Progressing",
+			Status:  metav1.ConditionTrue,
+			Reason:  "Reconciling",
+			Message: "Starting reconciliation",
+		})
+		if err := r.updateStatus(ctx, bench); err != nil {
+			logger.Error(err, "Failed to update status")
+			r.Recorder.Event(bench, corev1.EventTypeWarning, "StatusUpdateFailed", fmt.Sprintf("Failed to update status: %v", err))
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Get operator configuration
@@ -836,6 +842,12 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 // SetupWithManager sets up the controller with the Manager
 func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder := ctrl.NewControllerManagedBy(mgr).
+		WithOptions(controller.Options{
+			RateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[ctrl.Request](
+				5*time.Second,
+				5*time.Minute,
+			),
+		}).
 		For(&vyogotechv1alpha1.FrappeBench{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
@@ -844,8 +856,6 @@ func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.StatefulSet{})
 
-	// Detect platform
-	// r.IsOpenShift is already set by main.go, no need to re-detect
 	if r.IsOpenShift {
 		ctrl.Log.WithName("setup").Info("OpenShift platform detected for FrappeBench")
 	}

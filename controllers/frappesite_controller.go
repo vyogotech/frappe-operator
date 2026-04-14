@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -48,6 +50,11 @@ const (
 	requeueBackoffMax        = 5 * time.Minute
 	requeueAttemptAnnotation = "frappe.vyogo.tech/requeue-attempt"
 )
+
+// requeueAttempts tracks requeue attempts in-memory to avoid writing
+// annotations on every reconcile cycle (which triggers watch events and
+// self-inflicted reconcile storms).
+var requeueAttempts sync.Map
 
 // FrappeSiteReconciler reconciles a FrappeSite object
 type FrappeSiteReconciler struct {
@@ -111,6 +118,28 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
+	// Skip redundant reconciles while a long-running init job is in progress.
+	// Status updates and annotation patches during "job running" polling trigger
+	// watch events that re-enqueue reconciles, creating a storm. Instead, when the
+	// site is already Provisioning and the spec hasn't changed, check the init job
+	// directly and return RequeueAfter without writing anything.
+	if site.DeletionTimestamp == nil &&
+		site.Status.Phase == vyogotechv1alpha1.FrappeSitePhaseProvisioning &&
+		site.Generation == site.Status.ObservedGeneration {
+		jobName := fmt.Sprintf("%s-init", site.Name)
+		job := &batchv1.Job{}
+		if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: site.Namespace}, job); err == nil {
+			if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
+				attempt := r.getRequeueAttemptInMemory(site)
+				requeueAfter := backoff.ExponentialBackoff(requeueBackoffBase, attempt, requeueBackoffMax)
+				logger.V(1).Info("Init job still running, requeueing without status write",
+					"job", jobName, "attempt", attempt, "requeueAfter", requeueAfter)
+				r.setRequeueAttemptInMemory(site, attempt+1)
+				return ctrl.Result{RequeueAfter: requeueAfter}, nil
+			}
+		}
+	}
+
 	// Handle deletion
 	if site.GetDeletionTimestamp() != nil {
 		if controllerutil.ContainsFinalizer(site, frappeSiteFinalizer) {
@@ -137,8 +166,8 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				})
 				_ = r.updateStatus(ctx, site)
 
-				attempt := r.getRequeueAttempt(site)
-				_ = r.patchRequeueAttempt(ctx, site, attempt+1)
+				attempt := r.getRequeueAttemptInMemory(site)
+				r.setRequeueAttemptInMemory(site, attempt+1)
 				return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(15*time.Second, attempt, requeueBackoffMax)}, nil
 			}
 
@@ -154,15 +183,20 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	// Set progressing condition
-	r.setCondition(site, metav1.Condition{
-		Type:    "Progressing",
-		Status:  metav1.ConditionTrue,
-		Reason:  "Reconciling",
-		Message: "Starting site reconciliation",
-	})
-	if err := r.updateStatus(ctx, site); err != nil {
-		return ctrl.Result{}, err
+	// Only set Progressing condition when transitioning from a non-progressing
+	// state. Writing status on every reconcile triggers informer watch events
+	// that re-enqueue immediately, defeating RequeueAfter backoff.
+	progressing := meta.FindStatusCondition(site.Status.Conditions, "Progressing")
+	if progressing == nil || progressing.Status != metav1.ConditionTrue {
+		r.setCondition(site, metav1.Condition{
+			Type:    "Progressing",
+			Status:  metav1.ConditionTrue,
+			Reason:  "Reconciling",
+			Message: "Starting site reconciliation",
+		})
+		if err := r.updateStatus(ctx, site); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Validate and Get Bench
@@ -185,8 +219,8 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Message: fmt.Sprintf("Failed to get referenced bench: %v", err),
 		})
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
+		attempt := r.getRequeueAttemptInMemory(site)
+		r.setRequeueAttemptInMemory(site, attempt+1)
 		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(30*time.Second, attempt, requeueBackoffMax)}, nil
 	}
 
@@ -199,8 +233,8 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Message: fmt.Sprintf("Bench %s is not ready", bench.Name),
 		})
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
+		attempt := r.getRequeueAttemptInMemory(site)
+		r.setRequeueAttemptInMemory(site, attempt+1)
 		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(requeueBackoffBase, attempt, requeueBackoffMax)}, nil
 	}
 
@@ -239,8 +273,8 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Message: "Database is being provisioned",
 		})
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
+		attempt := r.getRequeueAttemptInMemory(site)
+		r.setRequeueAttemptInMemory(site, attempt+1)
 		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(requeueBackoffBase, attempt, requeueBackoffMax)}, nil
 	}
 
@@ -266,10 +300,15 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if !siteReady {
-		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseProvisioning
-		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
+		// Only write status if the phase is actually changing to avoid
+		// triggering a watch event that immediately re-enqueues this reconcile.
+		if site.Status.Phase != vyogotechv1alpha1.FrappeSitePhaseProvisioning {
+			site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseProvisioning
+			site.Status.ObservedGeneration = site.Generation
+			_ = r.updateStatus(ctx, site)
+		}
+		attempt := r.getRequeueAttemptInMemory(site)
+		r.setRequeueAttemptInMemory(site, attempt+1)
 		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(requeueBackoffBase, attempt, requeueBackoffMax)}, nil
 	}
 
@@ -310,6 +349,9 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.updateStatus(ctx, site); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	// Reset in-memory attempt counter on success
+	r.clearRequeueAttemptInMemory(site)
 
 	ResourceTotal.WithLabelValues("frappesite", site.Namespace).Inc()
 	ReconciliationDuration.WithLabelValues("frappesite", "success").Observe(time.Since(startTime).Seconds())
@@ -367,11 +409,35 @@ func (r *FrappeSiteReconciler) updateStatus(ctx context.Context, site *vyogotech
 	})
 }
 
+func (r *FrappeSiteReconciler) requeueKey(site *vyogotechv1alpha1.FrappeSite) string {
+	return site.Namespace + "/" + site.Name
+}
+
+func (r *FrappeSiteReconciler) getRequeueAttemptInMemory(site *vyogotechv1alpha1.FrappeSite) int {
+	if v, ok := requeueAttempts.Load(r.requeueKey(site)); ok {
+		return v.(int)
+	}
+	return 0
+}
+
+func (r *FrappeSiteReconciler) setRequeueAttemptInMemory(site *vyogotechv1alpha1.FrappeSite, attempt int) {
+	requeueAttempts.Store(r.requeueKey(site), attempt)
+}
+
+func (r *FrappeSiteReconciler) clearRequeueAttemptInMemory(site *vyogotechv1alpha1.FrappeSite) {
+	requeueAttempts.Delete(r.requeueKey(site))
+}
+
 func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.Recorder == nil {
 		r.Recorder = mgr.GetEventRecorderFor("frappesite-controller")
 	}
-	opts := controller.Options{}
+	opts := controller.Options{
+		RateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[ctrl.Request](
+			5*time.Second,
+			5*time.Minute,
+		),
+	}
 	if r.MaxConcurrentReconciles > 0 {
 		opts.MaxConcurrentReconciles = r.MaxConcurrentReconciles
 	}
