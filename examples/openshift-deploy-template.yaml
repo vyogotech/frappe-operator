@@ -14,11 +14,11 @@ spec:
   redisConfig:
     type: redis
   componentAutoscaling:
-    worker-short:
+    workerShort:
       enabled: false
-    worker-long:
+    workerLong:
       enabled: false
-    worker-default:
+    workerDefault:
       enabled: false
       staticReplicas: 1
 ---
@@ -32,7 +32,6 @@ spec:
   siteName: ${DOMAIN}
   adminPasswordSecretRef:
     name: ${SITE_NAME}-admin-password
-    key: password
   dbConfig:
     provider: mariadb
   routeConfig:
