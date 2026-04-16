@@ -105,7 +105,7 @@ spec:
   redisConfig:
     type: redis
     image: redis:7-alpine
-    maxMemory: "4gb"
+    maxMemory: "4Gi"
     resources:
       requests: {cpu: "500m", memory: "1Gi"}
       limits: {cpu: "2", memory: "4Gi"}

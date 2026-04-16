@@ -37,8 +37,8 @@ spec:
     - name: erpnext
       source: image
   # Enable KEDA for stress testing
-  workerAutoscaling:
-    default:
+  componentAutoscaling:
+    worker-default:
       enabled: true
       minReplicas: 1
       maxReplicas: 5
