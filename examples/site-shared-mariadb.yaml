@@ -40,6 +40,8 @@ spec:
     name: shared-bench
   
   siteName: site1.example.com
+  adminPasswordSecretRef:
+    name: site1-admin-password
   
   # Database configuration - shared mode
   dbConfig:

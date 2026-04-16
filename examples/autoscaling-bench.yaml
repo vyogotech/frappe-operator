@@ -71,6 +71,8 @@ spec:
     name: autoscaling-bench
     namespace: default
   siteName: autoscaling.local
+  adminPasswordSecretRef:
+    name: autoscaling-site-admin-password
   dbConfig:
     provider: mariadb
     mode: shared

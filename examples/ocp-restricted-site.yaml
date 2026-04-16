@@ -8,6 +8,8 @@ spec:
     name: ocp-restricted-bench
     namespace: frappe-test
   siteName: test.example.com
+  adminPasswordSecretRef:
+    name: ocp-restricted-site-admin-password
   dbConfig:
     mode: dedicated
     provider: mariadb
