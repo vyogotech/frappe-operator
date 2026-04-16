@@ -19,6 +19,8 @@ spec:
   
   # Site domain
   siteName: erp.example.com
+  adminPasswordSecretRef:
+    name: erp-site-admin-password
   
   # Apps to install on this site
   # These apps must be available in the referenced bench
