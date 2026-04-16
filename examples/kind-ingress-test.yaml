@@ -8,9 +8,9 @@ spec:
   frappeVersion: "v15"
   
   imageConfig:
-    repository: "localhost/erpnext-fixed"
-    tag: "v15-uid1001"
-    pullPolicy: Never
+    repository: "ghcr.io/vyogotech/frappe_base"
+    tag: "latest"
+    pullPolicy: IfNotPresent
   
   security:
     podSecurityContext:
