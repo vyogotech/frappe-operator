@@ -20,8 +20,6 @@ spec:
   siteName: backup.test.local
   adminPasswordSecretRef:
     name: backup-site-admin-password
-    key: password
-    generate: true
 ---
 apiVersion: vyogo.tech/v1alpha1
 kind: SiteBackup
