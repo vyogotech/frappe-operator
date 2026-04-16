@@ -32,9 +32,7 @@ spec:
   siteName: e2e.localhost
   adminPasswordSecretRef:
     name: e2e-admin-password
-    key: password
   dbConfig:
     provider: mariadb
   ingress:
     enabled: true
-    domain: e2e.localhost
