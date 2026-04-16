@@ -13,6 +13,10 @@ on:
         required: true
         default: '1.0.0'
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -73,70 +77,40 @@ jobs:
           echo "✅ Chart packaged successfully"
           ls -la docs/helm-repo/*.tgz
 
+      - name: Fetch previous Helm index
+        run: |
+          mkdir -p docs/helm-repo
+          echo "🔍 Fetching previous index.yaml from the gh-pages branch to merge..."
+          git fetch origin gh-pages
+          if git cat-file -e origin/gh-pages:helm-repo/index.yaml 2>/dev/null; then
+            git show origin/gh-pages:helm-repo/index.yaml > docs/helm-repo/index.yaml
+            echo "✅ Found previous index.yaml in gh-pages branch"
+          else
+            echo "⚠️ No previous index.yaml found in gh-pages branch, generating a fresh one."
+          fi
+
       - name: Generate Helm repository index
         run: |
           REPO_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/helm-repo"
           echo "🔍 Generating Helm repo index for $REPO_URL..."
-          helm repo index docs/helm-repo \
-            --url "$REPO_URL" \
-            --merge docs/helm-repo/index.yaml 2>/dev/null || \
-          helm repo index docs/helm-repo \
-            --url "$REPO_URL"
+          if [ -f docs/helm-repo/index.yaml ]; then
+            helm repo index docs/helm-repo --url "$REPO_URL" --merge docs/helm-repo/index.yaml
+          else
+            helm repo index docs/helm-repo --url "$REPO_URL"
+          fi
           echo "✅ Index generated"
           cat docs/helm-repo/index.yaml | head -20
 
-      - name: Commit and push changes
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Optional PAT for pushing to the other repository
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          git add docs/helm-repo/
-          if git diff --staged --quiet; then
-            echo "⚠️  No changes to commit"
-          else
-            echo "📝 Committing changes..."
-            git commit -m "chore: publish Helm chart v${{ steps.version.outputs.version }}"
-
-            # For release events github.ref_name is the tag (e.g. v3.1.0); push the
-            # helm-repo changes to the release branch so docs.yml is triggered.
-            if [ "${{ github.event_name }}" == "release" ]; then
-              TARGET_BRANCH="release"
-            else
-              TARGET_BRANCH="${{ github.ref_name }}"
-            fi
-
-            echo "🚀 Pushing to branch: $TARGET_BRANCH..."
-            if [ -n "$PAT_TOKEN" ]; then
-              echo "🔐 Using PAT_TOKEN for primary repository push so downstream push-triggered workflows can run..."
-              git remote set-url origin "https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git"
-            else
-              echo "ℹ️  PAT_TOKEN not found for primary repository push."
-              echo "⚠️  Falling back to the default origin credentials; downstream push-triggered workflows may not run."
-            fi
-            git push origin HEAD:refs/heads/$TARGET_BRANCH
-
-            # If PAT_TOKEN is available, also push to the other repository
-            if [ -n "$PAT_TOKEN" ]; then
-              OTHER_REPO=""
-              if [ "${{ github.repository_owner }}" == "rmallam" ]; then
-                OTHER_REPO="vyogotech/frappe-operator"
-              else
-                OTHER_REPO="rmallam/frappe-operator"
-              fi
-
-              echo "🚀 Pushing to secondary repository: $OTHER_REPO..."
-              # Use x-access-token method to avoid credential storage
-              git remote add secondary "https://x-access-token:${PAT_TOKEN}@github.com/$OTHER_REPO.git"
-              git push secondary HEAD:refs/heads/$TARGET_BRANCH || echo "⚠️ Failed to push to secondary repository: $OTHER_REPO, continuing..."
-              echo "✅ Primary repository push completed."
-            else
-              echo "ℹ️  PAT_TOKEN not found. Skipping push to secondary repository."
-              echo "💡 TIP: add a PAT_TOKEN secret to push to both rmallam and vyogotech automatically."
-            fi
-          fi
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/helm-repo
+          destination_dir: helm-repo
+          keep_files: true
+          commit_message: "chore: publish Helm chart v${{ steps.version.outputs.version }}"
 
       - name: Verify chart package
         run: |
-          echo "✅ Chart packaged and published successfully!"
+          echo "✅ Chart packaged and dynamically published to gh-pages branch!"
           ls -lh docs/helm-repo/*.tgz
