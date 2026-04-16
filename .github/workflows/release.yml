@@ -61,17 +61,9 @@ jobs:
         run: |
           mkdir -p dist
           make manifests
-          # Create consolidated install.yaml
-          cat config/crd/bases/*.yaml > dist/install.yaml
-          for f in config/rbac/*.yaml; do
-            if [[ "$f" == *"kustomization.yaml" ]]; then
-              continue
-            fi
-            echo "---" >> dist/install.yaml
-            cat "$f" >> dist/install.yaml
-          done
-          echo "---" >> dist/install.yaml  
-          cat config/manager/manager.yaml >> dist/install.yaml
+          make kustomize
+          # Create consolidated install.yaml using native kustomize
+          ./bin/kustomize build config/default > dist/install.yaml
           
           # Create manifest archive
           tar czf dist/manifests-${{ steps.version.outputs.VERSION }}.tar.gz -C config .
