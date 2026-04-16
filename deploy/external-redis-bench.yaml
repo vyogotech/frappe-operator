@@ -20,12 +20,24 @@ spec:
       name: external-redis-creds
   
   # Define replicas for components
-  componentReplicas:
-    gunicorn: 1
-    nginx: 1
-    socketio: 1
-    workerDefault: 1
-    workerLong: 1
-    workerShort: 1
+  componentAutoscaling:
+    gunicorn:
+      enabled: false
+      staticReplicas: 1
+    nginx:
+      enabled: false
+      staticReplicas: 1
+    socketio:
+      enabled: false
+      staticReplicas: 1
+    worker-default:
+      enabled: false
+      staticReplicas: 1
+    worker-long:
+      enabled: false
+      staticReplicas: 1
+    worker-short:
+      enabled: false
+      staticReplicas: 1
   
   storageSize: 2Gi

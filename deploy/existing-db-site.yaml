@@ -5,6 +5,8 @@ metadata:
   namespace: frappe
 spec:
   siteName: brainwise.vyogo.tech
+  adminPasswordSecretRef:
+    name: external-mock-site-admin-password
   benchRef:
     name: autoscaling-hpa-bench
   dbConfig:
