@@ -5,6 +5,8 @@ metadata:
   namespace: frappe
 spec:
   siteName: central-site.atxinvox.com.au
+  adminPasswordSecretRef:
+    name: central-site-admin-password
   benchRef:
     name: central-bench
     namespace: frappe

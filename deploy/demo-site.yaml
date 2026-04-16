@@ -10,6 +10,8 @@ spec:
   
   # Site domain
   siteName: demo-site.example.com
+  adminPasswordSecretRef:
+    name: demo-site-admin-password
   
   # Database configuration (Shared Instance from frappe-operator-system)
   dbConfig:

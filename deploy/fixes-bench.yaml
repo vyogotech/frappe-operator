@@ -21,15 +21,28 @@ spec:
       source: image
 
   # Component replicas (minimal for development)
-  componentReplicas:
-    gunicorn: 1
-    nginx: 1
-    socketio: 1
-    scheduler: 0
-    workers:
-      default: 1
-      short: 0
-      long: 0
+  componentAutoscaling:
+    gunicorn:
+      enabled: false
+      staticReplicas: 1
+    nginx:
+      enabled: false
+      staticReplicas: 1
+    socketio:
+      enabled: false
+      staticReplicas: 1
+    scheduler:
+      enabled: false
+      staticReplicas: 0
+    worker-default:
+      enabled: false
+      staticReplicas: 1
+    worker-short:
+      enabled: false
+      staticReplicas: 0
+    worker-long:
+      enabled: false
+      staticReplicas: 0
   podConfig:
     labels:
       e2e-custom-label: verified
