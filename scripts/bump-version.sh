@@ -29,7 +29,7 @@ rm -f config/manager/kustomization.yaml.bak
 
 # 3. Update Helm Chart values.yaml
 echo "Updating helm/frappe-operator/values.yaml..."
-sed -i.bak -e "s/tag: \".*\"/tag: \"$V_VERSION\"/" helm/frappe-operator/values.yaml
+awk -v new_tag="$V_VERSION" '/operator:/ {in_operator=1} in_operator && /tag: ".*"/ {sub(/tag: ".+"/, "tag: \"" new_tag "\""); in_operator=0} {print}' helm/frappe-operator/values.yaml > helm/frappe-operator/values.yaml.tmp && mv helm/frappe-operator/values.yaml.tmp helm/frappe-operator/values.yaml
 rm -f helm/frappe-operator/values.yaml.bak
 
 # 4. Update Helm Chart.yaml
