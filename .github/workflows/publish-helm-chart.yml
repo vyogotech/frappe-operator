@@ -13,6 +13,10 @@ on:
         required: true
         default: '1.0.0'
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
