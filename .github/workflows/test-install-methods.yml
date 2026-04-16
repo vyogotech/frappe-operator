@@ -49,8 +49,9 @@ jobs:
 
       - name: Deploy Operator via install.yaml
         run: |
-          # Apply using server-side apply (dry-run) to catch decoding and schema errors immediately
-          kubectl apply -f dist/install.yaml --dry-run=server
+          # We use standard apply (without dry-run) to allow the Namespace to be physically created
+          # so subsequent namespaced resources do not fail discovery/validation.
+          kubectl apply -f dist/install.yaml
           
           echo "✅ dist/install.yaml passed strict server-side validation!"
 
