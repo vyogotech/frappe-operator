@@ -61,6 +61,8 @@ spec:
     name: local-test-bench
   
   siteName: test.local
+  adminPasswordSecretRef:
+    name: test-site-admin-password
   
   dbConfig:
     mode: dedicated

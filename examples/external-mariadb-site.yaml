@@ -18,6 +18,8 @@ spec:
   benchRef:
     name: e2e-test-bench
   siteName: external-db.local
+  adminPasswordSecretRef:
+    name: external-db-site-admin-password
   dbConfig:
     provider: external
     host: mariadb.external-services.svc.cluster.local
