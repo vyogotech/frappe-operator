@@ -140,6 +140,8 @@ jobs:
             --set operator.image.repository="$REPO" \
             --set operator.image.tag="${OPERATOR_IMAGE_TAG}" \
             --set operator.image.pullPolicy=Never \
+            --set keda.enabled=false \
+            --set mariadb-operator.enabled=false \
             --set mariadb.enabled=true \
             --namespace frappe-operator-system \
             --create-namespace \

@@ -4,6 +4,7 @@ metadata:
   name: e2e-test-bench
   namespace: default
 spec:
+  frappeVersion: "version-15"
   # Patch existing bench with advanced configuration
   podConfig:
     labels:

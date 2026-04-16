@@ -14,6 +14,8 @@ spec:
   
   # Site domain - for local testing use .localhost
   siteName: dev.localhost
+  adminPasswordSecretRef:
+    name: dev-site-admin-password
   
   # Apps to install (optional)
   # Uncomment to install apps - they must be available in the bench
