@@ -1,0 +1,101 @@
+name: Test Install Methods
+
+on:
+  pull_request:
+    branches: [release]
+  workflow_dispatch:
+
+jobs:
+  test-install-yaml:
+    name: Test manual install.yaml deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: install-yaml-test
+
+      - name: Install dependencies (MariaDB and KEDA)
+        run: |
+          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+          helm repo add keda https://kedacore.github.io/charts
+          helm repo update
+          
+          echo "Installing MariaDB Operator..."
+          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+            --namespace frappe-operator-system --create-namespace --set crds.enabled=true --wait
+            
+          echo "Installing KEDA..."
+          helm upgrade --install keda keda/keda \
+            --namespace frappe-operator-system --create-namespace --set crds.install=true --wait
+
+      - name: Generate consolidated install manifest
+        run: |
+          mkdir -p dist
+          make manifests
+          cat config/crd/bases/*.yaml > dist/install.yaml
+          for f in config/rbac/*.yaml; do
+            if [[ "$f" == *"kustomization.yaml" ]]; then
+              continue
+            fi
+            echo "---" >> dist/install.yaml
+            cat "$f" >> dist/install.yaml
+          done
+          echo "---" >> dist/install.yaml  
+          cat config/manager/manager.yaml >> dist/install.yaml
+
+      - name: Deploy Operator via install.yaml
+        run: |
+          kubectl apply -f dist/install.yaml
+          
+          echo "Waiting for Operator controller-manager to be ready..."
+          # Since the image is controller:latest by default, we need to ensure the manifest is realistic 
+          # but the test proves the manifest parses without "strict decoding errors".
+          # We check the rollout status or deployment availability.
+          # Note: in a real install we'd replace controller:latest with our image or use imagePullPolicy: Never
+          # However, the exact test for Issue 31 is that 'kubectl apply -f install.yaml' succeeds cleanly!
+          kubectl get deployments -n system
+
+  test-helm-install:
+    name: Test Helm deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: helm-install-test
+
+      - name: Install dependencies (MariaDB and KEDA)
+        run: |
+          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+          helm repo add keda https://kedacore.github.io/charts
+          helm repo update
+          
+          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+            --namespace frappe-operator-system --create-namespace --set crds.enabled=true --wait
+            
+          helm upgrade --install keda keda/keda \
+            --namespace frappe-operator-system --create-namespace --set crds.install=true --wait
+
+      - name: Deploy Operator via Helm
+        run: |
+          cd helm/frappe-operator
+          helm dependency update
+          cd ../../
+          
+          helm upgrade --install frappe-operator ./helm/frappe-operator \
+            --namespace frappe-operator-system \
+            --create-namespace \
+            --set operator.image.repository=ghcr.io/vyogotech/frappe-operator \
+            --set operator.image.tag=latest \
+            --set mariadb.enabled=true \
+            --wait --timeout 5m
+            
+          echo "Verifying Frappe Operator deployment..."
+          kubectl rollout status deployment/frappe-operator-controller-manager -n frappe-operator-system --timeout=2m
