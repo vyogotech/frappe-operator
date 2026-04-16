@@ -13,12 +13,12 @@ spec:
       source: image
   redisConfig:
     type: redis
-  workerAutoscaling:
-    short:
+  componentAutoscaling:
+    worker-short:
       enabled: false
-    long:
+    worker-long:
       enabled: false
-    default:
+    worker-default:
       enabled: false
       staticReplicas: 1
 ---
@@ -28,7 +28,8 @@ metadata:
   name: e2e-test-site
   namespace: default
 spec:
-  benchRef: e2e-test-bench
+  benchRef:
+    name: e2e-test-bench
   siteName: e2e.localhost
   adminPasswordSecretRef:
     name: e2e-admin-password
