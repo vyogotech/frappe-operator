@@ -61,6 +61,8 @@ spec:
     name: test-bench
   
   siteName: test-v2.local
+  adminPasswordSecretRef:
+    name: test-site-v2-admin-password
   
   # External database mode for simpler testing
   dbConfig:

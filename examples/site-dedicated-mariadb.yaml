@@ -11,6 +11,8 @@ spec:
     name: shared-bench  # Can still share the bench
   
   siteName: enterprise.example.com
+  adminPasswordSecretRef:
+    name: enterprise-site-admin-password
   
   # Database configuration - dedicated mode
   dbConfig:
