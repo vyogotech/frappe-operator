@@ -77,4 +77,3 @@ spec:
     mariadbRef:
       name: frappe-mariadb
       namespace: frappe-operator-system
-  domain: autoscaling.local

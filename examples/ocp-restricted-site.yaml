@@ -8,7 +8,6 @@ spec:
     name: ocp-restricted-bench
     namespace: frappe-test
   siteName: test.example.com
-  domain: test.example.com
   dbConfig:
     mode: dedicated
     provider: mariadb
