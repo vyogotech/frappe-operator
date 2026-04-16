@@ -37,8 +37,8 @@ spec:
     - name: erpnext
       source: image
   # Enable KEDA for stress testing
-  workerAutoscaling:
-    default:
+  componentAutoscaling:
+    worker-default:
       enabled: true
       minReplicas: 1
       maxReplicas: 5
@@ -53,6 +53,8 @@ spec:
   benchRef:
     name: stress-test-bench
   siteName: site1.localhost
+  adminPasswordSecretRef:
+    name: site1-shared-admin-password
   apps:
     - erpnext
 ---
@@ -66,6 +68,8 @@ spec:
   benchRef:
     name: stress-test-bench
   siteName: site2.localhost
+  adminPasswordSecretRef:
+    name: site2-shared-admin-password
   apps:
     - erpnext
 ---
@@ -79,6 +83,8 @@ spec:
   benchRef:
     name: stress-test-bench
   siteName: site3.localhost
+  adminPasswordSecretRef:
+    name: site3-dedicated-admin-password
   dbConfig:
     mode: dedicated
   apps:
@@ -94,6 +100,8 @@ spec:
   benchRef:
     name: stress-test-bench
   siteName: site4.localhost
+  adminPasswordSecretRef:
+    name: site4-shared-admin-password
   apps:
     - erpnext
 ---
@@ -107,6 +115,8 @@ spec:
   benchRef:
     name: stress-test-bench
   siteName: site5.localhost
+  adminPasswordSecretRef:
+    name: site5-dedicated-admin-password
   dbConfig:
     mode: dedicated
   apps:

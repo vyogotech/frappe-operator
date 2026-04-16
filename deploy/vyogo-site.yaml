@@ -5,6 +5,8 @@ metadata:
   namespace: frappe
 spec:
   siteName: vyogo1.apps.crc.testing
+  adminPasswordSecretRef:
+    name: vyogodemo-admin-password
   benchRef:
     name: vyogo-bench
   dbConfig:

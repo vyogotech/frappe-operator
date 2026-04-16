@@ -8,9 +8,9 @@ spec:
   frappeVersion: "v15"
   
   imageConfig:
-    repository: "localhost/erpnext-fixed"
-    tag: "v15-uid1001"
-    pullPolicy: Never
+    repository: "ghcr.io/vyogotech/frappe_base"
+    tag: "latest"
+    pullPolicy: IfNotPresent
   
   security:
     podSecurityContext:
@@ -61,6 +61,8 @@ spec:
     name: test-bench
   
   siteName: test-v2.local
+  adminPasswordSecretRef:
+    name: test-site-v2-admin-password
   
   # External database mode for simpler testing
   dbConfig:

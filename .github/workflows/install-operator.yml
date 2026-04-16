@@ -78,6 +78,8 @@ jobs:
             ${{ github.event.inputs.create_namespace == 'true' && '--create-namespace' || '' }} \
             --set operator.image.repository=${{ github.event.inputs.image_repository }} \
             --set operator.image.tag=${{ github.event.inputs.image_tag }} \
+            --set keda.enabled=false \
+            --set mariadb-operator.enabled=false \
             --set mariadb.enabled=true \
             --wait \
             --timeout 15m
