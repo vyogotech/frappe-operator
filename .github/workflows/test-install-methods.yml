@@ -36,16 +36,8 @@ jobs:
         run: |
           mkdir -p dist
           make manifests
-          cat config/crd/bases/*.yaml > dist/install.yaml
-          for f in config/rbac/*.yaml; do
-            if [[ "$f" == *"kustomization.yaml" ]]; then
-              continue
-            fi
-            echo "---" >> dist/install.yaml
-            cat "$f" >> dist/install.yaml
-          done
-          echo "---" >> dist/install.yaml  
-          cat config/manager/manager.yaml >> dist/install.yaml
+          make kustomize
+          ./bin/kustomize build config/default > dist/install.yaml
 
       - name: Deploy Operator via install.yaml
         run: |
