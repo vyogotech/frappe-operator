@@ -42,7 +42,7 @@ func init() {
 	// Navigate up from test/e2e
 	binPath := filepath.Join(cwd, "..", "..", "bin", "k8s")
 
-	filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.Name() == "etcd" && !info.IsDir() {
 			os.Setenv("KUBEBUILDER_ASSETS", filepath.Dir(path))
 			skipE2ETests = false

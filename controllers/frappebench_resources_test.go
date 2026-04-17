@@ -85,9 +85,9 @@ func TestFrappeBenchReconciler_Resources(t *testing.T) {
 
 		// Manually modify deployment to have wrong image
 		deploy := &appsv1.Deployment{}
-		client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-gunicorn", Namespace: namespace}, deploy)
+		_ = client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-gunicorn", Namespace: namespace}, deploy)
 		deploy.Spec.Template.Spec.Containers[0].Image = "wrong/image:tag"
-		client.Update(context.TODO(), deploy)
+		_ = client.Update(context.TODO(), deploy)
 
 		// Reconcile should fix it
 		if err := r.ensureGunicorn(context.TODO(), bench); err != nil {
@@ -95,7 +95,7 @@ func TestFrappeBenchReconciler_Resources(t *testing.T) {
 		}
 
 		updatedDeploy := &appsv1.Deployment{}
-		client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-gunicorn", Namespace: namespace}, updatedDeploy)
+		_ = client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-gunicorn", Namespace: namespace}, updatedDeploy)
 		if updatedDeploy.Spec.Template.Spec.Containers[0].Image == "wrong/image:tag" {
 			t.Error("Gunicorn image not updated")
 		}

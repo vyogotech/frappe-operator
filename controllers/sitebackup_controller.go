@@ -116,7 +116,7 @@ func (r *SiteBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Info(msg)
 		
 		if siteBackup.Status.Phase != "Pending" {
-			r.updateSiteBackupStatus(ctx, siteBackup, "Pending", msg, "")
+			_ = r.updateSiteBackupStatus(ctx, siteBackup, "Pending", msg, "")
 		}
 		// Requeue to check again later
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
@@ -385,7 +385,7 @@ func (r *SiteBackupReconciler) buildBackupJob(siteBackup *vyogotechv1alpha1.Site
 	}
 	applyDefaultJobTTL(&job.Spec)
 
-	controllerutil.SetControllerReference(siteBackup, job, r.Scheme)
+	_ = controllerutil.SetControllerReference(siteBackup, job, r.Scheme)
 	return job
 }
 
@@ -467,7 +467,7 @@ func (r *SiteBackupReconciler) buildBackupCronJob(siteBackup *vyogotechv1alpha1.
 		},
 	}
 
-	controllerutil.SetControllerReference(siteBackup, cronJob, r.Scheme)
+	_ = controllerutil.SetControllerReference(siteBackup, cronJob, r.Scheme)
 	applyDefaultJobTTL(&cronJob.Spec.JobTemplate.Spec)
 
 	return cronJob
