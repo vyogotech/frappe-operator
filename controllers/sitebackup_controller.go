@@ -122,9 +122,14 @@ func (r *SiteBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
+	benchNamespace := benchRef.Namespace
+	if benchNamespace == "" {
+		benchNamespace = siteBackup.Namespace
+	}
+
 	// Get the bench
 	bench := &vyogotechv1alpha1.FrappeBench{}
-	if err := r.Get(ctx, client.ObjectKey{Name: benchRef.Name, Namespace: benchRef.Namespace}, bench); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: benchRef.Name, Namespace: benchNamespace}, bench); err != nil {
 		return ctrl.Result{}, err
 	}
 
