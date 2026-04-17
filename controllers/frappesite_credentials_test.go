@@ -364,7 +364,7 @@ func TestFrappeSiteReconciler_Reconcile(t *testing.T) {
 
 	// Verify finalizer added
 	updatedSite := &vyogotechv1alpha1.FrappeSite{}
-	client.Get(context.TODO(), req.NamespacedName, updatedSite)
+	_ = client.Get(context.TODO(), req.NamespacedName, updatedSite)
 	found := false
 	for _, f := range updatedSite.Finalizers {
 		if f == "vyogo.tech/site-finalizer" {
@@ -616,7 +616,7 @@ func TestFrappeSiteReconciler_Delete(t *testing.T) {
 	}
 
 	// Verify secret deleted
-	err = client.Get(context.TODO(), types.NamespacedName{Name: siteName + "-init-secrets", Namespace: namespace}, secret)
+	_ = client.Get(context.TODO(), types.NamespacedName{Name: siteName + "-init-secrets", Namespace: namespace}, secret)
 
 	// Verify finalizer removed
 	updatedSite := &vyogotechv1alpha1.FrappeSite{}
