@@ -312,7 +312,7 @@ func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1alpha1.S
 		},
 	}
 
-	controllerutil.SetControllerReference(siteRestore, job, r.Scheme)
+	_ = controllerutil.SetControllerReference(siteRestore, job, r.Scheme)
 	return job
 }
 

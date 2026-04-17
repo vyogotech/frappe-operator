@@ -98,9 +98,9 @@ var _ = Describe("SiteBackup E2E", func() {
 			Expect(argsStr).To(ContainSubstring("--compress"))
 
 			// Clean up
-			k8sClient.Delete(ctx, backup)
-			k8sClient.Delete(ctx, site)
-			k8sClient.Delete(ctx, bench)
+			_ = k8sClient.Delete(ctx, backup)
+			_ = k8sClient.Delete(ctx, site)
+			_ = k8sClient.Delete(ctx, bench)
 		})
 
 		It("should create scheduled backups", func() {
@@ -164,9 +164,9 @@ var _ = Describe("SiteBackup E2E", func() {
 			Expect(cronJob.Spec.Schedule).To(Equal("0 2 * * *"))
 
 			// Clean up
-			k8sClient.Delete(ctx, backup)
-			k8sClient.Delete(ctx, site)
-			k8sClient.Delete(ctx, bench)
+			_ = k8sClient.Delete(ctx, backup)
+			_ = k8sClient.Delete(ctx, site)
+			_ = k8sClient.Delete(ctx, bench)
 		})
 	})
 })

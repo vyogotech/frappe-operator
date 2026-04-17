@@ -230,9 +230,9 @@ var _ = Describe("SiteBackup Controller", func() {
 
 	AfterEach(func() {
 		// Clean up
-		k8sClient.Delete(ctx, siteBackup)
-		k8sClient.Delete(ctx, site)
-		k8sClient.Delete(ctx, bench)
+		_ = k8sClient.Delete(ctx, siteBackup)
+		_ = k8sClient.Delete(ctx, site)
+		_ = k8sClient.Delete(ctx, bench)
 	})
 
 	Context("One-time backup", func() {
