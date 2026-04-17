@@ -61,7 +61,7 @@ func TestFrappeBenchReconciler_Delete(t *testing.T) {
 
 		// Verify finalizer still exists
 		updatedBench := &vyogotechv1alpha1.FrappeBench{}
-		client.Get(context.TODO(), types.NamespacedName{Name: benchName, Namespace: namespace}, updatedBench)
+		_ = client.Get(context.TODO(), types.NamespacedName{Name: benchName, Namespace: namespace}, updatedBench)
 		if len(updatedBench.Finalizers) == 0 {
 			t.Error("Finalizer removed but dependent sites exist")
 		}
@@ -125,10 +125,10 @@ func TestFrappeBenchReconciler_Delete(t *testing.T) {
 
 		// Update deployment status to 0 replicas to simulate termination
 		updatedDeploy := &appsv1.Deployment{}
-		client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-worker-default", Namespace: namespace}, updatedDeploy)
+		_ = client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-worker-default", Namespace: namespace}, updatedDeploy)
 		updatedDeploy.Status.Replicas = 0
 		updatedDeploy.Status.ReadyReplicas = 0
-		client.Status().Update(context.TODO(), updatedDeploy)
+		_ = client.Status().Update(context.TODO(), updatedDeploy)
 
 		// Pass 2: Delete PVC and remove finalizer (controller may remove finalizer here; fake client may then remove bench)
 		_, err = r.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Name: benchName, Namespace: namespace}})
@@ -143,13 +143,13 @@ func TestFrappeBenchReconciler_Delete(t *testing.T) {
 		}
 
 		// Verify deployment scaled to 0
-		client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-worker-default", Namespace: namespace}, updatedDeploy)
+		_ = client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-worker-default", Namespace: namespace}, updatedDeploy)
 		if updatedDeploy.Spec.Replicas != nil && *updatedDeploy.Spec.Replicas != 0 {
 			t.Errorf("Deployment not scaled to 0, got %d", *updatedDeploy.Spec.Replicas)
 		}
 
 		// Verify PVC deleted (or bench gone so cleanup completed)
-		err = client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-sites", Namespace: namespace}, pvc)
+		_ = client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-sites", Namespace: namespace}, pvc)
 		if !errors.IsNotFound(err) {
 			t.Logf("PVC still exists: %v", err)
 		}

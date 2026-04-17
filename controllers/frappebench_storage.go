@@ -212,6 +212,7 @@ func (r *FrappeBenchReconciler) getBenchStorageAccessMode(bench *vyogotechv1alph
 	return corev1.ReadWriteMany
 }
 
+//nolint:unused
 func (r *FrappeBenchReconciler) markStorageFallback(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 

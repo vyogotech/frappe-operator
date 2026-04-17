@@ -87,7 +87,7 @@ func TestFrappeBenchReconciler_Resources(t *testing.T) {
 		deploy := &appsv1.Deployment{}
 		client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-gunicorn", Namespace: namespace}, deploy)
 		deploy.Spec.Template.Spec.Containers[0].Image = "wrong/image:tag"
-		client.Update(context.TODO(), deploy)
+		_ = client.Update(context.TODO(), deploy)
 
 		// Reconcile should fix it
 		if err := r.ensureGunicorn(context.TODO(), bench); err != nil {

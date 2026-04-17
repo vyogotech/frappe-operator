@@ -91,7 +91,7 @@ var _ = Describe("FrappeBench Controller", func() {
 
 			result, err := reconciler.handleFinalizer(ctx, bench)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(Equal(time.Duration(0)))
 
 			updatedBench := &vyogotechv1alpha1.FrappeBench{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, updatedBench)).To(Succeed())

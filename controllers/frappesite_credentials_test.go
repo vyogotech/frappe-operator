@@ -618,9 +618,6 @@ func TestFrappeSiteReconciler_Delete(t *testing.T) {
 
 	// Verify secret deleted
 	err = client.Get(context.TODO(), types.NamespacedName{Name: siteName + "-init-secrets", Namespace: namespace}, secret)
-	if !errors.IsNotFound(err) {
-		// t.Error("Secret should be deleted") // Fake client sometimes doesn't delete immediately in tests without track
-	}
 
 	// Verify finalizer removed
 	updatedSite := &vyogotechv1alpha1.FrappeSite{}
