@@ -785,7 +785,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: bench.Namespace}, job); err == nil {
 		if job.Status.Succeeded > 0 {
 			bench.Status.Phase = "Ready"
-			isReady = true
 			r.setCondition(bench, metav1.Condition{
 				Type:    "Ready",
 				Status:  metav1.ConditionTrue,
