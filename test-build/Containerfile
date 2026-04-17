@@ -1,0 +1,49 @@
+# ── Stage 1: Builder ─────────────────────────────────────────────────
+FROM frappe/erpnext:v15 AS builder
+
+USER root
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    git build-essential python3-dev libffi-dev libmariadb-dev jq \
+  && npm install -g yarn \
+  && rm -rf /var/lib/apt/lists/*
+
+USER 1000
+WORKDIR /home/frappe/frappe-bench
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ARG APPS_JSON_BASE64
+
+RUN mkdir -p sites && \
+    echo '{"socketio_port": 9000}' > sites/common_site_config.json
+
+RUN if [ -n "${APPS_JSON_BASE64}" ]; then \
+      echo "${APPS_JSON_BASE64}" | base64 -d > apps.json && \
+      cat apps.json | jq -r \
+        'to_entries[] | .value.url + \
+        (if .value.branch and .value.branch != "" \
+         then " --branch " + .value.branch \
+         else "" end)' > apps_list.txt && \
+      while read app_args; do \
+        eval "bench get-app $app_args"; \
+      done < apps_list.txt; \
+    fi
+
+RUN bench build
+
+# ── Stage 2: Runtime ─────────────────────────────────────────────────
+FROM ttl.sh/vyogo-frappe-ocp-test-base:1h
+
+USER 1001
+WORKDIR /home/frappe/frappe-bench
+
+COPY --from=builder --chown=1001:0 /home/frappe/frappe-bench/apps ./apps
+COPY --from=builder --chown=1001:0 /home/frappe/frappe-bench/sites/assets ./assets_cache
+
+RUN for app_dir in apps/*; do \
+      if [ -d "$app_dir" ]; then \
+        if [ -f "$app_dir/setup.py" ] || [ -f "$app_dir/pyproject.toml" ]; then \
+          abs_path=$(realpath "$app_dir"); \
+          ./env/bin/pip install -e "$abs_path"; \
+        fi; \
+      fi; \
+    done
