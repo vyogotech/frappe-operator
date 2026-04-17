@@ -620,7 +620,7 @@ func TestFrappeSiteReconciler_Delete(t *testing.T) {
 
 	// Verify finalizer removed
 	updatedSite := &vyogotechv1alpha1.FrappeSite{}
-	client.Get(context.TODO(), types.NamespacedName{Name: siteName, Namespace: namespace}, updatedSite)
+	_ = client.Get(context.TODO(), types.NamespacedName{Name: siteName, Namespace: namespace}, updatedSite)
 	if len(updatedSite.Finalizers) != 0 {
 		t.Error("Finalizer not removed")
 	}
