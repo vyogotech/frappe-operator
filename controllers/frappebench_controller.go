@@ -669,6 +669,7 @@ func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogot
 }
 
 // parseAppsJSON converts legacy appsJSON to AppSource array
+//nolint:unused
 func (r *FrappeBenchReconciler) parseAppsJSON(appsJSON string) []vyogotechv1alpha1.AppSource {
 	var appNames []string
 	if err := json.Unmarshal([]byte(appsJSON), &appNames); err != nil {
@@ -827,8 +828,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 		return err
 	}
 
-	if isReady {
-	}
 
 	return nil
 }
