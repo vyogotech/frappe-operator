@@ -65,7 +65,7 @@ func init() {
 	binPath := filepath.Join(cwd, "..", "bin", "k8s")
 
 	// Try to find any etcd in bin/k8s subdirectories
-	err := filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.Name() == "etcd" && !info.IsDir() {
 			os.Setenv("KUBEBUILDER_ASSETS", filepath.Dir(path))
 			skipControllerTests = false
