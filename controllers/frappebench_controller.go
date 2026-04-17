@@ -769,7 +769,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 	}
 
 	// Determine phase and conditions
-	isReady := false
 	if bench.Status.Phase == "" || (bench.Status.Phase != "Provisioning" && bench.Status.Phase != "Ready" && bench.Status.Phase != "Initializing") {
 		bench.Status.Phase = "Provisioning"
 		r.setCondition(bench, metav1.Condition{
