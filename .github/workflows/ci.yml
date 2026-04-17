@@ -44,11 +44,13 @@ jobs:
 
       - name: Run unit tests (Machine Readable)
         run: |
+          go clean -cache -modcache
           gotestsum --format standard-verbose --jsonfile test-report.json -- -coverprofile=cover.out ./api/... ./pkg/... ./controllers/...
 
       - name: Lint codebase (Machine Readable)
         run: |
           echo "=== Linting Codebase ==="
+          $(go env GOPATH)/bin/golangci-lint cache clean
           $(go env GOPATH)/bin/golangci-lint run --out-format json > lint-report.json || true
           # Print standard output for humans too
           $(go env GOPATH)/bin/golangci-lint run
