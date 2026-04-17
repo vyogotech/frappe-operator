@@ -20,6 +20,11 @@ spec:
   siteName: backup.test.local
   adminPasswordSecretRef:
     name: backup-site-admin-password
+  dbConfig:
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: mariadb
 ---
 apiVersion: vyogo.tech/v1alpha1
 kind: SiteBackup
