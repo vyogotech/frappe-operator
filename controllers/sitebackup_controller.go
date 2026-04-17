@@ -95,9 +95,11 @@ func (r *SiteBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	var benchRef *vyogotechv1alpha1.NamespacedName
-	for _, site := range siteList.Items {
-		if site.Spec.SiteName == siteBackup.Spec.Site {
-			benchRef = site.Spec.BenchRef
+	var targetSite *vyogotechv1alpha1.FrappeSite
+	for i := range siteList.Items {
+		if siteList.Items[i].Spec.SiteName == siteBackup.Spec.Site {
+			benchRef = siteList.Items[i].Spec.BenchRef
+			targetSite = &siteList.Items[i]
 			break
 		}
 	}
@@ -108,9 +110,26 @@ func (r *SiteBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, r.updateSiteBackupStatus(ctx, siteBackup, "Failed", err.Error(), "")
 	}
 
+	// Hold backup processing until the Site is fully Ready
+	if targetSite != nil && targetSite.Status.Phase != vyogotechv1alpha1.FrappeSitePhaseReady {
+		msg := fmt.Sprintf("Waiting for FrappeSite '%s' to be Ready (currently %s)", targetSite.Name, targetSite.Status.Phase)
+		logger.Info(msg)
+		
+		if siteBackup.Status.Phase != "Pending" {
+			r.updateSiteBackupStatus(ctx, siteBackup, "Pending", msg, "")
+		}
+		// Requeue to check again later
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	benchNamespace := benchRef.Namespace
+	if benchNamespace == "" {
+		benchNamespace = siteBackup.Namespace
+	}
+
 	// Get the bench
 	bench := &vyogotechv1alpha1.FrappeBench{}
-	if err := r.Get(ctx, client.ObjectKey{Name: benchRef.Name, Namespace: benchRef.Namespace}, bench); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Name: benchRef.Name, Namespace: benchNamespace}, bench); err != nil {
 		return ctrl.Result{}, err
 	}
 
