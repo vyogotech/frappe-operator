@@ -6,13 +6,14 @@ on:
       - main
       - master
       - develop
+      - release
       - feature/**
     paths-ignore:
       - "*.md"
       - "_config.yml"
       - "docs/**"
   pull_request:
-    branches: [main, master, develop, feature/**]
+    branches: [main, master, develop, release, feature/**]
     paths-ignore:
       - "*.md"
       - "_config.yml"
