@@ -39,13 +39,8 @@ jobs:
 
       - name: Install golangci-lint and gotestsum
         run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.58.1
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
           go install gotest.tools/gotestsum@latest
-
-      - name: Run unit tests (Machine Readable)
-        run: |
-          go clean -cache -modcache
-          gotestsum --format standard-verbose --jsonfile test-report.json -- -coverprofile=cover.out ./api/... ./pkg/... ./controllers/...
 
       - name: Lint codebase (Machine Readable)
         run: |
@@ -54,6 +49,10 @@ jobs:
           $(go env GOPATH)/bin/golangci-lint run --out-format json > lint-report.json || true
           # Print standard output for humans too
           $(go env GOPATH)/bin/golangci-lint run
+
+      - name: Run unit tests (Machine Readable)
+        run: |
+          gotestsum --format standard-verbose --jsonfile test-report.json -- -coverprofile=cover.out ./api/... ./pkg/... ./controllers/...
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
