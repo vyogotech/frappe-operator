@@ -49,9 +49,9 @@ jobs:
       - name: Lint codebase (Machine Readable)
         run: |
           echo "=== Linting Codebase ==="
-          golangci-lint run --out-format json > lint-report.json || true
+          $(go env GOPATH)/bin/golangci-lint run --out-format json > lint-report.json || true
           # Print standard output for humans too
-          golangci-lint run
+          $(go env GOPATH)/bin/golangci-lint run
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
