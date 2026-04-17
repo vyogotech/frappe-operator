@@ -1,0 +1,16 @@
+FROM frappe/erpnext:v15
+
+USER root
+
+# Remap 'frappe' OS account from UID/GID 1000 → 1001
+RUN groupmod -g 1001 frappe && \
+    usermod -u 1001 -g 1001 -d /home/frappe -s /bin/bash frappe
+
+# Fix ownership on all directories the frappe process writes to
+RUN chown -R 1001:1001 /home/frappe && \
+    chown -R 1001:1001 /var/log/nginx && \
+    chown -R 1001:1001 /var/lib/nginx && \
+    chown -R 1001:1001 /run
+
+# Drop back to non-root UID 1001
+USER 1001

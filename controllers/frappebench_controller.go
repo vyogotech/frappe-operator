@@ -669,6 +669,7 @@ func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogot
 }
 
 // parseAppsJSON converts legacy appsJSON to AppSource array
+//nolint:unused
 func (r *FrappeBenchReconciler) parseAppsJSON(appsJSON string) []vyogotechv1alpha1.AppSource {
 	var appNames []string
 	if err := json.Unmarshal([]byte(appsJSON), &appNames); err != nil {
@@ -768,7 +769,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 	}
 
 	// Determine phase and conditions
-	isReady := false
 	if bench.Status.Phase == "" || (bench.Status.Phase != "Provisioning" && bench.Status.Phase != "Ready" && bench.Status.Phase != "Initializing") {
 		bench.Status.Phase = "Provisioning"
 		r.setCondition(bench, metav1.Condition{
@@ -785,7 +785,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: bench.Namespace}, job); err == nil {
 		if job.Status.Succeeded > 0 {
 			bench.Status.Phase = "Ready"
-			isReady = true
 			r.setCondition(bench, metav1.Condition{
 				Type:    "Ready",
 				Status:  metav1.ConditionTrue,
@@ -827,8 +826,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 		return err
 	}
 
-	if isReady {
-	}
 
 	return nil
 }

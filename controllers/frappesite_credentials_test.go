@@ -9,7 +9,6 @@ import (
 	"github.com/vyogotech/frappe-operator/controllers/database"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -365,7 +364,7 @@ func TestFrappeSiteReconciler_Reconcile(t *testing.T) {
 
 	// Verify finalizer added
 	updatedSite := &vyogotechv1alpha1.FrappeSite{}
-	client.Get(context.TODO(), req.NamespacedName, updatedSite)
+	_ = client.Get(context.TODO(), req.NamespacedName, updatedSite)
 	found := false
 	for _, f := range updatedSite.Finalizers {
 		if f == "vyogo.tech/site-finalizer" {
@@ -617,14 +616,11 @@ func TestFrappeSiteReconciler_Delete(t *testing.T) {
 	}
 
 	// Verify secret deleted
-	err = client.Get(context.TODO(), types.NamespacedName{Name: siteName + "-init-secrets", Namespace: namespace}, secret)
-	if !errors.IsNotFound(err) {
-		// t.Error("Secret should be deleted") // Fake client sometimes doesn't delete immediately in tests without track
-	}
+	_ = client.Get(context.TODO(), types.NamespacedName{Name: siteName + "-init-secrets", Namespace: namespace}, secret)
 
 	// Verify finalizer removed
 	updatedSite := &vyogotechv1alpha1.FrappeSite{}
-	client.Get(context.TODO(), types.NamespacedName{Name: siteName, Namespace: namespace}, updatedSite)
+	_ = client.Get(context.TODO(), types.NamespacedName{Name: siteName, Namespace: namespace}, updatedSite)
 	if len(updatedSite.Finalizers) != 0 {
 		t.Error("Finalizer not removed")
 	}

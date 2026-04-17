@@ -361,7 +361,7 @@ func TestJobBuilderBuildWithOwner(t *testing.T) {
 	if j.Name != "job" {
 		t.Errorf("Build() job name expected job, got %s", j.Name)
 	}
-	if j.OwnerReferences == nil || len(j.OwnerReferences) == 0 {
+	if len(j.OwnerReferences) == 0 {
 		t.Error("Build() with owner should set OwnerReferences")
 	}
 	j2, err2 := NewJobBuilder("job2", "default").Build()
