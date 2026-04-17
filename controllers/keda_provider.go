@@ -36,12 +36,7 @@ func (p *KEDAProvider) IsAvailable(ctx context.Context) bool {
 
 	// Attempt to list - if this succeeds, KEDA is available
 	err := p.client.List(ctx, list, client.Limit(1))
-
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, componentName string, deploymentName string, config *vyogotechv1alpha1.ComponentAutoscaling) error {
