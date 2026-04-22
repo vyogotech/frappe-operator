@@ -1,0 +1,900 @@
+# API Reference
+
+Complete specification of Frappe Operator Custom Resource Definitions (CRDs).
+
+## FrappeBench
+
+**API Group:** `vyogo.tech/v1alpha1`  
+**Kind:** `FrappeBench`
+
+A FrappeBench represents a Frappe bench environment with shared infrastructure.
+
+### Spec
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: <bench-name>
+  namespace: <namespace>
+spec:
+  # Required: Frappe version
+  frappeVersion: string
+  
+  # Optional: Apps to install as JSON array
+  appsJSON: string
+  
+  # Optional: Container image configuration
+  imageConfig:
+    repository: string
+    tag: string
+    pullPolicy: string  # Always, Never, IfNotPresent
+    pullSecrets:
+      - name: string
+  
+  # Optional: Autoscaling and replica configuration for components
+  # Map keys: nginx, gunicorn, socketio, scheduler, worker-default, worker-long, worker-short
+  # +optional
+  componentAutoscaling:
+    <component-name>:
+      enabled: bool
+      staticReplicas: int32
+      minReplicas: int32
+      maxReplicas: int32
+      provider: string    # keda or hpa
+      keda:
+        trigger: string   # cpu, memory, redis
+        targetValue: string
+      hpa:
+        metric: string    # cpu or memory
+        targetUtilization: int32
+  
+  # Optional: Resource requirements for components
+  componentResources:
+    gunicorn:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+    nginx:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+    scheduler:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+    socketio:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+    workerDefault:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+    workerLong:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+    workerShort:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+  
+  # Optional: Domain configuration
+  domainConfig:
+    suffix: string
+    autoDetect: bool
+    ingressControllerRef:
+      name: string
+      namespace: string
+  
+  # Optional: Redis/DragonFly configuration
+  redisConfig:
+    type: string  # redis or dragonfly
+    image: string
+    maxMemory: string
+    resources:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+    storageSize: string
+  
+  # Optional: Suggests max concurrent site reconciles for sites on this bench.
+  # Operator uses max(operatorConfig.maxConcurrentSiteReconciles, max across all benches).
+  # Only applied at operator startup; change requires operator restart.
+  siteReconcileConcurrency: int32
+```
+
+### Status
+
+```yaml
+status:
+  # Indicates if the bench is ready
+  ready: bool
+  
+  # List of sites using this bench
+  sites:
+    - string
+```
+
+### Field Details
+
+#### `frappeVersion` (required)
+- **Type:** `string`
+- **Description:** Frappe framework version
+- **Example:** `"version-15"`, `"v15.0.0"`
+
+#### `appsJSON` (optional)
+- **Type:** `string`
+- **Description:** JSON array of apps to install
+- **Example:** `'["erpnext", "hrms"]'`
+- **Default:** `'["frappe"]'`
+
+#### `imageConfig` (optional)
+Container image configuration.
+
+- **`repository`** (string): Image repository (e.g., `frappe/erpnext`)
+- **`tag`** (string): Image tag (e.g., `v15.0.0`)
+- **`pullPolicy`** (string): Image pull policy - `Always`, `Never`, or `IfNotPresent`
+- **`pullSecrets`** (array): Secrets for private registries
+
+#### `componentAutoscaling` (optional)
+Autoscaling and replica configuration for each component.
+
+- **`enabled`** (bool): Whether to enable autoscaling for this component. If false, uses `staticReplicas`.
+- **`staticReplicas`** (int32): Fixed number of replicas when autoscaling is disabled.
+- **`minReplicas`** (int32): Minimum number of replicas when autoscaling is enabled (supports 0 for workers).
+- **`maxReplicas`** (int32): Maximum number of replicas when autoscaling is enabled.
+- **`provider`** (string): Scaling backend - `hpa` (default) or `keda`.
+
+##### `keda` (optional)
+KEDA-specific configuration.
+- **`trigger`** (string): `cpu`, `memory`, or `redis` (for workers).
+- **`targetValue`** (string): Threshold for the trigger (e.g., `"70"` for CPU, `"5"` for Redis queue).
+
+##### `hpa` (optional)
+HPA-specific configuration.
+- **`metric`** (string): `cpu` or `memory`.
+- **`targetUtilization`** (int32): Target percentage (1-100).
+
+#### `componentResources` (optional)
+Resource requirements for each component.
+
+Each component can specify:
+- **`requests`**: Minimum guaranteed resources
+- **`limits`**: Maximum allowed resources
+
+Common values:
+```yaml
+requests: {cpu: "100m", memory: "128Mi"}
+limits: {cpu: "500m", memory: "512Mi"}
+```
+
+#### `domainConfig` (optional)
+Domain resolution configuration.
+
+- **`suffix`** (string): Domain suffix to append to site names
+- **`autoDetect`** (bool): Enable automatic domain detection (default: true)
+- **`ingressControllerRef`**: Reference to ingress controller for domain detection
+
+#### `redisConfig` (optional)
+Redis or DragonFly configuration.
+
+- **`type`** (string): `redis` or `dragonfly` (default: `redis`)
+- **`image`** (string): Custom image
+- **`maxMemory`** (string): Maximum memory (e.g., `"4gb"`)
+- **`resources`**: Resource requirements
+- **`storageSize`**: Persistent storage size
+
+#### `siteReconcileConcurrency` (optional)
+- **Type:** `int32`
+- **Description:** Suggests max concurrent FrappeSite reconciles for sites on this bench. The operator uses **max(operator config `maxConcurrentSiteReconciles`, max across all benches)** at startup. Useful when running 100+ sites. Only applied at operator startup; changing it requires an operator restart.
+- **Example:** `20`
+
+---
+
+## FrappeSite
+
+**API Group:** `vyogo.tech/v1alpha1`  
+**Kind:** `FrappeSite`
+
+A FrappeSite represents an individual Frappe site.
+
+### Spec
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: <site-name>
+  namespace: <namespace>
+spec:
+  # Required: Reference to FrappeBench
+  benchRef:
+    name: string
+    namespace: string  # optional, defaults to same namespace
+  
+  # Required: Site name (must match domain)
+  siteName: string
+  
+  # Optional: Apps to install on this site
+  # Apps are checked against container filesystem
+  # Missing apps are gracefully skipped with warnings
+  apps:
+    - string
+  
+  # Optional: Admin password secret
+  adminPasswordSecretRef:
+    name: string
+    namespace: string
+  
+  # Optional: Database configuration
+  dbConfig:
+    mode: string  # shared, dedicated, or external
+    mariadbRef:
+      name: string
+      namespace: string
+    storageSize: string
+    resources:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+    connectionSecretRef:
+      name: string
+      namespace: string
+  
+  # Optional: External domain (defaults to siteName)
+  domain: string
+  
+  # Optional: TLS configuration
+  tls:
+    enabled: bool
+    certManagerIssuer: string
+    secretName: string
+  
+  # Optional: Ingress class name
+  ingressClassName: string
+  
+  # Optional: Ingress configuration
+  ingress:
+    enabled: bool
+    className: string
+    annotations:
+      key: value
+    tls:
+      enabled: bool
+      certManagerIssuer: string
+      secretName: string
+```
+
+### Status
+
+```yaml
+status:
+  # Current phase of the site
+  phase: string  # Pending, Provisioning, Ready, Failed
+  
+  # Indicates if the referenced bench is ready
+  benchReady: bool
+  
+  # Accessible URL for the site
+  siteURL: string
+  
+  # Database connection secret name
+  dbConnectionSecret: string
+  
+  # Resolved domain after configuration
+  resolvedDomain: string
+  
+  # How domain was determined
+  domainSource: string  # explicit, bench-suffix, auto-detected, sitename-default
+  
+  # Apps that were requested for installation on this site
+  installedApps:
+    - string
+  
+  # Status of app installation
+  appInstallationStatus: string
+```
+
+### Field Details
+
+#### `benchRef` (required)
+Reference to the FrappeBench this site belongs to.
+
+```yaml
+benchRef:
+  name: "production-bench"
+  namespace: "default"  # optional
+```
+
+#### `siteName` (required)
+- **Type:** `string`
+- **Description:** Site name - MUST match the domain that will receive traffic
+- **Validation:** Must be a valid DNS name
+- **Example:** `"customer1.example.com"`, `"mysite.local"`
+
+**Important:** This is what Frappe uses to route requests based on the HTTP Host header.
+
+#### `apps` (optional)
+- **Type:** `[]string`
+- **Description:** List of apps to install on this site during creation
+- **Validation:** App names must contain only alphanumeric characters, underscores, and hyphens
+- **Behavior:** Apps are checked against the actual container filesystem; missing apps are gracefully skipped with warnings
+
+**Example:**
+```yaml
+apps:
+  - erpnext
+  - hrms
+  - custom_app
+```
+
+**Key Features:**
+- **Filesystem Verification**: Apps are validated against the actual `apps/` directory in the container
+- **Graceful Degradation**: Missing apps generate warnings but don't fail site creation
+- **Immutable After Creation**: Apps can only be installed during initial site creation
+- **Status Tracking**: View installation status via `status.appInstallationStatus` and `status.installedApps`
+
+**Important Notes:**
+- Apps must exist in the container before installation
+- Check job logs to see which apps were installed vs skipped: `kubectl logs job/<site-name>-init`
+- To add apps after creation, use bench commands directly
+
+For complete details, see the [Site App Installation Guide](SITE_APP_INSTALLATION.md).
+
+#### `adminPasswordSecretRef` (optional)
+Reference to a Secret containing the admin password.
+
+```yaml
+adminPasswordSecretRef:
+  name: "site-admin-password"
+```
+
+Secret format:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: site-admin-password
+stringData:
+  password: "your-secure-password"
+```
+
+#### `dbConfig` (optional)
+Database configuration for the site.
+
+##### Shared Mode
+```yaml
+dbConfig:
+  mode: shared
+  mariadbRef:
+    name: shared-mariadb
+    namespace: databases
+```
+
+##### Dedicated Mode
+```yaml
+dbConfig:
+  mode: dedicated
+  storageSize: "50Gi"
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+```
+
+##### External Mode
+```yaml
+dbConfig:
+  mode: external
+  connectionSecretRef:
+    name: external-db-credentials
+```
+
+External secret format:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-db-credentials
+stringData:
+  host: "mysql.example.com"
+  port: "3306"
+  database: "site_db"
+  username: "site_user"
+  password: "db_password"
+```
+
+#### `domain` (optional)
+- **Type:** `string`
+- **Description:** External domain for ingress
+- **Default:** Uses `siteName` if not specified
+- **Example:** `"customer1.example.com"`
+
+#### `tls` (optional)
+TLS configuration for the site.
+
+```yaml
+tls:
+  enabled: true
+  certManagerIssuer: "letsencrypt-prod"  # cert-manager ClusterIssuer
+  secretName: "site-tls-cert"  # optional, auto-generated if not specified
+```
+
+#### `ingressClassName` (optional)
+- **Type:** `string`
+- **Description:** Ingress class to use
+- **Example:** `"nginx"`, `"traefik"`
+
+#### `ingress` (optional)
+Complete ingress configuration.
+
+```yaml
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+  tls:
+    enabled: true
+    certManagerIssuer: "letsencrypt-prod"
+```
+
+---
+
+## SiteUser
+
+**API Group:** `vyogo.tech/v1alpha1`  
+**Kind:** `SiteUser`
+
+Manages users on a Frappe site.
+
+### Spec
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteUser
+metadata:
+  name: <user-name>
+  namespace: <namespace>
+spec:
+  # Required: Reference to FrappeSite
+  siteRef:
+    name: string
+    namespace: string
+  
+  # Required: User email
+  email: string
+  
+  # Required: First name
+  firstName: string
+  
+  # Optional: Last name
+  lastName: string
+  
+  # Optional: Roles
+  roles:
+    - string
+  
+  # Optional: Password secret
+  passwordSecretRef:
+    name: string
+```
+
+---
+
+## SiteWorkspace
+
+**API Group:** `vyogo.tech/v1alpha1`  
+**Kind:** `SiteWorkspace`
+
+Creates a workspace on a site.
+
+### Spec
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteWorkspace
+metadata:
+  name: <workspace-name>
+  namespace: <namespace>
+spec:
+  # Required: Reference to FrappeSite
+  siteRef:
+    name: string
+    namespace: string
+  
+  # Required: Workspace title
+  title: string
+  
+  # Optional: Workspace configuration
+  workspaceConfig:
+    # Workspace-specific fields
+```
+
+---
+
+## SiteDashboard
+
+**API Group:** `vyogo.tech/v1alpha1`  
+**Kind:** `SiteDashboard`
+
+Creates a dashboard on a site.
+
+### Spec
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteDashboard
+metadata:
+  name: <dashboard-name>
+  namespace: <namespace>
+spec:
+  # Required: Reference to FrappeSite
+  siteRef:
+    name: string
+    namespace: string
+  
+  # Required: Dashboard name
+  dashboardName: string
+  
+  # Optional: Dashboard charts
+  charts:
+    - string
+```
+
+---
+
+## SiteDashboardChart
+
+**API Group:** `vyogo.tech/v1alpha1`  
+**Kind:** `SiteDashboardChart`
+
+Creates a dashboard chart on a site.
+
+### Spec
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteDashboardChart
+metadata:
+  name: <chart-name>
+  namespace: <namespace>
+spec:
+  # Required: Reference to FrappeSite
+  siteRef:
+    name: string
+    namespace: string
+  
+  # Required: Chart configuration
+  chartConfig:
+    # Chart-specific fields
+```
+
+---
+
+## SiteBackup
+
+**API Group:** `vyogo.tech/v1alpha1`  
+**Kind:** `SiteBackup`
+
+Creates automated backups of Frappe sites using the `bench backup` command.
+
+### Spec
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteBackup
+metadata:
+  name: <backup-name>
+  namespace: <namespace>
+spec:
+  # Required: Site to backup (must match existing FrappeSite)
+  site: string
+
+  # Optional: Cron schedule for recurring backups (e.g., "0 2 * * *")
+  # If empty, creates one-time backup
+  schedule: string
+
+  # Optional: Include private and public files in backup
+  withFiles: bool  # default: false
+
+  # Optional: Compress backup files
+  compress: bool  # default: false
+
+  # Optional: Custom backup path for all files
+  backupPath: string
+
+  # Optional: Separate backup paths for specific components
+  backupPathDB: string
+  backupPathConf: string
+  backupPathFiles: string
+  backupPathPrivateFiles: string
+
+  # Optional: DocType filtering (comma-separated lists)
+  exclude:  # DocTypes to exclude from backup
+    - string
+  include:  # DocTypes to include in backup
+    - string
+
+  # Optional: Backup configuration
+  ignoreBackupConf: bool  # default: false
+
+  # Optional: Enable verbose backup output
+  verbose: bool  # default: false
+```
+
+### Status
+
+```yaml
+status:
+  # Phase indicates the current phase of the backup (e.g., "Running", "Succeeded", "Failed", "Scheduled").
+  phase: string
+
+  # The timestamp of the last successful backup.
+  lastBackup: metav1.Time
+
+  # The name of the last backup job or cronjob.
+  lastBackupJob: string
+
+  # Additional information about the backup status.
+  message: string
+```
+
+### Field Details
+
+#### `site` (required)
+- **Type:** `string`
+- **Description:** Name of the Frappe site to backup
+- **Validation:** Must match an existing FrappeSite resource
+
+#### `schedule` (optional)
+- **Type:** `string`
+- **Description:** Cron expression for scheduled backups
+- **Examples:**
+  - `"0 2 * * *"` - Daily at 2 AM
+  - `"0 */4 * * *"` - Every 4 hours
+  - Empty string - One-time backup only
+
+#### Backup Options
+
+##### `withFiles` (optional)
+- **Type:** `bool`
+- **Default:** `false`
+- **Description:** Include private and public files in backup
+- **Maps to:** `bench backup --with-files`
+
+##### `compress` (optional)
+- **Type:** `bool`
+- **Default:** `false`
+- **Description:** Compress backup files
+- **Maps to:** `bench backup --compress`
+
+##### Custom Paths (optional)
+- **`backupPath`**: Main backup path (all files)
+- **`backupPathDB`**: Database file path
+- **`backupPathConf`**: Configuration file path
+- **`backupPathFiles`**: Public files path
+- **`backupPathPrivateFiles`**: Private files path
+
+##### DocType Filtering
+
+###### `exclude` (optional)
+- **Type:** `[]string`
+- **Description:** DocTypes to exclude from backup
+- **Example:** `["User", "Role", "Communication"]`
+- **Maps to:** `bench backup --exclude "User,Role,Communication"`
+
+###### `include` (optional)
+- **Type:** `[]string`
+- **Description:** DocTypes to include in backup (all others excluded)
+- **Example:** `["DocType", "Module Def", "Custom Field"]`
+- **Maps to:** `bench backup --include "DocType,Module Def,Custom Field"`
+
+##### Configuration Flags
+
+###### `ignoreBackupConf` (optional)
+- **Type:** `bool`
+- **Default:** `false`
+- **Description:** Ignore backup configuration excludes/includes
+- **Maps to:** `bench backup --ignore-backup-conf`
+
+###### `verbose` (optional)
+- **Type:** `bool`
+- **Default:** `false`
+- **Description:** Enable verbose backup output
+- **Maps to:** `bench backup --verbose`
+
+---
+
+## SiteJob
+
+**API Group:** `vyogo.tech/v1alpha1`  
+**Kind:** `SiteJob`
+
+Executes custom jobs on a site.
+
+### Spec
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: SiteJob
+metadata:
+  name: <job-name>
+  namespace: <namespace>
+spec:
+  # Required: Reference to FrappeSite
+  siteRef:
+    name: string
+    namespace: string
+  
+  # Required: Job type
+  jobType: string  # migrate, backup, custom, console
+  
+  # Optional: Custom command
+  command:
+    - string
+  
+  # Optional: Job configuration
+  jobConfig:
+    # Job-specific fields
+```
+
+---
+
+## Common Types
+
+### NamespacedName
+
+Reference to a resource in a specific namespace.
+
+```yaml
+name: string      # Required: Resource name
+namespace: string # Optional: Resource namespace (defaults to same namespace)
+```
+
+### ResourceRequirements
+
+CPU and memory resource specifications.
+
+```yaml
+requests:
+  cpu: string     # e.g., "100m", "1", "2.5"
+  memory: string  # e.g., "128Mi", "1Gi", "4Gi"
+limits:
+  cpu: string
+  memory: string
+```
+
+### TLSConfig
+
+TLS certificate configuration.
+
+```yaml
+enabled: bool              # Enable TLS
+certManagerIssuer: string  # cert-manager ClusterIssuer name
+secretName: string         # TLS secret name (optional)
+```
+
+---
+
+## Examples
+
+### Minimal Bench and Site
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: dev-bench
+spec:
+  frappeVersion: "version-15"
+  appsJSON: '["erpnext"]'
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: mysite
+spec:
+  benchRef:
+    name: dev-bench
+  siteName: "mysite.local"
+  dbConfig:
+    mode: shared
+```
+
+### Production Setup
+
+```yaml
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: prod-bench
+spec:
+  frappeVersion: "version-15"
+  appsJSON: '["erpnext", "hrms"]'
+  componentAutoscaling:
+    gunicorn:
+      enabled: true
+      provider: hpa
+      minReplicas: 3
+      maxReplicas: 10
+    worker-short:
+      enabled: true
+      provider: keda
+      minReplicas: 0
+      maxReplicas: 5
+  componentResources:
+    gunicorn:
+      requests: {cpu: "1", memory: "2Gi"}
+      limits: {cpu: "2", memory: "4Gi"}
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: prod-site
+spec:
+  benchRef:
+    name: prod-bench
+  siteName: "erp.example.com"
+  domain: "erp.example.com"
+  dbConfig:
+    mode: dedicated
+    storageSize: "100Gi"
+  ingress:
+    enabled: true
+    className: "nginx"
+    tls:
+      enabled: true
+      certManagerIssuer: "letsencrypt-prod"
+```
+
+---
+
+## Validation
+
+### FrappeBench Validations
+
+- `frappeVersion` must be specified
+- Replica counts must be >= minimum values
+- Resource values must be valid Kubernetes quantities
+
+### FrappeSite Validations
+
+- `benchRef.name` must be specified
+- `siteName` must be a valid DNS name (RFC 1123)
+- `dbConfig.mode` must be one of: `shared`, `dedicated`, `external`
+- If `dbConfig.mode` is `external`, `connectionSecretRef` is required
+
+---
+
+## Status Conditions
+
+Resources report their status through the `status` field. Common patterns:
+
+### FrappeBench Status
+
+```yaml
+status:
+  ready: true
+  sites:
+    - "site1"
+    - "site2"
+```
+
+### FrappeSite Status
+
+```yaml
+status:
+  phase: "Ready"  # Pending, Provisioning, Ready, Failed
+  benchReady: true
+  siteURL: "https://mysite.example.com"
+  dbConnectionSecret: "mysite-db-connection"
+  resolvedDomain: "mysite.example.com"
+  domainSource: "explicit"
+```
+
+---
+
+## Next Steps
+
+- **[Examples](examples.md)** - Real-world configuration examples
+- **[Operations](operations.md)** - Managing resources in production
+- **[Troubleshooting](troubleshooting.md)** - Debugging issues
+

@@ -1,0 +1,242 @@
+<!DOCTYPE html> <html lang="en-US"> <head> <meta charset="UTF-8"> <meta http-equiv="X-UA-Compatible" content="IE=Edge"> <link rel="stylesheet" href="/frappe-operator/assets/css/just-the-docs-default.css"> <link rel="stylesheet" href="/frappe-operator/assets/css/just-the-docs-head-nav.css" id="jtd-head-nav-stylesheet"> <style id="jtd-nav-activation"> .site-nav > ul.nav-list:first-child > li:not(:nth-child(13)) > a, .site-nav > ul.nav-list:first-child > li > ul > li a { background-image: none; } .site-nav > ul.nav-list:not(:first-child) a, .site-nav li.external a { background-image: none; } .site-nav > ul.nav-list:first-child > li:nth-child(13) > a { font-weight: 600; text-decoration: none; }.site-nav > ul.nav-list:first-child > li:nth-child(13) > button svg { transform: rotate(-90deg); }.site-nav > ul.nav-list:first-child > li.nav-list-item:nth-child(13) > ul.nav-list { display: block; } </style> <script src="/frappe-operator/assets/js/vendor/lunr.min.js"></script> <script src="/frappe-operator/assets/js/just-the-docs.js"></script> <meta name="viewport" content="width=device-width, initial-scale=1"> <!-- Begin Jekyll SEO tag v2.8.0 --> <title>Frappe Operator on OpenShift: Full Deployment Manual | Frappe Operator</title> <meta name="generator" content="Jekyll v3.10.0" /> <meta property="og:title" content="Frappe Operator on OpenShift: Full Deployment Manual" /> <meta property="og:locale" content="en_US" /> <meta name="description" content="Production-ready Kubernetes operator for Frappe/ERPNext" /> <meta property="og:description" content="Production-ready Kubernetes operator for Frappe/ERPNext" /> <link rel="canonical" href="https://vyogotech.github.io/frappe-operator/FULL-RUNBOOK.html" /> <meta property="og:url" content="https://vyogotech.github.io/frappe-operator/FULL-RUNBOOK.html" /> <meta property="og:site_name" content="Frappe Operator" /> <meta property="og:type" content="website" /> <meta name="twitter:card" content="summary" /> <meta property="twitter:title" content="Frappe Operator on OpenShift: Full Deployment Manual" /> <script type="application/ld+json"> {"@context":"https://schema.org","@type":"WebPage","description":"Production-ready Kubernetes operator for Frappe/ERPNext","headline":"Frappe Operator on OpenShift: Full Deployment Manual","url":"https://vyogotech.github.io/frappe-operator/FULL-RUNBOOK.html"}</script> <!-- End Jekyll SEO tag --> </head> <body> <a class="skip-to-main" href="#main-content">Skip to main content</a> <svg xmlns="http://www.w3.org/2000/svg" class="d-none"> <symbol id="svg-link" viewBox="0 0 24 24"> <title>Link</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-link"> <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path> </svg> </symbol> <symbol id="svg-menu" viewBox="0 0 24 24"> <title>Menu</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"> <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line> </svg> </symbol> <symbol id="svg-arrow-right" viewBox="0 0 24 24"> <title>Expand</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"> <polyline points="9 18 15 12 9 6"></polyline> </svg> </symbol> <!-- Feather. MIT License: https://github.com/feathericons/feather/blob/master/LICENSE --> <symbol id="svg-external-link" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-external-link"> <title id="svg-external-link-title">(external link)</title> <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line> </symbol> <symbol id="svg-doc" viewBox="0 0 24 24"> <title>Document</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file"> <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline> </svg> </symbol> <symbol id="svg-search" viewBox="0 0 24 24"> <title>Search</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"> <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line> </svg> </symbol> <!-- Bootstrap Icons. MIT License: https://github.com/twbs/icons/blob/main/LICENSE.md --> <symbol id="svg-copy" viewBox="0 0 16 16"> <title>Copy</title> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard" viewBox="0 0 16 16"> <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/> <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/> </svg> </symbol> <symbol id="svg-copied" viewBox="0 0 16 16"> <title>Copied</title> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard-check-fill" viewBox="0 0 16 16"> <path d="M6.5 0A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3Zm3 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3Z"/> <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1A2.5 2.5 0 0 1 9.5 5h-3A2.5 2.5 0 0 1 4 2.5v-1Zm6.854 7.354-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L7.5 10.793l2.646-2.647a.5.5 0 0 1 .708.708Z"/> </svg> </symbol> </svg> <header class="side-bar"> <div class="site-header"> <a href="/frappe-operator/" class="site-title lh-tight"> Frappe Operator </a> <button id="menu-button" class="site-button btn-reset" aria-label="Menu" aria-expanded="false"> <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><use xlink:href="#svg-menu"></use></svg> </button> </div> <nav aria-label="Main" id="site-nav" class="site-nav"> <ul class="nav-list"><li class="nav-list-item"><a href="/frappe-operator/" class="nav-list-link">Frappe Operator Documentation</a></li><li class="nav-list-item"><a href="/frappe-operator/api-reference.html" class="nav-list-link">API Reference</a></li><li class="nav-list-item"><a href="/frappe-operator/concepts.html" class="nav-list-link">Concepts</a></li><li class="nav-list-item"><a href="/frappe-operator/examples.html" class="nav-list-link">Examples</a></li><li class="nav-list-item"><a href="/frappe-operator/external-resources.html" class="nav-list-link">External Resource Support</a></li><li class="nav-list-item"><a href="/frappe-operator/COMPREHENSIVE_GUIDE.html" class="nav-list-link">Frappe Operator - Comprehensive Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/ARCHITECTURE.html" class="nav-list-link">Frappe Operator Architecture</a></li><li class="nav-list-item"><a href="/frappe-operator/helm-repo/" class="nav-list-link">Frappe Operator Helm Repository</a></li><li class="nav-list-item"><a href="/frappe-operator/INSTALLATION_HELM.html" class="nav-list-link">Frappe Operator Installation Guide (Helm)</a></li><li class="nav-list-item"><a href="/frappe-operator/USER_GUIDE.html" class="nav-list-link">Frappe Operator User Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/demo.html" class="nav-list-link">Frappe Operator on OpenShift (CRC) Demo</a></li><li class="nav-list-item"><a href="/frappe-operator/FULL-RUNBOOK-external-db.html" class="nav-list-link">Frappe Operator on OpenShift: Full Deployment Manual</a></li><li class="nav-list-item"><a href="/frappe-operator/FULL-RUNBOOK.html" class="nav-list-link">Frappe Operator on OpenShift: Full Deployment Manual</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_NOTES_v1.0.0.html" class="nav-list-link">Frappe Operator v1.0.0 - Production Ready Release 🎉</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_GUIDE.html" class="nav-list-link">Frappe Operator v2.0.0 Release Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_NOTES_v2.4.0.html" class="nav-list-link">Frappe Operator v2.4.0 - External Database Support &amp; Robustness 🚀</a></li><li class="nav-list-item"><a href="/frappe-operator/getting-started.html" class="nav-list-link">Getting Started</a></li><li class="nav-list-item"><a href="/frappe-operator/HELM_REPOSITORY.html" class="nav-list-link">Helm Repository Setup Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/helm-repo/SETUP.html" class="nav-list-link">Helm Repository Setup Instructions</a></li><li class="nav-list-item"><a href="/frappe-operator/INSTALL_OPENSHIFT.html" class="nav-list-link">Installing Frappe Operator on OpenShift</a></li><li class="nav-list-item"><a href="/frappe-operator/MARIADB_INTEGRATION.html" class="nav-list-link">MariaDB Database Integration</a></li><li class="nav-list-item"><a href="/frappe-operator/monitoring.html" class="nav-list-link">Monitoring Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/operations.html" class="nav-list-link">Operations Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_NOTES_v2.5.0.html" class="nav-list-link">Release Notes - v2.5.0 (OpenShift Compatibility &amp; Security)</a></li><li class="nav-list-item"><a href="/frappe-operator/SITE_APP_INSTALLATION.html" class="nav-list-link">Site-Specific App Installation</a></li><li class="nav-list-item"><a href="/frappe-operator/troubleshooting.html" class="nav-list-link">Troubleshooting</a></li><li class="nav-list-item"><a href="/frappe-operator/upgrade-guide.html" class="nav-list-link">Upgrade Guide</a></li></ul> <ul class="nav-list"><li class="nav-list-item external"> <a href="https://github.com/vyogotech/frappe-operator" class="nav-list-link external" > GitHub <svg viewBox="0 0 24 24" aria-labelledby="svg-external-link-title"><use xlink:href="#svg-external-link"></use></svg> </a> </li><li class="nav-list-item external"> <a href="https://vyogotech.github.io/frappe-operator/helm-repo" class="nav-list-link external" > Helm Repo <svg viewBox="0 0 24 24" aria-labelledby="svg-external-link-title"><use xlink:href="#svg-external-link"></use></svg> </a> </li></ul> </nav> <div class="d-md-block d-none site-footer"> This site uses <a href="https://github.com/just-the-docs/just-the-docs">Just the Docs</a>, a documentation theme for Jekyll. </div> </header> <div class="main" id="top"> <div id="main-header" class="main-header"> <div class="search" role="search"> <div class="search-input-wrap"> <input type="text" id="search-input" class="search-input" tabindex="0" placeholder="Search Frappe Operator" autocomplete="off"> <label for="search-input" class="search-label"> <span class="sr-only">Search Frappe Operator</span> <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true"><use xlink:href="#svg-search"></use></svg> </label> </div> <div id="search-results" class="search-results"></div> </div> <nav aria-label="Auxiliary" class="aux-nav"> <ul class="aux-nav-list"> <li class="aux-nav-list-item"> <a href="https://github.com/vyogotech/frappe-operator" class="site-button" > Frappe Operator on GitHub </a> </li> </ul> </nav> </div> <div class="main-content-wrap"> <div id="main-content" class="main-content"> <main> <h1 id="frappe-operator-on-openshift-full-deployment-manual"> <a href="#frappe-operator-on-openshift-full-deployment-manual" class="anchor-heading" aria-labelledby="frappe-operator-on-openshift-full-deployment-manual"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Frappe Operator on OpenShift: Full Deployment Manual </h1> <p>This guide provides the authoritative, step-by-step workflow for deploying the Frappe Operator and ERPNext in an enterprise OpenShift 4.x environment.</p><hr /> <h2 id="1-prerequisites"> <a href="#1-prerequisites" class="anchor-heading" aria-labelledby="1-prerequisites"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 1. Prerequisites </h2> <ul> <li>Access to an OpenShift 4.x cluster (v4.10+ recommended).</li> <li><code class="language-plaintext highlighter-rouge">oc</code> CLI authenticated (<code class="language-plaintext highlighter-rouge">oc login</code>).</li> <li><code class="language-plaintext highlighter-rouge">helm</code> CLI (v3+) installed.</li> <li>Cluster-admin permissions or equivalent RBAC to create Namespaces, CRDs, and cluster-wide RBAC.</li> </ul><hr /> <h2 id="2-prepare-the-infrastructure-project"> <a href="#2-prepare-the-infrastructure-project" class="anchor-heading" aria-labelledby="2-prepare-the-infrastructure-project"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 2. Prepare the Infrastructure Project </h2> <p>All operator components and infrastructure (MariaDB, Redis) should reside in a dedicated namespace to maintain clean security boundaries.</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>oc new-project frappe-operator-system
+</code></pre></div></div><hr /> <h2 id="3-install-mariadb-operator-mandatory"> <a href="#3-install-mariadb-operator-mandatory" class="anchor-heading" aria-labelledby="3-install-mariadb-operator-mandatory"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 3. Install MariaDB Operator (Mandatory) </h2> <p>The Frappe Operator delegates all database lifecycle operations to the <a href="https://mariadb-operator.github.io/mariadb-operator/">MariaDB Operator</a>. This must be installed first.</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Add the MariaDB Operator repository</span>
+helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+helm repo update
+
+<span class="c"># Install the MariaDB Operator</span>
+helm upgrade <span class="nt">--install</span> mariadb-operator mariadb-operator/mariadb-operator <span class="se">\</span>
+  <span class="nt">--namespace</span> frappe-operator-system <span class="se">\</span>
+  <span class="nt">--set</span> crds.enabled<span class="o">=</span><span class="nb">true</span> <span class="se">\</span>
+  <span class="nt">--create-namespace</span> <span class="se">\</span>
+  <span class="nt">--wait</span>
+</code></pre></div></div><hr /> <h2 id="4-install-frappe-operator"> <a href="#4-install-frappe-operator" class="anchor-heading" aria-labelledby="4-install-frappe-operator"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 4. Install Frappe Operator </h2> <p>Install the Frappe Operator using the official Helm chart.</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Add the Frappe Operator repository</span>
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
+helm repo update
+
+<span class="c"># Install the operator (disabling nested dependencies as they were manually installed)</span>
+helm upgrade <span class="nt">--install</span> frappe-operator frappe-operator/frappe-operator <span class="se">\</span>
+  <span class="nt">--namespace</span> frappe-operator-system <span class="se">\</span>
+  <span class="nt">--set</span> mariadb-operator.enabled<span class="o">=</span><span class="nb">false</span> <span class="se">\</span>
+  <span class="nt">--set</span> keda.enabled<span class="o">=</span><span class="nb">false</span> <span class="se">\</span>
+  <span class="nt">--wait</span>
+</code></pre></div></div><hr /> <h2 id="5-security-note-scc-compatibility"> <a href="#5-security-note-scc-compatibility" class="anchor-heading" aria-labelledby="5-security-note-scc-compatibility"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 5. Security Note: SCC Compatibility </h2> <p>The Frappe Operator is natively compatible with OpenShift’s <code class="language-plaintext highlighter-rouge">restricted-v2</code> Security Context Constraint (SCC).</p> <ul> <li><strong>Dynamic UIDs</strong>: The operator uses <code class="language-plaintext highlighter-rouge">nil</code> defaults for <code class="language-plaintext highlighter-rouge">runAsUser</code>, allowing OpenShift to automatically assign a compliant UID.</li> <li><strong>Filesystem Access</strong>: It uses platform-aware volume permissions for GID 0 compatibility.</li> </ul> <blockquote> <p>[!TIP] For deep technical details on SCC handling, see the <a href="./openshift.md">OpenShift Technical Guide</a>.</p> </blockquote><hr /> <h2 id="6-preparing-openshift-compatible-container-images"> <a href="#6-preparing-openshift-compatible-container-images" class="anchor-heading" aria-labelledby="6-preparing-openshift-compatible-container-images"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 6. Preparing OpenShift-Compatible Container Images </h2> <p>OpenShift requires containers to run as non-root (GID 0). The official images must be patched. This is typically a one-time activity per ERP release.</p> <h3 id="61-base-image--openshift-compatibility-patch"> <a href="#61-base-image--openshift-compatibility-patch" class="anchor-heading" aria-labelledby="61-base-image--openshift-compatibility-patch"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 6.1 Base Image – OpenShift Compatibility Patch </h3> <p>Use this container file to create a base image.</p> <div class="language-dockerfile highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># ── OpenShift-Compatible ERPNext Base Image ──────────────────────────</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">frappe/erpnext:v15.100.0</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">erpnext</span>
+
+<span class="k">USER</span><span class="s"> root</span>
+
+<span class="c"># 1. Nginx and Permission Fixes for GID 0</span>
+<span class="k">RUN </span><span class="nb">rm</span> <span class="nt">-fr</span> /etc/nginx/sites-enabled/default <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">sed</span> <span class="nt">-i</span> <span class="s1">'/user www-data/d'</span> /etc/nginx/nginx.conf <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">sed</span> <span class="nt">-i</span> <span class="s1">'s/listen 80 default_server/listen 8080 default_server/'</span> /etc/nginx/sites-available/default <span class="o">||</span> <span class="nb">true</span> <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">ln</span> <span class="nt">-sf</span> /dev/stdout /var/log/nginx/access.log <span class="o">&amp;&amp;</span> <span class="nb">ln</span> <span class="nt">-sf</span> /dev/stderr /var/log/nginx/error.log <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">touch</span> /run/nginx.pid <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">chown</span> <span class="nt">-R</span> frappe:root /etc/nginx /var/log/nginx /var/lib/nginx /run <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">chmod</span> <span class="nt">-R</span> <span class="nv">g</span><span class="o">=</span>u /etc/nginx /var/log/nginx /var/lib/nginx /run
+
+<span class="c"># 2. Copy Helper Scripts</span>
+<span class="k">COPY</span><span class="s"> resources/nginx-template.conf /templates/nginx/frappe.conf.template</span>
+<span class="k">COPY</span><span class="s"> resources/nginx-entrypoint.sh /usr/local/bin/nginx-entrypoint.sh</span>
+<span class="k">COPY</span><span class="s"> resources/entrypoint.sh /usr/local/bin/entrypoint.sh</span>
+
+<span class="c"># 3. Recursive chown/chmod for the frappe-bench directory</span>
+<span class="k">RUN </span><span class="nb">chmod</span> +x /usr/local/bin/nginx-entrypoint.sh /usr/local/bin/entrypoint.sh <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="k">if</span> <span class="o">[</span> <span class="nt">-d</span> <span class="s2">"/home/frappe/frappe-bench/sites/assets"</span> <span class="o">]</span><span class="p">;</span> <span class="k">then</span> <span class="se">\
+</span>        <span class="nb">mkdir</span> <span class="nt">-p</span> /home/frappe/assets_cache<span class="p">;</span> <span class="se">\
+</span>        <span class="nb">mv</span> /home/frappe/frappe-bench/sites/assets/<span class="k">*</span> /home/frappe/assets_cache/ <span class="o">||</span> <span class="nb">true</span><span class="p">;</span> <span class="se">\
+</span>        <span class="nb">rm</span> <span class="nt">-rf</span> /home/frappe/frappe-bench/sites/assets<span class="p">;</span> <span class="se">\
+</span>    <span class="k">fi</span> <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">mkdir</span> <span class="nt">-p</span> /home/frappe/frappe-bench/sites/assets <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">mkdir</span> <span class="nt">-p</span> /home/frappe/assets_cache <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">chown</span> <span class="nt">-R</span> frappe:root /home/frappe/frappe-bench /home/frappe/assets_cache <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">chmod</span> <span class="nt">-R</span> <span class="nv">g</span><span class="o">=</span>u /home/frappe/frappe-bench /home/frappe/assets_cache <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">chmod </span><span class="nv">g</span><span class="o">=</span>u /etc/passwd
+
+<span class="k">USER</span><span class="s"> 1000</span>
+<span class="k">ENTRYPOINT</span><span class="s"> ["/usr/local/bin/entrypoint.sh"]</span>
+<span class="k">CMD</span><span class="s"> ["/home/frappe/frappe-bench/env/bin/gunicorn", "--chdir=/home/frappe/frappe-bench/sites", "--bind=0.0.0.0:8000", "--threads=4", "--workers=2", "--worker-class=gthread", "frappe.app:application"]</span>
+</code></pre></div></div> <h4 id="build-and-push-base-image"> <a href="#build-and-push-base-image" class="anchor-heading" aria-labelledby="build-and-push-base-image"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Build and Push Base Image </h4> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>docker build <span class="nt">-f</span> Containerfile.base <span class="se">\</span>
+  <span class="nt">-t</span> your-registry.io/frappe/erpnext-ocp-base:v15 <span class="nb">.</span>
+
+docker push your-registry.io/frappe/erpnext-ocp-base:v15
+</code></pre></div></div><hr /> <h3 id="62-custom-apps-image--two-stage-build"> <a href="#62-custom-apps-image--two-stage-build" class="anchor-heading" aria-labelledby="62-custom-apps-image--two-stage-build"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 6.2 Custom-Apps Image – Two-Stage Build </h3> <p>To include custom applications, use a two-stage build to keep the runtime image lean.</p> <h4 id="1-define-appsjson"> <a href="#1-define-appsjson" class="anchor-heading" aria-labelledby="1-define-appsjson"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 1. Define apps.json </h4> <div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"my_custom_app"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nl">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/yourorg/my_custom_app.git"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"branch"</span><span class="p">:</span><span class="w"> </span><span class="s2">"main"</span><span class="w">
+  </span><span class="p">},</span><span class="w">
+  </span><span class="nl">"another_app"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nl">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/yourorg/another_app.git"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"branch"</span><span class="p">:</span><span class="w"> </span><span class="s2">"version-15"</span><span class="w">
+  </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div> <h4 id="2-create-the-custom-containerfile"> <a href="#2-create-the-custom-containerfile" class="anchor-heading" aria-labelledby="2-create-the-custom-containerfile"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 2. Create the Custom Containerfile </h4> <div class="language-dockerfile highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># ── Stage 1: Builder ─────────────────────────────────────────────────</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">ghcr.io/vyogotech/frappe_base:latest</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">builder</span>
+
+<span class="k">USER</span><span class="s"> root</span>
+<span class="k">RUN </span>apt-get update <span class="o">&amp;&amp;</span> apt-get <span class="nb">install</span> <span class="nt">--no-install-recommends</span> <span class="nt">-y</span> <span class="se">\
+</span>    git build-essential python3-dev libffi-dev libmariadb-dev jq <span class="se">\
+</span>    <span class="o">&amp;&amp;</span> npm <span class="nb">install</span> <span class="nt">-g</span> yarn <span class="se">\
+</span>    <span class="o">&amp;&amp;</span> <span class="nb">rm</span> <span class="nt">-rf</span> /var/lib/apt/lists/<span class="k">*</span>
+
+<span class="k">USER</span><span class="s"> 1000</span>
+<span class="k">WORKDIR</span><span class="s"> /home/frappe/frappe-bench</span>
+<span class="k">SHELL</span><span class="s"> ["/bin/bash", "-o", "pipefail", "-c"]</span>
+
+<span class="k">ARG</span><span class="s"> APPS_JSON_BASE64</span>
+
+<span class="c"># Create dummy config for build orchestration</span>
+<span class="k">RUN </span><span class="nb">mkdir</span> <span class="nt">-p</span> sites <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">echo</span> <span class="s1">'{"socketio_port": 9000}'</span> <span class="o">&gt;</span> sites/common_site_config.json
+
+<span class="c"># Install apps from base64 encoded apps.json</span>
+<span class="k">RUN if</span> <span class="o">[</span> <span class="nt">-n</span> <span class="s2">"</span><span class="k">${</span><span class="nv">APPS_JSON_BASE64</span><span class="k">}</span><span class="s2">"</span> <span class="o">]</span><span class="p">;</span> <span class="k">then</span> <span class="se">\
+</span>    <span class="nb">echo</span> <span class="s2">"</span><span class="k">${</span><span class="nv">APPS_JSON_BASE64</span><span class="k">}</span><span class="s2">"</span> | <span class="nb">base64</span> <span class="nt">-d</span> <span class="o">&gt;</span> apps.json <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="nb">cat </span>apps.json | jq <span class="nt">-r</span> <span class="s1">'to_entries[] | .value.url + (if .value.branch and .value.branch != "" then " --branch " + .value.branch else "" end)'</span> <span class="o">&gt;</span> apps_list.txt <span class="o">&amp;&amp;</span> <span class="se">\
+</span>    <span class="k">while </span><span class="nb">read </span>app_args<span class="p">;</span> <span class="k">do</span> <span class="se">\
+</span>      <span class="nb">eval</span> <span class="s2">"bench get-app </span><span class="nv">$app_args</span><span class="s2">"</span><span class="p">;</span> <span class="se">\
+</span>    <span class="k">done</span> &lt; apps_list.txt<span class="p">;</span> <span class="se">\
+</span>  <span class="k">fi</span>
+
+<span class="c"># Build assets for the new apps</span>
+<span class="k">RUN </span>bench build
+
+<span class="c"># ── Stage 2: Final Image (Runtime) ───────────────────────────────────</span>
+<span class="k">FROM</span><span class="s"> your-registry.io/frappe/erpnext-ocp-base:v15</span>
+
+<span class="k">USER</span><span class="s"> 1000</span>
+<span class="k">WORKDIR</span><span class="s"> /home/frappe/frappe-bench</span>
+
+<span class="c"># Copy apps and pre-built assets from builder</span>
+<span class="k">COPY</span><span class="s"> --from=builder --chown=1000:0 /home/frappe/frappe-bench/apps ./apps</span>
+<span class="k">COPY</span><span class="s"> --from=builder --chown=1000:0 /home/frappe/frappe-bench/sites/assets /home/frappe/assets_cache</span>
+
+<span class="c"># Register Apps in Python Environment</span>
+<span class="k">RUN for </span>app_dir <span class="k">in </span>apps/<span class="k">*</span><span class="p">;</span> <span class="k">do</span> <span class="se">\
+</span>    <span class="k">if</span> <span class="o">[</span> <span class="nt">-d</span> <span class="s2">"</span><span class="nv">$app_dir</span><span class="s2">"</span> <span class="o">]</span><span class="p">;</span> <span class="k">then</span> <span class="se">\
+</span>        <span class="k">if</span> <span class="o">[</span> <span class="nt">-f</span> <span class="s2">"</span><span class="nv">$app_dir</span><span class="s2">/setup.py"</span> <span class="o">]</span> <span class="o">||</span> <span class="o">[</span> <span class="nt">-f</span> <span class="s2">"</span><span class="nv">$app_dir</span><span class="s2">/pyproject.toml"</span> <span class="o">]</span><span class="p">;</span> <span class="k">then</span> <span class="se">\
+</span>            <span class="nv">abs_app_path</span><span class="o">=</span><span class="si">$(</span><span class="nb">realpath</span> <span class="s2">"</span><span class="nv">$app_dir</span><span class="s2">"</span><span class="si">)</span><span class="p">;</span> <span class="se">\
+</span>            ./env/bin/pip <span class="nb">install</span> <span class="nt">-e</span> <span class="s2">"</span><span class="nv">$abs_app_path</span><span class="s2">"</span><span class="p">;</span> <span class="se">\
+</span>        <span class="k">fi</span> <span class="se">\
+</span>    <span class="k">fi</span> <span class="se">\
+</span><span class="k">done</span>
+</code></pre></div></div> <h4 id="3-build-and-push-custom-image"> <a href="#3-build-and-push-custom-image" class="anchor-heading" aria-labelledby="3-build-and-push-custom-image"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 3. Build and Push Custom Image </h4> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">APPS_B64</span><span class="o">=</span><span class="si">$(</span><span class="nb">base64</span> <span class="nt">-w</span> 0 apps.json<span class="si">)</span>
+
+docker build <span class="nt">--build-arg</span> <span class="nv">APPS_JSON_BASE64</span><span class="o">=</span><span class="s2">"</span><span class="k">${</span><span class="nv">APPS_B64</span><span class="k">}</span><span class="s2">"</span> <span class="nt">-f</span> Containerfile <span class="nt">-t</span> your-registry.io/frappe/custom-apps:v15-1.0.0 <span class="nb">.</span>
+
+docker push your-registry.io/frappe/custom-apps:v15-1.0.0
+</code></pre></div></div><hr /> <h2 id="7-deployment-examples"> <a href="#7-deployment-examples" class="anchor-heading" aria-labelledby="7-deployment-examples"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 7. Deployment Examples </h2> <p>With the infrastructure ready and images built, you can now deploy your Bench and Site.</p> <h3 id="step-71-create-mariadb-shared-instance"> <a href="#step-71-create-mariadb-shared-instance" class="anchor-heading" aria-labelledby="step-71-create-mariadb-shared-instance"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Step 7.1: Create MariaDB Shared Instance </h3> <p>Create <code class="language-plaintext highlighter-rouge">mariadb-instance.yaml</code>:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Secret</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">frappe-mariadb-root</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">frappe-operator-system</span>
+<span class="na">type</span><span class="pi">:</span> <span class="s">Opaque</span>
+<span class="na">stringData</span><span class="pi">:</span>
+  <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">StrongRootPassword123"</span>
+<span class="nn">---</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">k8s.mariadb.com/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">MariaDB</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">frappe-mariadb</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">frappe-operator-system</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">rootPasswordSecretKeyRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">frappe-mariadb-root</span>
+    <span class="na">key</span><span class="pi">:</span> <span class="s">password</span>
+  <span class="na">image</span><span class="pi">:</span> <span class="s">mariadb:10.11</span>
+  <span class="na">storage</span><span class="pi">:</span>
+    <span class="na">size</span><span class="pi">:</span> <span class="s">20Gi</span>
+  <span class="na">resources</span><span class="pi">:</span>
+    <span class="na">requests</span><span class="pi">:</span>
+      <span class="na">cpu</span><span class="pi">:</span> <span class="s">250m</span>
+      <span class="na">memory</span><span class="pi">:</span> <span class="s">512Mi</span>
+  <span class="na">replicas</span><span class="pi">:</span> <span class="m">1</span>
+</code></pre></div></div> <h3 id="step-72-create-the-frappebench"> <a href="#step-72-create-the-frappebench" class="anchor-heading" aria-labelledby="step-72-create-the-frappebench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Step 7.2: Create the FrappeBench </h3> <p>A Bench represents your application environment. Create <code class="language-plaintext highlighter-rouge">my-bench.yaml</code>. <strong>This uses the custom image built in Section 6.2.</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">prod-bench</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">frappe</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15.0.0"</span>
+  <span class="na">imageConfig</span><span class="pi">:</span>
+    <span class="na">repository</span><span class="pi">:</span> <span class="s">your-registry.io/frappe/custom-apps</span>
+    <span class="na">tag</span><span class="pi">:</span> <span class="s">v15-1.0.0</span>
+    <span class="na">pullPolicy</span><span class="pi">:</span> <span class="s">Always</span>
+    <span class="na">pullSecrets</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">registry-credentials</span>
+  
+  <span class="na">componentAutoscaling</span><span class="pi">:</span>
+    <span class="na">gunicorn</span><span class="pi">:</span>
+      <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">minReplicas</span><span class="pi">:</span> <span class="m">2</span>
+      <span class="na">maxReplicas</span><span class="pi">:</span> <span class="m">5</span>
+      <span class="na">provider</span><span class="pi">:</span> <span class="s">hpa</span>
+      <span class="na">hpa</span><span class="pi">:</span>
+        <span class="na">metric</span><span class="pi">:</span> <span class="s">cpu</span>
+        <span class="na">targetUtilization</span><span class="pi">:</span> <span class="m">75</span>
+        <span class="na">scaleUpStabilization</span><span class="pi">:</span> <span class="m">0</span>
+        <span class="na">scaleDownStabilization</span><span class="pi">:</span> <span class="m">60</span>
+    <span class="na">nginx</span><span class="pi">:</span>
+      <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">minReplicas</span><span class="pi">:</span> <span class="m">2</span>
+      <span class="na">maxReplicas</span><span class="pi">:</span> <span class="m">4</span>
+      <span class="na">provider</span><span class="pi">:</span> <span class="s">hpa</span>
+      <span class="na">hpa</span><span class="pi">:</span>
+        <span class="na">metric</span><span class="pi">:</span> <span class="s">cpu</span>
+        <span class="na">targetUtilization</span><span class="pi">:</span> <span class="m">80</span>
+        <span class="na">scaleUpStabilization</span><span class="pi">:</span> <span class="m">0</span>
+        <span class="na">scaleDownStabilization</span><span class="pi">:</span> <span class="m">60</span>
+    <span class="na">workerDefault</span><span class="pi">:</span>
+      <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">minReplicas</span><span class="pi">:</span> <span class="m">1</span>
+      <span class="na">maxReplicas</span><span class="pi">:</span> <span class="m">5</span>
+      <span class="na">provider</span><span class="pi">:</span> <span class="s">hpa</span>
+      <span class="na">hpa</span><span class="pi">:</span>
+        <span class="na">metric</span><span class="pi">:</span> <span class="s">cpu</span>
+        <span class="na">targetUtilization</span><span class="pi">:</span> <span class="m">85</span>
+    
+    <span class="na">workerShort</span><span class="pi">:</span>
+      <span class="na">enabled</span><span class="pi">:</span> <span class="no">false</span> <span class="c1"># Static replicas</span>
+      <span class="na">staticReplicas</span><span class="pi">:</span> <span class="m">1</span>
+    
+    <span class="na">workerLong</span><span class="pi">:</span>
+      <span class="na">enabled</span><span class="pi">:</span> <span class="no">false</span>
+      <span class="na">staticReplicas</span><span class="pi">:</span> <span class="m">1</span>
+      
+    <span class="na">socketio</span><span class="pi">:</span>
+      <span class="na">enabled</span><span class="pi">:</span> <span class="no">false</span>
+      <span class="na">staticReplicas</span><span class="pi">:</span> <span class="m">1</span>
+  
+  <span class="na">storageSize</span><span class="pi">:</span> <span class="s">5Gi</span>
+</code></pre></div></div> <h3 id="step-73-create-the-frappesite"> <a href="#step-73-create-the-frappesite" class="anchor-heading" aria-labelledby="step-73-create-the-frappesite"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Step 7.3: Create the FrappeSite </h3> <p>A Site is your actual application instance. Create <code class="language-plaintext highlighter-rouge">my-site.yaml</code>:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Secret</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">prod-site-admin</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">frappe</span>
+<span class="na">type</span><span class="pi">:</span> <span class="s">Opaque</span>
+<span class="na">stringData</span><span class="pi">:</span>
+  <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">AdminPassword123"</span>
+<span class="nn">---</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">prod-site</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">frappe</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">benchRef</span><span class="pi">:</span> <span class="s">prod-bench</span> <span class="c1"># point to the bench created above.</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s">prod-site.apps.cluster.example.com</span>  <span class="c1"># Must be a valid domain</span>
+  <span class="na">adminPasswordSecretRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">prod-site-admin</span>
+    <span class="na">key</span><span class="pi">:</span> <span class="s">password</span>
+  <span class="na">dbConfig</span><span class="pi">:</span>
+    <span class="na">mode</span><span class="pi">:</span> <span class="s">shared</span>
+    <span class="na">mariadbRef</span><span class="pi">:</span>
+      <span class="na">name</span><span class="pi">:</span> <span class="s">frappe-mariadb</span>
+  <span class="na">routeConfig</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">termination</span><span class="pi">:</span> <span class="s">edge</span>
+</code></pre></div></div> <p>Apply all manifests:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>oc apply <span class="nt">-f</span> mariadb-instance.yaml
+oc apply <span class="nt">-f</span> my-bench.yaml
+oc apply <span class="nt">-f</span> my-site.yaml
+</code></pre></div></div><hr /> <h2 id="8-verification--troubleshooting"> <a href="#8-verification--troubleshooting" class="anchor-heading" aria-labelledby="8-verification--troubleshooting"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 8. Verification &amp; Troubleshooting </h2> <h3 id="check-pods-and-jobs"> <a href="#check-pods-and-jobs" class="anchor-heading" aria-labelledby="check-pods-and-jobs"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Check Pods and Jobs </h3> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>oc get pods <span class="nt">-n</span> frappe-operator-system
+oc get <span class="nb">jobs</span> <span class="nt">-n</span> frappe-operator-system
+</code></pre></div></div> <h3 id="access-the-site"> <a href="#access-the-site" class="anchor-heading" aria-labelledby="access-the-site"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Access the Site </h3> <p>Once the site phase is <code class="language-plaintext highlighter-rouge">Ready</code>, retrieve the URL from the OpenShift Route:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>oc get route prod-site <span class="nt">-n</span> frappe-operator-system <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.spec.host}'</span>
+</code></pre></div></div><hr /> <p>For more details, see:</p> <ul> <li><a href="./openshift.md">OpenShift Technical Guide</a></li> <li><a href="/frappe-operator/MARIADB_INTEGRATION.html">MariaDB Integration Guide</a></li> </ul> </main> <hr> <footer> <p class="text-small mb-0">Built with ❤️ by Vyogo Technologies</p> <div class="d-md-none mt-4 fs-2"> This site uses <a href="https://github.com/just-the-docs/just-the-docs">Just the Docs</a>, a documentation theme for Jekyll. </div> </footer> </div> </div> <div class="search-overlay"></div> </div> </body> </html>
