@@ -72,6 +72,24 @@ This signals the operator to delete the old `bench-init` job and spin up a new o
 
 **That's it!** You now have a running Frappe site.
 
+### Uninstalling Testing Environments
+
+If you are just testing and want to clean up your cluster, delete your site and bench resources first, then clean up the CRDs:
+
+**Bash / Zsh**:
+```bash
+kubectl delete CustomResourceDefinition $(kubectl get CustomResourceDefinition -A | grep ".vyogo.tech" | awk '{print $1}')
+```
+
+**PowerShell**:
+```powershell
+kubectl get crd | Select-String ".vyogo.tech" | ForEach-Object {
+    ($_.ToString().Split()[0])
+} | ForEach-Object {
+    kubectl delete crd $_
+}
+```
+
 ## Documentation
 
 For detailed guides, visit **[vyogotech.github.io/frappe-operator](https://vyogotech.github.io/frappe-operator/)**:

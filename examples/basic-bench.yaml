@@ -6,8 +6,11 @@ metadata:
   name: dev-bench
   namespace: default
 spec:
-  frappeVersion: "version-15"
-  
+  frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+    pullPolicy: Always
   # Apps to install
   apps:
     - name: erpnext
