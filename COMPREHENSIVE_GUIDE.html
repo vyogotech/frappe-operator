@@ -1,0 +1,760 @@
+<!DOCTYPE html> <html lang="en-US"> <head> <meta charset="UTF-8"> <meta http-equiv="X-UA-Compatible" content="IE=Edge"> <link rel="stylesheet" href="/frappe-operator/assets/css/just-the-docs-default.css"> <link rel="stylesheet" href="/frappe-operator/assets/css/just-the-docs-head-nav.css" id="jtd-head-nav-stylesheet"> <style id="jtd-nav-activation"> .site-nav > ul.nav-list:first-child > li:not(:nth-child(6)) > a, .site-nav > ul.nav-list:first-child > li > ul > li a { background-image: none; } .site-nav > ul.nav-list:not(:first-child) a, .site-nav li.external a { background-image: none; } .site-nav > ul.nav-list:first-child > li:nth-child(6) > a { font-weight: 600; text-decoration: none; }.site-nav > ul.nav-list:first-child > li:nth-child(6) > button svg { transform: rotate(-90deg); }.site-nav > ul.nav-list:first-child > li.nav-list-item:nth-child(6) > ul.nav-list { display: block; } </style> <script src="/frappe-operator/assets/js/vendor/lunr.min.js"></script> <script src="/frappe-operator/assets/js/just-the-docs.js"></script> <meta name="viewport" content="width=device-width, initial-scale=1"> <!-- Begin Jekyll SEO tag v2.8.0 --> <title>Frappe Operator - Comprehensive Guide | Frappe Operator</title> <meta name="generator" content="Jekyll v3.10.0" /> <meta property="og:title" content="Frappe Operator - Comprehensive Guide" /> <meta property="og:locale" content="en_US" /> <meta name="description" content="Production-ready Kubernetes operator for Frappe/ERPNext" /> <meta property="og:description" content="Production-ready Kubernetes operator for Frappe/ERPNext" /> <link rel="canonical" href="https://vyogotech.github.io/frappe-operator/COMPREHENSIVE_GUIDE.html" /> <meta property="og:url" content="https://vyogotech.github.io/frappe-operator/COMPREHENSIVE_GUIDE.html" /> <meta property="og:site_name" content="Frappe Operator" /> <meta property="og:type" content="website" /> <meta name="twitter:card" content="summary" /> <meta property="twitter:title" content="Frappe Operator - Comprehensive Guide" /> <script type="application/ld+json"> {"@context":"https://schema.org","@type":"WebPage","description":"Production-ready Kubernetes operator for Frappe/ERPNext","headline":"Frappe Operator - Comprehensive Guide","url":"https://vyogotech.github.io/frappe-operator/COMPREHENSIVE_GUIDE.html"}</script> <!-- End Jekyll SEO tag --> </head> <body> <a class="skip-to-main" href="#main-content">Skip to main content</a> <svg xmlns="http://www.w3.org/2000/svg" class="d-none"> <symbol id="svg-link" viewBox="0 0 24 24"> <title>Link</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-link"> <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path> </svg> </symbol> <symbol id="svg-menu" viewBox="0 0 24 24"> <title>Menu</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"> <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line> </svg> </symbol> <symbol id="svg-arrow-right" viewBox="0 0 24 24"> <title>Expand</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"> <polyline points="9 18 15 12 9 6"></polyline> </svg> </symbol> <!-- Feather. MIT License: https://github.com/feathericons/feather/blob/master/LICENSE --> <symbol id="svg-external-link" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-external-link"> <title id="svg-external-link-title">(external link)</title> <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line> </symbol> <symbol id="svg-doc" viewBox="0 0 24 24"> <title>Document</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file"> <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline> </svg> </symbol> <symbol id="svg-search" viewBox="0 0 24 24"> <title>Search</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"> <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line> </svg> </symbol> <!-- Bootstrap Icons. MIT License: https://github.com/twbs/icons/blob/main/LICENSE.md --> <symbol id="svg-copy" viewBox="0 0 16 16"> <title>Copy</title> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard" viewBox="0 0 16 16"> <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/> <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/> </svg> </symbol> <symbol id="svg-copied" viewBox="0 0 16 16"> <title>Copied</title> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard-check-fill" viewBox="0 0 16 16"> <path d="M6.5 0A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3Zm3 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3Z"/> <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1A2.5 2.5 0 0 1 9.5 5h-3A2.5 2.5 0 0 1 4 2.5v-1Zm6.854 7.354-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L7.5 10.793l2.646-2.647a.5.5 0 0 1 .708.708Z"/> </svg> </symbol> </svg> <header class="side-bar"> <div class="site-header"> <a href="/frappe-operator/" class="site-title lh-tight"> Frappe Operator </a> <button id="menu-button" class="site-button btn-reset" aria-label="Menu" aria-expanded="false"> <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><use xlink:href="#svg-menu"></use></svg> </button> </div> <nav aria-label="Main" id="site-nav" class="site-nav"> <ul class="nav-list"><li class="nav-list-item"><a href="/frappe-operator/" class="nav-list-link">Frappe Operator Documentation</a></li><li class="nav-list-item"><a href="/frappe-operator/api-reference.html" class="nav-list-link">API Reference</a></li><li class="nav-list-item"><a href="/frappe-operator/concepts.html" class="nav-list-link">Concepts</a></li><li class="nav-list-item"><a href="/frappe-operator/examples.html" class="nav-list-link">Examples</a></li><li class="nav-list-item"><a href="/frappe-operator/external-resources.html" class="nav-list-link">External Resource Support</a></li><li class="nav-list-item"><a href="/frappe-operator/COMPREHENSIVE_GUIDE.html" class="nav-list-link">Frappe Operator - Comprehensive Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/ARCHITECTURE.html" class="nav-list-link">Frappe Operator Architecture</a></li><li class="nav-list-item"><a href="/frappe-operator/helm-repo/" class="nav-list-link">Frappe Operator Helm Repository</a></li><li class="nav-list-item"><a href="/frappe-operator/INSTALLATION_HELM.html" class="nav-list-link">Frappe Operator Installation Guide (Helm)</a></li><li class="nav-list-item"><a href="/frappe-operator/USER_GUIDE.html" class="nav-list-link">Frappe Operator User Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/demo.html" class="nav-list-link">Frappe Operator on OpenShift (CRC) Demo</a></li><li class="nav-list-item"><a href="/frappe-operator/FULL-RUNBOOK-external-db.html" class="nav-list-link">Frappe Operator on OpenShift: Full Deployment Manual</a></li><li class="nav-list-item"><a href="/frappe-operator/FULL-RUNBOOK.html" class="nav-list-link">Frappe Operator on OpenShift: Full Deployment Manual</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_NOTES_v1.0.0.html" class="nav-list-link">Frappe Operator v1.0.0 - Production Ready Release 🎉</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_GUIDE.html" class="nav-list-link">Frappe Operator v2.0.0 Release Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_NOTES_v2.4.0.html" class="nav-list-link">Frappe Operator v2.4.0 - External Database Support &amp; Robustness 🚀</a></li><li class="nav-list-item"><a href="/frappe-operator/getting-started.html" class="nav-list-link">Getting Started</a></li><li class="nav-list-item"><a href="/frappe-operator/HELM_REPOSITORY.html" class="nav-list-link">Helm Repository Setup Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/helm-repo/SETUP.html" class="nav-list-link">Helm Repository Setup Instructions</a></li><li class="nav-list-item"><a href="/frappe-operator/INSTALL_OPENSHIFT.html" class="nav-list-link">Installing Frappe Operator on OpenShift</a></li><li class="nav-list-item"><a href="/frappe-operator/MARIADB_INTEGRATION.html" class="nav-list-link">MariaDB Database Integration</a></li><li class="nav-list-item"><a href="/frappe-operator/monitoring.html" class="nav-list-link">Monitoring Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/operations.html" class="nav-list-link">Operations Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_NOTES_v2.5.0.html" class="nav-list-link">Release Notes - v2.5.0 (OpenShift Compatibility &amp; Security)</a></li><li class="nav-list-item"><a href="/frappe-operator/SITE_APP_INSTALLATION.html" class="nav-list-link">Site-Specific App Installation</a></li><li class="nav-list-item"><a href="/frappe-operator/troubleshooting.html" class="nav-list-link">Troubleshooting</a></li><li class="nav-list-item"><a href="/frappe-operator/upgrade-guide.html" class="nav-list-link">Upgrade Guide</a></li></ul> <ul class="nav-list"><li class="nav-list-item external"> <a href="https://github.com/vyogotech/frappe-operator" class="nav-list-link external" > GitHub <svg viewBox="0 0 24 24" aria-labelledby="svg-external-link-title"><use xlink:href="#svg-external-link"></use></svg> </a> </li><li class="nav-list-item external"> <a href="https://vyogotech.github.io/frappe-operator/helm-repo" class="nav-list-link external" > Helm Repo <svg viewBox="0 0 24 24" aria-labelledby="svg-external-link-title"><use xlink:href="#svg-external-link"></use></svg> </a> </li></ul> </nav> <div class="d-md-block d-none site-footer"> This site uses <a href="https://github.com/just-the-docs/just-the-docs">Just the Docs</a>, a documentation theme for Jekyll. </div> </header> <div class="main" id="top"> <div id="main-header" class="main-header"> <div class="search" role="search"> <div class="search-input-wrap"> <input type="text" id="search-input" class="search-input" tabindex="0" placeholder="Search Frappe Operator" autocomplete="off"> <label for="search-input" class="search-label"> <span class="sr-only">Search Frappe Operator</span> <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true"><use xlink:href="#svg-search"></use></svg> </label> </div> <div id="search-results" class="search-results"></div> </div> <nav aria-label="Auxiliary" class="aux-nav"> <ul class="aux-nav-list"> <li class="aux-nav-list-item"> <a href="https://github.com/vyogotech/frappe-operator" class="site-button" > Frappe Operator on GitHub </a> </li> </ul> </nav> </div> <div class="main-content-wrap"> <div id="main-content" class="main-content"> <main> <h1 id="frappe-operator---comprehensive-guide"> <a href="#frappe-operator---comprehensive-guide" class="anchor-heading" aria-labelledby="frappe-operator---comprehensive-guide"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Frappe Operator - Comprehensive Guide </h1> <p>A complete reference guide for developers and platform operators deploying and managing Frappe Framework applications on Kubernetes.</p> <h2 id="table-of-contents"> <a href="#table-of-contents" class="anchor-heading" aria-labelledby="table-of-contents"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Table of Contents </h2> <ol> <li><a href="#introduction">Introduction</a></li> <li><a href="#installation">Installation</a></li> <li><a href="#configuration">Configuration</a></li> <li><a href="#core-concepts">Core Concepts</a></li> <li><a href="#resource-management">Resource Management</a></li> <li><a href="#image-configuration">Image Configuration</a></li> <li><a href="#database-configuration">Database Configuration</a></li> <li><a href="#scaling-and-performance">Scaling and Performance</a></li> <li><a href="#security">Security</a></li> <li><a href="#operations">Operations</a></li> <li><a href="#troubleshooting">Troubleshooting</a></li> <li><a href="#api-reference">API Reference</a></li> <li><a href="#examples">Examples</a></li> </ol><hr /> <h2 id="introduction"> <a href="#introduction" class="anchor-heading" aria-labelledby="introduction"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Introduction </h2> <h3 id="what-is-frappe-operator"> <a href="#what-is-frappe-operator" class="anchor-heading" aria-labelledby="what-is-frappe-operator"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> What is Frappe Operator? </h3> <p>Frappe Operator is a Kubernetes operator that automates the lifecycle management of Frappe Framework applications. It provides:</p> <ul> <li><strong>Declarative Configuration</strong>: Define benches and sites as Kubernetes resources</li> <li><strong>Automated Provisioning</strong>: Handles database, storage, and networking setup</li> <li><strong>Multi-Tenancy</strong>: Efficiently manage multiple sites on shared infrastructure</li> <li><strong>Auto-Scaling</strong>: Scale workers based on queue length using KEDA</li> <li><strong>Production Ready</strong>: High availability, security, and observability built-in</li> </ul> <h3 id="architecture-overview"> <a href="#architecture-overview" class="anchor-heading" aria-labelledby="architecture-overview"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Architecture Overview </h3> <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>┌─────────────────────────────────────────────────────────┐
+│                    Kubernetes Cluster                     │
+├─────────────────────────────────────────────────────────┤
+│                                                           │
+│  ┌──────────────────┐      ┌──────────────────┐         │
+│  │ Frappe Operator  │──────▶│  FrappeBench     │         │
+│  │   Controller     │      │   (CRD)          │         │
+│  └──────────────────┘      └──────────────────┘         │
+│         │                           │                    │
+│         │                           │                    │
+│         │                           ▼                    │
+│         │                  ┌──────────────────┐         │
+│         │                  │   FrappeSite     │         │
+│         │                  │   (CRD)          │         │
+│         │                  └──────────────────┘         │
+│         │                           │                    │
+│         │                           │                    │
+│         ▼                           ▼                    │
+│  ┌──────────────────────────────────────────┐           │
+│  │  Kubernetes Resources                    │           │
+│  │  - Deployments (gunicorn, nginx, etc.)   │           │
+│  │  - Services                             │           │
+│  │  - PersistentVolumeClaims                 │           │
+│  │  - Ingress/Routes                         │           │
+│  │  - Jobs (site init, backup)              │           │
+│  └──────────────────────────────────────────┘           │
+│                                                           │
+│  ┌──────────────────┐      ┌──────────────────┐         │
+│  │  MariaDB         │      │  Redis            │         │
+│  │  Operator        │      │  (Cache + Queue)  │         │
+│  └──────────────────┘      └──────────────────┘         │
+│                                                           │
+└─────────────────────────────────────────────────────────┘
+</code></pre></div></div><hr /> <h2 id="installation"> <a href="#installation" class="anchor-heading" aria-labelledby="installation"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Installation </h2> <h3 id="prerequisites"> <a href="#prerequisites" class="anchor-heading" aria-labelledby="prerequisites"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Prerequisites </h3> <ul> <li>Kubernetes cluster (v1.19+)</li> <li><code class="language-plaintext highlighter-rouge">kubectl</code> configured and connected</li> <li><code class="language-plaintext highlighter-rouge">helm</code> v3.x (for Helm installation)</li> <li>Sufficient cluster resources: <ul> <li>2 CPU cores</li> <li>4GB RAM</li> <li>20GB storage</li> </ul> </li> </ul> <h3 id="quick-installation"> <a href="#quick-installation" class="anchor-heading" aria-labelledby="quick-installation"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Quick Installation </h3> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># One-command installation</span>
+curl <span class="nt">-fsSL</span> https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.sh | bash
+</code></pre></div></div> <h3 id="manual-installation"> <a href="#manual-installation" class="anchor-heading" aria-labelledby="manual-installation"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Manual Installation </h3> <h4 id="step-1-install-mariadb-operator-crds"> <a href="#step-1-install-mariadb-operator-crds" class="anchor-heading" aria-labelledby="step-1-install-mariadb-operator-crds"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Step 1: Install MariaDB Operator CRDs </h4> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl apply <span class="nt">--server-side</span> <span class="nt">-k</span> <span class="s2">"github.com/mariadb-operator/mariadb-operator/config/crd?ref=v0.34.0"</span>
+</code></pre></div></div> <h4 id="step-2-install-frappe-operator"> <a href="#step-2-install-frappe-operator" class="anchor-heading" aria-labelledby="step-2-install-frappe-operator"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Step 2: Install Frappe Operator </h4> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Add Helm repository</span>
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator
+helm repo update
+
+<span class="c"># Install operator</span>
+helm <span class="nb">install </span>frappe-operator frappe-operator/frappe-operator <span class="se">\</span>
+  <span class="nt">--namespace</span> frappe-operator-system <span class="se">\</span>
+  <span class="nt">--create-namespace</span>
+</code></pre></div></div> <h4 id="step-3-verify-installation"> <a href="#step-3-verify-installation" class="anchor-heading" aria-labelledby="step-3-verify-installation"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Step 3: Verify Installation </h4> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check operator pod</span>
+kubectl get pods <span class="nt">-n</span> frappe-operator-system
+
+<span class="c"># Check CRDs</span>
+kubectl get crd | <span class="nb">grep </span>frappe
+
+<span class="c"># Check operator logs</span>
+kubectl logs <span class="nt">-n</span> frappe-operator-system deployment/frappe-operator-controller-manager
+</code></pre></div></div> <h3 id="installation-options"> <a href="#installation-options" class="anchor-heading" aria-labelledby="installation-options"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Installation Options </h3> <h4 id="custom-namespace"> <a href="#custom-namespace" class="anchor-heading" aria-labelledby="custom-namespace"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Custom Namespace </h4> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm <span class="nb">install </span>frappe-operator frappe-operator/frappe-operator <span class="se">\</span>
+  <span class="nt">--namespace</span> my-frappe-system <span class="se">\</span>
+  <span class="nt">--create-namespace</span>
+</code></pre></div></div> <h4 id="custom-image-registry"> <a href="#custom-image-registry" class="anchor-heading" aria-labelledby="custom-image-registry"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Custom Image Registry </h4> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm <span class="nb">install </span>frappe-operator frappe-operator/frappe-operator <span class="se">\</span>
+  <span class="nt">--set</span> operator.image.repository<span class="o">=</span>myregistry.com/frappe-operator <span class="se">\</span>
+  <span class="nt">--set</span> operator.image.tag<span class="o">=</span>v2.5.0
+</code></pre></div></div><hr /> <h2 id="configuration"> <a href="#configuration" class="anchor-heading" aria-labelledby="configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Configuration </h2> <h3 id="operator-level-configuration"> <a href="#operator-level-configuration" class="anchor-heading" aria-labelledby="operator-level-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Operator-Level Configuration </h3> <p>The operator reads configuration from the <code class="language-plaintext highlighter-rouge">frappe-operator-config</code> ConfigMap in the operator namespace.</p> <h4 id="configmap-structure"> <a href="#configmap-structure" class="anchor-heading" aria-labelledby="configmap-structure"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> ConfigMap Structure </h4> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">ConfigMap</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">frappe-operator-config</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">frappe-operator-system</span>
+<span class="na">data</span><span class="pi">:</span>
+  <span class="c1"># Domain configuration</span>
+  <span class="na">defaultDomainSuffix</span><span class="pi">:</span> <span class="s2">"</span><span class="s">.myplatform.com"</span>
+  <span class="na">ingressControllerService</span><span class="pi">:</span> <span class="s2">"</span><span class="s">ingress-nginx-controller"</span>
+  <span class="na">ingressControllerNamespace</span><span class="pi">:</span> <span class="s2">"</span><span class="s">ingress-nginx"</span>
+  
+  <span class="c1"># Git configuration</span>
+  <span class="na">gitEnabled</span><span class="pi">:</span> <span class="s2">"</span><span class="s">false"</span>
+  
+  <span class="c1"># Max concurrent FrappeSite reconciles (default: 10). Tune for 100s of sites.</span>
+  <span class="c1"># Can be overridden per-bench via spec.siteReconcileConcurrency (operator uses max).</span>
+  <span class="na">maxConcurrentSiteReconciles</span><span class="pi">:</span> <span class="s2">"</span><span class="s">10"</span>
+  
+  <span class="c1"># FPM configuration</span>
+  <span class="na">fpmCliPath</span><span class="pi">:</span> <span class="s2">"</span><span class="s">/usr/local/bin/fpm"</span>
+  <span class="na">fpmRepositories</span><span class="pi">:</span> <span class="pi">|</span>
+    <span class="s">[</span>
+      <span class="s">{</span>
+        <span class="s">"name": "frappe-community",</span>
+        <span class="s">"url": "https://fpm.frappe.io",</span>
+        <span class="s">"priority": 100</span>
+      <span class="s">}</span>
+    <span class="s">]</span>
+  
+  <span class="c1"># Image defaults</span>
+  <span class="na">defaultFrappeImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">docker.io/frappe/erpnext:latest"</span>
+  <span class="na">defaultMariaDBImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">docker.io/library/mariadb:10.6"</span>
+  <span class="na">defaultPostgresImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">docker.io/library/postgres:15-alpine"</span>
+  <span class="na">defaultRedisImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">docker.io/library/redis:7-alpine"</span>
+  <span class="na">defaultNginxImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">docker.io/library/nginx:1.25-alpine"</span>
+</code></pre></div></div> <h4 id="updating-configuration"> <a href="#updating-configuration" class="anchor-heading" aria-labelledby="updating-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Updating Configuration </h4> <p><strong>Via Helm:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm upgrade frappe-operator frappe-operator/frappe-operator <span class="se">\</span>
+  <span class="nt">--set</span> operatorConfig.defaultFrappeImage<span class="o">=</span><span class="s2">"myregistry.com/frappe/erpnext:latest"</span>
+</code></pre></div></div> <p><strong>Direct ConfigMap Edit:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl edit configmap frappe-operator-config <span class="nt">-n</span> frappe-operator-system
+</code></pre></div></div><hr /> <h2 id="core-concepts"> <a href="#core-concepts" class="anchor-heading" aria-labelledby="core-concepts"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Core Concepts </h2> <h3 id="frappebench"> <a href="#frappebench" class="anchor-heading" aria-labelledby="frappebench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> FrappeBench </h3> <p>A <code class="language-plaintext highlighter-rouge">FrappeBench</code> represents a shared infrastructure for multiple Frappe sites. It includes:</p> <ul> <li><strong>Storage</strong>: Persistent volume for site data</li> <li><strong>Components</strong>: Gunicorn, Nginx, Socket.IO, Scheduler, Workers</li> <li><strong>Apps</strong>: Installed Frappe applications (ERPNext, etc.)</li> <li><strong>Database</strong>: Shared or dedicated database instances</li> </ul> <h3 id="frappesite"> <a href="#frappesite" class="anchor-heading" aria-labelledby="frappesite"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> FrappeSite </h3> <p>A <code class="language-plaintext highlighter-rouge">FrappeSite</code> represents a single Frappe site running on a bench. Each site:</p> <ul> <li>Has its own database (isolated)</li> <li>Shares bench infrastructure (cost-efficient)</li> <li>Can have custom domain and TLS configuration</li> <li>Supports backup and restore operations</li> </ul> <h3 id="resource-relationships"> <a href="#resource-relationships" class="anchor-heading" aria-labelledby="resource-relationships"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Resource Relationships </h3> <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>FrappeBench (1)
+    │
+    ├── PersistentVolumeClaim (1)
+    ├── Deployment: gunicorn (N)
+    ├── Deployment: nginx (1)
+    ├── Deployment: socketio (1)
+    ├── Deployment: scheduler (1)
+    ├── Deployment: worker-* (N)
+    └── FrappeSite (N)
+            │
+            ├── Database (1)
+            ├── Secret: db-credentials (1)
+            ├── Secret: admin-password (1)
+            ├── Ingress/Route (1)
+            └── Job: site-init (1)
+</code></pre></div></div><hr /> <h2 id="resource-management"> <a href="#resource-management" class="anchor-heading" aria-labelledby="resource-management"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Resource Management </h2> <h3 id="creating-a-frappebench"> <a href="#creating-a-frappebench" class="anchor-heading" aria-labelledby="creating-a-frappebench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Creating a FrappeBench </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">production-bench</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">apps</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">erpnext</span>
+      <span class="na">source</span><span class="pi">:</span> <span class="s">image</span>
+  <span class="na">imageConfig</span><span class="pi">:</span>
+    <span class="na">repository</span><span class="pi">:</span> <span class="s2">"</span><span class="s">myregistry.com/frappe/erpnext"</span>
+    <span class="na">tag</span><span class="pi">:</span> <span class="s2">"</span><span class="s">v15.41.2"</span>
+    <span class="na">pullPolicy</span><span class="pi">:</span> <span class="s">Always</span>
+  <span class="na">componentReplicas</span><span class="pi">:</span>
+    <span class="na">gunicorn</span><span class="pi">:</span> <span class="m">2</span>
+    <span class="na">nginx</span><span class="pi">:</span> <span class="m">1</span>
+    <span class="na">socketio</span><span class="pi">:</span> <span class="m">1</span>
+    <span class="na">scheduler</span><span class="pi">:</span> <span class="m">1</span>
+  <span class="na">storageClassName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">fast-ssd"</span>
+</code></pre></div></div> <h3 id="creating-a-frappesite"> <a href="#creating-a-frappesite" class="anchor-heading" aria-labelledby="creating-a-frappesite"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Creating a FrappeSite </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">customer-site</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s">customer.example.com</span>
+  <span class="na">benchRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">production-bench</span>
+    <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+  <span class="na">adminPasswordSecretRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">site-admin-password</span>
+    <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+  <span class="na">ingress</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+  <span class="na">tls</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">secretName</span><span class="pi">:</span> <span class="s">customer-tls-cert</span>
+</code></pre></div></div> <h3 id="monitoring-resources"> <a href="#monitoring-resources" class="anchor-heading" aria-labelledby="monitoring-resources"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Monitoring Resources </h3> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check bench status</span>
+kubectl get frappebench production-bench <span class="nt">-o</span> yaml
+
+<span class="c"># Check site status</span>
+kubectl get frappesite customer-site <span class="nt">-o</span> yaml
+
+<span class="c"># Watch bench events</span>
+kubectl get events <span class="nt">--field-selector</span> involvedObject.name<span class="o">=</span>production-bench <span class="nt">--sort-by</span><span class="o">=</span><span class="s1">'.lastTimestamp'</span>
+
+<span class="c"># Check component pods</span>
+kubectl get pods <span class="nt">-l</span> <span class="nv">app</span><span class="o">=</span>frappe,bench<span class="o">=</span>production-bench
+</code></pre></div></div><hr /> <h2 id="image-configuration"> <a href="#image-configuration" class="anchor-heading" aria-labelledby="image-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Image Configuration </h2> <h3 id="configuration-priority"> <a href="#configuration-priority" class="anchor-heading" aria-labelledby="configuration-priority"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Configuration Priority </h3> <p>Image selection follows this priority:</p> <ol> <li><strong>Bench-level override</strong> (<code class="language-plaintext highlighter-rouge">spec.imageConfig</code>)</li> <li><strong>Operator ConfigMap defaults</strong> (<code class="language-plaintext highlighter-rouge">frappe-operator-config</code>)</li> <li><strong>Hardcoded constants</strong> (fallback)</li> </ol> <h3 id="operator-level-defaults"> <a href="#operator-level-defaults" class="anchor-heading" aria-labelledby="operator-level-defaults"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Operator-Level Defaults </h3> <p>Set defaults in the operator ConfigMap:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># In frappe-operator-config ConfigMap</span>
+<span class="na">data</span><span class="pi">:</span>
+  <span class="na">defaultFrappeImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">myregistry.com/frappe/erpnext:latest"</span>
+  <span class="na">defaultMariaDBImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">myregistry.com/library/mariadb:10.6"</span>
+  <span class="na">defaultPostgresImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">myregistry.com/library/postgres:15-alpine"</span>
+  <span class="na">defaultRedisImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">myregistry.com/library/redis:7-alpine"</span>
+  <span class="na">defaultNginxImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">myregistry.com/library/nginx:1.25-alpine"</span>
+</code></pre></div></div> <h3 id="bench-level-override"> <a href="#bench-level-override" class="anchor-heading" aria-labelledby="bench-level-override"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Bench-Level Override </h3> <p>Override defaults per bench:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">custom-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">imageConfig</span><span class="pi">:</span>
+    <span class="na">repository</span><span class="pi">:</span> <span class="s2">"</span><span class="s">production-registry.com/frappe/erpnext"</span>
+    <span class="na">tag</span><span class="pi">:</span> <span class="s2">"</span><span class="s">v15.41.2"</span>
+    <span class="na">pullPolicy</span><span class="pi">:</span> <span class="s">Always</span>
+    <span class="na">pullSecrets</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">registry-credentials</span>
+</code></pre></div></div> <h3 id="version-handling"> <a href="#version-handling" class="anchor-heading" aria-labelledby="version-handling"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Version Handling </h3> <p>When <code class="language-plaintext highlighter-rouge">frappeVersion</code> is specified:</p> <ul> <li>If <code class="language-plaintext highlighter-rouge">imageConfig.repository</code> is set but <code class="language-plaintext highlighter-rouge">tag</code> is not → version is used as tag</li> <li>If using ConfigMap defaults → version replaces tag in default image</li> <li>If no defaults → <code class="language-plaintext highlighter-rouge">docker.io/frappe/erpnext:{version}</code> is used</li> </ul> <h3 id="air-gapped-environments"> <a href="#air-gapped-environments" class="anchor-heading" aria-labelledby="air-gapped-environments"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Air-Gapped Environments </h3> <p>For air-gapped deployments, configure all images in the operator ConfigMap:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">data</span><span class="pi">:</span>
+  <span class="na">defaultFrappeImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">internal-registry.company.com/frappe/erpnext:latest"</span>
+  <span class="na">defaultMariaDBImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">internal-registry.company.com/library/mariadb:10.6"</span>
+  <span class="na">defaultPostgresImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">internal-registry.company.com/library/postgres:15-alpine"</span>
+  <span class="na">defaultRedisImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">internal-registry.company.com/library/redis:7-alpine"</span>
+  <span class="na">defaultNginxImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">internal-registry.company.com/library/nginx:1.25-alpine"</span>
+</code></pre></div></div><hr /> <h2 id="database-configuration"> <a href="#database-configuration" class="anchor-heading" aria-labelledby="database-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Database Configuration </h2> <h3 id="shared-database-mode"> <a href="#shared-database-mode" class="anchor-heading" aria-labelledby="shared-database-mode"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Shared Database Mode </h3> <p>Multiple sites share one MariaDB instance:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">shared-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">dbConfig</span><span class="pi">:</span>
+    <span class="na">provider</span><span class="pi">:</span> <span class="s">mariadb</span>
+    <span class="na">mode</span><span class="pi">:</span> <span class="s">shared</span>
+    <span class="c1"># Optional: reference existing MariaDB</span>
+    <span class="na">mariadbRef</span><span class="pi">:</span>
+      <span class="na">name</span><span class="pi">:</span> <span class="s">shared-mariadb</span>
+      <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+</code></pre></div></div> <h3 id="dedicated-database-mode"> <a href="#dedicated-database-mode" class="anchor-heading" aria-labelledby="dedicated-database-mode"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Dedicated Database Mode </h3> <p>Each site gets its own MariaDB instance:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">isolated-site</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s">isolated.example.com</span>
+  <span class="na">benchRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">production-bench</span>
+  <span class="na">dbConfig</span><span class="pi">:</span>
+    <span class="na">provider</span><span class="pi">:</span> <span class="s">mariadb</span>
+    <span class="na">mode</span><span class="pi">:</span> <span class="s">dedicated</span>
+</code></pre></div></div> <h3 id="external-database"> <a href="#external-database" class="anchor-heading" aria-labelledby="external-database"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> External Database </h3> <p>Connect to RDS, Cloud SQL, or any external database:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">external-db-site</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s">external.example.com</span>
+  <span class="na">benchRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">production-bench</span>
+  <span class="na">dbConfig</span><span class="pi">:</span>
+    <span class="na">provider</span><span class="pi">:</span> <span class="s">external</span>
+    <span class="na">host</span><span class="pi">:</span> <span class="s2">"</span><span class="s">rds-instance.region.rds.amazonaws.com"</span>
+    <span class="na">port</span><span class="pi">:</span> <span class="s2">"</span><span class="s">3306"</span>
+    <span class="na">connectionSecretRef</span><span class="pi">:</span>
+      <span class="na">name</span><span class="pi">:</span> <span class="s">rds-credentials</span>
+      <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+</code></pre></div></div> <p><strong>Connection Secret:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Secret</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">rds-credentials</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+<span class="na">type</span><span class="pi">:</span> <span class="s">Opaque</span>
+<span class="na">stringData</span><span class="pi">:</span>
+  <span class="na">username</span><span class="pi">:</span> <span class="s2">"</span><span class="s">frappe_user"</span>
+  <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">secure_password"</span>
+</code></pre></div></div> <h3 id="postgresql-support"> <a href="#postgresql-support" class="anchor-heading" aria-labelledby="postgresql-support"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> PostgreSQL Support </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">postgres-site</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s">postgres.example.com</span>
+  <span class="na">benchRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">production-bench</span>
+  <span class="na">dbConfig</span><span class="pi">:</span>
+    <span class="na">provider</span><span class="pi">:</span> <span class="s">postgres</span>
+    <span class="na">host</span><span class="pi">:</span> <span class="s2">"</span><span class="s">postgres.example.com"</span>
+    <span class="na">port</span><span class="pi">:</span> <span class="s2">"</span><span class="s">5432"</span>
+    <span class="na">connectionSecretRef</span><span class="pi">:</span>
+      <span class="na">name</span><span class="pi">:</span> <span class="s">postgres-credentials</span>
+</code></pre></div></div> <h3 id="database-security-and-privilege-model"> <a href="#database-security-and-privilege-model" class="anchor-heading" aria-labelledby="database-security-and-privilege-model"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Database Security and Privilege Model </h3> <p>The Frappe Operator implements a <strong>principle of least privilege</strong> security model for database access to protect production data.</p> <h4 id="privilege-separation"> <a href="#privilege-separation" class="anchor-heading" aria-labelledby="privilege-separation"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Privilege Separation </h4> <p>There are <strong>two distinct sets of database credentials</strong> with different privilege levels:</p> <ol> <li><strong>Site User Credentials</strong> (Limited Privileges) <ul> <li>Used by running application pods (gunicorn, workers, scheduler, socketio)</li> <li>Stored in site-specific secret: <code class="language-plaintext highlighter-rouge">{site-name}-db-password</code></li> <li>Can perform table-level operations only</li> <li><strong>Cannot drop databases or users</strong> (protection against accidental data loss)</li> </ul> </li> <li><strong>MariaDB Root Credentials</strong> (Administrative Privileges) <ul> <li>Used only in deletion jobs (never in runtime pods)</li> <li>Stored in: <code class="language-plaintext highlighter-rouge">{site-name}-mariadb-root</code> (dedicated mode) or MariaDB CR’s root secret (shared mode)</li> <li>Can perform database-level operations including DROP DATABASE</li> <li><strong>Never exposed to application containers</strong></li> </ul> </li> </ol> <h4 id="site-user-privileges"> <a href="#site-user-privileges" class="anchor-heading" aria-labelledby="site-user-privileges"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Site User Privileges </h4> <p>Site users are granted these privileges (via MariaDB Operator Grant CR):</p> <div class="table-wrapper"><table> <thead> <tr> <th>Privilege</th> <th>Purpose</th> <th>Risk Level</th> </tr> </thead> <tbody> <tr> <td><code class="language-plaintext highlighter-rouge">SELECT</code>, <code class="language-plaintext highlighter-rouge">INSERT</code>, <code class="language-plaintext highlighter-rouge">UPDATE</code>, <code class="language-plaintext highlighter-rouge">DELETE</code></td> <td>Basic data operations</td> <td>Low</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">CREATE</code>, <code class="language-plaintext highlighter-rouge">ALTER</code>, <code class="language-plaintext highlighter-rouge">INDEX</code></td> <td>Schema management (migrations, DocType creation)</td> <td>Low</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">DROP</code> (table-level only)</td> <td>Remove tables during migrations</td> <td>Medium</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">REFERENCES</code></td> <td>Foreign key constraints</td> <td>Low</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">CREATE TEMPORARY TABLES</code>, <code class="language-plaintext highlighter-rouge">LOCK TABLES</code></td> <td>Complex queries and transactions</td> <td>Low</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">EXECUTE</code></td> <td>Stored procedures and functions</td> <td>Low</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">CREATE VIEW</code>, <code class="language-plaintext highlighter-rouge">SHOW VIEW</code></td> <td>View management</td> <td>Low</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">CREATE ROUTINE</code>, <code class="language-plaintext highlighter-rouge">ALTER ROUTINE</code></td> <td>Function management</td> <td>Low</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">EVENT</code>, <code class="language-plaintext highlighter-rouge">TRIGGER</code></td> <td>Event and trigger management</td> <td>Low</td> </tr> </tbody> </table></div> <p><strong>Site users CANNOT:</strong></p> <ul> <li>Drop databases (<code class="language-plaintext highlighter-rouge">DROP DATABASE</code>) - prevents accidental site destruction</li> <li>Drop users (<code class="language-plaintext highlighter-rouge">DROP USER</code>) - prevents credential tampering</li> <li>Grant privileges to others (<code class="language-plaintext highlighter-rouge">GRANT OPTION</code> is false) - prevents privilege escalation</li> </ul> <h4 id="security-rationale"> <a href="#security-rationale" class="anchor-heading" aria-labelledby="security-rationale"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Security Rationale </h4> <p>This design protects against several scenarios:</p> <ol> <li><strong>Developer Access</strong>: If a developer gains pod access (via <code class="language-plaintext highlighter-rouge">kubectl exec</code>), they can query data but cannot accidentally drop the entire database</li> <li><strong>Compromised Credentials</strong>: If site credentials leak, attackers can modify data but cannot destroy the database</li> <li><strong>Application Bugs</strong>: Bugs in Frappe code or custom apps cannot execute <code class="language-plaintext highlighter-rouge">DROP DATABASE</code> commands</li> <li><strong>Audit Trail</strong>: Database deletions only occur through operator-managed jobs with proper logging</li> </ol> <h4 id="site-deletion-process"> <a href="#site-deletion-process" class="anchor-heading" aria-labelledby="site-deletion-process"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Site Deletion Process </h4> <p>When a FrappeSite resource is deleted:</p> <ol> <li>Operator creates a deletion job</li> <li>Job retrieves <strong>MariaDB root credentials</strong> (not site user credentials)</li> <li>Runs <code class="language-plaintext highlighter-rouge">bench drop-site --db-root-username root --db-root-password &lt;password&gt;</code></li> <li>Drops database, user, and site files</li> <li>Job completes and site is removed</li> </ol> <p>This ensures only authorized Kubernetes operations can delete sites, not application code or developers.</p> <h4 id="credential-storage"> <a href="#credential-storage" class="anchor-heading" aria-labelledby="credential-storage"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Credential Storage </h4> <p>All credentials are stored as Kubernetes Secrets:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># View available secrets (values are base64-encoded)</span>
+kubectl get secrets <span class="nt">-n</span> &lt;namespace&gt;
+
+<span class="c"># Site user credentials (used by runtime pods)</span>
+kubectl get secret &lt;site-name&gt;-db-password <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.data.password}'</span> | <span class="nb">base64</span> <span class="nt">-d</span>
+
+<span class="c"># Root credentials (dedicated mode only, used by deletion jobs)</span>
+kubectl get secret &lt;site-name&gt;-mariadb-root <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.data.password}'</span> | <span class="nb">base64</span> <span class="nt">-d</span>
+</code></pre></div></div> <p><strong>Important:</strong> Never mount root credentials in application pods. Root credentials should only be used in operator-managed jobs.</p><hr /> <h2 id="scaling-and-performance"> <a href="#scaling-and-performance" class="anchor-heading" aria-labelledby="scaling-and-performance"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Scaling and Performance </h2> <h3 id="component-replicas"> <a href="#component-replicas" class="anchor-heading" aria-labelledby="component-replicas"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Component Replicas </h3> <p>Configure replica counts for each component:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">scaled-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">componentReplicas</span><span class="pi">:</span>
+    <span class="na">gunicorn</span><span class="pi">:</span> <span class="m">3</span>      <span class="c1"># Web servers</span>
+    <span class="na">nginx</span><span class="pi">:</span> <span class="m">2</span>         <span class="c1"># Load balancers</span>
+    <span class="na">socketio</span><span class="pi">:</span> <span class="m">2</span>      <span class="c1"># WebSocket servers</span>
+    <span class="na">scheduler</span><span class="pi">:</span> <span class="m">1</span>     <span class="c1"># Always 1</span>
+</code></pre></div></div> <h3 id="worker-autoscaling-keda"> <a href="#worker-autoscaling-keda" class="anchor-heading" aria-labelledby="worker-autoscaling-keda"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Worker Autoscaling (KEDA) </h3> <p>Scale workers based on queue length:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">autoscaled-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">workerAutoscaling</span><span class="pi">:</span>
+    <span class="na">default</span><span class="pi">:</span>
+      <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">minReplicas</span><span class="pi">:</span> <span class="m">0</span>      <span class="c1"># Scale to zero</span>
+      <span class="na">maxReplicas</span><span class="pi">:</span> <span class="m">10</span>
+      <span class="na">targetQueueLength</span><span class="pi">:</span> <span class="m">5</span>
+    <span class="na">long</span><span class="pi">:</span>
+      <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">minReplicas</span><span class="pi">:</span> <span class="m">0</span>
+      <span class="na">maxReplicas</span><span class="pi">:</span> <span class="m">5</span>
+      <span class="na">targetQueueLength</span><span class="pi">:</span> <span class="m">2</span>
+</code></pre></div></div> <h3 id="resource-limits"> <a href="#resource-limits" class="anchor-heading" aria-labelledby="resource-limits"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Resource Limits </h3> <p>Set CPU and memory limits:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">resource-limited-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">componentResources</span><span class="pi">:</span>
+    <span class="na">gunicorn</span><span class="pi">:</span>
+      <span class="na">requests</span><span class="pi">:</span>
+        <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">500m"</span>
+        <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1Gi"</span>
+      <span class="na">limits</span><span class="pi">:</span>
+        <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2"</span>
+        <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">4Gi"</span>
+    <span class="na">worker-default</span><span class="pi">:</span>
+      <span class="na">requests</span><span class="pi">:</span>
+        <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">200m"</span>
+        <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">512Mi"</span>
+      <span class="na">limits</span><span class="pi">:</span>
+        <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1"</span>
+        <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2Gi"</span>
+</code></pre></div></div> <h3 id="performance-tuning"> <a href="#performance-tuning" class="anchor-heading" aria-labelledby="performance-tuning"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Performance Tuning </h3> <p><strong>Gunicorn Workers:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">componentReplicas</span><span class="pi">:</span>
+  <span class="na">gunicorn</span><span class="pi">:</span> <span class="m">4</span>  <span class="c1"># 2-4 workers per CPU core recommended</span>
+</code></pre></div></div> <p><strong>Redis Configuration:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">redisConfig</span><span class="pi">:</span>
+  <span class="na">cache</span><span class="pi">:</span>
+    <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2Gi"</span>
+  <span class="na">queue</span><span class="pi">:</span>
+    <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1Gi"</span>
+</code></pre></div></div><hr /> <h2 id="security"> <a href="#security" class="anchor-heading" aria-labelledby="security"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Security </h2> <h3 id="security-contexts"> <a href="#security-contexts" class="anchor-heading" aria-labelledby="security-contexts"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Security Contexts </h3> <p>Configure pod and container security:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">secure-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">security</span><span class="pi">:</span>
+    <span class="na">podSecurityContext</span><span class="pi">:</span>
+      <span class="na">runAsNonRoot</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">runAsUser</span><span class="pi">:</span> <span class="m">1001</span>
+      <span class="na">fsGroup</span><span class="pi">:</span> <span class="m">1001</span>
+    <span class="na">securityContext</span><span class="pi">:</span>
+      <span class="na">allowPrivilegeEscalation</span><span class="pi">:</span> <span class="no">false</span>
+      <span class="na">readOnlyRootFilesystem</span><span class="pi">:</span> <span class="no">false</span>
+      <span class="na">capabilities</span><span class="pi">:</span>
+        <span class="na">drop</span><span class="pi">:</span>
+          <span class="pi">-</span> <span class="s">ALL</span>
+</code></pre></div></div> <h3 id="image-pull-secrets"> <a href="#image-pull-secrets" class="anchor-heading" aria-labelledby="image-pull-secrets"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Image Pull Secrets </h3> <p>For private registries:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Secret</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">registry-credentials</span>
+<span class="na">type</span><span class="pi">:</span> <span class="s">kubernetes.io/dockerconfigjson</span>
+<span class="na">data</span><span class="pi">:</span>
+  <span class="na">.dockerconfigjson</span><span class="pi">:</span> <span class="s">&lt;base64-encoded-docker-config&gt;</span>
+<span class="nn">---</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">private-registry-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">imageConfig</span><span class="pi">:</span>
+    <span class="na">repository</span><span class="pi">:</span> <span class="s2">"</span><span class="s">private-registry.com/frappe/erpnext"</span>
+    <span class="na">pullSecrets</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">registry-credentials</span>
+</code></pre></div></div> <h3 id="tls-configuration"> <a href="#tls-configuration" class="anchor-heading" aria-labelledby="tls-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> TLS Configuration </h3> <p>Enable TLS for sites:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">secure-site</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s">secure.example.com</span>
+  <span class="na">benchRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">production-bench</span>
+  <span class="na">tls</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">secretName</span><span class="pi">:</span> <span class="s">tls-certificate</span>
+    <span class="na">issuer</span><span class="pi">:</span> <span class="s">letsencrypt-prod</span>  <span class="c1"># cert-manager issuer</span>
+</code></pre></div></div> <h3 id="network-policies"> <a href="#network-policies" class="anchor-heading" aria-labelledby="network-policies"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Network Policies </h3> <p>Restrict network access:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">networking.k8s.io/v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">NetworkPolicy</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">frappe-bench-policy</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">podSelector</span><span class="pi">:</span>
+    <span class="na">matchLabels</span><span class="pi">:</span>
+      <span class="na">app</span><span class="pi">:</span> <span class="s">frappe</span>
+      <span class="na">bench</span><span class="pi">:</span> <span class="s">production-bench</span>
+  <span class="na">policyTypes</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="s">Ingress</span>
+    <span class="pi">-</span> <span class="s">Egress</span>
+  <span class="na">ingress</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">from</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">namespaceSelector</span><span class="pi">:</span>
+            <span class="na">matchLabels</span><span class="pi">:</span>
+              <span class="na">name</span><span class="pi">:</span> <span class="s">ingress-nginx</span>
+      <span class="na">ports</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">protocol</span><span class="pi">:</span> <span class="s">TCP</span>
+          <span class="na">port</span><span class="pi">:</span> <span class="m">8080</span>
+  <span class="na">egress</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">to</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">namespaceSelector</span><span class="pi">:</span>
+            <span class="na">matchLabels</span><span class="pi">:</span>
+              <span class="na">name</span><span class="pi">:</span> <span class="s">mariadb-operator</span>
+      <span class="na">ports</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">protocol</span><span class="pi">:</span> <span class="s">TCP</span>
+          <span class="na">port</span><span class="pi">:</span> <span class="m">3306</span>
+</code></pre></div></div><hr /> <h2 id="operations"> <a href="#operations" class="anchor-heading" aria-labelledby="operations"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Operations </h2> <h3 id="updating-a-bench"> <a href="#updating-a-bench" class="anchor-heading" aria-labelledby="updating-a-bench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Updating a Bench </h3> <p>Update Frappe version or apps:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">production-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>  <span class="c1"># Update version</span>
+  <span class="na">apps</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">erpnext</span>
+      <span class="na">source</span><span class="pi">:</span> <span class="s">image</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">custom-app</span>
+      <span class="na">source</span><span class="pi">:</span> <span class="s">git</span>
+      <span class="na">git</span><span class="pi">:</span>
+        <span class="na">repository</span><span class="pi">:</span> <span class="s2">"</span><span class="s">https://github.com/company/custom-app"</span>
+        <span class="na">branch</span><span class="pi">:</span> <span class="s2">"</span><span class="s">main"</span>
+</code></pre></div></div> <p>Apply changes:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl apply <span class="nt">-f</span> bench.yaml
+kubectl rollout status deployment/production-bench-gunicorn
+</code></pre></div></div> <h3 id="backing-up-a-site"> <a href="#backing-up-a-site" class="anchor-heading" aria-labelledby="backing-up-a-site"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Backing Up a Site </h3> <p>Create a backup:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">daily-backup</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">customer-site</span>
+    <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+  <span class="na">schedule</span><span class="pi">:</span> <span class="s2">"</span><span class="s">0</span><span class="nv"> </span><span class="s">2</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*"</span>  <span class="c1"># Daily at 2 AM</span>
+  <span class="na">retention</span><span class="pi">:</span>
+    <span class="na">days</span><span class="pi">:</span> <span class="m">30</span>
+  <span class="na">storage</span><span class="pi">:</span>
+    <span class="na">s3</span><span class="pi">:</span>
+      <span class="na">bucket</span><span class="pi">:</span> <span class="s2">"</span><span class="s">frappe-backups"</span>
+      <span class="na">region</span><span class="pi">:</span> <span class="s2">"</span><span class="s">us-east-1"</span>
+</code></pre></div></div> <h3 id="restoring-from-backup"> <a href="#restoring-from-backup" class="anchor-heading" aria-labelledby="restoring-from-backup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Restoring from Backup </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">restore-job</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">customer-site</span>
+    <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+  <span class="na">restore</span><span class="pi">:</span>
+    <span class="na">backupName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">daily-backup-2024-01-15"</span>
+    <span class="na">restoreDatabase</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">restoreFiles</span><span class="pi">:</span> <span class="no">true</span>
+</code></pre></div></div> <h3 id="monitoring-and-observability"> <a href="#monitoring-and-observability" class="anchor-heading" aria-labelledby="monitoring-and-observability"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Monitoring and Observability </h3> <p><strong>Check Bench Status:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get frappebench production-bench <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.status.conditions[*]}'</span>
+</code></pre></div></div> <p><strong>Check Site Status:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get frappesite customer-site <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.status.conditions[*]}'</span>
+</code></pre></div></div> <p><strong>View Logs:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Operator logs</span>
+kubectl logs <span class="nt">-n</span> frappe-operator-system deployment/frappe-operator-controller-manager
+
+<span class="c"># Bench component logs</span>
+kubectl logs <span class="nt">-l</span> <span class="nv">app</span><span class="o">=</span>frappe,bench<span class="o">=</span>production-bench,component<span class="o">=</span>gunicorn
+
+<span class="c"># Site init job logs</span>
+kubectl logs job/customer-site-init
+</code></pre></div></div> <p><strong>Prometheus Metrics:</strong> The operator exposes metrics at <code class="language-plaintext highlighter-rouge">/metrics</code> endpoint:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl port-forward <span class="nt">-n</span> frappe-operator-system deployment/frappe-operator-controller-manager 8080:8080
+curl http://localhost:8080/metrics
+</code></pre></div></div> <h3 id="health-checks"> <a href="#health-checks" class="anchor-heading" aria-labelledby="health-checks"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Health Checks </h3> <p><strong>Bench Health:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get frappebench production-bench <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.status.conditions[?(@.type=="Ready")]}'</span>
+</code></pre></div></div> <p><strong>Component Health:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get pods <span class="nt">-l</span> <span class="nv">app</span><span class="o">=</span>frappe,bench<span class="o">=</span>production-bench
+kubectl describe pod &lt;pod-name&gt;
+</code></pre></div></div><hr /> <h2 id="troubleshooting"> <a href="#troubleshooting" class="anchor-heading" aria-labelledby="troubleshooting"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Troubleshooting </h2> <h3 id="common-issues"> <a href="#common-issues" class="anchor-heading" aria-labelledby="common-issues"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Common Issues </h3> <h4 id="bench-not-ready"> <a href="#bench-not-ready" class="anchor-heading" aria-labelledby="bench-not-ready"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Bench Not Ready </h4> <p><strong>Symptoms:</strong></p> <ul> <li>Bench status shows <code class="language-plaintext highlighter-rouge">Progressing</code> or <code class="language-plaintext highlighter-rouge">Degraded</code></li> <li>Pods not starting</li> </ul> <p><strong>Debugging:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check bench conditions</span>
+kubectl describe frappebench production-bench
+
+<span class="c"># Check events</span>
+kubectl get events <span class="nt">--field-selector</span> involvedObject.name<span class="o">=</span>production-bench
+
+<span class="c"># Check pod status</span>
+kubectl get pods <span class="nt">-l</span> <span class="nv">app</span><span class="o">=</span>frappe,bench<span class="o">=</span>production-bench
+
+<span class="c"># Check logs</span>
+kubectl logs <span class="nt">-l</span> <span class="nv">app</span><span class="o">=</span>frappe,bench<span class="o">=</span>production-bench,component<span class="o">=</span>gunicorn
+</code></pre></div></div> <p><strong>Common Causes:</strong></p> <ul> <li>Image pull errors (check image name and pull secrets)</li> <li>Storage issues (check PVC status)</li> <li>Resource constraints (check node resources)</li> </ul> <h4 id="site-not-ready"> <a href="#site-not-ready" class="anchor-heading" aria-labelledby="site-not-ready"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Site Not Ready </h4> <p><strong>Symptoms:</strong></p> <ul> <li>Site status shows <code class="language-plaintext highlighter-rouge">Pending</code> or <code class="language-plaintext highlighter-rouge">Failed</code></li> <li>Site init job failing</li> </ul> <p><strong>Debugging:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check site conditions</span>
+kubectl describe frappesite customer-site
+
+<span class="c"># Check init job</span>
+kubectl get job customer-site-init
+kubectl logs job/customer-site-init
+
+<span class="c"># Check database connection</span>
+kubectl get secret customer-site-db-credentials <span class="nt">-o</span> yaml
+</code></pre></div></div> <p><strong>Common Causes:</strong></p> <ul> <li>Database connection issues</li> <li>Admin password secret missing</li> <li>Bench not ready</li> </ul> <h4 id="image-pull-errors"> <a href="#image-pull-errors" class="anchor-heading" aria-labelledby="image-pull-errors"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Image Pull Errors </h4> <p><strong>Symptoms:</strong></p> <ul> <li>Pods in <code class="language-plaintext highlighter-rouge">ImagePullBackOff</code> state</li> </ul> <p><strong>Solutions:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check image name</span>
+kubectl get frappebench production-bench <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.spec.imageConfig}'</span>
+
+<span class="c"># Verify pull secrets</span>
+kubectl get secret registry-credentials
+
+<span class="c"># Test image pull manually</span>
+kubectl run test-pull <span class="nt">--image</span><span class="o">=</span>myregistry.com/frappe/erpnext:latest <span class="nt">--rm</span> <span class="nt">-it</span> <span class="nt">--restart</span><span class="o">=</span>Never
+</code></pre></div></div> <h4 id="database-connection-issues"> <a href="#database-connection-issues" class="anchor-heading" aria-labelledby="database-connection-issues"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Database Connection Issues </h4> <p><strong>Symptoms:</strong></p> <ul> <li>Site init job failing with database errors</li> <li>Sites unable to connect to database</li> </ul> <p><strong>Debugging:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check database credentials</span>
+kubectl get secret customer-site-db-credentials <span class="nt">-o</span> yaml
+
+<span class="c"># Check database pod (if using MariaDB operator)</span>
+kubectl get mariadb <span class="nt">-n</span> default
+
+<span class="c"># Test database connection</span>
+kubectl run db-test <span class="nt">--image</span><span class="o">=</span>mariadb:10.6 <span class="nt">--rm</span> <span class="nt">-it</span> <span class="nt">--restart</span><span class="o">=</span>Never <span class="nt">--</span> <span class="se">\</span>
+  mysql <span class="nt">-h</span> &lt;db-host&gt; <span class="nt">-u</span> &lt;user&gt; <span class="nt">-p</span>&lt;password&gt;
+</code></pre></div></div> <h4 id="site-deletion-failures"> <a href="#site-deletion-failures" class="anchor-heading" aria-labelledby="site-deletion-failures"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Site Deletion Failures </h4> <p><strong>Symptoms:</strong></p> <ul> <li>Site deletion job fails with password prompt</li> <li>Error: “MySQL root password: Aborted!”</li> <li>Site resource stuck in deletion</li> </ul> <p><strong>Root Cause:</strong> Site deletion requires MariaDB root credentials to drop the database. Site users have limited privileges and cannot drop databases (security feature).</p> <p><strong>Debugging:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check if deletion job exists</span>
+kubectl get job &lt;site-name&gt;-delete <span class="nt">-n</span> &lt;namespace&gt;
+
+<span class="c"># View deletion job logs</span>
+kubectl logs job/&lt;site-name&gt;-delete <span class="nt">-n</span> &lt;namespace&gt;
+
+<span class="c"># Verify root secret exists (dedicated mode)</span>
+kubectl get secret &lt;site-name&gt;-mariadb-root <span class="nt">-n</span> &lt;namespace&gt;
+
+<span class="c"># For shared mode, check MariaDB CR's root secret</span>
+kubectl get mariadb &lt;mariadb-name&gt; <span class="nt">-n</span> &lt;namespace&gt; <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.spec.rootPasswordSecretKeyRef}'</span>
+</code></pre></div></div> <p><strong>Solutions:</strong></p> <ol> <li><strong>Missing Root Secret</strong>: If root secret is missing, recreate it or use MariaDB operator to regenerate: <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># For dedicated mode MariaDB instances</span>
+kubectl get mariadb &lt;site-name&gt;-mariadb <span class="nt">-o</span> yaml
+<span class="c"># Check rootPasswordSecretKeyRef field</span>
+</code></pre></div> </div> </li> <li><strong>Manual Cleanup</strong> (if deletion job continues to fail): <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Drop database manually</span>
+kubectl <span class="nb">exec</span> <span class="nt">-it</span> &lt;mariadb-pod&gt; <span class="nt">--</span> mysql <span class="nt">-u</span> root <span class="nt">-p</span>&lt;password&gt; <span class="se">\</span>
+  <span class="nt">-e</span> <span class="s2">"DROP DATABASE IF EXISTS &lt;database-name&gt;;"</span>
+   
+<span class="c"># Drop user manually</span>
+kubectl <span class="nb">exec</span> <span class="nt">-it</span> &lt;mariadb-pod&gt; <span class="nt">--</span> mysql <span class="nt">-u</span> root <span class="nt">-p</span>&lt;password&gt; <span class="se">\</span>
+  <span class="nt">-e</span> <span class="s2">"DROP USER IF EXISTS '&lt;username&gt;'@'%';"</span>
+   
+<span class="c"># Remove finalizer from site resource</span>
+kubectl patch frappesite &lt;site-name&gt; <span class="nt">-n</span> &lt;namespace&gt; <span class="se">\</span>
+  <span class="nt">--type</span> json <span class="nt">-p</span><span class="o">=</span><span class="s1">'[{"op": "remove", "path": "/metadata/finalizers"}]'</span>
+</code></pre></div> </div> </li> <li><strong>Verify Privileges</strong>: Confirm site user doesn’t have DROP DATABASE privilege (expected): <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl <span class="nb">exec</span> <span class="nt">-it</span> &lt;mariadb-pod&gt; <span class="nt">--</span> mysql <span class="nt">-u</span> root <span class="nt">-p</span>&lt;password&gt; <span class="se">\</span>
+  <span class="nt">-e</span> <span class="s2">"SHOW GRANTS FOR '&lt;site-username&gt;'@'%';"</span>
+<span class="c"># Should NOT see "DROP" in database-level grants</span>
+</code></pre></div> </div> </li> </ol> <p><strong>Prevention:</strong></p> <ul> <li>Ensure MariaDB Operator CRDs are installed: <code class="language-plaintext highlighter-rouge">kubectl get crd mariadbs.k8s.mariadb.com</code></li> <li>Don’t manually modify database secrets</li> <li>Let operator manage database lifecycle</li> </ul> <h3 id="debugging-tips"> <a href="#debugging-tips" class="anchor-heading" aria-labelledby="debugging-tips"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Debugging Tips </h3> <p><strong>Enable Verbose Logging:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Update operator deployment</span>
+kubectl edit deployment frappe-operator-controller-manager <span class="nt">-n</span> frappe-operator-system
+
+<span class="c"># Add to args:</span>
+- <span class="nt">--zap-log-level</span><span class="o">=</span>debug
+</code></pre></div></div> <p><strong>Check Resource Events:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get events <span class="nt">--all-namespaces</span> <span class="nt">--sort-by</span><span class="o">=</span><span class="s1">'.lastTimestamp'</span> | <span class="nb">grep </span>frappe
+</code></pre></div></div> <p><strong>Inspect Resource Status:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get frappebench production-bench <span class="nt">-o</span> yaml | <span class="nb">grep</span> <span class="nt">-A</span> 20 status
+kubectl get frappesite customer-site <span class="nt">-o</span> yaml | <span class="nb">grep</span> <span class="nt">-A</span> 20 status
+</code></pre></div></div><hr /> <h2 id="api-reference"> <a href="#api-reference" class="anchor-heading" aria-labelledby="api-reference"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> API Reference </h2> <h3 id="frappebench-spec"> <a href="#frappebench-spec" class="anchor-heading" aria-labelledby="frappebench-spec"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> FrappeBench Spec </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">example-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="c1"># Required: Frappe version</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  
+  <span class="c1"># Optional: Apps to install</span>
+  <span class="na">apps</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">erpnext</span>
+      <span class="na">source</span><span class="pi">:</span> <span class="s">image</span>  <span class="c1"># or "git" or "fpm"</span>
+  
+  <span class="c1"># Optional: Image configuration</span>
+  <span class="na">imageConfig</span><span class="pi">:</span>
+    <span class="na">repository</span><span class="pi">:</span> <span class="s2">"</span><span class="s">docker.io/frappe/erpnext"</span>
+    <span class="na">tag</span><span class="pi">:</span> <span class="s2">"</span><span class="s">latest"</span>
+    <span class="na">pullPolicy</span><span class="pi">:</span> <span class="s">Always</span>
+    <span class="na">pullSecrets</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">registry-credentials</span>
+  
+  <span class="c1"># Optional: Component replicas</span>
+  <span class="na">componentReplicas</span><span class="pi">:</span>
+    <span class="na">gunicorn</span><span class="pi">:</span> <span class="m">2</span>
+    <span class="na">nginx</span><span class="pi">:</span> <span class="m">1</span>
+    <span class="na">socketio</span><span class="pi">:</span> <span class="m">1</span>
+    <span class="na">scheduler</span><span class="pi">:</span> <span class="m">1</span>
+  
+  <span class="c1"># Optional: Resource limits</span>
+  <span class="na">componentResources</span><span class="pi">:</span>
+    <span class="na">gunicorn</span><span class="pi">:</span>
+      <span class="na">requests</span><span class="pi">:</span>
+        <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">500m"</span>
+        <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1Gi"</span>
+      <span class="na">limits</span><span class="pi">:</span>
+        <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2"</span>
+        <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">4Gi"</span>
+  
+  <span class="c1"># Optional: Worker autoscaling</span>
+  <span class="na">workerAutoscaling</span><span class="pi">:</span>
+    <span class="na">default</span><span class="pi">:</span>
+      <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">minReplicas</span><span class="pi">:</span> <span class="m">0</span>
+      <span class="na">maxReplicas</span><span class="pi">:</span> <span class="m">10</span>
+      <span class="na">targetQueueLength</span><span class="pi">:</span> <span class="m">5</span>
+  
+  <span class="c1"># Optional: Storage class</span>
+  <span class="na">storageClassName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">fast-ssd"</span>
+  
+  <span class="c1"># Optional: Database config</span>
+  <span class="na">dbConfig</span><span class="pi">:</span>
+    <span class="na">provider</span><span class="pi">:</span> <span class="s">mariadb</span>
+    <span class="na">mode</span><span class="pi">:</span> <span class="s">shared</span>
+  
+  <span class="c1"># Optional: Security context</span>
+  <span class="na">security</span><span class="pi">:</span>
+    <span class="na">podSecurityContext</span><span class="pi">:</span>
+      <span class="na">runAsNonRoot</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">runAsUser</span><span class="pi">:</span> <span class="m">1001</span>
+    <span class="na">securityContext</span><span class="pi">:</span>
+      <span class="na">allowPrivilegeEscalation</span><span class="pi">:</span> <span class="no">false</span>
+</code></pre></div></div> <h3 id="frappesite-spec"> <a href="#frappesite-spec" class="anchor-heading" aria-labelledby="frappesite-spec"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> FrappeSite Spec </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">example-site</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="c1"># Required: Site name (must match domain)</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">example.com"</span>
+  
+  <span class="c1"># Required: Bench reference</span>
+  <span class="na">benchRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">example-bench</span>
+    <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+  
+  <span class="c1"># Optional: Admin password secret</span>
+  <span class="na">adminPasswordSecretRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">site-admin-password</span>
+    <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
+  
+  <span class="c1"># Optional: Database configuration</span>
+  <span class="na">dbConfig</span><span class="pi">:</span>
+    <span class="na">provider</span><span class="pi">:</span> <span class="s">mariadb</span>  <span class="c1"># or "postgres" or "external"</span>
+    <span class="na">mode</span><span class="pi">:</span> <span class="s">shared</span>  <span class="c1"># or "dedicated"</span>
+    <span class="na">connectionSecretRef</span><span class="pi">:</span>
+      <span class="na">name</span><span class="pi">:</span> <span class="s">db-credentials</span>
+  
+  <span class="c1"># Optional: Domain override</span>
+  <span class="na">domain</span><span class="pi">:</span> <span class="s2">"</span><span class="s">custom.example.com"</span>
+  
+  <span class="c1"># Optional: Ingress configuration</span>
+  <span class="na">ingress</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">className</span><span class="pi">:</span> <span class="s2">"</span><span class="s">nginx"</span>
+    <span class="na">annotations</span><span class="pi">:</span>
+      <span class="na">cert-manager.io/cluster-issuer</span><span class="pi">:</span> <span class="s2">"</span><span class="s">letsencrypt-prod"</span>
+  
+  <span class="c1"># Optional: TLS configuration</span>
+  <span class="na">tls</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">secretName</span><span class="pi">:</span> <span class="s">tls-certificate</span>
+    <span class="na">issuer</span><span class="pi">:</span> <span class="s2">"</span><span class="s">letsencrypt-prod"</span>
+  
+  <span class="c1"># Optional: OpenShift Route (for OpenShift clusters)</span>
+  <span class="na">routeConfig</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">host</span><span class="pi">:</span> <span class="s2">"</span><span class="s">example.com"</span>
+    <span class="na">tlsTermination</span><span class="pi">:</span> <span class="s2">"</span><span class="s">edge"</span>
+</code></pre></div></div> <h3 id="status-fields"> <a href="#status-fields" class="anchor-heading" aria-labelledby="status-fields"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Status Fields </h3> <p><strong>FrappeBench Status:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">status</span><span class="pi">:</span>
+  <span class="na">phase</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Ready"</span>  <span class="c1"># Pending, Progressing, Ready, Failed</span>
+  <span class="na">conditions</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">type</span><span class="pi">:</span> <span class="s">Ready</span>
+      <span class="na">status</span><span class="pi">:</span> <span class="s2">"</span><span class="s">True"</span>
+      <span class="na">observedGeneration</span><span class="pi">:</span> <span class="m">1</span>
+    <span class="pi">-</span> <span class="na">type</span><span class="pi">:</span> <span class="s">Progressing</span>
+      <span class="na">status</span><span class="pi">:</span> <span class="s2">"</span><span class="s">False"</span>
+  <span class="na">installedApps</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="s">erpnext</span>
+  <span class="na">observedGeneration</span><span class="pi">:</span> <span class="m">1</span>
+</code></pre></div></div> <p><strong>FrappeSite Status:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">status</span><span class="pi">:</span>
+  <span class="na">phase</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Ready"</span>  <span class="c1"># Pending, Provisioning, Ready, Failed</span>
+  <span class="na">conditions</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">type</span><span class="pi">:</span> <span class="s">Ready</span>
+      <span class="na">status</span><span class="pi">:</span> <span class="s2">"</span><span class="s">True"</span>
+      <span class="na">observedGeneration</span><span class="pi">:</span> <span class="m">1</span>
+  <span class="na">benchReady</span><span class="pi">:</span> <span class="no">true</span>
+  <span class="na">databaseReady</span><span class="pi">:</span> <span class="no">true</span>
+  <span class="na">databaseName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">example_com"</span>
+  <span class="na">siteURL</span><span class="pi">:</span> <span class="s2">"</span><span class="s">https://example.com"</span>
+  <span class="na">resolvedDomain</span><span class="pi">:</span> <span class="s2">"</span><span class="s">example.com"</span>
+</code></pre></div></div><hr /> <h2 id="examples"> <a href="#examples" class="anchor-heading" aria-labelledby="examples"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Examples </h2> <h3 id="basic-deployment"> <a href="#basic-deployment" class="anchor-heading" aria-labelledby="basic-deployment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Basic Deployment </h3> <p><strong>Bench:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">basic-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">apps</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">erpnext</span>
+      <span class="na">source</span><span class="pi">:</span> <span class="s">image</span>
+</code></pre></div></div> <p><strong>Site:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">basic-site</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">basic.local"</span>
+  <span class="na">benchRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">basic-bench</span>
+  <span class="na">ingress</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+</code></pre></div></div> <h3 id="production-deployment"> <a href="#production-deployment" class="anchor-heading" aria-labelledby="production-deployment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Production Deployment </h3> <p><strong>High-Availability Bench:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">prod-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">apps</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">erpnext</span>
+      <span class="na">source</span><span class="pi">:</span> <span class="s">image</span>
+  <span class="na">componentReplicas</span><span class="pi">:</span>
+    <span class="na">gunicorn</span><span class="pi">:</span> <span class="m">4</span>
+    <span class="na">nginx</span><span class="pi">:</span> <span class="m">2</span>
+    <span class="na">socketio</span><span class="pi">:</span> <span class="m">2</span>
+  <span class="na">componentResources</span><span class="pi">:</span>
+    <span class="na">gunicorn</span><span class="pi">:</span>
+      <span class="na">requests</span><span class="pi">:</span>
+        <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1"</span>
+        <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2Gi"</span>
+      <span class="na">limits</span><span class="pi">:</span>
+        <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">4"</span>
+        <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">8Gi"</span>
+  <span class="na">workerAutoscaling</span><span class="pi">:</span>
+    <span class="na">default</span><span class="pi">:</span>
+      <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">minReplicas</span><span class="pi">:</span> <span class="m">2</span>
+      <span class="na">maxReplicas</span><span class="pi">:</span> <span class="m">20</span>
+      <span class="na">targetQueueLength</span><span class="pi">:</span> <span class="m">5</span>
+  <span class="na">storageClassName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">fast-ssd"</span>
+</code></pre></div></div> <p><strong>Production Site:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">prod-site</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">production.example.com"</span>
+  <span class="na">benchRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">prod-bench</span>
+  <span class="na">ingress</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">className</span><span class="pi">:</span> <span class="s2">"</span><span class="s">nginx"</span>
+  <span class="na">tls</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">issuer</span><span class="pi">:</span> <span class="s2">"</span><span class="s">letsencrypt-prod"</span>
+</code></pre></div></div> <h3 id="openshift-deployment"> <a href="#openshift-deployment" class="anchor-heading" aria-labelledby="openshift-deployment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> OpenShift Deployment </h3> <p><strong>OpenShift Bench:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">ocp-bench</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">frappeVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">15"</span>
+  <span class="na">apps</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">erpnext</span>
+      <span class="na">source</span><span class="pi">:</span> <span class="s">image</span>
+  <span class="na">imageConfig</span><span class="pi">:</span>
+    <span class="na">repository</span><span class="pi">:</span> <span class="s2">"</span><span class="s">image-registry.openshift-image-registry.svc:5000/frappe/erpnext"</span>
+    <span class="na">pullPolicy</span><span class="pi">:</span> <span class="s">Always</span>
+  <span class="na">security</span><span class="pi">:</span>
+    <span class="na">podSecurityContext</span><span class="pi">:</span>
+      <span class="na">runAsNonRoot</span><span class="pi">:</span> <span class="no">true</span>
+</code></pre></div></div> <p><strong>OpenShift Site with Route:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">ocp-site</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">ocp.example.com"</span>
+  <span class="na">benchRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">ocp-bench</span>
+  <span class="na">routeConfig</span><span class="pi">:</span>
+    <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">host</span><span class="pi">:</span> <span class="s2">"</span><span class="s">ocp.example.com"</span>
+    <span class="na">tlsTermination</span><span class="pi">:</span> <span class="s2">"</span><span class="s">edge"</span>
+    <span class="na">annotations</span><span class="pi">:</span>
+      <span class="na">haproxy.router.openshift.io/timeout</span><span class="pi">:</span> <span class="s2">"</span><span class="s">300s"</span>
+</code></pre></div></div> <h3 id="external-database-1"> <a href="#external-database-1" class="anchor-heading" aria-labelledby="external-database-1"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> External Database </h3> <p><strong>Site with RDS:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Secret</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">rds-credentials</span>
+<span class="na">type</span><span class="pi">:</span> <span class="s">Opaque</span>
+<span class="na">stringData</span><span class="pi">:</span>
+  <span class="na">username</span><span class="pi">:</span> <span class="s2">"</span><span class="s">frappe_user"</span>
+  <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">secure_password"</span>
+<span class="nn">---</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">rds-site</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">siteName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">rds.example.com"</span>
+  <span class="na">benchRef</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">production-bench</span>
+  <span class="na">dbConfig</span><span class="pi">:</span>
+    <span class="na">provider</span><span class="pi">:</span> <span class="s">external</span>
+    <span class="na">host</span><span class="pi">:</span> <span class="s2">"</span><span class="s">rds-instance.region.rds.amazonaws.com"</span>
+    <span class="na">port</span><span class="pi">:</span> <span class="s2">"</span><span class="s">3306"</span>
+    <span class="na">connectionSecretRef</span><span class="pi">:</span>
+      <span class="na">name</span><span class="pi">:</span> <span class="s">rds-credentials</span>
+</code></pre></div></div><hr /> <h2 id="best-practices"> <a href="#best-practices" class="anchor-heading" aria-labelledby="best-practices"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Best Practices </h2> <h3 id="resource-planning"> <a href="#resource-planning" class="anchor-heading" aria-labelledby="resource-planning"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Resource Planning </h3> <ul> <li><strong>Gunicorn</strong>: 2-4 replicas per CPU core</li> <li><strong>Workers</strong>: Start with 2-3, scale based on queue length</li> <li><strong>Storage</strong>: Use fast SSD storage for production</li> <li><strong>Memory</strong>: Allocate 2-4GB per gunicorn pod</li> </ul> <h3 id="security-1"> <a href="#security-1" class="anchor-heading" aria-labelledby="security-1"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Security </h3> <ul> <li>Always use TLS for production sites</li> <li>Enable security contexts (runAsNonRoot)</li> <li>Use image pull secrets for private registries</li> <li>Regularly rotate database credentials</li> </ul> <h3 id="monitoring"> <a href="#monitoring" class="anchor-heading" aria-labelledby="monitoring"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Monitoring </h3> <ul> <li>Monitor bench and site conditions</li> <li>Set up alerts for failed reconciliations</li> <li>Track resource usage and scaling metrics</li> <li>Monitor database connection pools</li> </ul> <h3 id="backup-strategy"> <a href="#backup-strategy" class="anchor-heading" aria-labelledby="backup-strategy"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Backup Strategy </h3> <ul> <li>Enable automated backups for production sites</li> <li>Test restore procedures regularly</li> <li>Store backups in multiple locations</li> <li>Document recovery procedures</li> </ul><hr /> <h2 id="additional-resources"> <a href="#additional-resources" class="anchor-heading" aria-labelledby="additional-resources"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Additional Resources </h2> <ul> <li><strong>GitHub Repository</strong>: <a href="https://github.com/vyogotech/frappe-operator">vyogotech/frappe-operator</a></li> <li><strong>Release Notes</strong>: See <code class="language-plaintext highlighter-rouge">docs/RELEASE_NOTES_*.md</code></li> <li><strong>Examples</strong>: See <code class="language-plaintext highlighter-rouge">examples/</code> directory</li> <li><strong>Issues</strong>: <a href="https://github.com/vyogotech/frappe-operator/issues">GitHub Issues</a></li> </ul><hr /> <p><strong>Last Updated</strong>: 2024-01-15<br /> <strong>Operator Version</strong>: v2.5.0</p> </main> <hr> <footer> <p class="text-small mb-0">Built with ❤️ by Vyogo Technologies</p> <div class="d-md-none mt-4 fs-2"> This site uses <a href="https://github.com/just-the-docs/just-the-docs">Just the Docs</a>, a documentation theme for Jekyll. </div> </footer> </div> </div> <div class="search-overlay"></div> </div> </body> </html>

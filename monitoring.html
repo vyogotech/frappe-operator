@@ -1,0 +1,407 @@
+<!DOCTYPE html> <html lang="en-US"> <head> <meta charset="UTF-8"> <meta http-equiv="X-UA-Compatible" content="IE=Edge"> <link rel="stylesheet" href="/frappe-operator/assets/css/just-the-docs-default.css"> <link rel="stylesheet" href="/frappe-operator/assets/css/just-the-docs-head-nav.css" id="jtd-head-nav-stylesheet"> <style id="jtd-nav-activation"> .site-nav > ul.nav-list:first-child > li:not(:nth-child(22)) > a, .site-nav > ul.nav-list:first-child > li > ul > li a { background-image: none; } .site-nav > ul.nav-list:not(:first-child) a, .site-nav li.external a { background-image: none; } .site-nav > ul.nav-list:first-child > li:nth-child(22) > a { font-weight: 600; text-decoration: none; }.site-nav > ul.nav-list:first-child > li:nth-child(22) > button svg { transform: rotate(-90deg); }.site-nav > ul.nav-list:first-child > li.nav-list-item:nth-child(22) > ul.nav-list { display: block; } </style> <script src="/frappe-operator/assets/js/vendor/lunr.min.js"></script> <script src="/frappe-operator/assets/js/just-the-docs.js"></script> <meta name="viewport" content="width=device-width, initial-scale=1"> <!-- Begin Jekyll SEO tag v2.8.0 --> <title>Monitoring Guide | Frappe Operator</title> <meta name="generator" content="Jekyll v3.10.0" /> <meta property="og:title" content="Monitoring Guide" /> <meta property="og:locale" content="en_US" /> <meta name="description" content="Production-ready Kubernetes operator for Frappe/ERPNext" /> <meta property="og:description" content="Production-ready Kubernetes operator for Frappe/ERPNext" /> <link rel="canonical" href="https://vyogotech.github.io/frappe-operator/monitoring.html" /> <meta property="og:url" content="https://vyogotech.github.io/frappe-operator/monitoring.html" /> <meta property="og:site_name" content="Frappe Operator" /> <meta property="og:type" content="website" /> <meta name="twitter:card" content="summary" /> <meta property="twitter:title" content="Monitoring Guide" /> <script type="application/ld+json"> {"@context":"https://schema.org","@type":"WebPage","description":"Production-ready Kubernetes operator for Frappe/ERPNext","headline":"Monitoring Guide","url":"https://vyogotech.github.io/frappe-operator/monitoring.html"}</script> <!-- End Jekyll SEO tag --> </head> <body> <a class="skip-to-main" href="#main-content">Skip to main content</a> <svg xmlns="http://www.w3.org/2000/svg" class="d-none"> <symbol id="svg-link" viewBox="0 0 24 24"> <title>Link</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-link"> <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path> </svg> </symbol> <symbol id="svg-menu" viewBox="0 0 24 24"> <title>Menu</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"> <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line> </svg> </symbol> <symbol id="svg-arrow-right" viewBox="0 0 24 24"> <title>Expand</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"> <polyline points="9 18 15 12 9 6"></polyline> </svg> </symbol> <!-- Feather. MIT License: https://github.com/feathericons/feather/blob/master/LICENSE --> <symbol id="svg-external-link" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-external-link"> <title id="svg-external-link-title">(external link)</title> <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line> </symbol> <symbol id="svg-doc" viewBox="0 0 24 24"> <title>Document</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file"> <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline> </svg> </symbol> <symbol id="svg-search" viewBox="0 0 24 24"> <title>Search</title> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"> <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line> </svg> </symbol> <!-- Bootstrap Icons. MIT License: https://github.com/twbs/icons/blob/main/LICENSE.md --> <symbol id="svg-copy" viewBox="0 0 16 16"> <title>Copy</title> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard" viewBox="0 0 16 16"> <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/> <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/> </svg> </symbol> <symbol id="svg-copied" viewBox="0 0 16 16"> <title>Copied</title> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard-check-fill" viewBox="0 0 16 16"> <path d="M6.5 0A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3Zm3 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3Z"/> <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1A2.5 2.5 0 0 1 9.5 5h-3A2.5 2.5 0 0 1 4 2.5v-1Zm6.854 7.354-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L7.5 10.793l2.646-2.647a.5.5 0 0 1 .708.708Z"/> </svg> </symbol> </svg> <header class="side-bar"> <div class="site-header"> <a href="/frappe-operator/" class="site-title lh-tight"> Frappe Operator </a> <button id="menu-button" class="site-button btn-reset" aria-label="Menu" aria-expanded="false"> <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><use xlink:href="#svg-menu"></use></svg> </button> </div> <nav aria-label="Main" id="site-nav" class="site-nav"> <ul class="nav-list"><li class="nav-list-item"><a href="/frappe-operator/" class="nav-list-link">Frappe Operator Documentation</a></li><li class="nav-list-item"><a href="/frappe-operator/api-reference.html" class="nav-list-link">API Reference</a></li><li class="nav-list-item"><a href="/frappe-operator/concepts.html" class="nav-list-link">Concepts</a></li><li class="nav-list-item"><a href="/frappe-operator/examples.html" class="nav-list-link">Examples</a></li><li class="nav-list-item"><a href="/frappe-operator/external-resources.html" class="nav-list-link">External Resource Support</a></li><li class="nav-list-item"><a href="/frappe-operator/COMPREHENSIVE_GUIDE.html" class="nav-list-link">Frappe Operator - Comprehensive Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/ARCHITECTURE.html" class="nav-list-link">Frappe Operator Architecture</a></li><li class="nav-list-item"><a href="/frappe-operator/helm-repo/" class="nav-list-link">Frappe Operator Helm Repository</a></li><li class="nav-list-item"><a href="/frappe-operator/INSTALLATION_HELM.html" class="nav-list-link">Frappe Operator Installation Guide (Helm)</a></li><li class="nav-list-item"><a href="/frappe-operator/USER_GUIDE.html" class="nav-list-link">Frappe Operator User Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/demo.html" class="nav-list-link">Frappe Operator on OpenShift (CRC) Demo</a></li><li class="nav-list-item"><a href="/frappe-operator/FULL-RUNBOOK-external-db.html" class="nav-list-link">Frappe Operator on OpenShift: Full Deployment Manual</a></li><li class="nav-list-item"><a href="/frappe-operator/FULL-RUNBOOK.html" class="nav-list-link">Frappe Operator on OpenShift: Full Deployment Manual</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_NOTES_v1.0.0.html" class="nav-list-link">Frappe Operator v1.0.0 - Production Ready Release 🎉</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_GUIDE.html" class="nav-list-link">Frappe Operator v2.0.0 Release Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_NOTES_v2.4.0.html" class="nav-list-link">Frappe Operator v2.4.0 - External Database Support &amp; Robustness 🚀</a></li><li class="nav-list-item"><a href="/frappe-operator/getting-started.html" class="nav-list-link">Getting Started</a></li><li class="nav-list-item"><a href="/frappe-operator/HELM_REPOSITORY.html" class="nav-list-link">Helm Repository Setup Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/helm-repo/SETUP.html" class="nav-list-link">Helm Repository Setup Instructions</a></li><li class="nav-list-item"><a href="/frappe-operator/INSTALL_OPENSHIFT.html" class="nav-list-link">Installing Frappe Operator on OpenShift</a></li><li class="nav-list-item"><a href="/frappe-operator/MARIADB_INTEGRATION.html" class="nav-list-link">MariaDB Database Integration</a></li><li class="nav-list-item"><a href="/frappe-operator/monitoring.html" class="nav-list-link">Monitoring Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/operations.html" class="nav-list-link">Operations Guide</a></li><li class="nav-list-item"><a href="/frappe-operator/RELEASE_NOTES_v2.5.0.html" class="nav-list-link">Release Notes - v2.5.0 (OpenShift Compatibility &amp; Security)</a></li><li class="nav-list-item"><a href="/frappe-operator/SITE_APP_INSTALLATION.html" class="nav-list-link">Site-Specific App Installation</a></li><li class="nav-list-item"><a href="/frappe-operator/troubleshooting.html" class="nav-list-link">Troubleshooting</a></li><li class="nav-list-item"><a href="/frappe-operator/upgrade-guide.html" class="nav-list-link">Upgrade Guide</a></li></ul> <ul class="nav-list"><li class="nav-list-item external"> <a href="https://github.com/vyogotech/frappe-operator" class="nav-list-link external" > GitHub <svg viewBox="0 0 24 24" aria-labelledby="svg-external-link-title"><use xlink:href="#svg-external-link"></use></svg> </a> </li><li class="nav-list-item external"> <a href="https://vyogotech.github.io/frappe-operator/helm-repo" class="nav-list-link external" > Helm Repo <svg viewBox="0 0 24 24" aria-labelledby="svg-external-link-title"><use xlink:href="#svg-external-link"></use></svg> </a> </li></ul> </nav> <div class="d-md-block d-none site-footer"> This site uses <a href="https://github.com/just-the-docs/just-the-docs">Just the Docs</a>, a documentation theme for Jekyll. </div> </header> <div class="main" id="top"> <div id="main-header" class="main-header"> <div class="search" role="search"> <div class="search-input-wrap"> <input type="text" id="search-input" class="search-input" tabindex="0" placeholder="Search Frappe Operator" autocomplete="off"> <label for="search-input" class="search-label"> <span class="sr-only">Search Frappe Operator</span> <svg viewBox="0 0 24 24" class="search-icon" aria-hidden="true"><use xlink:href="#svg-search"></use></svg> </label> </div> <div id="search-results" class="search-results"></div> </div> <nav aria-label="Auxiliary" class="aux-nav"> <ul class="aux-nav-list"> <li class="aux-nav-list-item"> <a href="https://github.com/vyogotech/frappe-operator" class="site-button" > Frappe Operator on GitHub </a> </li> </ul> </nav> </div> <div class="main-content-wrap"> <div id="main-content" class="main-content"> <main> <h1 id="monitoring-guide"> <a href="#monitoring-guide" class="anchor-heading" aria-labelledby="monitoring-guide"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Monitoring Guide </h1> <p>This guide covers monitoring the Frappe Operator and Frappe workloads.</p> <h2 id="table-of-contents"> <a href="#table-of-contents" class="anchor-heading" aria-labelledby="table-of-contents"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Table of Contents </h2> <ul> <li><a href="#prometheus-metrics">Prometheus Metrics</a></li> <li><a href="#grafana-dashboards">Grafana Dashboards</a></li> <li><a href="#alert-rules">Alert Rules</a></li> <li><a href="#logging">Logging</a></li> <li><a href="#health-checks">Health Checks</a></li> </ul> <h2 id="prometheus-metrics"> <a href="#prometheus-metrics" class="anchor-heading" aria-labelledby="prometheus-metrics"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Prometheus Metrics </h2> <p>The Frappe Operator exposes Prometheus metrics on port 8080 at <code class="language-plaintext highlighter-rouge">/metrics</code>.</p> <h3 id="available-metrics"> <a href="#available-metrics" class="anchor-heading" aria-labelledby="available-metrics"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Available Metrics </h3> <div class="table-wrapper"><table> <thead> <tr> <th>Metric</th> <th>Type</th> <th>Labels</th> <th>Description</th> </tr> </thead> <tbody> <tr> <td><code class="language-plaintext highlighter-rouge">frappe_operator_reconciliation_duration_seconds</code></td> <td>Histogram</td> <td><code class="language-plaintext highlighter-rouge">controller</code>, <code class="language-plaintext highlighter-rouge">result</code></td> <td>Time spent reconciling resources</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">frappe_operator_reconciliation_errors_total</code></td> <td>Counter</td> <td><code class="language-plaintext highlighter-rouge">controller</code>, <code class="language-plaintext highlighter-rouge">error_type</code></td> <td>Total number of reconciliation errors</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">frappe_operator_job_status</code></td> <td>Gauge</td> <td><code class="language-plaintext highlighter-rouge">job_name</code>, <code class="language-plaintext highlighter-rouge">namespace</code>, <code class="language-plaintext highlighter-rouge">status</code></td> <td>Current status of operator jobs</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">frappe_operator_resource_total</code></td> <td>Gauge</td> <td><code class="language-plaintext highlighter-rouge">resource_type</code>, <code class="language-plaintext highlighter-rouge">namespace</code></td> <td>Total count of managed resources</td> </tr> </tbody> </table></div> <h3 id="enabling-metrics"> <a href="#enabling-metrics" class="anchor-heading" aria-labelledby="enabling-metrics"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Enabling Metrics </h3> <p>Metrics are enabled by default. The ServiceMonitor is created if Prometheus Operator is detected.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Custom ServiceMonitor</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">monitoring.coreos.com/v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">ServiceMonitor</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">frappe-operator-metrics</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">frappe-operator-system</span>
+  <span class="na">labels</span><span class="pi">:</span>
+    <span class="na">control-plane</span><span class="pi">:</span> <span class="s">controller-manager</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">endpoints</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">port</span><span class="pi">:</span> <span class="s">https</span>
+    <span class="na">scheme</span><span class="pi">:</span> <span class="s">https</span>
+    <span class="na">bearerTokenFile</span><span class="pi">:</span> <span class="s">/var/run/secrets/kubernetes.io/serviceaccount/token</span>
+    <span class="na">tlsConfig</span><span class="pi">:</span>
+      <span class="na">insecureSkipVerify</span><span class="pi">:</span> <span class="no">true</span>
+    <span class="na">interval</span><span class="pi">:</span> <span class="s">30s</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">matchLabels</span><span class="pi">:</span>
+      <span class="na">control-plane</span><span class="pi">:</span> <span class="s">controller-manager</span>
+</code></pre></div></div> <h3 id="scraping-without-prometheus-operator"> <a href="#scraping-without-prometheus-operator" class="anchor-heading" aria-labelledby="scraping-without-prometheus-operator"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Scraping Without Prometheus Operator </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Prometheus scrape config</span>
+<span class="na">scrape_configs</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">job_name</span><span class="pi">:</span> <span class="s1">'</span><span class="s">frappe-operator'</span>
+    <span class="na">kubernetes_sd_configs</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">role</span><span class="pi">:</span> <span class="s">endpoints</span>
+        <span class="na">namespaces</span><span class="pi">:</span>
+          <span class="na">names</span><span class="pi">:</span>
+            <span class="pi">-</span> <span class="s">frappe-operator-system</span>
+    <span class="na">relabel_configs</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">source_labels</span><span class="pi">:</span> <span class="pi">[</span><span class="nv">__meta_kubernetes_service_label_control_plane</span><span class="pi">]</span>
+        <span class="na">action</span><span class="pi">:</span> <span class="s">keep</span>
+        <span class="na">regex</span><span class="pi">:</span> <span class="s">controller-manager</span>
+      <span class="pi">-</span> <span class="na">source_labels</span><span class="pi">:</span> <span class="pi">[</span><span class="nv">__meta_kubernetes_endpoint_port_name</span><span class="pi">]</span>
+        <span class="na">action</span><span class="pi">:</span> <span class="s">keep</span>
+        <span class="na">regex</span><span class="pi">:</span> <span class="s">https</span>
+</code></pre></div></div> <h2 id="grafana-dashboards"> <a href="#grafana-dashboards" class="anchor-heading" aria-labelledby="grafana-dashboards"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Grafana Dashboards </h2> <h3 id="operator-dashboard"> <a href="#operator-dashboard" class="anchor-heading" aria-labelledby="operator-dashboard"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Operator Dashboard </h3> <p>A standalone dashboard JSON is available at <a href="/frappe-operator/grafana-dashboard.json">docs/grafana-dashboard.json</a> for one-click import. Alternatively, use the embedded JSON below.</p> <div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"annotations"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nl">"list"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w">
+  </span><span class="p">},</span><span class="w">
+  </span><span class="nl">"editable"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"fiscalYearStartMonth"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"graphTooltip"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"links"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w">
+  </span><span class="nl">"panels"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"datasource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prometheus"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"uid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prometheus"</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"fieldConfig"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"defaults"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"palette-classic"</span><span class="w">
+          </span><span class="p">},</span><span class="w">
+          </span><span class="nl">"mappings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w">
+          </span><span class="nl">"thresholds"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"absolute"</span><span class="p">,</span><span class="w">
+            </span><span class="nl">"steps"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+              </span><span class="p">{</span><span class="w"> </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="s2">"green"</span><span class="p">,</span><span class="w"> </span><span class="nl">"value"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">},</span><span class="w">
+              </span><span class="p">{</span><span class="w"> </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="s2">"red"</span><span class="p">,</span><span class="w"> </span><span class="nl">"value"</span><span class="p">:</span><span class="w"> </span><span class="mi">80</span><span class="w"> </span><span class="p">}</span><span class="w">
+            </span><span class="p">]</span><span class="w">
+          </span><span class="p">}</span><span class="w">
+        </span><span class="p">},</span><span class="w">
+        </span><span class="nl">"overrides"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"gridPos"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"h"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="nl">"w"</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="nl">"x"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nl">"y"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"options"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"legend"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"calcs"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w"> </span><span class="nl">"displayMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"list"</span><span class="p">,</span><span class="w"> </span><span class="nl">"placement"</span><span class="p">:</span><span class="w"> </span><span class="s2">"bottom"</span><span class="w"> </span><span class="p">},</span><span class="w">
+        </span><span class="nl">"tooltip"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"single"</span><span class="w"> </span><span class="p">}</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"targets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"expr"</span><span class="p">:</span><span class="w"> </span><span class="s2">"rate(frappe_operator_reconciliation_duration_seconds_sum[5m]) / rate(frappe_operator_reconciliation_duration_seconds_count[5m])"</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"legendFormat"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"refId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Reconciliation Duration (avg)"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"timeseries"</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"datasource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prometheus"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"uid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prometheus"</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"fieldConfig"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"defaults"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"palette-classic"</span><span class="w"> </span><span class="p">},</span><span class="w">
+          </span><span class="nl">"mappings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w">
+          </span><span class="nl">"thresholds"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"absolute"</span><span class="p">,</span><span class="w">
+            </span><span class="nl">"steps"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+              </span><span class="p">{</span><span class="w"> </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="s2">"green"</span><span class="p">,</span><span class="w"> </span><span class="nl">"value"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">},</span><span class="w">
+              </span><span class="p">{</span><span class="w"> </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="s2">"yellow"</span><span class="p">,</span><span class="w"> </span><span class="nl">"value"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">},</span><span class="w">
+              </span><span class="p">{</span><span class="w"> </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="s2">"red"</span><span class="p">,</span><span class="w"> </span><span class="nl">"value"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="p">}</span><span class="w">
+            </span><span class="p">]</span><span class="w">
+          </span><span class="p">}</span><span class="w">
+        </span><span class="p">},</span><span class="w">
+        </span><span class="nl">"overrides"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"gridPos"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"h"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="nl">"w"</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="nl">"x"</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="nl">"y"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"options"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"legend"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"calcs"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w"> </span><span class="nl">"displayMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"list"</span><span class="p">,</span><span class="w"> </span><span class="nl">"placement"</span><span class="p">:</span><span class="w"> </span><span class="s2">"bottom"</span><span class="w"> </span><span class="p">},</span><span class="w">
+        </span><span class="nl">"tooltip"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"single"</span><span class="w"> </span><span class="p">}</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"targets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"expr"</span><span class="p">:</span><span class="w"> </span><span class="s2">"rate(frappe_operator_reconciliation_errors_total[5m])"</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"legendFormat"</span><span class="p">:</span><span class="w"> </span><span class="s2">" - "</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"refId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Reconciliation Errors"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"timeseries"</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"datasource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prometheus"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"uid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prometheus"</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"fieldConfig"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"defaults"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"thresholds"</span><span class="w"> </span><span class="p">},</span><span class="w">
+          </span><span class="nl">"mappings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w">
+          </span><span class="nl">"thresholds"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"absolute"</span><span class="p">,</span><span class="w">
+            </span><span class="nl">"steps"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+              </span><span class="p">{</span><span class="w"> </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="s2">"green"</span><span class="p">,</span><span class="w"> </span><span class="nl">"value"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">}</span><span class="w">
+            </span><span class="p">]</span><span class="w">
+          </span><span class="p">}</span><span class="w">
+        </span><span class="p">},</span><span class="w">
+        </span><span class="nl">"overrides"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"gridPos"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"h"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="nl">"w"</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="nl">"x"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nl">"y"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="w"> </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"options"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"colorMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"value"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"graphMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"area"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"justifyMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"orientation"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"reduceOptions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"calcs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"lastNotNull"</span><span class="p">],</span><span class="w">
+          </span><span class="nl">"fields"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"values"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+        </span><span class="p">},</span><span class="w">
+        </span><span class="nl">"textMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"targets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"expr"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sum(frappe_operator_resource_total{resource_type=</span><span class="se">\"</span><span class="s2">frappebench</span><span class="se">\"</span><span class="s2">})"</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"refId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Total Benches"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"stat"</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"datasource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prometheus"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"uid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prometheus"</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"fieldConfig"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"defaults"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"thresholds"</span><span class="w"> </span><span class="p">},</span><span class="w">
+          </span><span class="nl">"mappings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w">
+          </span><span class="nl">"thresholds"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"absolute"</span><span class="p">,</span><span class="w">
+            </span><span class="nl">"steps"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+              </span><span class="p">{</span><span class="w"> </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="s2">"green"</span><span class="p">,</span><span class="w"> </span><span class="nl">"value"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">}</span><span class="w">
+            </span><span class="p">]</span><span class="w">
+          </span><span class="p">}</span><span class="w">
+        </span><span class="p">},</span><span class="w">
+        </span><span class="nl">"overrides"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"gridPos"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"h"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="nl">"w"</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="nl">"x"</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="nl">"y"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="w"> </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"options"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"colorMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"value"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"graphMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"area"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"justifyMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"orientation"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"reduceOptions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"calcs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"lastNotNull"</span><span class="p">],</span><span class="w">
+          </span><span class="nl">"fields"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"values"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+        </span><span class="p">},</span><span class="w">
+        </span><span class="nl">"textMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"targets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"expr"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sum(frappe_operator_resource_total{resource_type=</span><span class="se">\"</span><span class="s2">frappesite</span><span class="se">\"</span><span class="s2">})"</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"refId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Total Sites"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"stat"</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">],</span><span class="w">
+  </span><span class="nl">"schemaVersion"</span><span class="p">:</span><span class="w"> </span><span class="mi">38</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"tags"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"frappe"</span><span class="p">,</span><span class="w"> </span><span class="s2">"operator"</span><span class="p">,</span><span class="w"> </span><span class="s2">"kubernetes"</span><span class="p">],</span><span class="w">
+  </span><span class="nl">"templating"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"list"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w"> </span><span class="p">},</span><span class="w">
+  </span><span class="nl">"time"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nl">"from"</span><span class="p">:</span><span class="w"> </span><span class="s2">"now-1h"</span><span class="p">,</span><span class="w"> </span><span class="nl">"to"</span><span class="p">:</span><span class="w"> </span><span class="s2">"now"</span><span class="w"> </span><span class="p">},</span><span class="w">
+  </span><span class="nl">"timepicker"</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span><span class="w">
+  </span><span class="nl">"timezone"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Frappe Operator"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"uid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"frappe-operator"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"weekStart"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div> <h3 id="frappe-workload-dashboard"> <a href="#frappe-workload-dashboard" class="anchor-heading" aria-labelledby="frappe-workload-dashboard"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Frappe Workload Dashboard </h3> <p>Monitor the Frappe application workloads:</p> <div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Frappe Workloads"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"uid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"frappe-workloads"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"panels"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Gunicorn Response Time"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"targets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"expr"</span><span class="p">:</span><span class="w"> </span><span class="s2">"histogram_quantile(0.95, rate(nginx_http_request_duration_seconds_bucket{upstream=~</span><span class="se">\"</span><span class="s2">.*gunicorn.*</span><span class="se">\"</span><span class="s2">}[5m]))"</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"legendFormat"</span><span class="p">:</span><span class="w"> </span><span class="s2">"p95"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"timeseries"</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Worker Queue Depth"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"targets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"expr"</span><span class="p">:</span><span class="w"> </span><span class="s2">"frappe_worker_queue_length"</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"legendFormat"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"timeseries"</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Database Connections"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"targets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"expr"</span><span class="p">:</span><span class="w"> </span><span class="s2">"mysql_global_status_threads_connected"</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"legendFormat"</span><span class="p">:</span><span class="w"> </span><span class="s2">"connections"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"timeseries"</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div> <h2 id="alert-rules"> <a href="#alert-rules" class="anchor-heading" aria-labelledby="alert-rules"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Alert Rules </h2> <p>A standalone PrometheusRule is available at <a href="/frappe-operator/alert-rules.yaml">docs/alert-rules.yaml</a>. Apply with <code class="language-plaintext highlighter-rouge">kubectl apply -f docs/alert-rules.yaml</code>. Full content below:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">monitoring.coreos.com/v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">PrometheusRule</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">frappe-operator-alerts</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">frappe-operator-system</span>
+  <span class="na">labels</span><span class="pi">:</span>
+    <span class="na">prometheus</span><span class="pi">:</span> <span class="s">k8s</span>
+    <span class="na">role</span><span class="pi">:</span> <span class="s">alert-rules</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">groups</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">frappe-operator</span>
+    <span class="na">rules</span><span class="pi">:</span>
+    <span class="c1"># Operator is not running</span>
+    <span class="pi">-</span> <span class="na">alert</span><span class="pi">:</span> <span class="s">FrappeOperatorDown</span>
+      <span class="na">expr</span><span class="pi">:</span> <span class="s">absent(up{job="frappe-operator"}) == </span><span class="m">1</span>
+      <span class="na">for</span><span class="pi">:</span> <span class="s">5m</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">severity</span><span class="pi">:</span> <span class="s">critical</span>
+      <span class="na">annotations</span><span class="pi">:</span>
+        <span class="na">summary</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Frappe</span><span class="nv"> </span><span class="s">Operator</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">down"</span>
+        <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Frappe</span><span class="nv"> </span><span class="s">Operator</span><span class="nv"> </span><span class="s">has</span><span class="nv"> </span><span class="s">been</span><span class="nv"> </span><span class="s">down</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">more</span><span class="nv"> </span><span class="s">than</span><span class="nv"> </span><span class="s">5</span><span class="nv"> </span><span class="s">minutes"</span>
+
+    <span class="c1"># High reconciliation error rate</span>
+    <span class="pi">-</span> <span class="na">alert</span><span class="pi">:</span> <span class="s">FrappeOperatorHighErrorRate</span>
+      <span class="na">expr</span><span class="pi">:</span> <span class="pi">|</span>
+        <span class="s">rate(frappe_operator_reconciliation_errors_total[5m]) &gt; 0.1</span>
+      <span class="na">for</span><span class="pi">:</span> <span class="s">5m</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">severity</span><span class="pi">:</span> <span class="s">warning</span>
+      <span class="na">annotations</span><span class="pi">:</span>
+        <span class="na">summary</span><span class="pi">:</span> <span class="s2">"</span><span class="s">High</span><span class="nv"> </span><span class="s">reconciliation</span><span class="nv"> </span><span class="s">error</span><span class="nv"> </span><span class="s">rate"</span>
+        <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Controller</span><span class="nv">  </span><span class="s">has</span><span class="nv"> </span><span class="s">error</span><span class="nv"> </span><span class="s">rate</span><span class="nv"> </span><span class="s">of</span><span class="nv">  </span><span class="s">errors/sec"</span>
+
+    <span class="c1"># Slow reconciliation</span>
+    <span class="pi">-</span> <span class="na">alert</span><span class="pi">:</span> <span class="s">FrappeOperatorSlowReconciliation</span>
+      <span class="na">expr</span><span class="pi">:</span> <span class="pi">|</span>
+        <span class="s">histogram_quantile(0.95, rate(frappe_operator_reconciliation_duration_seconds_bucket[5m])) &gt; 60</span>
+      <span class="na">for</span><span class="pi">:</span> <span class="s">10m</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">severity</span><span class="pi">:</span> <span class="s">warning</span>
+      <span class="na">annotations</span><span class="pi">:</span>
+        <span class="na">summary</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Slow</span><span class="nv"> </span><span class="s">reconciliation</span><span class="nv"> </span><span class="s">detected"</span>
+        <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Controller</span><span class="nv">  </span><span class="s">p95</span><span class="nv"> </span><span class="s">reconciliation</span><span class="nv"> </span><span class="s">time</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">s"</span>
+
+    <span class="c1"># Site not ready</span>
+    <span class="pi">-</span> <span class="na">alert</span><span class="pi">:</span> <span class="s">FrappeSiteNotReady</span>
+      <span class="na">expr</span><span class="pi">:</span> <span class="pi">|</span>
+        <span class="s">kube_customresource_frappesite_status_phase{phase!="Ready"} == 1</span>
+      <span class="na">for</span><span class="pi">:</span> <span class="s">15m</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">severity</span><span class="pi">:</span> <span class="s">warning</span>
+      <span class="na">annotations</span><span class="pi">:</span>
+        <span class="na">summary</span><span class="pi">:</span> <span class="s2">"</span><span class="s">FrappeSite</span><span class="nv"> </span><span class="s">not</span><span class="nv"> </span><span class="s">ready"</span>
+        <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Site</span><span class="nv">  </span><span class="s">in</span><span class="nv"> </span><span class="s">namespace</span><span class="nv">  </span><span class="s">is</span><span class="nv"> </span><span class="s">not</span><span class="nv"> </span><span class="s">ready"</span>
+
+    <span class="c1"># Bench not ready</span>
+    <span class="pi">-</span> <span class="na">alert</span><span class="pi">:</span> <span class="s">FrappeBenchNotReady</span>
+      <span class="na">expr</span><span class="pi">:</span> <span class="pi">|</span>
+        <span class="s">kube_customresource_frappebench_status_phase{phase!="Ready"} == 1</span>
+      <span class="na">for</span><span class="pi">:</span> <span class="s">15m</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">severity</span><span class="pi">:</span> <span class="s">warning</span>
+      <span class="na">annotations</span><span class="pi">:</span>
+        <span class="na">summary</span><span class="pi">:</span> <span class="s2">"</span><span class="s">FrappeBench</span><span class="nv"> </span><span class="s">not</span><span class="nv"> </span><span class="s">ready"</span>
+        <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Bench</span><span class="nv">  </span><span class="s">in</span><span class="nv"> </span><span class="s">namespace</span><span class="nv">  </span><span class="s">is</span><span class="nv"> </span><span class="s">not</span><span class="nv"> </span><span class="s">ready"</span>
+
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">frappe-workloads</span>
+    <span class="na">rules</span><span class="pi">:</span>
+    <span class="c1"># Gunicorn pod restarts</span>
+    <span class="pi">-</span> <span class="na">alert</span><span class="pi">:</span> <span class="s">FrappeGunicornRestarts</span>
+      <span class="na">expr</span><span class="pi">:</span> <span class="pi">|</span>
+        <span class="s">increase(kube_pod_container_status_restarts_total{container="gunicorn"}[1h]) &gt; 3</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">severity</span><span class="pi">:</span> <span class="s">warning</span>
+      <span class="na">annotations</span><span class="pi">:</span>
+        <span class="na">summary</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Gunicorn</span><span class="nv"> </span><span class="s">container</span><span class="nv"> </span><span class="s">restarting"</span>
+        <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Gunicorn</span><span class="nv"> </span><span class="s">container</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">pod</span><span class="nv">  </span><span class="s">has</span><span class="nv"> </span><span class="s">restarted</span><span class="nv">  </span><span class="s">times</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">hour"</span>
+
+    <span class="c1"># Worker queue buildup</span>
+    <span class="pi">-</span> <span class="na">alert</span><span class="pi">:</span> <span class="s">FrappeWorkerQueueHigh</span>
+      <span class="na">expr</span><span class="pi">:</span> <span class="pi">|</span>
+        <span class="s">frappe_worker_queue_length &gt; 100</span>
+      <span class="na">for</span><span class="pi">:</span> <span class="s">10m</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">severity</span><span class="pi">:</span> <span class="s">warning</span>
+      <span class="na">annotations</span><span class="pi">:</span>
+        <span class="na">summary</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Worker</span><span class="nv"> </span><span class="s">queue</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">backing</span><span class="nv"> </span><span class="s">up"</span>
+        <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Queue</span><span class="nv">  </span><span class="s">has</span><span class="nv">  </span><span class="s">pending</span><span class="nv"> </span><span class="s">jobs"</span>
+
+    <span class="c1"># Database connections high</span>
+    <span class="pi">-</span> <span class="na">alert</span><span class="pi">:</span> <span class="s">FrappeDatabaseConnectionsHigh</span>
+      <span class="na">expr</span><span class="pi">:</span> <span class="pi">|</span>
+        <span class="s">mysql_global_status_threads_connected / mysql_global_variables_max_connections &gt; 0.8</span>
+      <span class="na">for</span><span class="pi">:</span> <span class="s">5m</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">severity</span><span class="pi">:</span> <span class="s">warning</span>
+      <span class="na">annotations</span><span class="pi">:</span>
+        <span class="na">summary</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Database</span><span class="nv"> </span><span class="s">connections</span><span class="nv"> </span><span class="s">near</span><span class="nv"> </span><span class="s">limit"</span>
+        <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">max</span><span class="nv"> </span><span class="s">connections</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">use"</span>
+</code></pre></div></div> <h2 id="logging"> <a href="#logging" class="anchor-heading" aria-labelledby="logging"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Logging </h2> <h3 id="operator-logs"> <a href="#operator-logs" class="anchor-heading" aria-labelledby="operator-logs"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Operator Logs </h3> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Stream operator logs</span>
+kubectl logs <span class="nt">-n</span> frappe-operator-system <span class="nt">-l</span> control-plane<span class="o">=</span>controller-manager <span class="nt">-f</span>
+
+<span class="c"># Filter by log level</span>
+kubectl logs <span class="nt">-n</span> frappe-operator-system deployment/frappe-operator-controller-manager | <span class="nb">grep</span> <span class="nt">-E</span> <span class="s1">'level=(error|warn)'</span>
+
+<span class="c"># JSON structured logs (if enabled)</span>
+kubectl logs <span class="nt">-n</span> frappe-operator-system deployment/frappe-operator-controller-manager <span class="nt">-o</span> json
+</code></pre></div></div> <h3 id="configuring-log-verbosity"> <a href="#configuring-log-verbosity" class="anchor-heading" aria-labelledby="configuring-log-verbosity"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Configuring Log Verbosity </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># In Helm values</span>
+<span class="na">controller</span><span class="pi">:</span>
+  <span class="na">manager</span><span class="pi">:</span>
+    <span class="na">args</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="s2">"</span><span class="s">--zap-log-level=debug"</span>
+      <span class="pi">-</span> <span class="s2">"</span><span class="s">--zap-encoder=json"</span>
+</code></pre></div></div> <h3 id="log-aggregation"> <a href="#log-aggregation" class="anchor-heading" aria-labelledby="log-aggregation"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Log Aggregation </h3> <p>Forward logs to your logging stack:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Fluent Bit ConfigMap</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">ConfigMap</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">fluent-bit-config</span>
+<span class="na">data</span><span class="pi">:</span>
+  <span class="na">fluent-bit.conf</span><span class="pi">:</span> <span class="pi">|</span>
+    <span class="s">[INPUT]</span>
+        <span class="s">Name              tail</span>
+        <span class="s">Path              /var/log/containers/frappe-*.log</span>
+        <span class="s">Parser            docker</span>
+        <span class="s">Tag               frappe.*</span>
+    
+    <span class="s">[OUTPUT]</span>
+        <span class="s">Name              es</span>
+        <span class="s">Match             frappe.*</span>
+        <span class="s">Host              elasticsearch</span>
+        <span class="s">Port              9200</span>
+        <span class="s">Index             frappe-logs</span>
+</code></pre></div></div> <h2 id="health-checks"> <a href="#health-checks" class="anchor-heading" aria-labelledby="health-checks"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Health Checks </h2> <h3 id="operator-health"> <a href="#operator-health" class="anchor-heading" aria-labelledby="operator-health"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Operator Health </h3> <p>The operator exposes health endpoints on port 8081:</p> <ul> <li><code class="language-plaintext highlighter-rouge">/healthz</code> - Liveness probe</li> <li><code class="language-plaintext highlighter-rouge">/readyz</code> - Readiness probe</li> </ul> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Port-forward to check health</span>
+kubectl port-forward <span class="nt">-n</span> frappe-operator-system svc/frappe-operator-controller-manager-metrics-service 8081:8081
+
+<span class="c"># Check liveness</span>
+curl http://localhost:8081/healthz
+
+<span class="c"># Check readiness</span>
+curl http://localhost:8081/readyz
+</code></pre></div></div> <h3 id="frappe-site-health"> <a href="#frappe-site-health" class="anchor-heading" aria-labelledby="frappe-site-health"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Frappe Site Health </h3> <p>Check site health using the Frappe API:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Get site URL</span>
+<span class="nv">SITE_URL</span><span class="o">=</span><span class="si">$(</span>kubectl get frappesite mysite <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.status.siteURL}'</span><span class="si">)</span>
+
+<span class="c"># Check API</span>
+curl <span class="nt">-s</span> <span class="s2">"</span><span class="nv">$SITE_URL</span><span class="s2">/api/method/ping"</span>
+</code></pre></div></div> <h3 id="kubernetes-health-probes"> <a href="#kubernetes-health-probes" class="anchor-heading" aria-labelledby="kubernetes-health-probes"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Kubernetes Health Probes </h3> <p>The operator configures health probes for Frappe pods:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Gunicorn container probes</span>
+<span class="na">livenessProbe</span><span class="pi">:</span>
+  <span class="na">httpGet</span><span class="pi">:</span>
+    <span class="na">path</span><span class="pi">:</span> <span class="s">/api/method/ping</span>
+    <span class="na">port</span><span class="pi">:</span> <span class="m">8000</span>
+  <span class="na">initialDelaySeconds</span><span class="pi">:</span> <span class="m">30</span>
+  <span class="na">periodSeconds</span><span class="pi">:</span> <span class="m">10</span>
+  
+<span class="na">readinessProbe</span><span class="pi">:</span>
+  <span class="na">httpGet</span><span class="pi">:</span>
+    <span class="na">path</span><span class="pi">:</span> <span class="s">/api/method/ping</span>
+    <span class="na">port</span><span class="pi">:</span> <span class="m">8000</span>
+  <span class="na">initialDelaySeconds</span><span class="pi">:</span> <span class="m">10</span>
+  <span class="na">periodSeconds</span><span class="pi">:</span> <span class="m">5</span>
+</code></pre></div></div> </main> <hr> <footer> <p class="text-small mb-0">Built with ❤️ by Vyogo Technologies</p> <div class="d-md-none mt-4 fs-2"> This site uses <a href="https://github.com/just-the-docs/just-the-docs">Just the Docs</a>, a documentation theme for Jekyll. </div> </footer> </div> </div> <div class="search-overlay"></div> </div> </body> </html>

@@ -1,0 +1,1 @@
+Sitemap: https://vyogotech.github.io/frappe-operator/sitemap.xml
