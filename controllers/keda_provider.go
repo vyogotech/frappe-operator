@@ -30,7 +30,7 @@ func (p *KEDAProvider) IsAvailable(ctx context.Context) bool {
 	list := &metav1.PartialObjectMetadataList{}
 	list.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "keda.sh",
-		Version: "v1alpha1",
+		Version: "v1",
 		Kind:    "ScaledObject",
 	})
 
@@ -52,7 +52,7 @@ func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1.FrappeBenc
 	scaledObject := &unstructured.Unstructured{}
 	scaledObject.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "keda.sh",
-		Version: "v1alpha1",
+		Version: "v1",
 		Kind:    "ScaledObject",
 	})
 	scaledObject.SetName(scaledObjectName)
@@ -146,7 +146,7 @@ func (p *KEDAProvider) Delete(ctx context.Context, bench *vyogotechv1.FrappeBenc
 	scaledObject := &unstructured.Unstructured{}
 	scaledObject.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "keda.sh",
-		Version: "v1alpha1",
+		Version: "v1",
 		Kind:    "ScaledObject",
 	})
 

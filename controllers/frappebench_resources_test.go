@@ -450,7 +450,7 @@ func TestEnsureRedisStatefulSet_UpdateImmutability(t *testing.T) {
 	bench := &vyogotechv1.FrappeBench{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "FrappeBench",
-			APIVersion: "vyogo.tech/v1alpha1",
+			APIVersion: "vyogo.tech/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
 		Spec: vyogotechv1.FrappeBenchSpec{
