@@ -67,9 +67,9 @@ jobs:
           kind load docker-image localhost/frappe-operator-bundle:patched-e2e --name bundle-e2e
 
           echo "Running customized bundle install on cluster..."
+          kubectl create namespace frappe-operator-system || true
           operator-sdk run bundle localhost/frappe-operator-bundle:patched-e2e \
             --namespace frappe-operator-system \
-            --create-namespace \
             --timeout 5m
 
       - name: Verify Controller Status
