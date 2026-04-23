@@ -43,28 +43,27 @@ jobs:
           make build
           docker build -t ghcr.io/vyogotech/frappe-operator:local-e2e -f Dockerfile .
 
-      - name: Start Local Registry
-        run: docker run -d -p 5000:5000 --name registry registry:2
-
       - name: Run Operator Bundle
         run: |
           # Fix CSV to point to our loaded e2e operator image
           sed -i "s|controller:latest|ghcr.io/vyogotech/frappe-operator:local-e2e|g" bundle/manifests/frappe-operator.clusterserviceversion.yaml || true
           
-          # Build and strictly push the bundle to the local GitHub runner registry so `operator-sdk` can pull its manifests
-          make bundle-build BUNDLE_IMG=localhost:5000/frappe-operator-bundle:patched-e2e
-          docker push localhost:5000/frappe-operator-bundle:patched-e2e
+          # We use an ephemeral anonymous CI registry (ttl.sh) so operator-sdk and OLM 
+          # can pull the catalogs without internal loopback TLS connection timeouts.
+          export BUNDLE_IMAGE="ttl.sh/vyogotech-frappe-operator-bundle-${{ github.sha }}:15m"
+          
+          make bundle-build BUNDLE_IMG=$BUNDLE_IMAGE
+          docker push $BUNDLE_IMAGE
 
-          # Load both images completely into Kind's internal nodes so the cluster bypasses external pulls
-          kind load docker-image localhost:5000/frappe-operator-bundle:patched-e2e --name bundle-e2e
+          # Load into exact nodes so the local kind pulls cache instead of hitting the internet
+          kind load docker-image $BUNDLE_IMAGE --name bundle-e2e
           kind load docker-image ghcr.io/vyogotech/frappe-operator:local-e2e --name bundle-e2e
 
           echo "Running customized bundle install on cluster..."
           operator-sdk olm install
           kubectl create namespace frappe-operator-system || true
-          operator-sdk run bundle localhost:5000/frappe-operator-bundle:patched-e2e \
+          operator-sdk run bundle $BUNDLE_IMAGE \
             --namespace frappe-operator-system \
-            --use-http \
             --timeout 5m
 
       - name: Verify Controller Status
