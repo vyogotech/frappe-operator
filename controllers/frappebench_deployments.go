@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +38,7 @@ const (
 )
 
 // ensureSocketIO ensures the Socket.IO Deployment and Service exist
-func (r *FrappeBenchReconciler) ensureSocketIO(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureSocketIO(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	if err := r.ensureSocketIOService(ctx, bench); err != nil {
 		return err
 	}
@@ -46,14 +46,14 @@ func (r *FrappeBenchReconciler) ensureSocketIO(ctx context.Context, bench *vyogo
 }
 
 // ensureGunicorn ensures the Gunicorn Deployment and Service exist
-func (r *FrappeBenchReconciler) ensureGunicorn(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureGunicorn(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	if err := r.ensureGunicornService(ctx, bench); err != nil {
 		return err
 	}
 	return r.ensureGunicornDeployment(ctx, bench)
 }
 
-func (r *FrappeBenchReconciler) ensureGunicornService(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureGunicornService(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
 	svcName := fmt.Sprintf("%s-gunicorn", bench.Name)
@@ -85,7 +85,7 @@ func (r *FrappeBenchReconciler) ensureGunicornService(ctx context.Context, bench
 	return r.Create(ctx, svc)
 }
 
-func (r *FrappeBenchReconciler) ensureNginxService(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureNginxService(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
 	svcName := fmt.Sprintf("%s-nginx", bench.Name)
@@ -117,7 +117,7 @@ func (r *FrappeBenchReconciler) ensureNginxService(ctx context.Context, bench *v
 	return r.Create(ctx, svc)
 }
 
-func (r *FrappeBenchReconciler) ensureSocketIOService(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureSocketIOService(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
 	svcName := fmt.Sprintf("%s-socketio", bench.Name)
@@ -149,7 +149,7 @@ func (r *FrappeBenchReconciler) ensureSocketIOService(ctx context.Context, bench
 	return r.Create(ctx, svc)
 }
 
-func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 	componentName := "gunicorn"
 	deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)
@@ -267,7 +267,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 }
 
 // ensureNginx ensures the NGINX Deployment and Service exist
-func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	if err := r.ensureNginxService(ctx, bench); err != nil {
 		return err
 	}
@@ -394,7 +394,7 @@ func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotec
 	return nil
 }
 
-func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 	componentName := "socketio"
 	deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)
@@ -512,7 +512,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 }
 
 // ensureScheduler ensures the Scheduler Deployment exists
-func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 	componentName := "scheduler"
 	deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)

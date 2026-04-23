@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	routev1 "github.com/openshift/api/route/v1"
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -53,7 +53,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	utilruntime.Must(routev1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -62,7 +62,7 @@ const defaultMaxConcurrentSiteReconciles = 10
 
 // effectiveMaxFromBenches returns the effective max concurrent site reconciles from env value and bench list.
 // Used by getMaxConcurrentSiteReconciles; exported for testing.
-func effectiveMaxFromBenches(fromEnv int, items []vyogotechv1alpha1.FrappeBench) int {
+func effectiveMaxFromBenches(fromEnv int, items []vyogotechv1.FrappeBench) int {
 	benchMax := 0
 	for i := range items {
 		if items[i].Spec.SiteReconcileConcurrency != nil && *items[i].Spec.SiteReconcileConcurrency > 0 {
@@ -90,10 +90,10 @@ func getMaxConcurrentSiteReconciles(mgr ctrl.Manager) int {
 			fromEnv = n
 		}
 	}
-	var items []vyogotechv1alpha1.FrappeBench
+	var items []vyogotechv1.FrappeBench
 	cl, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
 	if err == nil {
-		var list vyogotechv1alpha1.FrappeBenchList
+		var list vyogotechv1.FrappeBenchList
 		// Omit InNamespace to list FrappeBenches across all namespaces (bench-level override).
 		if err := cl.List(context.Background(), &list); err == nil {
 			items = list.Items

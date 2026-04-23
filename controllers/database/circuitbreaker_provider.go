@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/circuitbreaker"
 )
 
@@ -38,7 +38,7 @@ func NewCircuitBreakerProvider(inner Provider, cb *circuitbreaker.CircuitBreaker
 }
 
 // EnsureDatabase runs through the circuit breaker.
-func (p *CircuitBreakerProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseInfo, error) {
+func (p *CircuitBreakerProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseInfo, error) {
 	var info *DatabaseInfo
 	err := p.cb.Execute(ctx, func(ctx context.Context) error {
 		var e error
@@ -55,7 +55,7 @@ func (p *CircuitBreakerProvider) EnsureDatabase(ctx context.Context, site *vyogo
 }
 
 // IsReady runs through the circuit breaker.
-func (p *CircuitBreakerProvider) IsReady(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (bool, error) {
+func (p *CircuitBreakerProvider) IsReady(ctx context.Context, site *vyogotechv1.FrappeSite) (bool, error) {
 	var ready bool
 	err := p.cb.Execute(ctx, func(ctx context.Context) error {
 		var e error
@@ -72,7 +72,7 @@ func (p *CircuitBreakerProvider) IsReady(ctx context.Context, site *vyogotechv1a
 }
 
 // GetCredentials runs through the circuit breaker.
-func (p *CircuitBreakerProvider) GetCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseCredentials, error) {
+func (p *CircuitBreakerProvider) GetCredentials(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseCredentials, error) {
 	var creds *DatabaseCredentials
 	err := p.cb.Execute(ctx, func(ctx context.Context) error {
 		var e error
@@ -89,7 +89,7 @@ func (p *CircuitBreakerProvider) GetCredentials(ctx context.Context, site *vyogo
 }
 
 // Cleanup runs through the circuit breaker.
-func (p *CircuitBreakerProvider) Cleanup(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
+func (p *CircuitBreakerProvider) Cleanup(ctx context.Context, site *vyogotechv1.FrappeSite) error {
 	return p.cb.Execute(ctx, func(ctx context.Context) error {
 		return p.inner.Cleanup(ctx, site)
 	})

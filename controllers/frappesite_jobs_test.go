@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	routev1 "github.com/openshift/api/route/v1"
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
 )
 
@@ -43,8 +43,8 @@ var _ = Describe("FrappeSite Jobs", func() {
 		reconciler   *FrappeSiteReconciler
 		fakeClient   client.Client
 		fakeRecorder *record.FakeRecorder
-		site         *vyogotechv1alpha1.FrappeSite
-		bench        *vyogotechv1alpha1.FrappeBench
+		site         *vyogotechv1.FrappeSite
+		bench        *vyogotechv1.FrappeBench
 		namespace    string
 		scheme       *runtime.Scheme
 	)
@@ -54,27 +54,27 @@ var _ = Describe("FrappeSite Jobs", func() {
 		namespace = "test-namespace"
 		fakeRecorder = record.NewFakeRecorder(10)
 
-		bench = &vyogotechv1alpha1.FrappeBench{
+		bench = &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-bench",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+			Spec: vyogotechv1.FrappeBenchSpec{
 				FrappeVersion: "15",
 			},
-			Status: vyogotechv1alpha1.FrappeBenchStatus{
+			Status: vyogotechv1.FrappeBenchStatus{
 				Phase: "Ready",
 			},
 		}
 
-		site = &vyogotechv1alpha1.FrappeSite{
+		site = &vyogotechv1.FrappeSite{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-site",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			Spec: vyogotechv1.FrappeSiteSpec{
 				SiteName: "test-site.local",
-				BenchRef: &vyogotechv1alpha1.NamespacedName{
+				BenchRef: &vyogotechv1.NamespacedName{
 					Name:      bench.Name,
 					Namespace: bench.Namespace,
 				},
@@ -82,12 +82,12 @@ var _ = Describe("FrappeSite Jobs", func() {
 		}
 
 		scheme = runtime.NewScheme()
-		_ = vyogotechv1alpha1.AddToScheme(scheme)
+		_ = vyogotechv1.AddToScheme(scheme)
 		_ = corev1.AddToScheme(scheme)
 		_ = batchv1.AddToScheme(scheme)
 		_ = routev1.AddToScheme(scheme)
 
-		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(bench).WithStatusSubresource(&vyogotechv1alpha1.FrappeSite{}).Build()
+		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(bench).WithStatusSubresource(&vyogotechv1.FrappeSite{}).Build()
 
 		reconciler = &FrappeSiteReconciler{
 			Client:   fakeClient,
@@ -99,7 +99,7 @@ var _ = Describe("FrappeSite Jobs", func() {
 	Describe("Asynchronous Site Deletion", func() {
 		It("should create deletion job when site is marked for deletion", func() {
 			site.SetFinalizers([]string{frappeSiteFinalizer})
-			site.Spec.DBConfig = vyogotechv1alpha1.DatabaseConfig{Mode: "shared"}
+			site.Spec.DBConfig = vyogotechv1.DatabaseConfig{Mode: "shared"}
 			Expect(fakeClient.Create(ctx, site)).To(Succeed())
 
 			// Add MariaDB root secret for shared mode

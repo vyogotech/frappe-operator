@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/constants"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 	batchv1 "k8s.io/api/batch/v1"
@@ -39,7 +39,7 @@ import (
 
 // getBenchImage returns the image to use from the bench
 // Priority: 1. bench.spec.imageConfig, 2. operator ConfigMap defaults, 3. hardcoded constants
-func (r *FrappeSiteReconciler) getBenchImage(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+func (r *FrappeSiteReconciler) getBenchImage(ctx context.Context, bench *vyogotechv1.FrappeBench) string {
 	// Priority 1: Check bench-level ImageConfig override
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
 		image := bench.Spec.ImageConfig.Repository

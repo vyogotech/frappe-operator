@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -39,7 +39,7 @@ import (
 )
 
 // ensureAdminPassword gets or generates the admin password for the site
-func (r *FrappeSiteReconciler) ensureAdminPassword(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, error) {
+func (r *FrappeSiteReconciler) ensureAdminPassword(ctx context.Context, site *vyogotechv1.FrappeSite) (string, error) {
 	logger := log.FromContext(ctx)
 	var adminPassword string
 	var adminPasswordSecret *corev1.Secret
@@ -121,7 +121,7 @@ func (r *FrappeSiteReconciler) generateFernetKey() (string, error) {
 }
 
 // ensureInitSecrets creates a Secret containing all initialization credentials
-func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string, redisCacheAddress string, redisQueueAddress string) error {
+func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string, redisCacheAddress string, redisQueueAddress string) error {
 	logger := log.FromContext(ctx)
 
 	secretName := fmt.Sprintf("%s-init-secrets", site.Name)
@@ -299,7 +299,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 }
 
 // resolveDBConfig merges site-specific database configuration with bench-level defaults
-func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench) vyogotechv1alpha1.DatabaseConfig {
+func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench) vyogotechv1.DatabaseConfig {
 	config := site.Spec.DBConfig
 
 	if bench.Spec.DBConfig == nil {
@@ -341,7 +341,7 @@ func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1alpha1.FrappeSit
 }
 
 // resolveDomain determines the final domain for the site with priority-based resolution
-func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench) (string, string) {
+func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench) (string, string) {
 	if site.Spec.Domain != "" {
 		return site.Spec.Domain, "explicit"
 	}
@@ -369,7 +369,7 @@ func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotec
 }
 
 // getMariaDBRootCredentials retrieves root credentials for database operations
-func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, dbConfig vyogotechv1alpha1.DatabaseConfig) (string, string, error) {
+func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, site *vyogotechv1.FrappeSite, dbConfig vyogotechv1.DatabaseConfig) (string, string, error) {
 	if dbConfig.Mode == "dedicated" {
 		secretName := fmt.Sprintf("%s-mariadb-root", site.Name)
 		secret := &corev1.Secret{}
@@ -430,7 +430,7 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 }
 
 // getRequeueAttempt returns the current requeue attempt from the site annotation
-func (r *FrappeSiteReconciler) getRequeueAttempt(site *vyogotechv1alpha1.FrappeSite) int {
+func (r *FrappeSiteReconciler) getRequeueAttempt(site *vyogotechv1.FrappeSite) int {
 	if site.Annotations == nil {
 		return 0
 	}
@@ -449,7 +449,7 @@ func (r *FrappeSiteReconciler) getRequeueAttempt(site *vyogotechv1alpha1.FrappeS
 }
 
 // patchRequeueAttempt sets the requeue-attempt annotation on the site
-func (r *FrappeSiteReconciler) patchRequeueAttempt(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, nextAttempt int) error {
+func (r *FrappeSiteReconciler) patchRequeueAttempt(ctx context.Context, site *vyogotechv1.FrappeSite, nextAttempt int) error {
 	siteCopy := site.DeepCopy()
 	if siteCopy.Annotations == nil {
 		siteCopy.Annotations = make(map[string]string)
@@ -459,17 +459,17 @@ func (r *FrappeSiteReconciler) patchRequeueAttempt(ctx context.Context, site *vy
 }
 
 // getPodSecurityContext returns the pod-level security context (shared logic in security_context.go)
-func (r *FrappeSiteReconciler) getPodSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+func (r *FrappeSiteReconciler) getPodSecurityContext(ctx context.Context, bench *vyogotechv1.FrappeBench) *corev1.PodSecurityContext {
 	return PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security)
 }
 
 // getContainerSecurityContext returns the container-level security context (shared logic in security_context.go)
-func (r *FrappeSiteReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+func (r *FrappeSiteReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1.FrappeBench) *corev1.SecurityContext {
 	return ContainerSecurityContextForBench(r.IsOpenShift, bench.Spec.Security)
 }
 
 // getSiteInitResources returns resource requirements for site initialization jobs
-func (r *FrappeSiteReconciler) getSiteInitResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeSiteReconciler) getSiteInitResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -483,7 +483,7 @@ func (r *FrappeSiteReconciler) getSiteInitResources(bench *vyogotechv1alpha1.Fra
 }
 
 // getSiteDeleteResources returns resource requirements for site deletion jobs
-func (r *FrappeSiteReconciler) getSiteDeleteResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeSiteReconciler) getSiteDeleteResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),

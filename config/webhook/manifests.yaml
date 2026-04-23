@@ -9,15 +9,15 @@ webhooks:
   clientConfig:
     service:
       name: webhook-service
-      namespace: frappe-operator-system
-      path: /validate-vyogo-tech-v1alpha1-frappebench
+      namespace: system
+      path: /validate-vyogo-tech-v1-frappebench
   failurePolicy: Fail
   name: vfrappebench.kb.io
   rules:
   - apiGroups:
     - vyogo.tech
     apiVersions:
-    - v1alpha1
+    - v1
     operations:
     - CREATE
     - UPDATE
@@ -29,15 +29,15 @@ webhooks:
   clientConfig:
     service:
       name: webhook-service
-      namespace: frappe-operator-system
-      path: /validate-vyogo-tech-v1alpha1-frappesite
+      namespace: system
+      path: /validate-vyogo-tech-v1-frappesite
   failurePolicy: Fail
   name: vfrappesite.kb.io
   rules:
   - apiGroups:
     - vyogo.tech
     apiVersions:
-    - v1alpha1
+    - v1
     operations:
     - CREATE
     - UPDATE

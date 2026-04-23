@@ -19,7 +19,7 @@ package controllers
 import (
 	"context"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -27,7 +27,7 @@ import (
 
 // PodSecurityContextForBench returns the pod-level security context for bench/site pods.
 // Used by both FrappeBenchReconciler and FrappeSiteReconciler to avoid duplication.
-func PodSecurityContextForBench(ctx context.Context, c client.Client, isOpenShift bool, namespace string, security *vyogotechv1alpha1.SecurityConfig) *corev1.PodSecurityContext {
+func PodSecurityContextForBench(ctx context.Context, c client.Client, isOpenShift bool, namespace string, security *vyogotechv1.SecurityConfig) *corev1.PodSecurityContext {
 	defaultFSGroup := getDefaultFSGroup()
 	fsGroupChangePolicy := corev1.FSGroupChangeAlways
 
@@ -99,7 +99,7 @@ func PodSecurityContextForBench(ctx context.Context, c client.Client, isOpenShif
 
 // ContainerSecurityContextForBench returns the container-level security context for bench/site containers.
 // Used by both FrappeBenchReconciler and FrappeSiteReconciler to avoid duplication.
-func ContainerSecurityContextForBench(isOpenShift bool, security *vyogotechv1alpha1.SecurityConfig) *corev1.SecurityContext {
+func ContainerSecurityContextForBench(isOpenShift bool, security *vyogotechv1.SecurityConfig) *corev1.SecurityContext {
 	defaultUID := getDefaultUID()
 	defaultGID := getDefaultGID()
 

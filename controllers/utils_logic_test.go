@@ -13,7 +13,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/constants"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 )
@@ -180,14 +180,14 @@ func TestInt32Ptr(t *testing.T) {
 func TestFrappeSiteReconciler_getBenchImage(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	ctx := context.Background()
 
 	t.Run("bench ImageConfig override", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "default"},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
-				ImageConfig: &vyogotechv1alpha1.ImageConfig{
+			Spec: vyogotechv1.FrappeBenchSpec{
+				ImageConfig: &vyogotechv1.ImageConfig{
 					Repository: "myreg/frappe",
 					Tag:        "v15",
 				},
@@ -202,9 +202,9 @@ func TestFrappeSiteReconciler_getBenchImage(t *testing.T) {
 	})
 
 	t.Run("fallback to constant when no config", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "default"},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).Build()
 		r := &FrappeSiteReconciler{Client: client}
@@ -215,9 +215,9 @@ func TestFrappeSiteReconciler_getBenchImage(t *testing.T) {
 	})
 
 	t.Run("ConfigMap default image", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "default"},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{

@@ -17,12 +17,12 @@ limitations under the License.
 package controllers
 
 import (
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // getImagePullSecrets retrieves the image pull secrets from the associated bench
-func (r *FrappeSiteReconciler) getImagePullSecrets(bench *vyogotechv1alpha1.FrappeBench) []corev1.LocalObjectReference {
+func (r *FrappeSiteReconciler) getImagePullSecrets(bench *vyogotechv1.FrappeBench) []corev1.LocalObjectReference {
 	if bench.Spec.ImageConfig != nil && len(bench.Spec.ImageConfig.PullSecrets) > 0 {
 		secrets := make([]corev1.LocalObjectReference, len(bench.Spec.ImageConfig.PullSecrets))
 		for i, s := range bench.Spec.ImageConfig.PullSecrets {
@@ -34,7 +34,7 @@ func (r *FrappeSiteReconciler) getImagePullSecrets(bench *vyogotechv1alpha1.Frap
 }
 
 // getImagePullPolicy retrieves the image pull policy from the associated bench
-func (r *FrappeSiteReconciler) getImagePullPolicy(bench *vyogotechv1alpha1.FrappeBench) corev1.PullPolicy {
+func (r *FrappeSiteReconciler) getImagePullPolicy(bench *vyogotechv1.FrappeBench) corev1.PullPolicy {
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.PullPolicy != "" {
 		return bench.Spec.ImageConfig.PullPolicy
 	}
