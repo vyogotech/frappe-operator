@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 var (
@@ -105,7 +105,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = vyogotechv1alpha1.AddToScheme(scheme.Scheme)
+	err = vyogotechv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	testClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})

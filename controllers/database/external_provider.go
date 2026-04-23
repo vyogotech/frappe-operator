@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,12 +28,12 @@ import (
 
 // ExternalProvider implements database provisioning for externally managed databases
 type ExternalProvider struct {
-	config vyogotechv1alpha1.DatabaseConfig
+	config vyogotechv1.DatabaseConfig
 	client client.Client
 }
 
 // NewExternalProvider creates a new external database provider
-func NewExternalProvider(config vyogotechv1alpha1.DatabaseConfig, client client.Client) Provider {
+func NewExternalProvider(config vyogotechv1.DatabaseConfig, client client.Client) Provider {
 	return &ExternalProvider{
 		config: config,
 		client: client,
@@ -41,7 +41,7 @@ func NewExternalProvider(config vyogotechv1alpha1.DatabaseConfig, client client.
 }
 
 // EnsureDatabase retrieves connection info from the site spec or secret
-func (p *ExternalProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseInfo, error) {
+func (p *ExternalProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseInfo, error) {
 	host := p.config.Host
 	port := p.config.Port
 	dbName := site.Spec.SiteName // Default to site name
@@ -90,7 +90,7 @@ func (p *ExternalProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1
 }
 
 // IsReady checks if the connection secret exists
-func (p *ExternalProvider) IsReady(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (bool, error) {
+func (p *ExternalProvider) IsReady(ctx context.Context, site *vyogotechv1.FrappeSite) (bool, error) {
 	if p.config.ConnectionSecretRef == nil {
 		// If no secret ref, we assume it's "ready" if host is provided in spec,
 		// but typically we need credentials.
@@ -113,7 +113,7 @@ func (p *ExternalProvider) IsReady(ctx context.Context, site *vyogotechv1alpha1.
 }
 
 // GetCredentials retrieves credentials from the secret
-func (p *ExternalProvider) GetCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseCredentials, error) {
+func (p *ExternalProvider) GetCredentials(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseCredentials, error) {
 	if p.config.ConnectionSecretRef == nil {
 		return nil, fmt.Errorf("connectionSecretRef is required for external database provider to retrieve credentials")
 	}
@@ -145,6 +145,6 @@ func (p *ExternalProvider) GetCredentials(ctx context.Context, site *vyogotechv1
 }
 
 // Cleanup does nothing for external databases
-func (p *ExternalProvider) Cleanup(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
+func (p *ExternalProvider) Cleanup(ctx context.Context, site *vyogotechv1.FrappeSite) error {
 	return nil
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,17 +23,17 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// SiteDashboardSpec defines the desired state of SiteDashboard
-type SiteDashboardSpec struct {
+// SiteJobSpec defines the desired state of SiteJob
+type SiteJobSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of SiteDashboard. Edit sitedashboard_types.go to remove/update
+	// Foo is an example field of SiteJob. Edit sitejob_types.go to remove/update
 	Foo string `json:"foo,omitempty"`
 }
 
-// SiteDashboardStatus defines the observed state of SiteDashboard
-type SiteDashboardStatus struct {
+// SiteJobStatus defines the observed state of SiteJob
+type SiteJobStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -41,24 +41,24 @@ type SiteDashboardStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// SiteDashboard is the Schema for the sitedashboards API
-type SiteDashboard struct {
+// SiteJob is the Schema for the sitejobs API
+type SiteJob struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SiteDashboardSpec   `json:"spec,omitempty"`
-	Status SiteDashboardStatus `json:"status,omitempty"`
+	Spec   SiteJobSpec   `json:"spec,omitempty"`
+	Status SiteJobStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// SiteDashboardList contains a list of SiteDashboard
-type SiteDashboardList struct {
+// SiteJobList contains a list of SiteJob
+type SiteJobList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SiteDashboard `json:"items"`
+	Items           []SiteJob `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&SiteDashboard{}, &SiteDashboardList{})
+	SchemeBuilder.Register(&SiteJob{}, &SiteJobList{})
 }

@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 
 	s := runtime.NewScheme()
 	_ = scheme.AddToScheme(s)
-	_ = vyogotechv1alpha1.AddToScheme(s)
+	_ = vyogotechv1.AddToScheme(s)
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: s})
 	if err != nil {
@@ -124,14 +124,14 @@ func TestBenchCreation(t *testing.T) {
 	createTestNamespace(t, namespace)
 	defer cleanupTestNamespace(t, namespace)
 
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bench",
 			Namespace: namespace,
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "version-15",
-			Apps: []vyogotechv1alpha1.AppSource{
+			Apps: []vyogotechv1.AppSource{
 				{
 					Name:   "frappe",
 					Source: "image",
@@ -146,7 +146,7 @@ func TestBenchCreation(t *testing.T) {
 	}
 
 	// Wait for phase update
-	var createdBench vyogotechv1alpha1.FrappeBench
+	var createdBench vyogotechv1.FrappeBench
 	err := waitFor(t, 30*time.Second, func() bool {
 		if err := k8sClient.Get(testCtx, types.NamespacedName{Name: "test-bench", Namespace: namespace}, &createdBench); err != nil {
 			return false
@@ -175,12 +175,12 @@ func TestBenchValidation(t *testing.T) {
 	defer cleanupTestNamespace(t, namespace)
 
 	// Test missing required fields (FrappeVersion and Apps)
-	invalidBench := &vyogotechv1alpha1.FrappeBench{
+	invalidBench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "invalid-bench",
 			Namespace: namespace,
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			// Missing FrappeVersion and Apps
 		},
 	}
@@ -203,14 +203,14 @@ func TestSiteCreation(t *testing.T) {
 	defer cleanupTestNamespace(t, namespace)
 
 	// Create bench first
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "site-test-bench",
 			Namespace: namespace,
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "version-15",
-			Apps: []vyogotechv1alpha1.AppSource{
+			Apps: []vyogotechv1.AppSource{
 				{Name: "frappe", Source: "image"},
 			},
 		},
@@ -220,18 +220,18 @@ func TestSiteCreation(t *testing.T) {
 	}
 
 	// Create site
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-site",
 			Namespace: namespace,
 		},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+		Spec: vyogotechv1.FrappeSiteSpec{
 			SiteName: "test.local",
-			BenchRef: &vyogotechv1alpha1.NamespacedName{
+			BenchRef: &vyogotechv1.NamespacedName{
 				Name:      "site-test-bench",
 				Namespace: namespace,
 			},
-			DBConfig: vyogotechv1alpha1.DatabaseConfig{
+			DBConfig: vyogotechv1.DatabaseConfig{
 				Provider: "mariadb",
 				Mode:     "shared",
 			},
@@ -243,7 +243,7 @@ func TestSiteCreation(t *testing.T) {
 	}
 
 	// Verify site was created
-	var createdSite vyogotechv1alpha1.FrappeSite
+	var createdSite vyogotechv1.FrappeSite
 	if err := k8sClient.Get(testCtx, types.NamespacedName{Name: "test-site", Namespace: namespace}, &createdSite); err != nil {
 		t.Fatalf("Failed to get created site: %v", err)
 	}
@@ -260,12 +260,12 @@ func TestSiteValidation(t *testing.T) {
 	defer cleanupTestNamespace(t, namespace)
 
 	// Test missing benchRef
-	invalidSite := &vyogotechv1alpha1.FrappeSite{
+	invalidSite := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "invalid-site",
 			Namespace: namespace,
 		},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+		Spec: vyogotechv1.FrappeSiteSpec{
 			SiteName: "test.local",
 			// Missing BenchRef
 		},
@@ -281,7 +281,7 @@ func TestSiteValidation(t *testing.T) {
 
 // TestResourceDefaults tests that default resources are applied
 func TestResourceDefaults(t *testing.T) {
-	defaults := vyogotechv1alpha1.DefaultComponentResources()
+	defaults := vyogotechv1.DefaultComponentResources()
 
 	if defaults.Gunicorn == nil {
 		t.Error("Expected Gunicorn defaults to be set")
@@ -297,7 +297,7 @@ func TestResourceDefaults(t *testing.T) {
 	}
 
 	// Test production defaults
-	prodDefaults := vyogotechv1alpha1.ProductionComponentResources()
+	prodDefaults := vyogotechv1.ProductionComponentResources()
 	prodMem := prodDefaults.Gunicorn.Limits[corev1.ResourceMemory]
 	defMem := defaults.Gunicorn.Limits[corev1.ResourceMemory]
 	if (&prodMem).String() == (&defMem).String() {
@@ -307,13 +307,13 @@ func TestResourceDefaults(t *testing.T) {
 
 // TestMergeResources tests resource merging
 func TestMergeResources(t *testing.T) {
-	defaults := vyogotechv1alpha1.DefaultComponentResources()
+	defaults := vyogotechv1.DefaultComponentResources()
 
 	// User overrides only Gunicorn
-	userResources := vyogotechv1alpha1.ComponentResources{
-		Gunicorn: &vyogotechv1alpha1.ResourceRequirements{
+	userResources := vyogotechv1.ComponentResources{
+		Gunicorn: &vyogotechv1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU: vyogotechv1alpha1.MustParseQuantity("500m"),
+				corev1.ResourceCPU: vyogotechv1.MustParseQuantity("500m"),
 			},
 		},
 	}

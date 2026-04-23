@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -20,13 +20,13 @@ import (
 func TestFrappeBenchReconciler_Resources(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 
 	namespace := "test-ns"
 	benchName := "test-bench"
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
 		},
 	}
@@ -200,15 +200,15 @@ func TestFrappeBenchReconciler_Resources(t *testing.T) {
 func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 
 	namespace := "test-ns"
 	benchName := "test-bench"
 
 	t.Run("getRedisImage", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -220,9 +220,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getComponentReplicaCount", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -240,9 +240,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("benchLabels", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -254,9 +254,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("componentLabels", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -268,9 +268,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getRedisResources", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -282,9 +282,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getGunicornResources", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -296,9 +296,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("resolveRedisCacheURL", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -310,9 +310,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getPodSecurityContext", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -324,9 +324,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getContainerSecurityContext", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -338,9 +338,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getNginxResources", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -352,9 +352,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getSocketIOResources", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -366,9 +366,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getSchedulerResources", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -380,9 +380,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getWorkerDefaultResources", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -394,9 +394,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getGunicornResources default", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -407,11 +407,11 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getGunicornResources override", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
-				ComponentResources: &vyogotechv1alpha1.ComponentResources{
-					Gunicorn: &vyogotechv1alpha1.ResourceRequirements{
+			Spec: vyogotechv1.FrappeBenchSpec{
+				ComponentResources: &vyogotechv1.ComponentResources{
+					Gunicorn: &vyogotechv1.ResourceRequirements{
 						Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m"), corev1.ResourceMemory: resource.MustParse("1Gi")},
 						Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2"), corev1.ResourceMemory: resource.MustParse("4Gi")},
 					},
@@ -427,9 +427,9 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 	})
 
 	t.Run("getRedisResources default", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(bench).Build()
 		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
@@ -443,17 +443,17 @@ func TestFrappeBenchReconciler_Helpers(t *testing.T) {
 func TestEnsureRedisStatefulSet_UpdateImmutability(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 
 	namespace := "test-ns"
 	benchName := "test-bench"
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "FrappeBench",
 			APIVersion: "vyogo.tech/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{Name: benchName, Namespace: namespace},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
 		},
 	}

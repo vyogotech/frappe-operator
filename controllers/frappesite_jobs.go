@@ -22,7 +22,7 @@ import (
 	"io"
 	"strings"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 	"github.com/vyogotech/frappe-operator/pkg/scripts"
@@ -38,7 +38,7 @@ import (
 )
 
 // ensureSiteInitialized creates a Job to run bench new-site
-func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials) (bool, error) {
+func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	jobName := fmt.Sprintf("%s-init", site.Name)
@@ -243,11 +243,11 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 }
 
 // deleteSite implements the site deletion logic
-func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
+func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1.FrappeSite) error {
 	logger := log.FromContext(ctx)
 
 	// Get the referenced bench
-	bench := &vyogotechv1alpha1.FrappeBench{}
+	bench := &vyogotechv1.FrappeBench{}
 	benchKey := types.NamespacedName{
 		Name:      site.Spec.BenchRef.Name,
 		Namespace: site.Spec.BenchRef.Namespace,
@@ -392,7 +392,7 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 }
 
 // resolveRedisCacheURL returns the Redis cache connection URL for the bench
-func (r *FrappeSiteReconciler) resolveRedisCacheURL(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+func (r *FrappeSiteReconciler) resolveRedisCacheURL(ctx context.Context, bench *vyogotechv1.FrappeBench) string {
 	// Default internal Redis URL
 	host := fmt.Sprintf("%s-redis-cache", bench.Name)
 	port := int32(6379)
@@ -429,7 +429,7 @@ func (r *FrappeSiteReconciler) resolveRedisCacheURL(ctx context.Context, bench *
 }
 
 // resolveRedisQueueURL returns the Redis queue connection URL for the bench
-func (r *FrappeSiteReconciler) resolveRedisQueueURL(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+func (r *FrappeSiteReconciler) resolveRedisQueueURL(ctx context.Context, bench *vyogotechv1.FrappeBench) string {
 	// Default internal Redis URL
 	host := fmt.Sprintf("%s-redis-queue", bench.Name)
 	port := int32(6379)

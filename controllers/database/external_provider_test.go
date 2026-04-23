@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/circuitbreaker"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +19,7 @@ import (
 func TestExternalProvider_GetCredentials(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 
 	ctx := context.Background()
 	namespace := "test-ns"
@@ -37,12 +37,12 @@ func TestExternalProvider_GetCredentials(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build()
 
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 		},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
-			DBConfig: vyogotechv1alpha1.DatabaseConfig{
+		Spec: vyogotechv1.FrappeSiteSpec{
+			DBConfig: vyogotechv1.DatabaseConfig{
 				ConnectionSecretRef: &corev1.SecretReference{
 					Name:      "db-secret",
 					Namespace: namespace,
@@ -65,19 +65,19 @@ func TestExternalProvider_GetCredentials(t *testing.T) {
 func TestExternalProvider_IsReady(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 
 	ctx := context.Background()
 	namespace := "test-ns"
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 		},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
-			DBConfig: vyogotechv1alpha1.DatabaseConfig{
+		Spec: vyogotechv1.FrappeSiteSpec{
+			DBConfig: vyogotechv1.DatabaseConfig{
 				Host: "rds.example.com",
 				Port: "3306",
 			},
@@ -99,14 +99,14 @@ func TestExternalProvider_IsReady(t *testing.T) {
 func TestCircuitBreakerProvider_IsReady_ReturnsErrWhenCircuitOpen(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 	ctx := context.Background()
 	namespace := "test-ns"
 
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
-			DBConfig: vyogotechv1alpha1.DatabaseConfig{
+		Spec: vyogotechv1.FrappeSiteSpec{
+			DBConfig: vyogotechv1.DatabaseConfig{
 				ConnectionSecretRef: &corev1.SecretReference{Name: "db-secret", Namespace: namespace},
 			},
 		},
@@ -132,14 +132,14 @@ func TestCircuitBreakerProvider_IsReady_ReturnsErrWhenCircuitOpen(t *testing.T) 
 func TestExternalProvider_EnsureDatabase_HostInSpec(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 	ctx := context.Background()
 
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test-ns"},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+		Spec: vyogotechv1.FrappeSiteSpec{
 			SiteName: "mysite",
-			DBConfig: vyogotechv1alpha1.DatabaseConfig{
+			DBConfig: vyogotechv1.DatabaseConfig{
 				Host: "rds.example.com",
 				Port: "3306",
 			},
@@ -158,14 +158,14 @@ func TestExternalProvider_EnsureDatabase_HostInSpec(t *testing.T) {
 func TestExternalProvider_EnsureDatabase_MissingHost(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 	ctx := context.Background()
 
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test-ns"},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+		Spec: vyogotechv1.FrappeSiteSpec{
 			SiteName: "mysite",
-			DBConfig: vyogotechv1alpha1.DatabaseConfig{},
+			DBConfig: vyogotechv1.DatabaseConfig{},
 		},
 	}
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
@@ -178,12 +178,12 @@ func TestExternalProvider_EnsureDatabase_MissingHost(t *testing.T) {
 func TestExternalProvider_Cleanup(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 	ctx := context.Background()
 
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test-ns"},
-		Spec:       vyogotechv1alpha1.FrappeSiteSpec{},
+		Spec:       vyogotechv1.FrappeSiteSpec{},
 	}
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	provider := NewExternalProvider(site.Spec.DBConfig, client)
@@ -194,7 +194,7 @@ func TestExternalProvider_Cleanup(t *testing.T) {
 func TestCircuitBreakerProvider_GetCredentials_WhenClosed(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 	ctx := context.Background()
 	namespace := "test-ns"
 	secret := &corev1.Secret{
@@ -206,10 +206,10 @@ func TestCircuitBreakerProvider_GetCredentials_WhenClosed(t *testing.T) {
 	}
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build()
 
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
-			DBConfig: vyogotechv1alpha1.DatabaseConfig{
+		Spec: vyogotechv1.FrappeSiteSpec{
+			DBConfig: vyogotechv1.DatabaseConfig{
 				ConnectionSecretRef: &corev1.SecretReference{Name: "db-secret", Namespace: namespace},
 			},
 		},
@@ -226,15 +226,15 @@ func TestCircuitBreakerProvider_GetCredentials_WhenClosed(t *testing.T) {
 func TestCircuitBreakerProvider_EnsureDatabase_WhenClosed(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 	ctx := context.Background()
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test-ns"},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+		Spec: vyogotechv1.FrappeSiteSpec{
 			SiteName: "mysite",
-			DBConfig: vyogotechv1alpha1.DatabaseConfig{Host: "rds.example.com", Port: "3306"},
+			DBConfig: vyogotechv1.DatabaseConfig{Host: "rds.example.com", Port: "3306"},
 		},
 	}
 	inner := NewExternalProvider(site.Spec.DBConfig, client)
@@ -249,11 +249,11 @@ func TestCircuitBreakerProvider_EnsureDatabase_WhenClosed(t *testing.T) {
 func TestCircuitBreakerProvider_Cleanup_WhenClosed(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 	ctx := context.Background()
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	site := &vyogotechv1alpha1.FrappeSite{ObjectMeta: metav1.ObjectMeta{Namespace: "test-ns"}}
+	site := &vyogotechv1.FrappeSite{ObjectMeta: metav1.ObjectMeta{Namespace: "test-ns"}}
 	inner := NewExternalProvider(site.Spec.DBConfig, client)
 	cb := circuitbreaker.New(circuitbreaker.Config{Name: "db", MaxFailures: 5, Timeout: time.Second})
 	wrapped := NewCircuitBreakerProvider(inner, cb)

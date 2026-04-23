@@ -3,14 +3,14 @@ package controllers
 import (
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 func TestApplyPodConfig(t *testing.T) {
 	tests := []struct {
 		name      string
-		podConfig *vyogotechv1alpha1.PodConfig
+		podConfig *vyogotechv1.PodConfig
 		initial   struct {
 			labels map[string]string
 		}
@@ -21,7 +21,7 @@ func TestApplyPodConfig(t *testing.T) {
 	}{
 		{
 			name: "Basic labels and nodeSelector",
-			podConfig: &vyogotechv1alpha1.PodConfig{
+			podConfig: &vyogotechv1.PodConfig{
 				Labels:       map[string]string{"foo": "bar"},
 				NodeSelector: map[string]string{"disk": "ssd"},
 			},
@@ -30,8 +30,8 @@ func TestApplyPodConfig(t *testing.T) {
 		},
 		{
 			name: "GeoTag Region and Zone",
-			podConfig: &vyogotechv1alpha1.PodConfig{
-				GeoTag: &vyogotechv1alpha1.GeoTagConfig{
+			podConfig: &vyogotechv1.PodConfig{
+				GeoTag: &vyogotechv1.GeoTagConfig{
 					Region: "us-east-1",
 					Zone:   "us-east-1a",
 				},
@@ -65,7 +65,7 @@ func TestApplyPodConfig(t *testing.T) {
 		},
 		{
 			name: "Merge labels with initial labels",
-			podConfig: &vyogotechv1alpha1.PodConfig{
+			podConfig: &vyogotechv1.PodConfig{
 				Labels: map[string]string{"custom": "value"},
 			},
 			initial: struct{ labels map[string]string }{
