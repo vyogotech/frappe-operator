@@ -226,6 +226,10 @@ var _ = Describe("SiteBackup Controller", func() {
 		// Create bench and site
 		Expect(k8sClient.Create(ctx, bench)).To(Succeed())
 		Expect(k8sClient.Create(ctx, site)).To(Succeed())
+
+		// Mock site status to Ready
+		site.Status.Phase = vyogotechv1.FrappeSitePhaseReady
+		Expect(k8sClient.Status().Update(ctx, site)).To(Succeed())
 	})
 
 	AfterEach(func() {

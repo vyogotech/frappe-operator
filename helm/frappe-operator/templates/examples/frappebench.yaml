@@ -1,5 +1,5 @@
 {{- if .Values.examples.createBench -}}
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: {{ .Values.examples.bench.name }}
