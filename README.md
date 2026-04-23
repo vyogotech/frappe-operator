@@ -72,6 +72,41 @@ This signals the operator to delete the old `bench-init` job and spin up a new o
 
 **That's it!** You now have a running Frappe site.
 
+### Uninstalling the Operator
+
+If you are just testing and want to clean up your cluster, delete your site and bench resources first, then clean up the CRDs and operator resources.
+
+**1. Clean up Frappe resources and CRDs:**
+
+**Bash / Zsh**:
+```bash
+kubectl delete CustomResourceDefinition $(kubectl get CustomResourceDefinition | grep -F ".vyogo.tech" | awk '{print $1}')
+```
+
+**PowerShell**:
+```powershell
+kubectl get crd | Select-String -SimpleMatch ".vyogo.tech" | ForEach-Object {
+    ($_.ToString().Split()[0])
+} | ForEach-Object {
+    kubectl delete crd $_
+}
+```
+
+**2. Uninstall the Operator itself:**
+
+Depending on how you installed the operator, use one of the following methods to remove the controller manager, RBAC, and namespace:
+
+**If installed via Helm:**
+```bash
+helm uninstall frappe-operator --namespace frappe-operator-system
+kubectl delete namespace frappe-operator-system
+```
+
+**If installed via kubectl (install.yaml):**
+```bash
+kubectl delete -f https://github.com/vyogotech/frappe-operator/releases/latest/download/install.yaml
+```
+
 ## Documentation
 
 For detailed guides, visit **[vyogotech.github.io/frappe-operator](https://vyogotech.github.io/frappe-operator/)**:
