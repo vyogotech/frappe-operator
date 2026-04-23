@@ -7,7 +7,7 @@ metadata:
     createdAt: "2026-04-23T08:48:59Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: frappe-operator.v3.2.1
+  name: frappe-operator.v4.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -445,4 +445,4 @@ spec:
   provider:
     name: Provider Name
     url: https://your.domain
-  version: 3.2.1
+  version: 4.0.0
