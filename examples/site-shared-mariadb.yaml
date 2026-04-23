@@ -1,7 +1,7 @@
 # Example: Frappe site using shared MariaDB instance
 # This is the most cost-effective option for multiple sites
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: shared-bench
@@ -30,7 +30,7 @@ spec:
       staticReplicas: 1
   storageSize: "10Gi"
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: site1

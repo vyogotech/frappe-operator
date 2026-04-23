@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: backup-bench
@@ -10,7 +10,7 @@ spec:
     pullPolicy: Always
   storageSize: 2Gi
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: backup-site
@@ -24,7 +24,7 @@ spec:
       name: frappe-mariadb
       namespace: mariadb
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: test-backup

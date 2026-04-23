@@ -1,7 +1,7 @@
 # Example: Frappe site with dedicated MariaDB instance
 # Use this for enterprise/isolated deployments
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: enterprise-site

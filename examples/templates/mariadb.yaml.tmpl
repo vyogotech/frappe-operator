@@ -13,7 +13,7 @@ type: Opaque
 stringData:
   password: {{ .RootPassword | default "changeme" }}
 ---
-apiVersion: k8s.mariadb.com/v1alpha1
+apiVersion: k8s.mariadb.com/v1
 kind: MariaDB
 metadata:
   name: {{ .Name | default "frappe-mariadb" }}

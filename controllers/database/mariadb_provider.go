@@ -42,22 +42,22 @@ import (
 var (
 	MariaDBGVK = schema.GroupVersionKind{
 		Group:   "k8s.mariadb.com",
-		Version: "v1alpha1",
+		Version: "v1",
 		Kind:    "MariaDB",
 	}
 	DatabaseGVK = schema.GroupVersionKind{
 		Group:   "k8s.mariadb.com",
-		Version: "v1alpha1",
+		Version: "v1",
 		Kind:    "Database",
 	}
 	UserGVK = schema.GroupVersionKind{
 		Group:   "k8s.mariadb.com",
-		Version: "v1alpha1",
+		Version: "v1",
 		Kind:    "User",
 	}
 	GrantGVK = schema.GroupVersionKind{
 		Group:   "k8s.mariadb.com",
-		Version: "v1alpha1",
+		Version: "v1",
 		Kind:    "Grant",
 	}
 )
@@ -354,7 +354,7 @@ func (p *MariaDBProviderUnstructured) createDedicatedMariaDB(ctx context.Context
 
 	mariadb := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "k8s.mariadb.com/v1alpha1",
+			"apiVersion": "k8s.mariadb.com/v1",
 			"kind":       "MariaDB",
 			"metadata": map[string]interface{}{
 				"name":      mariadbName,
@@ -389,7 +389,7 @@ func (p *MariaDBProviderUnstructured) createDedicatedMariaDB(ctx context.Context
 func (p *MariaDBProviderUnstructured) ensureDatabaseCR(ctx context.Context, site *vyogotechv1.FrappeSite, mariadbName, mariadbNamespace, dbName string) error {
 	database := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "k8s.mariadb.com/v1alpha1",
+			"apiVersion": "k8s.mariadb.com/v1",
 			"kind":       "Database",
 			"metadata": map[string]interface{}{
 				"name":      fmt.Sprintf("%s-db", site.Name),
@@ -459,7 +459,7 @@ func (p *MariaDBProviderUnstructured) ensureUserCR(ctx context.Context, site *vy
 	// Create User CR
 	user := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "k8s.mariadb.com/v1alpha1",
+			"apiVersion": "k8s.mariadb.com/v1",
 			"kind":       "User",
 			"metadata": map[string]interface{}{
 				"name":      fmt.Sprintf("%s-user", site.Name),
@@ -511,7 +511,7 @@ func (p *MariaDBProviderUnstructured) ensureUserCR(ctx context.Context, site *vy
 func (p *MariaDBProviderUnstructured) ensureGrantCR(ctx context.Context, site *vyogotechv1.FrappeSite, mariadbName, mariadbNamespace, dbName, dbUser string) error {
 	grant := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "k8s.mariadb.com/v1alpha1",
+			"apiVersion": "k8s.mariadb.com/v1",
 			"kind":       "Grant",
 			"metadata": map[string]interface{}{
 				"name":      fmt.Sprintf("%s-grant", site.Name),

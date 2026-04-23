@@ -5,7 +5,7 @@
 # 2. FPM packages from repository
 # 3. Git repositories (when Git is enabled)
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: hybrid-bench

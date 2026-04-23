@@ -7,7 +7,7 @@ import (
 )
 
 func TestComponentAutoscaling_Defaults(t *testing.T) {
-	// Note: These tests will fail until types are implemented in api/v1alpha1/shared_types.go
+	// Note: These tests will fail until types are implemented in api/v1/shared_types.go
 	config := vyogotechv1.ComponentAutoscaling{}
 	if config.Enabled != nil {
 		t.Error("Expected nil Enabled by default")

@@ -114,7 +114,7 @@ func (r *SiteBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if targetSite != nil && targetSite.Status.Phase != vyogotechv1.FrappeSitePhaseReady {
 		msg := fmt.Sprintf("Waiting for FrappeSite '%s' to be Ready (currently %s)", targetSite.Name, targetSite.Status.Phase)
 		logger.Info(msg)
-		
+
 		if siteBackup.Status.Phase != "Pending" {
 			_ = r.updateSiteBackupStatus(ctx, siteBackup, "Pending", msg, "")
 		}

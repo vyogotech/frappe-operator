@@ -110,7 +110,7 @@ var _ = Describe("FrappeSite Jobs", func() {
 			Expect(fakeClient.Create(ctx, rootSecret)).To(Succeed())
 
 			// Mock MariaDB CR
-			mariadbGVK := schema.GroupVersionKind{Group: "k8s.mariadb.com", Version: "v1alpha1", Kind: "MariaDB"}
+			mariadbGVK := schema.GroupVersionKind{Group: "k8s.mariadb.com", Version: "v1", Kind: "MariaDB"}
 			mariadbObj := &unstructured.Unstructured{}
 			mariadbObj.SetGroupVersionKind(mariadbGVK)
 			mariadbObj.SetName("frappe-mariadb")

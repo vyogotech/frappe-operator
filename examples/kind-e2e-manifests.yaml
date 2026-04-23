@@ -1,4 +1,4 @@
-apiVersion: k8s.mariadb.com/v1alpha1
+apiVersion: k8s.mariadb.com/v1
 kind: MariaDB
 metadata:
   name: frappe-mariadb
@@ -30,7 +30,7 @@ type: Opaque
 stringData:
   password: admin
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: e2e-test-bench
@@ -62,7 +62,7 @@ spec:
     labels:
       e2e-custom-label: verified
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: e2e-test-site

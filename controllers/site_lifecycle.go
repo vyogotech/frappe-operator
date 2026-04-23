@@ -397,7 +397,7 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 		mariadbCR := &unstructured.Unstructured{}
 		mariadbCR.SetGroupVersionKind(schema.GroupVersionKind{
 			Group:   "k8s.mariadb.com",
-			Version: "v1alpha1",
+			Version: "v1",
 			Kind:    "MariaDB",
 		})
 		err := r.Get(ctx, types.NamespacedName{Name: mariadbName, Namespace: mariadbNamespace}, mariadbCR)
