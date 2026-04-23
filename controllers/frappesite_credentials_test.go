@@ -81,7 +81,7 @@ func TestFrappeSiteReconciler_getMariaDBRootCredentials(t *testing.T) {
 
 		mariadb := &unstructured.Unstructured{
 			Object: map[string]interface{}{
-				"apiVersion": "k8s.mariadb.com/v1",
+				"apiVersion": "k8s.mariadb.com/v1alpha1",
 				"kind":       "MariaDB",
 				"metadata": map[string]interface{}{
 					"name":      "main-mariadb",
