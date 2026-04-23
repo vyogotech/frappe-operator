@@ -2,7 +2,7 @@ name: Bundle E2E Test
 
 on:
   push:
-    branches: [main, master, release]
+    branches: [main, master, release, 'feat/**']
     paths:
       - 'bundle/**'
       - 'api/**'
