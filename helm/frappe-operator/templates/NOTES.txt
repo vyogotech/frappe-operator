@@ -47,7 +47,7 @@ Chart Version: {{ .Chart.Version }}
    If you wish to use a shared MariaDB model for your sites, create a MariaDB resource:
 
    cat <<EOF | kubectl apply -f -
-   apiVersion: k8s.mariadb.com/v1
+   apiVersion: k8s.mariadb.com/v1alpha1
    kind: MariaDB
    metadata:
      name: {{ .Values.mariadb.name }}
