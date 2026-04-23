@@ -43,33 +43,28 @@ jobs:
           make build
           docker build -t ghcr.io/vyogotech/frappe-operator:local-e2e -f Dockerfile .
 
-      - name: Build Bundle Image
-        run: |
-          # The bundle Dockerfile references VERSION etc. Ensure it matches.
-          make bundle-build BUNDLE_IMG=localhost/frappe-operator-bundle:local-e2e
-
-      - name: Load Images to Kind
-        run: |
-          kind load docker-image ghcr.io/vyogotech/frappe-operator:local-e2e --name bundle-e2e
-          kind load docker-image localhost/frappe-operator-bundle:local-e2e --name bundle-e2e
-
-      - name: Install OLM
-        run: operator-sdk olm install
+      - name: Start Local Registry
+        run: docker run -d -p 5000:5000 --name registry registry:2
 
       - name: Run Operator Bundle
         run: |
-          # Operator SDK automatically replaces standard image refs, but we should make sure the CSV 
-          # points to our loaded e2e operator image rather than public one.
+          # Fix CSV to point to our loaded e2e operator image
           sed -i "s|controller:latest|ghcr.io/vyogotech/frappe-operator:local-e2e|g" bundle/manifests/frappe-operator.clusterserviceversion.yaml || true
           
-          # We need to rebuild the bundle to bake that CSV change into the bundle container
-          make bundle-build BUNDLE_IMG=localhost/frappe-operator-bundle:patched-e2e
-          kind load docker-image localhost/frappe-operator-bundle:patched-e2e --name bundle-e2e
+          # Build and strictly push the bundle to the local GitHub runner registry so `operator-sdk` can pull its manifests
+          make bundle-build BUNDLE_IMG=localhost:5000/frappe-operator-bundle:patched-e2e
+          docker push localhost:5000/frappe-operator-bundle:patched-e2e
+
+          # Load both images completely into Kind's internal nodes so the cluster bypasses external pulls
+          kind load docker-image localhost:5000/frappe-operator-bundle:patched-e2e --name bundle-e2e
+          kind load docker-image ghcr.io/vyogotech/frappe-operator:local-e2e --name bundle-e2e
 
           echo "Running customized bundle install on cluster..."
+          operator-sdk olm install
           kubectl create namespace frappe-operator-system || true
-          operator-sdk run bundle localhost/frappe-operator-bundle:patched-e2e \
+          operator-sdk run bundle localhost:5000/frappe-operator-bundle:patched-e2e \
             --namespace frappe-operator-system \
+            --use-http \
             --timeout 5m
 
       - name: Verify Controller Status
