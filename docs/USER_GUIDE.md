@@ -9,7 +9,7 @@ The `FrappeBench` custom resource represents a cluster of Frappe components (Wor
 ### Manifest Example (`deploy/bench.yaml`)
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: my-bench
@@ -72,7 +72,7 @@ The `FrappeSite` custom resource represents a tenant or a specific site within t
 ### Manifest Example (`deploy/site.yaml`)
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: my-site
@@ -130,7 +130,7 @@ You can specify which apps to install when creating a site. The operator will ch
 ### Example with Apps
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: erp-site
