@@ -15,7 +15,7 @@ resources:
 #    version: v1
 #    kind: Deployment
 #    name: controller-manager
-#    namespace: system
+#    namespace: frappe-operator-system
 #  patch: |-
 #    # Remove the manager container's "cert" volumeMount, since OLM will create and mount a set of certs.
 #    # Update the indices in this path if adding or removing containers/volumeMounts in the manager's Deployment.

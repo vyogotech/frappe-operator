@@ -4,18 +4,18 @@ metadata:
   labels:
     control-plane: controller-manager
     app.kubernetes.io/name: namespace
-    app.kubernetes.io/instance: system
+    app.kubernetes.io/instance: frappe-operator-system
     app.kubernetes.io/component: manager
     app.kubernetes.io/created-by: frappe-operator
     app.kubernetes.io/part-of: frappe-operator
     app.kubernetes.io/managed-by: kustomize
-  name: system
+  name: frappe-operator-system
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
+  namespace: frappe-operator-system
   labels:
     control-plane: controller-manager
     app.kubernetes.io/name: deployment
