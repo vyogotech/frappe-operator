@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: basic-bench
@@ -11,7 +11,7 @@ spec:
   # Image is substituted by the test script/workflow
   storageSize: 2Gi
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: basic-site

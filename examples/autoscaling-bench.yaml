@@ -1,7 +1,7 @@
 # Frappe Bench with Worker Autoscaling
 # This example shows how to configure KEDA-based autoscaling for background workers
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: autoscaling-bench
@@ -61,7 +61,7 @@ spec:
 
 ---
 # Example FrappeSite using the autoscaling bench
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: autoscaling-site
