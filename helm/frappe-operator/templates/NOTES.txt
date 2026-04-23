@@ -47,7 +47,7 @@ Chart Version: {{ .Chart.Version }}
    If you wish to use a shared MariaDB model for your sites, create a MariaDB resource:
 
    cat <<EOF | kubectl apply -f -
-   apiVersion: k8s.mariadb.com/v1alpha1
+   apiVersion: k8s.mariadb.com/v1
    kind: MariaDB
    metadata:
      name: {{ .Values.mariadb.name }}
@@ -72,7 +72,7 @@ Chart Version: {{ .Chart.Version }}
    Create a file named my-site.yaml:
    
    ---
-   apiVersion: vyogo.tech/v1alpha1
+   apiVersion: vyogo.tech/v1
    kind: FrappeBench
    metadata:
      name: my-bench
@@ -83,7 +83,7 @@ Chart Version: {{ .Chart.Version }}
        - name: erpnext
          source: image
    ---
-   apiVersion: vyogo.tech/v1alpha1
+   apiVersion: vyogo.tech/v1
    kind: FrappeSite
    metadata:
      name: my-site
