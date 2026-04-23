@@ -1,5 +1,5 @@
 {{- if .Values.mariadb.enabled -}}
-apiVersion: k8s.mariadb.com/v1
+apiVersion: k8s.mariadb.com/v1alpha1
 kind: MariaDB
 metadata:
   name: {{ .Values.mariadb.name }}

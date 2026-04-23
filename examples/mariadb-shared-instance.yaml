@@ -10,7 +10,7 @@ type: Opaque
 stringData:
   password: "CHANGE-ME-STRONG-PASSWORD"  # Change this to a strong password
 ---
-apiVersion: k8s.mariadb.com/v1
+apiVersion: k8s.mariadb.com/v1alpha1
 kind: MariaDB
 metadata:
   name: frappe-mariadb
