@@ -42,22 +42,22 @@ import (
 var (
 	MariaDBGVK = schema.GroupVersionKind{
 		Group:   "k8s.mariadb.com",
-		Version: "v1",
+		Version: "v1alpha1",
 		Kind:    "MariaDB",
 	}
 	DatabaseGVK = schema.GroupVersionKind{
 		Group:   "k8s.mariadb.com",
-		Version: "v1",
+		Version: "v1alpha1",
 		Kind:    "Database",
 	}
 	UserGVK = schema.GroupVersionKind{
 		Group:   "k8s.mariadb.com",
-		Version: "v1",
+		Version: "v1alpha1",
 		Kind:    "User",
 	}
 	GrantGVK = schema.GroupVersionKind{
 		Group:   "k8s.mariadb.com",
-		Version: "v1",
+		Version: "v1alpha1",
 		Kind:    "Grant",
 	}
 )
