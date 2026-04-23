@@ -85,7 +85,7 @@ kubectl delete CustomResourceDefinition $(kubectl get CustomResourceDefinition |
 
 **PowerShell**:
 ```powershell
-kubectl get crd | Select-String ".vyogo.tech" | ForEach-Object {
+kubectl get crd | Select-String -SimpleMatch ".vyogo.tech" | ForEach-Object {
     ($_.ToString().Split()[0])
 } | ForEach-Object {
     kubectl delete crd $_
