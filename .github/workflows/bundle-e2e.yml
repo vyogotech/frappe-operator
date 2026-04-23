@@ -1,0 +1,89 @@
+name: Bundle E2E Test
+
+on:
+  push:
+    branches: [main, master, release]
+    paths:
+      - 'bundle/**'
+      - 'api/**'
+      - 'controllers/**'
+      - '.github/workflows/bundle-e2e.yml'
+  pull_request:
+    branches: [main, master, release]
+  workflow_dispatch:
+
+jobs:
+  test-bundle:
+    name: OLM Bundle E2E (Kind)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: bundle-e2e
+
+      - name: Install Operator SDK
+        run: |
+          export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
+          export OS=$(uname | awk '{print tolower($0)}')
+          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.34.1
+          curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
+          chmod +x operator-sdk_${OS}_${ARCH}
+          sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
+
+      - name: Build Operator Image
+        run: |
+          make build
+          docker build -t ghcr.io/vyogotech/frappe-operator:local-e2e -f Dockerfile .
+
+      - name: Build Bundle Image
+        run: |
+          # The bundle Dockerfile references VERSION etc. Ensure it matches.
+          make bundle-build BUNDLE_IMG=localhost/frappe-operator-bundle:local-e2e
+
+      - name: Load Images to Kind
+        run: |
+          kind load docker-image ghcr.io/vyogotech/frappe-operator:local-e2e --name bundle-e2e
+          kind load docker-image localhost/frappe-operator-bundle:local-e2e --name bundle-e2e
+
+      - name: Install OLM
+        run: operator-sdk olm install
+
+      - name: Run Operator Bundle
+        run: |
+          # Operator SDK automatically replaces standard image refs, but we should make sure the CSV 
+          # points to our loaded e2e operator image rather than public one.
+          sed -i "s|controller:latest|ghcr.io/vyogotech/frappe-operator:local-e2e|g" bundle/manifests/frappe-operator.clusterserviceversion.yaml || true
+          
+          # We need to rebuild the bundle to bake that CSV change into the bundle container
+          make bundle-build BUNDLE_IMG=localhost/frappe-operator-bundle:patched-e2e
+          kind load docker-image localhost/frappe-operator-bundle:patched-e2e --name bundle-e2e
+
+          echo "Running customized bundle install on cluster..."
+          operator-sdk run bundle localhost/frappe-operator-bundle:patched-e2e \
+            --namespace frappe-operator-system \
+            --create-namespace \
+            --timeout 5m
+
+      - name: Verify Controller Status
+        run: |
+          kubectl get deployments -n frappe-operator-system
+          kubectl wait deployment -n frappe-operator-system --all --for=condition=Available --timeout=60s
+          kubectl get pods -n frappe-operator-system
+
+      - name: Capture logs on failure
+        if: failure()
+        run: |
+          echo "=== Operator Logs ==="
+          kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=200 || true
+          echo "=== CSV / Subscription info ==="
+          kubectl get csv,subscriptions,installplan,catalogsource -n frappe-operator-system || true
+          echo "=== Events ==="
+          kubectl get events -n frappe-operator-system --sort-by='.lastTimestamp' | tail -n 50 || true
