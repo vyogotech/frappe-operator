@@ -72,11 +72,34 @@ jobs:
           kubectl wait deployment -n frappe-operator-system --all --for=condition=Available --timeout=60s
           kubectl get pods -n frappe-operator-system
 
+      - name: Install Test Dependencies (MariaDB and KEDA)
+        run: |
+          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+          helm repo add keda https://kedacore.github.io/charts
+          helm repo update
+          
+          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+            --namespace frappe-operator-system --create-namespace --set crds.enabled=true --wait
+            
+          helm upgrade --install keda keda/keda \
+            --namespace frappe-operator-system --create-namespace --set crds.install=true --wait
+
+      - name: Run E2E Suite against Bundle
+        run: |
+          chmod +x scripts/e2e-suite.sh
+          # Run the basic scenario to validate OLM CRDs and webhook validation bindings.
+          # We skip the helm installation because the operator is actively managed by Operator Lifecycle Manager.
+          ./scripts/e2e-suite.sh --platform kind --scenario basic --skip-operator-install
+
       - name: Capture logs on failure
         if: failure()
         run: |
           echo "=== Operator Logs ==="
           kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=200 || true
+          echo "=== Resource Status ==="
+          kubectl get frappebench,frappesite -A || true
+          echo "=== Pod Status ==="
+          kubectl get pods -A || true
           echo "=== CSV / Subscription info ==="
           kubectl get csv,subscriptions,installplan,catalogsource -n frappe-operator-system || true
           echo "=== Events ==="
