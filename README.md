@@ -80,7 +80,7 @@ If you are just testing and want to clean up your cluster, delete your site and 
 
 **Bash / Zsh**:
 ```bash
-kubectl delete CustomResourceDefinition $(kubectl get CustomResourceDefinition -A | grep ".vyogo.tech" | awk '{print $1}')
+kubectl delete CustomResourceDefinition $(kubectl get CustomResourceDefinition | grep -F ".vyogo.tech" | awk '{print $1}')
 ```
 
 **PowerShell**:
