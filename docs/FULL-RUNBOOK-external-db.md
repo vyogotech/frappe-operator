@@ -159,7 +159,7 @@ type: Opaque
 stringData:
   password: <your-redis-password>
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: prod-bench
@@ -245,7 +245,7 @@ type: Opaque
 stringData:
   password: "AdminPassword123"
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: prod-site

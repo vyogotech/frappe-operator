@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteDashboardChart
 metadata:
   labels:
