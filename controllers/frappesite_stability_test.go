@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	routev1 "github.com/openshift/api/route/v1"
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
 )
 
@@ -44,8 +44,8 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 		reconciler   *FrappeSiteReconciler
 		fakeClient   client.Client
 		fakeRecorder *record.FakeRecorder
-		site         *vyogotechv1alpha1.FrappeSite
-		bench        *vyogotechv1alpha1.FrappeBench
+		site         *vyogotechv1.FrappeSite
+		bench        *vyogotechv1.FrappeBench
 		namespace    string
 	)
 
@@ -54,15 +54,15 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 		namespace = "test-namespace"
 		fakeRecorder = record.NewFakeRecorder(10)
 
-		bench = &vyogotechv1alpha1.FrappeBench{
+		bench = &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-bench",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+			Spec: vyogotechv1.FrappeBenchSpec{
 				FrappeVersion: "15",
 			},
-			Status: vyogotechv1alpha1.FrappeBenchStatus{
+			Status: vyogotechv1.FrappeBenchStatus{
 				Phase: "Ready",
 				Conditions: []metav1.Condition{
 					{
@@ -73,32 +73,32 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 			},
 		}
 
-		site = &vyogotechv1alpha1.FrappeSite{
+		site = &vyogotechv1.FrappeSite{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:       "test-site",
 				Namespace:  namespace,
 				Generation: 1,
 			},
-			Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			Spec: vyogotechv1.FrappeSiteSpec{
 				SiteName: "test-site.local",
-				BenchRef: &vyogotechv1alpha1.NamespacedName{
+				BenchRef: &vyogotechv1.NamespacedName{
 					Name:      bench.Name,
 					Namespace: bench.Namespace,
 				},
-				Ingress: &vyogotechv1alpha1.IngressConfig{
+				Ingress: &vyogotechv1.IngressConfig{
 					Enabled: boolPtr(true),
 				},
 			},
 		}
 
 		scheme := runtime.NewScheme()
-		_ = vyogotechv1alpha1.AddToScheme(scheme)
+		_ = vyogotechv1.AddToScheme(scheme)
 		_ = corev1.AddToScheme(scheme)
 		_ = networkingv1.AddToScheme(scheme)
 		_ = batchv1.AddToScheme(scheme)
 		_ = routev1.AddToScheme(scheme)
 
-		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(bench).WithStatusSubresource(&vyogotechv1alpha1.FrappeSite{}).Build()
+		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(bench).WithStatusSubresource(&vyogotechv1.FrappeSite{}).Build()
 
 		// Create shared MariaDB CR so Reconcile can provision DB in shared mode (Create ensures fake client can Get it)
 		sharedMariaDB := &unstructured.Unstructured{}
@@ -118,7 +118,7 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 	Describe("Ready Site Stability", func() {
 		It("should not re-provision a site that is already Ready", func() {
 			// Given: A site that is already in Ready phase with ObservedGeneration matching Generation
-			site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseReady
+			site.Status.Phase = vyogotechv1.FrappeSitePhaseReady
 			site.Status.ObservedGeneration = site.Generation
 			site.Status.Conditions = []metav1.Condition{
 				{
@@ -144,9 +144,9 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 			Expect(result.IsZero()).To(BeTrue())
 
 			// And: Site status should remain Ready
-			updatedSite := &vyogotechv1alpha1.FrappeSite{}
+			updatedSite := &vyogotechv1.FrappeSite{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, updatedSite)).To(Succeed())
-			Expect(updatedSite.Status.Phase).To(Equal(vyogotechv1alpha1.FrappeSitePhaseReady))
+			Expect(updatedSite.Status.Phase).To(Equal(vyogotechv1.FrappeSitePhaseReady))
 
 			// And: No new init job should be created
 			job := &batchv1.Job{}
@@ -157,7 +157,7 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 		It("should re-reconcile a Ready site when spec changes (Generation mismatch)", func() {
 			// Given: A site that is Ready but has a spec change (Generation > ObservedGeneration)
 			site.Generation = 2
-			site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseReady
+			site.Status.Phase = vyogotechv1.FrappeSitePhaseReady
 			site.Status.ObservedGeneration = 1 // Older generation
 			site.Status.Conditions = []metav1.Condition{
 				{
@@ -192,7 +192,7 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 	Describe("Concurrent Reconciliation Safety", func() {
 		It("should handle concurrent status updates without flapping", func() {
 			// Given: A site in Provisioning phase
-			site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseProvisioning
+			site.Status.Phase = vyogotechv1.FrappeSitePhaseProvisioning
 			site.Status.ObservedGeneration = site.Generation
 			Expect(fakeClient.Create(ctx, site)).To(Succeed())
 
@@ -209,13 +209,13 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 			}
 
 			// Then: Site phase should be stable (not flapping between states)
-			updatedSite := &vyogotechv1alpha1.FrappeSite{}
+			updatedSite := &vyogotechv1.FrappeSite{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, updatedSite)).To(Succeed())
 
 			// Phase should be consistent (either Provisioning or Ready, not flapping)
 			Expect(updatedSite.Status.Phase).To(Or(
-				Equal(vyogotechv1alpha1.FrappeSitePhaseProvisioning),
-				Equal(vyogotechv1alpha1.FrappeSitePhaseReady),
+				Equal(vyogotechv1.FrappeSitePhaseProvisioning),
+				Equal(vyogotechv1.FrappeSitePhaseReady),
 			))
 		})
 	})
@@ -241,7 +241,7 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 
 			// And: ObservedGeneration should eventually be updated
 			// Note: This test will initially fail until we implement ObservedGeneration tracking
-			updatedSite := &vyogotechv1alpha1.FrappeSite{}
+			updatedSite := &vyogotechv1.FrappeSite{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, updatedSite)).To(Succeed())
 
 			// We expect ObservedGeneration to be updated (this will fail initially)

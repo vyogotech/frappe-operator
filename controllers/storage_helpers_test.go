@@ -7,7 +7,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 func TestStorageClassSupportsRWX(t *testing.T) {
@@ -57,7 +57,7 @@ func TestIsDefaultStorageClass(t *testing.T) {
 
 func TestGetBenchStorageAccessMode(t *testing.T) {
 	r := &FrappeBenchReconciler{}
-	bench := &vyogotechv1alpha1.FrappeBench{}
+	bench := &vyogotechv1.FrappeBench{}
 	if mode := r.getBenchStorageAccessMode(bench); mode != corev1.ReadWriteMany {
 		t.Fatalf("expected ReadWriteMany by default, got %v", mode)
 	}
@@ -69,7 +69,7 @@ func TestGetBenchStorageAccessMode(t *testing.T) {
 }
 
 func TestShouldFallbackStorage(t *testing.T) {
-	bench := &vyogotechv1alpha1.FrappeBench{ObjectMeta: metav1.ObjectMeta{Name: "bench1"}}
+	bench := &vyogotechv1.FrappeBench{ObjectMeta: metav1.ObjectMeta{Name: "bench1"}}
 	pvc := &corev1.PersistentVolumeClaim{Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimPending}, ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"frappe.tech/requested-access": string(corev1.ReadWriteMany)}}}
 	if !shouldFallbackStorage(pvc, bench) {
 		t.Fatalf("expected fallback to be true for pending PVC with ReadWriteMany")

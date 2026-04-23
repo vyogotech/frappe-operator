@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -24,7 +24,7 @@ func NewFPMManager(fpmPath string) *FPMManager {
 }
 
 // ConfigureRepositories configures FPM repositories
-func (m *FPMManager) ConfigureRepositories(ctx context.Context, repos []vyogotechv1alpha1.FPMRepository) error {
+func (m *FPMManager) ConfigureRepositories(ctx context.Context, repos []vyogotechv1.FPMRepository) error {
 	logger := log.FromContext(ctx)
 
 	for _, repo := range repos {
@@ -131,7 +131,7 @@ func (m *FPMManager) SearchPackage(ctx context.Context, query string) (string, e
 }
 
 // GenerateFPMConfigScript generates a bash script to configure FPM
-func (m *FPMManager) GenerateFPMConfigScript(repos []vyogotechv1alpha1.FPMRepository, defaultRepo string) string {
+func (m *FPMManager) GenerateFPMConfigScript(repos []vyogotechv1.FPMRepository, defaultRepo string) string {
 	var script strings.Builder
 
 	script.WriteString("#!/bin/bash\n")
@@ -161,7 +161,7 @@ func (m *FPMManager) GenerateFPMConfigScript(repos []vyogotechv1alpha1.FPMReposi
 }
 
 // GenerateAppInstallScript generates a bash script to install apps
-func (m *FPMManager) GenerateAppInstallScript(apps []vyogotechv1alpha1.AppSource, gitEnabled bool, benchPath string) string {
+func (m *FPMManager) GenerateAppInstallScript(apps []vyogotechv1.AppSource, gitEnabled bool, benchPath string) string {
 	var script strings.Builder
 
 	script.WriteString("#!/bin/bash\n")

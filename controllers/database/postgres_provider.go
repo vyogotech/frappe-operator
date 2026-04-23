@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -42,7 +42,7 @@ func NewPostgresProvider(client client.Client, scheme *runtime.Scheme) Provider 
 }
 
 // EnsureDatabase provisions PostgreSQL database using CloudNativePG operator
-func (p *PostgresProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseInfo, error) {
+func (p *PostgresProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseInfo, error) {
 	// TODO: Implement PostgreSQL provisioning in v1.1.0
 	// Will create:
 	// - CloudNativePG Cluster CR (for dedicated mode) or reference existing
@@ -52,17 +52,17 @@ func (p *PostgresProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1
 }
 
 // IsReady checks if PostgreSQL database is ready
-func (p *PostgresProvider) IsReady(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (bool, error) {
+func (p *PostgresProvider) IsReady(ctx context.Context, site *vyogotechv1.FrappeSite) (bool, error) {
 	return false, fmt.Errorf("PostgreSQL provider not yet implemented - planned for v1.1.0+")
 }
 
 // GetCredentials retrieves PostgreSQL credentials
-func (p *PostgresProvider) GetCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseCredentials, error) {
+func (p *PostgresProvider) GetCredentials(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseCredentials, error) {
 	return nil, fmt.Errorf("PostgreSQL provider not yet implemented - planned for v1.1.0+")
 }
 
 // Cleanup removes PostgreSQL resources
-func (p *PostgresProvider) Cleanup(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
+func (p *PostgresProvider) Cleanup(ctx context.Context, site *vyogotechv1.FrappeSite) error {
 	return fmt.Errorf("PostgreSQL provider not yet implemented - planned for v1.1.0+")
 }
 

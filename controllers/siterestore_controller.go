@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 // SiteRestoreReconciler reconciles a SiteRestore object
@@ -49,7 +49,7 @@ type SiteRestoreReconciler struct {
 func (r *SiteRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	siteRestore := &vyogotechv1alpha1.SiteRestore{}
+	siteRestore := &vyogotechv1.SiteRestore{}
 	if err := r.Get(ctx, req.NamespacedName, siteRestore); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -63,7 +63,7 @@ func (r *SiteRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Get the bench
-	bench := &vyogotechv1alpha1.FrappeBench{}
+	bench := &vyogotechv1.FrappeBench{}
 	if err := r.Get(ctx, client.ObjectKey{Name: siteRestore.Spec.BenchRef.Name, Namespace: siteRestore.Spec.BenchRef.Namespace}, bench); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -96,7 +96,7 @@ func (r *SiteRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{}, nil
 }
 
-func (r *SiteRestoreReconciler) buildRestoreScript(siteRestore *vyogotechv1alpha1.SiteRestore) string {
+func (r *SiteRestoreReconciler) buildRestoreScript(siteRestore *vyogotechv1.SiteRestore) string {
 	script := `#!/bin/bash
 set -e
 
@@ -114,7 +114,7 @@ mkdir -p /tmp/restore
 `
 
 	// Helper for S3 download
-	s3Download := func(source vyogotechv1alpha1.BackupSource, target string, envPrefix string) {
+	s3Download := func(source vyogotechv1.BackupSource, target string, envPrefix string) {
 		if source.S3 != nil {
 			script += fmt.Sprintf(`
 echo "Downloading %s from S3..."
@@ -184,11 +184,11 @@ rm -rf /tmp/restore
 	return script
 }
 
-func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1alpha1.SiteRestore, bench *vyogotechv1alpha1.FrappeBench) *batchv1.Job {
+func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1.SiteRestore, bench *vyogotechv1.FrappeBench) *batchv1.Job {
 	env := []corev1.EnvVar{}
 
 	// Helper for adding S3 env vars
-	addS3Env := func(source vyogotechv1alpha1.BackupSource, prefix string) {
+	addS3Env := func(source vyogotechv1.BackupSource, prefix string) {
 		if source.S3 != nil {
 			env = append(env, corev1.EnvVar{Name: prefix + "_S3_BUCKET", Value: source.S3.Bucket})
 			env = append(env, corev1.EnvVar{Name: prefix + "_S3_KEY", Value: source.S3.Key})
@@ -316,7 +316,7 @@ func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1alpha1.S
 	return job
 }
 
-func (r *SiteRestoreReconciler) getBenchImage(bench *vyogotechv1alpha1.FrappeBench) string {
+func (r *SiteRestoreReconciler) getBenchImage(bench *vyogotechv1.FrappeBench) string {
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
 		image := bench.Spec.ImageConfig.Repository
 		if bench.Spec.ImageConfig.Tag != "" {
@@ -327,8 +327,8 @@ func (r *SiteRestoreReconciler) getBenchImage(bench *vyogotechv1alpha1.FrappeBen
 	return fmt.Sprintf("frappe/erpnext:%s", bench.Spec.FrappeVersion)
 }
 
-func (r *SiteRestoreReconciler) updateStatus(ctx context.Context, siteRestore *vyogotechv1alpha1.SiteRestore, phase, message, jobName string) error {
-	latest := &vyogotechv1alpha1.SiteRestore{}
+func (r *SiteRestoreReconciler) updateStatus(ctx context.Context, siteRestore *vyogotechv1.SiteRestore, phase, message, jobName string) error {
+	latest := &vyogotechv1.SiteRestore{}
 	if err := r.Get(ctx, client.ObjectKeyFromObject(siteRestore), latest); err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ func (r *SiteRestoreReconciler) updateStatus(ctx context.Context, siteRestore *v
 
 func (r *SiteRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&vyogotechv1alpha1.SiteRestore{}).
+		For(&vyogotechv1.SiteRestore{}).
 		Owns(&batchv1.Job{}).
 		Complete(r)
 }

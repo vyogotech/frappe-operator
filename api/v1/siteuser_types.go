@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,17 +23,17 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// SiteDashboardChartSpec defines the desired state of SiteDashboardChart
-type SiteDashboardChartSpec struct {
+// SiteUserSpec defines the desired state of SiteUser
+type SiteUserSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of SiteDashboardChart. Edit sitedashboardchart_types.go to remove/update
+	// Foo is an example field of SiteUser. Edit siteuser_types.go to remove/update
 	Foo string `json:"foo,omitempty"`
 }
 
-// SiteDashboardChartStatus defines the observed state of SiteDashboardChart
-type SiteDashboardChartStatus struct {
+// SiteUserStatus defines the observed state of SiteUser
+type SiteUserStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -41,24 +41,24 @@ type SiteDashboardChartStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// SiteDashboardChart is the Schema for the sitedashboardcharts API
-type SiteDashboardChart struct {
+// SiteUser is the Schema for the siteusers API
+type SiteUser struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SiteDashboardChartSpec   `json:"spec,omitempty"`
-	Status SiteDashboardChartStatus `json:"status,omitempty"`
+	Spec   SiteUserSpec   `json:"spec,omitempty"`
+	Status SiteUserStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// SiteDashboardChartList contains a list of SiteDashboardChart
-type SiteDashboardChartList struct {
+// SiteUserList contains a list of SiteUser
+type SiteUserList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SiteDashboardChart `json:"items"`
+	Items           []SiteUser `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&SiteDashboardChart{}, &SiteDashboardChartList{})
+	SchemeBuilder.Register(&SiteUser{}, &SiteUserList{})
 }
