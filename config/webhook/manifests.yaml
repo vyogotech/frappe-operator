@@ -9,7 +9,7 @@ webhooks:
   clientConfig:
     service:
       name: webhook-service
-      namespace: system
+      namespace: frappe-operator-system
       path: /validate-vyogo-tech-v1-frappebench
   failurePolicy: Fail
   name: vfrappebench.kb.io
@@ -29,7 +29,7 @@ webhooks:
   clientConfig:
     service:
       name: webhook-service
-      namespace: system
+      namespace: frappe-operator-system
       path: /validate-vyogo-tech-v1-frappesite
   failurePolicy: Fail
   name: vfrappesite.kb.io
