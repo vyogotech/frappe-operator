@@ -149,7 +149,7 @@ docker push your-registry.io/frappe/custom-apps:v15-1.0.0
       <span class="na">cpu</span><span class="pi">:</span> <span class="s">250m</span>
       <span class="na">memory</span><span class="pi">:</span> <span class="s">512Mi</span>
   <span class="na">replicas</span><span class="pi">:</span> <span class="m">1</span>
-</code></pre></div></div> <h3 id="step-72-create-the-frappebench"> <a href="#step-72-create-the-frappebench" class="anchor-heading" aria-labelledby="step-72-create-the-frappebench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Step 7.2: Create the FrappeBench </h3> <p>A Bench represents your application environment. Create <code class="language-plaintext highlighter-rouge">my-bench.yaml</code>. <strong>This uses the custom image built in Section 6.2.</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="step-72-create-the-frappebench"> <a href="#step-72-create-the-frappebench" class="anchor-heading" aria-labelledby="step-72-create-the-frappebench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Step 7.2: Create the FrappeBench </h3> <p>A Bench represents your application environment. Create <code class="language-plaintext highlighter-rouge">my-bench.yaml</code>. <strong>This uses the custom image built in Section 6.2.</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">prod-bench</span>
@@ -215,7 +215,7 @@ docker push your-registry.io/frappe/custom-apps:v15-1.0.0
 <span class="na">stringData</span><span class="pi">:</span>
   <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">AdminPassword123"</span>
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">prod-site</span>

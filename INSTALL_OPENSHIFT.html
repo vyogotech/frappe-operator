@@ -60,7 +60,7 @@ helm upgrade <span class="nt">--install</span> frappe-operator frappe-operator/f
   <span class="na">storage</span><span class="pi">:</span>
     <span class="na">size</span><span class="pi">:</span> <span class="s">2Gi</span>
   <span class="na">replicas</span><span class="pi">:</span> <span class="m">1</span>
-</code></pre></div></div> <h3 id="step-62-create-a-frappebench"> <a href="#step-62-create-a-frappebench" class="anchor-heading" aria-labelledby="step-62-create-a-frappebench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Step 6.2: Create a FrappeBench </h3> <p>A Bench represents your application environment (source code and common infrastructure). Create <code class="language-plaintext highlighter-rouge">my-bench.yaml</code>:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="step-62-create-a-frappebench"> <a href="#step-62-create-a-frappebench" class="anchor-heading" aria-labelledby="step-62-create-a-frappebench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Step 6.2: Create a FrappeBench </h3> <p>A Bench represents your application environment (source code and common infrastructure). Create <code class="language-plaintext highlighter-rouge">my-bench.yaml</code>:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">prod-bench</span>
@@ -83,7 +83,7 @@ helm upgrade <span class="nt">--install</span> frappe-operator frappe-operator/f
   <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">AdminPassword123"</span>  <span class="c1"># CHANGE THIS</span>
 <span class="nn">---</span>
 <span class="c1"># 2. The Site resource</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">prod-site</span>

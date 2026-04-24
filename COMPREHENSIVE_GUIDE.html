@@ -109,7 +109,7 @@ kubectl logs <span class="nt">-n</span> frappe-operator-system deployment/frappe
             ├── Secret: admin-password (1)
             ├── Ingress/Route (1)
             └── Job: site-init (1)
-</code></pre></div></div><hr /> <h2 id="resource-management"> <a href="#resource-management" class="anchor-heading" aria-labelledby="resource-management"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Resource Management </h2> <h3 id="creating-a-frappebench"> <a href="#creating-a-frappebench" class="anchor-heading" aria-labelledby="creating-a-frappebench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Creating a FrappeBench </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div><hr /> <h2 id="resource-management"> <a href="#resource-management" class="anchor-heading" aria-labelledby="resource-management"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Resource Management </h2> <h3 id="creating-a-frappebench"> <a href="#creating-a-frappebench" class="anchor-heading" aria-labelledby="creating-a-frappebench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Creating a FrappeBench </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">production-bench</span>
@@ -129,7 +129,7 @@ kubectl logs <span class="nt">-n</span> frappe-operator-system deployment/frappe
     <span class="na">socketio</span><span class="pi">:</span> <span class="m">1</span>
     <span class="na">scheduler</span><span class="pi">:</span> <span class="m">1</span>
   <span class="na">storageClassName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">fast-ssd"</span>
-</code></pre></div></div> <h3 id="creating-a-frappesite"> <a href="#creating-a-frappesite" class="anchor-heading" aria-labelledby="creating-a-frappesite"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Creating a FrappeSite </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="creating-a-frappesite"> <a href="#creating-a-frappesite" class="anchor-heading" aria-labelledby="creating-a-frappesite"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Creating a FrappeSite </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">customer-site</span>
@@ -165,7 +165,7 @@ kubectl get pods <span class="nt">-l</span> <span class="nv">app</span><span cla
   <span class="na">defaultPostgresImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">myregistry.com/library/postgres:15-alpine"</span>
   <span class="na">defaultRedisImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">myregistry.com/library/redis:7-alpine"</span>
   <span class="na">defaultNginxImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">myregistry.com/library/nginx:1.25-alpine"</span>
-</code></pre></div></div> <h3 id="bench-level-override"> <a href="#bench-level-override" class="anchor-heading" aria-labelledby="bench-level-override"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Bench-Level Override </h3> <p>Override defaults per bench:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="bench-level-override"> <a href="#bench-level-override" class="anchor-heading" aria-labelledby="bench-level-override"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Bench-Level Override </h3> <p>Override defaults per bench:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">custom-bench</span>
@@ -183,7 +183,7 @@ kubectl get pods <span class="nt">-l</span> <span class="nv">app</span><span cla
   <span class="na">defaultPostgresImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">internal-registry.company.com/library/postgres:15-alpine"</span>
   <span class="na">defaultRedisImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">internal-registry.company.com/library/redis:7-alpine"</span>
   <span class="na">defaultNginxImage</span><span class="pi">:</span> <span class="s2">"</span><span class="s">internal-registry.company.com/library/nginx:1.25-alpine"</span>
-</code></pre></div></div><hr /> <h2 id="database-configuration"> <a href="#database-configuration" class="anchor-heading" aria-labelledby="database-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Database Configuration </h2> <h3 id="shared-database-mode"> <a href="#shared-database-mode" class="anchor-heading" aria-labelledby="shared-database-mode"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Shared Database Mode </h3> <p>Multiple sites share one MariaDB instance:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div><hr /> <h2 id="database-configuration"> <a href="#database-configuration" class="anchor-heading" aria-labelledby="database-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Database Configuration </h2> <h3 id="shared-database-mode"> <a href="#shared-database-mode" class="anchor-heading" aria-labelledby="shared-database-mode"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Shared Database Mode </h3> <p>Multiple sites share one MariaDB instance:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">shared-bench</span>
@@ -196,7 +196,7 @@ kubectl get pods <span class="nt">-l</span> <span class="nv">app</span><span cla
     <span class="na">mariadbRef</span><span class="pi">:</span>
       <span class="na">name</span><span class="pi">:</span> <span class="s">shared-mariadb</span>
       <span class="na">namespace</span><span class="pi">:</span> <span class="s">default</span>
-</code></pre></div></div> <h3 id="dedicated-database-mode"> <a href="#dedicated-database-mode" class="anchor-heading" aria-labelledby="dedicated-database-mode"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Dedicated Database Mode </h3> <p>Each site gets its own MariaDB instance:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="dedicated-database-mode"> <a href="#dedicated-database-mode" class="anchor-heading" aria-labelledby="dedicated-database-mode"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Dedicated Database Mode </h3> <p>Each site gets its own MariaDB instance:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">isolated-site</span>
@@ -207,7 +207,7 @@ kubectl get pods <span class="nt">-l</span> <span class="nv">app</span><span cla
   <span class="na">dbConfig</span><span class="pi">:</span>
     <span class="na">provider</span><span class="pi">:</span> <span class="s">mariadb</span>
     <span class="na">mode</span><span class="pi">:</span> <span class="s">dedicated</span>
-</code></pre></div></div> <h3 id="external-database"> <a href="#external-database" class="anchor-heading" aria-labelledby="external-database"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> External Database </h3> <p>Connect to RDS, Cloud SQL, or any external database:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="external-database"> <a href="#external-database" class="anchor-heading" aria-labelledby="external-database"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> External Database </h3> <p>Connect to RDS, Cloud SQL, or any external database:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">external-db-site</span>
@@ -231,7 +231,7 @@ kubectl get pods <span class="nt">-l</span> <span class="nv">app</span><span cla
 <span class="na">stringData</span><span class="pi">:</span>
   <span class="na">username</span><span class="pi">:</span> <span class="s2">"</span><span class="s">frappe_user"</span>
   <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">secure_password"</span>
-</code></pre></div></div> <h3 id="postgresql-support"> <a href="#postgresql-support" class="anchor-heading" aria-labelledby="postgresql-support"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> PostgreSQL Support </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="postgresql-support"> <a href="#postgresql-support" class="anchor-heading" aria-labelledby="postgresql-support"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> PostgreSQL Support </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">postgres-site</span>
@@ -253,7 +253,7 @@ kubectl get secret &lt;site-name&gt;-db-password <span class="nt">-o</span> <spa
 
 <span class="c"># Root credentials (dedicated mode only, used by deletion jobs)</span>
 kubectl get secret &lt;site-name&gt;-mariadb-root <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.data.password}'</span> | <span class="nb">base64</span> <span class="nt">-d</span>
-</code></pre></div></div> <p><strong>Important:</strong> Never mount root credentials in application pods. Root credentials should only be used in operator-managed jobs.</p><hr /> <h2 id="scaling-and-performance"> <a href="#scaling-and-performance" class="anchor-heading" aria-labelledby="scaling-and-performance"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Scaling and Performance </h2> <h3 id="component-replicas"> <a href="#component-replicas" class="anchor-heading" aria-labelledby="component-replicas"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Component Replicas </h3> <p>Configure replica counts for each component:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <p><strong>Important:</strong> Never mount root credentials in application pods. Root credentials should only be used in operator-managed jobs.</p><hr /> <h2 id="scaling-and-performance"> <a href="#scaling-and-performance" class="anchor-heading" aria-labelledby="scaling-and-performance"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Scaling and Performance </h2> <h3 id="component-replicas"> <a href="#component-replicas" class="anchor-heading" aria-labelledby="component-replicas"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Component Replicas </h3> <p>Configure replica counts for each component:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">scaled-bench</span>
@@ -264,7 +264,7 @@ kubectl get secret &lt;site-name&gt;-mariadb-root <span class="nt">-o</span> <sp
     <span class="na">nginx</span><span class="pi">:</span> <span class="m">2</span>         <span class="c1"># Load balancers</span>
     <span class="na">socketio</span><span class="pi">:</span> <span class="m">2</span>      <span class="c1"># WebSocket servers</span>
     <span class="na">scheduler</span><span class="pi">:</span> <span class="m">1</span>     <span class="c1"># Always 1</span>
-</code></pre></div></div> <h3 id="worker-autoscaling-keda"> <a href="#worker-autoscaling-keda" class="anchor-heading" aria-labelledby="worker-autoscaling-keda"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Worker Autoscaling (KEDA) </h3> <p>Scale workers based on queue length:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="worker-autoscaling-keda"> <a href="#worker-autoscaling-keda" class="anchor-heading" aria-labelledby="worker-autoscaling-keda"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Worker Autoscaling (KEDA) </h3> <p>Scale workers based on queue length:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">autoscaled-bench</span>
@@ -281,7 +281,7 @@ kubectl get secret &lt;site-name&gt;-mariadb-root <span class="nt">-o</span> <sp
       <span class="na">minReplicas</span><span class="pi">:</span> <span class="m">0</span>
       <span class="na">maxReplicas</span><span class="pi">:</span> <span class="m">5</span>
       <span class="na">targetQueueLength</span><span class="pi">:</span> <span class="m">2</span>
-</code></pre></div></div> <h3 id="resource-limits"> <a href="#resource-limits" class="anchor-heading" aria-labelledby="resource-limits"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Resource Limits </h3> <p>Set CPU and memory limits:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="resource-limits"> <a href="#resource-limits" class="anchor-heading" aria-labelledby="resource-limits"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Resource Limits </h3> <p>Set CPU and memory limits:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">resource-limited-bench</span>
@@ -309,7 +309,7 @@ kubectl get secret &lt;site-name&gt;-mariadb-root <span class="nt">-o</span> <sp
     <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2Gi"</span>
   <span class="na">queue</span><span class="pi">:</span>
     <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1Gi"</span>
-</code></pre></div></div><hr /> <h2 id="security"> <a href="#security" class="anchor-heading" aria-labelledby="security"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Security </h2> <h3 id="security-contexts"> <a href="#security-contexts" class="anchor-heading" aria-labelledby="security-contexts"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Security Contexts </h3> <p>Configure pod and container security:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div><hr /> <h2 id="security"> <a href="#security" class="anchor-heading" aria-labelledby="security"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Security </h2> <h3 id="security-contexts"> <a href="#security-contexts" class="anchor-heading" aria-labelledby="security-contexts"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Security Contexts </h3> <p>Configure pod and container security:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">secure-bench</span>
@@ -334,7 +334,7 @@ kubectl get secret &lt;site-name&gt;-mariadb-root <span class="nt">-o</span> <sp
 <span class="na">data</span><span class="pi">:</span>
   <span class="na">.dockerconfigjson</span><span class="pi">:</span> <span class="s">&lt;base64-encoded-docker-config&gt;</span>
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">private-registry-bench</span>
@@ -344,7 +344,7 @@ kubectl get secret &lt;site-name&gt;-mariadb-root <span class="nt">-o</span> <sp
     <span class="na">repository</span><span class="pi">:</span> <span class="s2">"</span><span class="s">private-registry.com/frappe/erpnext"</span>
     <span class="na">pullSecrets</span><span class="pi">:</span>
       <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">registry-credentials</span>
-</code></pre></div></div> <h3 id="tls-configuration"> <a href="#tls-configuration" class="anchor-heading" aria-labelledby="tls-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> TLS Configuration </h3> <p>Enable TLS for sites:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="tls-configuration"> <a href="#tls-configuration" class="anchor-heading" aria-labelledby="tls-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> TLS Configuration </h3> <p>Enable TLS for sites:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">secure-site</span>
@@ -384,7 +384,7 @@ kubectl get secret &lt;site-name&gt;-mariadb-root <span class="nt">-o</span> <sp
       <span class="na">ports</span><span class="pi">:</span>
         <span class="pi">-</span> <span class="na">protocol</span><span class="pi">:</span> <span class="s">TCP</span>
           <span class="na">port</span><span class="pi">:</span> <span class="m">3306</span>
-</code></pre></div></div><hr /> <h2 id="operations"> <a href="#operations" class="anchor-heading" aria-labelledby="operations"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Operations </h2> <h3 id="updating-a-bench"> <a href="#updating-a-bench" class="anchor-heading" aria-labelledby="updating-a-bench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Updating a Bench </h3> <p>Update Frappe version or apps:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div><hr /> <h2 id="operations"> <a href="#operations" class="anchor-heading" aria-labelledby="operations"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Operations </h2> <h3 id="updating-a-bench"> <a href="#updating-a-bench" class="anchor-heading" aria-labelledby="updating-a-bench"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Updating a Bench </h3> <p>Update Frappe version or apps:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">production-bench</span>
@@ -400,7 +400,7 @@ kubectl get secret &lt;site-name&gt;-mariadb-root <span class="nt">-o</span> <sp
         <span class="na">branch</span><span class="pi">:</span> <span class="s2">"</span><span class="s">main"</span>
 </code></pre></div></div> <p>Apply changes:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl apply <span class="nt">-f</span> bench.yaml
 kubectl rollout status deployment/production-bench-gunicorn
-</code></pre></div></div> <h3 id="backing-up-a-site"> <a href="#backing-up-a-site" class="anchor-heading" aria-labelledby="backing-up-a-site"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Backing Up a Site </h3> <p>Create a backup:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="backing-up-a-site"> <a href="#backing-up-a-site" class="anchor-heading" aria-labelledby="backing-up-a-site"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Backing Up a Site </h3> <p>Create a backup:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">daily-backup</span>
@@ -415,7 +415,7 @@ kubectl rollout status deployment/production-bench-gunicorn
     <span class="na">s3</span><span class="pi">:</span>
       <span class="na">bucket</span><span class="pi">:</span> <span class="s2">"</span><span class="s">frappe-backups"</span>
       <span class="na">region</span><span class="pi">:</span> <span class="s2">"</span><span class="s">us-east-1"</span>
-</code></pre></div></div> <h3 id="restoring-from-backup"> <a href="#restoring-from-backup" class="anchor-heading" aria-labelledby="restoring-from-backup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Restoring from Backup </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="restoring-from-backup"> <a href="#restoring-from-backup" class="anchor-heading" aria-labelledby="restoring-from-backup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Restoring from Backup </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">restore-job</span>
@@ -515,7 +515,7 @@ kubectl edit deployment frappe-operator-controller-manager <span class="nt">-n</
 </code></pre></div></div> <p><strong>Check Resource Events:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get events <span class="nt">--all-namespaces</span> <span class="nt">--sort-by</span><span class="o">=</span><span class="s1">'.lastTimestamp'</span> | <span class="nb">grep </span>frappe
 </code></pre></div></div> <p><strong>Inspect Resource Status:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get frappebench production-bench <span class="nt">-o</span> yaml | <span class="nb">grep</span> <span class="nt">-A</span> 20 status
 kubectl get frappesite customer-site <span class="nt">-o</span> yaml | <span class="nb">grep</span> <span class="nt">-A</span> 20 status
-</code></pre></div></div><hr /> <h2 id="api-reference"> <a href="#api-reference" class="anchor-heading" aria-labelledby="api-reference"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> API Reference </h2> <h3 id="frappebench-spec"> <a href="#frappebench-spec" class="anchor-heading" aria-labelledby="frappebench-spec"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> FrappeBench Spec </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div><hr /> <h2 id="api-reference"> <a href="#api-reference" class="anchor-heading" aria-labelledby="api-reference"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> API Reference </h2> <h3 id="frappebench-spec"> <a href="#frappebench-spec" class="anchor-heading" aria-labelledby="frappebench-spec"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> FrappeBench Spec </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">example-bench</span>
@@ -576,7 +576,7 @@ kubectl get frappesite customer-site <span class="nt">-o</span> yaml | <span cla
       <span class="na">runAsUser</span><span class="pi">:</span> <span class="m">1001</span>
     <span class="na">securityContext</span><span class="pi">:</span>
       <span class="na">allowPrivilegeEscalation</span><span class="pi">:</span> <span class="no">false</span>
-</code></pre></div></div> <h3 id="frappesite-spec"> <a href="#frappesite-spec" class="anchor-heading" aria-labelledby="frappesite-spec"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> FrappeSite Spec </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="frappesite-spec"> <a href="#frappesite-spec" class="anchor-heading" aria-labelledby="frappesite-spec"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> FrappeSite Spec </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">example-site</span>
@@ -644,7 +644,7 @@ kubectl get frappesite customer-site <span class="nt">-o</span> yaml | <span cla
   <span class="na">databaseName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">example_com"</span>
   <span class="na">siteURL</span><span class="pi">:</span> <span class="s2">"</span><span class="s">https://example.com"</span>
   <span class="na">resolvedDomain</span><span class="pi">:</span> <span class="s2">"</span><span class="s">example.com"</span>
-</code></pre></div></div><hr /> <h2 id="examples"> <a href="#examples" class="anchor-heading" aria-labelledby="examples"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Examples </h2> <h3 id="basic-deployment"> <a href="#basic-deployment" class="anchor-heading" aria-labelledby="basic-deployment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Basic Deployment </h3> <p><strong>Bench:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div><hr /> <h2 id="examples"> <a href="#examples" class="anchor-heading" aria-labelledby="examples"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Examples </h2> <h3 id="basic-deployment"> <a href="#basic-deployment" class="anchor-heading" aria-labelledby="basic-deployment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Basic Deployment </h3> <p><strong>Bench:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">basic-bench</span>
@@ -653,7 +653,7 @@ kubectl get frappesite customer-site <span class="nt">-o</span> yaml | <span cla
   <span class="na">apps</span><span class="pi">:</span>
     <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">erpnext</span>
       <span class="na">source</span><span class="pi">:</span> <span class="s">image</span>
-</code></pre></div></div> <p><strong>Site:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <p><strong>Site:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">basic-site</span>
@@ -663,7 +663,7 @@ kubectl get frappesite customer-site <span class="nt">-o</span> yaml | <span cla
     <span class="na">name</span><span class="pi">:</span> <span class="s">basic-bench</span>
   <span class="na">ingress</span><span class="pi">:</span>
     <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
-</code></pre></div></div> <h3 id="production-deployment"> <a href="#production-deployment" class="anchor-heading" aria-labelledby="production-deployment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Production Deployment </h3> <p><strong>High-Availability Bench:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="production-deployment"> <a href="#production-deployment" class="anchor-heading" aria-labelledby="production-deployment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Production Deployment </h3> <p><strong>High-Availability Bench:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">prod-bench</span>
@@ -691,7 +691,7 @@ kubectl get frappesite customer-site <span class="nt">-o</span> yaml | <span cla
       <span class="na">maxReplicas</span><span class="pi">:</span> <span class="m">20</span>
       <span class="na">targetQueueLength</span><span class="pi">:</span> <span class="m">5</span>
   <span class="na">storageClassName</span><span class="pi">:</span> <span class="s2">"</span><span class="s">fast-ssd"</span>
-</code></pre></div></div> <p><strong>Production Site:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <p><strong>Production Site:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">prod-site</span>
@@ -705,7 +705,7 @@ kubectl get frappesite customer-site <span class="nt">-o</span> yaml | <span cla
   <span class="na">tls</span><span class="pi">:</span>
     <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
     <span class="na">issuer</span><span class="pi">:</span> <span class="s2">"</span><span class="s">letsencrypt-prod"</span>
-</code></pre></div></div> <h3 id="openshift-deployment"> <a href="#openshift-deployment" class="anchor-heading" aria-labelledby="openshift-deployment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> OpenShift Deployment </h3> <p><strong>OpenShift Bench:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="openshift-deployment"> <a href="#openshift-deployment" class="anchor-heading" aria-labelledby="openshift-deployment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> OpenShift Deployment </h3> <p><strong>OpenShift Bench:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">ocp-bench</span>
@@ -720,7 +720,7 @@ kubectl get frappesite customer-site <span class="nt">-o</span> yaml | <span cla
   <span class="na">security</span><span class="pi">:</span>
     <span class="na">podSecurityContext</span><span class="pi">:</span>
       <span class="na">runAsNonRoot</span><span class="pi">:</span> <span class="no">true</span>
-</code></pre></div></div> <p><strong>OpenShift Site with Route:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <p><strong>OpenShift Site with Route:</strong></p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">ocp-site</span>
@@ -743,7 +743,7 @@ kubectl get frappesite customer-site <span class="nt">-o</span> yaml | <span cla
   <span class="na">username</span><span class="pi">:</span> <span class="s2">"</span><span class="s">frappe_user"</span>
   <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">secure_password"</span>
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">rds-site</span>

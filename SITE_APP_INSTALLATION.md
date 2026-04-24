@@ -16,7 +16,7 @@ The Frappe Operator supports installing specific apps during site creation throu
 ### Basic Example
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: my-site
@@ -339,7 +339,7 @@ The FrappeSite's app installation integrates with the FrappeBench's app configur
 
 ```yaml
 # FrappeBench
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: my-bench
@@ -360,7 +360,7 @@ spec:
       version: "15.0.0"
 
 # FrappeSite (can only install apps available in bench)
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: my-site
