@@ -103,7 +103,7 @@ kind: Project
 metadata:
   name: frappe
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: bench-test
@@ -149,7 +149,7 @@ oc get pods -n frappe
 Deploy the actual Frappe Site and connect it to the MariaDB database.
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: vyogotechdemo

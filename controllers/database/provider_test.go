@@ -8,7 +8,7 @@ import (
 	"context"
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,11 +20,11 @@ import (
 func TestNewProvider(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 	t.Run("mariadb", func(t *testing.T) {
-		config := vyogotechv1alpha1.DatabaseConfig{Mode: "shared", Provider: "mariadb"}
+		config := vyogotechv1.DatabaseConfig{Mode: "shared", Provider: "mariadb"}
 		p, err := NewProvider(config, client, scheme)
 		if err != nil {
 			t.Fatalf("NewProvider(mariadb) error: %v", err)
@@ -37,7 +37,7 @@ func TestNewProvider(t *testing.T) {
 	})
 
 	t.Run("external from ConnectionSecretRef", func(t *testing.T) {
-		config := vyogotechv1alpha1.DatabaseConfig{
+		config := vyogotechv1.DatabaseConfig{
 			ConnectionSecretRef: &corev1.SecretReference{Name: "db", Namespace: "default"},
 		}
 		p, err := NewProvider(config, client, scheme)
@@ -52,7 +52,7 @@ func TestNewProvider(t *testing.T) {
 	})
 
 	t.Run("external explicit", func(t *testing.T) {
-		config := vyogotechv1alpha1.DatabaseConfig{Provider: "external", Host: "rds.example.com"}
+		config := vyogotechv1.DatabaseConfig{Provider: "external", Host: "rds.example.com"}
 		p, err := NewProvider(config, client, scheme)
 		if err != nil {
 			t.Fatalf("NewProvider(external) error: %v", err)
@@ -64,7 +64,7 @@ func TestNewProvider(t *testing.T) {
 	})
 
 	t.Run("sqlite", func(t *testing.T) {
-		config := vyogotechv1alpha1.DatabaseConfig{Provider: "sqlite"}
+		config := vyogotechv1.DatabaseConfig{Provider: "sqlite"}
 		p, err := NewProvider(config, client, scheme)
 		if err != nil {
 			t.Fatalf("NewProvider(sqlite) error: %v", err)
@@ -76,7 +76,7 @@ func TestNewProvider(t *testing.T) {
 	})
 
 	t.Run("postgres returns error", func(t *testing.T) {
-		config := vyogotechv1alpha1.DatabaseConfig{Provider: "postgres"}
+		config := vyogotechv1.DatabaseConfig{Provider: "postgres"}
 		p, err := NewProvider(config, client, scheme)
 		if err == nil {
 			t.Fatal("NewProvider(postgres) expected error")
@@ -90,7 +90,7 @@ func TestNewProvider(t *testing.T) {
 	})
 
 	t.Run("unknown provider returns error", func(t *testing.T) {
-		config := vyogotechv1alpha1.DatabaseConfig{Provider: "unknown"}
+		config := vyogotechv1.DatabaseConfig{Provider: "unknown"}
 		p, err := NewProvider(config, client, scheme)
 		if err == nil {
 			t.Fatal("NewProvider(unknown) expected error")
@@ -104,13 +104,13 @@ func TestNewProvider(t *testing.T) {
 func TestMariaDBProvider_IsReady_NoDatabaseCR(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+		Spec: vyogotechv1.FrappeSiteSpec{
 			SiteName: "test.local",
-			DBConfig: vyogotechv1alpha1.DatabaseConfig{Mode: "shared"},
+			DBConfig: vyogotechv1.DatabaseConfig{Mode: "shared"},
 		},
 	}
 	p := NewMariaDBProvider(site.Spec.DBConfig, client, scheme)

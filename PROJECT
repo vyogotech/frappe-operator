@@ -4,7 +4,7 @@
 # More info: https://book.kubebuilder.io/reference/project-config.html
 domain: vyogo.tech
 layout:
-- go.kubebuilder.io/v3
+- go.kubebuilder.io/v4
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
@@ -17,62 +17,62 @@ resources:
   controller: true
   domain: vyogo.tech
   kind: FrappeSite
-  path: github.com/vyogotech/frappe-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
   domain: vyogo.tech
   kind: SiteUser
-  path: github.com/vyogotech/frappe-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
   domain: vyogo.tech
   kind: FrappeWorkpace
-  path: github.com/vyogotech/frappe-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
   domain: vyogo.tech
   kind: SiteWorkspace
-  path: github.com/vyogotech/frappe-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
   domain: vyogo.tech
   kind: SiteDashboardChart
-  path: github.com/vyogotech/frappe-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
   domain: vyogo.tech
   kind: SiteDashboard
-  path: github.com/vyogotech/frappe-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
   domain: vyogo.tech
   kind: SiteJob
-  path: github.com/vyogotech/frappe-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
   domain: vyogo.tech
   kind: SiteBackup
-  path: github.com/vyogotech/frappe-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
 version: "3"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -12,7 +12,7 @@ import (
 
 func TestResolveProvider(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 	tests := []struct {
@@ -49,7 +49,7 @@ func TestResolveProvider(t *testing.T) {
 
 func TestKEDAProvider_IsAvailable(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 
 	// Since we use unstructured to check KEDA availability, the fake client
 	// might return an error if the resource is not registered in the scheme.
@@ -89,7 +89,7 @@ func TestGetHPAMetricName(t *testing.T) {
 
 func TestCleanupOtherProviders(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 
 	tests := []struct {
 		name            string
@@ -118,7 +118,7 @@ func TestCleanupOtherProviders(t *testing.T) {
 			client := fake.NewClientBuilder().WithScheme(scheme).Build()
 			ctx := context.TODO()
 
-			bench := &vyogotechv1alpha1.FrappeBench{
+			bench := &vyogotechv1.FrappeBench{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-bench",
 					Namespace: "default",

@@ -2,7 +2,7 @@
 # Prerequisites:
 # 1. Create FrappeSite (see basic-site.yaml)
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: dev-site-backup

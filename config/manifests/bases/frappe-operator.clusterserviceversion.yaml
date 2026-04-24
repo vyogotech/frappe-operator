@@ -1,0 +1,88 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: frappe-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: FrappeSite is the Schema for the frappesites API
+      displayName: Frappe Site
+      kind: FrappeSite
+      name: frappesites.vyogo.tech
+      version: v1
+    - description: FrappeWorkpace is the Schema for the frappeworkpaces API
+      displayName: Frappe Workpace
+      kind: FrappeWorkpace
+      name: frappeworkpaces.vyogo.tech
+      version: v1
+    - description: SiteBackup is the Schema for the sitebackups API
+      displayName: Site Backup
+      kind: SiteBackup
+      name: sitebackups.vyogo.tech
+      version: v1
+    - description: SiteDashboardChart is the Schema for the sitedashboardcharts API
+      displayName: Site Dashboard Chart
+      kind: SiteDashboardChart
+      name: sitedashboardcharts.vyogo.tech
+      version: v1
+    - description: SiteDashboard is the Schema for the sitedashboards API
+      displayName: Site Dashboard
+      kind: SiteDashboard
+      name: sitedashboards.vyogo.tech
+      version: v1
+    - description: SiteJob is the Schema for the sitejobs API
+      displayName: Site Job
+      kind: SiteJob
+      name: sitejobs.vyogo.tech
+      version: v1
+    - description: SiteUser is the Schema for the siteusers API
+      displayName: Site User
+      kind: SiteUser
+      name: siteusers.vyogo.tech
+      version: v1
+    - description: SiteWorkspace is the Schema for the siteworkspaces API
+      displayName: Site Workspace
+      kind: SiteWorkspace
+      name: siteworkspaces.vyogo.tech
+      version: v1
+  description: "Kubernetes Operator for Frappe and ERPNext frameworks allowing native, GitOps-ready application orchestration."
+  displayName: Frappe Operator
+  minKubeVersion: "1.23.0"
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - frappe
+  - erpnext
+  - operator
+  links:
+  - name: Frappe Operator
+    url: https://github.com/vyogotech/frappe-operator
+  maintainers:
+  - name: rakeshkumarmallam
+    email: rakesh@vyogo.tech
+  - name: varkrish
+    email: info@vyogo.tech
+  maturity: alpha
+  provider:
+    name: Vyogo Tech
+    url: https://vyogo.tech
+  version: 0.0.0

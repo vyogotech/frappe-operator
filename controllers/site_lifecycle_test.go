@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	routev1 "github.com/openshift/api/route/v1"
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 var _ = Describe("FrappeSite Lifecycle", func() {
@@ -40,8 +40,8 @@ var _ = Describe("FrappeSite Lifecycle", func() {
 		reconciler   *FrappeSiteReconciler
 		fakeClient   client.Client
 		fakeRecorder *record.FakeRecorder
-		site         *vyogotechv1alpha1.FrappeSite
-		bench        *vyogotechv1alpha1.FrappeBench
+		site         *vyogotechv1.FrappeSite
+		bench        *vyogotechv1.FrappeBench
 		namespace    string
 		scheme       *runtime.Scheme
 	)
@@ -51,30 +51,30 @@ var _ = Describe("FrappeSite Lifecycle", func() {
 		namespace = "test-namespace"
 		fakeRecorder = record.NewFakeRecorder(10)
 
-		bench = &vyogotechv1alpha1.FrappeBench{
+		bench = &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-bench",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
-				DomainConfig: &vyogotechv1alpha1.DomainConfig{
+			Spec: vyogotechv1.FrappeBenchSpec{
+				DomainConfig: &vyogotechv1.DomainConfig{
 					Suffix: ".example.com",
 				},
 			},
 		}
 
-		site = &vyogotechv1alpha1.FrappeSite{
+		site = &vyogotechv1.FrappeSite{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-site",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			Spec: vyogotechv1.FrappeSiteSpec{
 				SiteName: "mysite",
 			},
 		}
 
 		scheme = runtime.NewScheme()
-		_ = vyogotechv1alpha1.AddToScheme(scheme)
+		_ = vyogotechv1.AddToScheme(scheme)
 		_ = corev1.AddToScheme(scheme)
 		_ = networkingv1.AddToScheme(scheme)
 		_ = batchv1.AddToScheme(scheme)
@@ -115,7 +115,7 @@ var _ = Describe("FrappeSite Lifecycle", func() {
 		It("should provide correct security context for non-OpenShift", func() {
 			// Use explicit Security overrides so the test does not depend on env (FRAPPE_DEFAULT_UID/GID)
 			uid, gid := int64(1001), int64(0)
-			bench.Spec.Security = &vyogotechv1alpha1.SecurityConfig{
+			bench.Spec.Security = &vyogotechv1.SecurityConfig{
 				PodSecurityContext: &corev1.PodSecurityContext{
 					RunAsUser:    &uid,
 					RunAsGroup:   &gid,

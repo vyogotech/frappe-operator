@@ -22,7 +22,7 @@ This guide covers upgrading the Frappe Operator between versions.
    # Trigger backups for all sites
    for site in $(kubectl get frappesites -A -o jsonpath='{.items[*].metadata.name}'); do
      kubectl create -f - <<EOF
-   apiVersion: vyogo.tech/v1alpha1
+   apiVersion: vyogo.tech/v1
    kind: SiteBackup
    metadata:
      name: pre-upgrade-backup-${site}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func (r *FrappeSite) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/validate-vyogo-tech-v1alpha1-frappesite,mutating=false,failurePolicy=fail,sideEffects=None,groups=vyogo.tech,resources=frappesites,verbs=create;update,versions=v1alpha1,name=vfrappesite.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-vyogo-tech-v1-frappesite,mutating=false,failurePolicy=fail,sideEffects=None,groups=vyogo.tech,resources=frappesites,verbs=create;update,versions=v1,name=vfrappesite.kb.io,admissionReviewVersions=v1
 
 var _ webhook.CustomValidator = &FrappeSite{}
 

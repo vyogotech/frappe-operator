@@ -14,6 +14,7 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --platform) PLATFORM="$2"; shift 2 ;;
     --scenario) SCENARIO="$2"; shift 2 ;;
+    --skip-operator-install) SKIP_OPERATOR_INSTALL="true"; shift 1 ;;
     *) echo "Unknown option $1"; exit 1 ;;
   esac
 done
@@ -90,30 +91,36 @@ if [ "$SCENARIO" == "external" ]; then
     kubectl rollout status deployment/mariadb-external -n $NAMESPACE --timeout=2m
 fi
 
-# 5. Install Frappe Operator (Unified with MariaDB & KEDA)
-log "Building Helm dependencies..."
-helm dependency update ./helm/frappe-operator
+if [ "$SKIP_OPERATOR_INSTALL" != "true" ]; then
+    log "Building Helm dependencies..."
+    helm dependency update ./helm/frappe-operator
 
-log "Installing Frappe Operator (with MariaDB and KEDA dependencies)..."
-# If OPERATOR_IMAGE is provided (e.g. from CI), split it into repo and tag for Helm
-HELM_OPTS=("--set" "mariadb-operator.enabled=true" "--set" "keda.enabled=true" "--set" "operator.image.pullPolicy=IfNotPresent")
-if [ -n "$OPERATOR_IMAGE" ]; then
-    IFS=':' read -ra ADDR <<< "$OPERATOR_IMAGE"
-    HELM_OPTS+=("--set" "operator.image.repository=${ADDR[0]}")
-    if [ -n "${ADDR[1]}" ]; then
-        HELM_OPTS+=("--set" "operator.image.tag=${ADDR[1]}")
+    log "Installing Frappe Operator (with MariaDB and KEDA dependencies)..."
+    # If OPERATOR_IMAGE is provided (e.g. from CI), split it into repo and tag for Helm
+    HELM_OPTS=("--set" "mariadb-operator.enabled=true" "--set" "keda.enabled=true" "--set" "operator.image.pullPolicy=IfNotPresent")
+    if [ -n "$OPERATOR_IMAGE" ]; then
+        IFS=':' read -ra ADDR <<< "$OPERATOR_IMAGE"
+        HELM_OPTS+=("--set" "operator.image.repository=${ADDR[0]}")
+        if [ -n "${ADDR[1]}" ]; then
+            HELM_OPTS+=("--set" "operator.image.tag=${ADDR[1]}")
+        fi
     fi
+
+    helm upgrade --install frappe-operator ./helm/frappe-operator \
+      --namespace $OPERATOR_NAMESPACE \
+      --create-namespace \
+      "${HELM_OPTS[@]}"
+
+    log "Waiting for all operator components to be ready..."
+    for deploy in $(kubectl get deployment -n $OPERATOR_NAMESPACE -o name); do
+        kubectl rollout status "$deploy" -n "$OPERATOR_NAMESPACE" --timeout=2m
+    done
+else
+    log "Skipping operator Helm installation (--skip-operator-install specified). Verifying existing deployments..."
+    for deploy in $(kubectl get deployment -n $OPERATOR_NAMESPACE -o name); do
+        kubectl rollout status "$deploy" -n "$OPERATOR_NAMESPACE" --timeout=2m
+    done
 fi
-
-helm upgrade --install frappe-operator ./helm/frappe-operator \
-  --namespace $OPERATOR_NAMESPACE \
-  --create-namespace \
-  "${HELM_OPTS[@]}"
-
-log "Waiting for all operator components to be ready..."
-for deploy in $(kubectl get deployment -n $OPERATOR_NAMESPACE -o name); do
-    kubectl rollout status "$deploy" -n "$OPERATOR_NAMESPACE" --timeout=2m
-done
 
 log "Giving webhooks a moment to start listening..."
 sleep 15

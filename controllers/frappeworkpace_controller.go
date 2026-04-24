@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 // FrappeWorkpaceReconciler reconciles a FrappeWorkpace object
@@ -59,6 +59,6 @@ func (r *FrappeWorkpaceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 // SetupWithManager sets up the controller with the Manager.
 func (r *FrappeWorkpaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&vyogotechv1alpha1.FrappeWorkpace{}).
+		For(&vyogotechv1.FrappeWorkpace{}).
 		Complete(r)
 }

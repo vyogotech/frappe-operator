@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,17 +23,17 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// SiteUserSpec defines the desired state of SiteUser
-type SiteUserSpec struct {
+// SiteDashboardSpec defines the desired state of SiteDashboard
+type SiteDashboardSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of SiteUser. Edit siteuser_types.go to remove/update
+	// Foo is an example field of SiteDashboard. Edit sitedashboard_types.go to remove/update
 	Foo string `json:"foo,omitempty"`
 }
 
-// SiteUserStatus defines the observed state of SiteUser
-type SiteUserStatus struct {
+// SiteDashboardStatus defines the observed state of SiteDashboard
+type SiteDashboardStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -41,24 +41,24 @@ type SiteUserStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// SiteUser is the Schema for the siteusers API
-type SiteUser struct {
+// SiteDashboard is the Schema for the sitedashboards API
+type SiteDashboard struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SiteUserSpec   `json:"spec,omitempty"`
-	Status SiteUserStatus `json:"status,omitempty"`
+	Spec   SiteDashboardSpec   `json:"spec,omitempty"`
+	Status SiteDashboardStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// SiteUserList contains a list of SiteUser
-type SiteUserList struct {
+// SiteDashboardList contains a list of SiteDashboard
+type SiteDashboardList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SiteUser `json:"items"`
+	Items           []SiteDashboard `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&SiteUser{}, &SiteUserList{})
+	SchemeBuilder.Register(&SiteDashboard{}, &SiteDashboardList{})
 }

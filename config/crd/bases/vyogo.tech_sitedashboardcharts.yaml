@@ -14,7 +14,7 @@ spec:
     singular: sitedashboardchart
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: SiteDashboardChart is the Schema for the sitedashboardcharts

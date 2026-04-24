@@ -3,7 +3,7 @@
 # Uses Frappe Package Manager to install apps from repositories
 # Perfect for enterprise environments without Git access
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: fpm-bench

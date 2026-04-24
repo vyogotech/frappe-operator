@@ -3,7 +3,7 @@
 # 1. Create shared MariaDB instance (see mariadb-shared-instance.yaml)
 # 2. Create FrappeBench (see basic-bench.yaml)
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: dev-site

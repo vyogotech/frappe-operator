@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/circuitbreaker"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,16 +29,16 @@ import (
 // Provider defines the interface for database provisioning
 type Provider interface {
 	// EnsureDatabase ensures database and user exist for the site
-	EnsureDatabase(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseInfo, error)
+	EnsureDatabase(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseInfo, error)
 
 	// IsReady checks if database is ready
-	IsReady(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (bool, error)
+	IsReady(ctx context.Context, site *vyogotechv1.FrappeSite) (bool, error)
 
 	// GetCredentials retrieves database credentials
-	GetCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseCredentials, error)
+	GetCredentials(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseCredentials, error)
 
 	// Cleanup removes database resources (on site deletion)
-	Cleanup(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error
+	Cleanup(ctx context.Context, site *vyogotechv1.FrappeSite) error
 }
 
 // DatabaseInfo contains database connection information
@@ -57,7 +57,7 @@ type DatabaseCredentials struct {
 }
 
 // NewProvider returns the appropriate provider based on config
-func NewProvider(config vyogotechv1alpha1.DatabaseConfig, client client.Client, scheme *runtime.Scheme) (Provider, error) {
+func NewProvider(config vyogotechv1.DatabaseConfig, client client.Client, scheme *runtime.Scheme) (Provider, error) {
 	providerType := config.Provider
 	if providerType == "" {
 		if config.ConnectionSecretRef != nil {

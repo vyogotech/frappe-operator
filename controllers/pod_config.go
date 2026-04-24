@@ -1,12 +1,12 @@
 package controllers
 
 import (
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // applyPodConfig merges the desired pod configuration with initial labels and returns the resolved kubernetes spec fields.
-func applyPodConfig(config *vyogotechv1alpha1.PodConfig, initialLabels map[string]string) (
+func applyPodConfig(config *vyogotechv1.PodConfig, initialLabels map[string]string) (
 	nodeSelector map[string]string,
 	affinity *corev1.Affinity,
 	tolerations []corev1.Toleration,

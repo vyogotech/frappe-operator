@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,7 +22,7 @@ import (
 func TestFrappeBenchReconciler_Delete(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 
 	namespace := "test-ns"
 	benchName := "test-bench"
@@ -30,7 +30,7 @@ func TestFrappeBenchReconciler_Delete(t *testing.T) {
 	t.Run("Blocked by dependent sites", func(t *testing.T) {
 		// Bench with deletion timestamp and finalizer
 		now := metav1.Now()
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              benchName,
 				Namespace:         namespace,
@@ -40,13 +40,13 @@ func TestFrappeBenchReconciler_Delete(t *testing.T) {
 		}
 
 		// Dependent site
-		site := &vyogotechv1alpha1.FrappeSite{
+		site := &vyogotechv1.FrappeSite{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "site1",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeSiteSpec{
-				BenchRef: &vyogotechv1alpha1.NamespacedName{Name: benchName},
+			Spec: vyogotechv1.FrappeSiteSpec{
+				BenchRef: &vyogotechv1.NamespacedName{Name: benchName},
 			},
 		}
 
@@ -60,7 +60,7 @@ func TestFrappeBenchReconciler_Delete(t *testing.T) {
 		}
 
 		// Verify finalizer still exists
-		updatedBench := &vyogotechv1alpha1.FrappeBench{}
+		updatedBench := &vyogotechv1.FrappeBench{}
 		_ = client.Get(context.TODO(), types.NamespacedName{Name: benchName, Namespace: namespace}, updatedBench)
 		if len(updatedBench.Finalizers) == 0 {
 			t.Error("Finalizer removed but dependent sites exist")
@@ -82,7 +82,7 @@ func TestFrappeBenchReconciler_Delete(t *testing.T) {
 	t.Run("Successful cleanup", func(t *testing.T) {
 		// Bench with deletion timestamp and finalizer
 		now := metav1.Now()
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              benchName,
 				Namespace:         namespace,
@@ -155,7 +155,7 @@ func TestFrappeBenchReconciler_Delete(t *testing.T) {
 		}
 
 		// Verify finalizer removed (only if bench still exists in fake client)
-		updatedBench := &vyogotechv1alpha1.FrappeBench{}
+		updatedBench := &vyogotechv1.FrappeBench{}
 		err = client.Get(context.TODO(), types.NamespacedName{Name: benchName, Namespace: namespace}, updatedBench)
 		if err == nil && len(updatedBench.Finalizers) != 0 {
 			t.Error("Finalizer not removed")
