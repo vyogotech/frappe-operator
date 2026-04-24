@@ -235,7 +235,7 @@ After the operator is installed:
 ```yaml
 # my-site.yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: production-bench
@@ -246,7 +246,7 @@ spec:
     - name: erpnext
       source: image
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: my-company-site
@@ -332,7 +332,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main
 
 **3. Disable Ingress creation (if not needed):**
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: my-site

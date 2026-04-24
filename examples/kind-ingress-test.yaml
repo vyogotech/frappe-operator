@@ -1,5 +1,5 @@
 # Kind Cluster Test with Ingress
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: test-bench
@@ -51,7 +51,7 @@ spec:
   storageClassName: "standard"
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: test-site-v2

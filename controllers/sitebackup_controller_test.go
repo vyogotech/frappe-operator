@@ -31,17 +31,17 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 )
 
 func TestSiteBackupReconciler_getBenchImage(t *testing.T) {
 	r := &SiteBackupReconciler{}
 	t.Run("ImageConfig override", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		bench := &vyogotechv1.FrappeBench{
+			Spec: vyogotechv1.FrappeBenchSpec{
 				FrappeVersion: "15",
-				ImageConfig: &vyogotechv1alpha1.ImageConfig{
+				ImageConfig: &vyogotechv1.ImageConfig{
 					Repository: "myreg/erpnext",
 					Tag:        "v15",
 				},
@@ -53,8 +53,8 @@ func TestSiteBackupReconciler_getBenchImage(t *testing.T) {
 		}
 	})
 	t.Run("Default with version", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{FrappeVersion: "15"},
+		bench := &vyogotechv1.FrappeBench{
+			Spec: vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
 		}
 		img := r.getBenchImage(bench)
 		if img != "frappe/erpnext:15" {
@@ -65,7 +65,7 @@ func TestSiteBackupReconciler_getBenchImage(t *testing.T) {
 
 func TestSiteBackupReconciler_getSitesPVCName(t *testing.T) {
 	r := &SiteBackupReconciler{}
-	bench := &vyogotechv1alpha1.FrappeBench{ObjectMeta: metav1.ObjectMeta{Name: "my-bench"}}
+	bench := &vyogotechv1.FrappeBench{ObjectMeta: metav1.ObjectMeta{Name: "my-bench"}}
 	name := r.getSitesPVCName(bench)
 	if name != "my-bench-sites" {
 		t.Errorf("expected my-bench-sites, got %s", name)
@@ -75,7 +75,7 @@ func TestSiteBackupReconciler_getSitesPVCName(t *testing.T) {
 func TestSiteBackupReconciler_buildBackupArgs(t *testing.T) {
 	r := &SiteBackupReconciler{}
 	t.Run("minimal", func(t *testing.T) {
-		sb := &vyogotechv1alpha1.SiteBackup{Spec: vyogotechv1alpha1.SiteBackupSpec{Site: "site1.local"}}
+		sb := &vyogotechv1.SiteBackup{Spec: vyogotechv1.SiteBackupSpec{Site: "site1.local"}}
 		args := r.buildBackupArgs(sb)
 		if len(args) < 3 {
 			t.Fatalf("expected at least --site site1.local backup, got %v", args)
@@ -86,8 +86,8 @@ func TestSiteBackupReconciler_buildBackupArgs(t *testing.T) {
 	})
 	t.Run("with options", func(t *testing.T) {
 		withFiles := true
-		sb := &vyogotechv1alpha1.SiteBackup{
-			Spec: vyogotechv1alpha1.SiteBackupSpec{
+		sb := &vyogotechv1.SiteBackup{
+			Spec: vyogotechv1.SiteBackupSpec{
 				Site:       "site2.local",
 				WithFiles:  withFiles,
 				Compress:   true,
@@ -121,15 +121,15 @@ func TestSiteBackupReconciler_buildBackupJob(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(batchv1.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	r := &SiteBackupReconciler{Scheme: scheme}
-	siteBackup := &vyogotechv1alpha1.SiteBackup{
+	siteBackup := &vyogotechv1.SiteBackup{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-backup", Namespace: "default"},
-		Spec:       vyogotechv1alpha1.SiteBackupSpec{Site: "site.local"},
+		Spec:       vyogotechv1.SiteBackupSpec{Site: "site.local"},
 	}
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{Name: "bench", Namespace: "default"},
-		Spec:       vyogotechv1alpha1.FrappeBenchSpec{FrappeVersion: "15"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
 	}
 	job := r.buildBackupJob(siteBackup, bench)
 	if job.Name != "my-backup-backup" || job.Namespace != "default" {
@@ -151,19 +151,19 @@ func TestSiteBackupReconciler_buildBackupJob(t *testing.T) {
 
 func TestSiteBackupReconciler_updateSiteBackupStatus(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
-	siteBackup := &vyogotechv1alpha1.SiteBackup{
+	_ = vyogotechv1.AddToScheme(scheme)
+	siteBackup := &vyogotechv1.SiteBackup{
 		ObjectMeta: metav1.ObjectMeta{Name: "sb", Namespace: "default"},
-		Spec:       vyogotechv1alpha1.SiteBackupSpec{Site: "site.local"},
+		Spec:       vyogotechv1.SiteBackupSpec{Site: "site.local"},
 	}
-	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteBackup).WithStatusSubresource(&vyogotechv1alpha1.SiteBackup{}).Build()
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteBackup).WithStatusSubresource(&vyogotechv1.SiteBackup{}).Build()
 	r := &SiteBackupReconciler{Client: client}
 	ctx := context.Background()
 	err := r.updateSiteBackupStatus(ctx, siteBackup, "Running", "Backup in progress", "sb-backup")
 	if err != nil {
 		t.Fatalf("updateSiteBackupStatus: %v", err)
 	}
-	updated := &vyogotechv1alpha1.SiteBackup{}
+	updated := &vyogotechv1.SiteBackup{}
 	if err := client.Get(ctx, types.NamespacedName{Name: "sb", Namespace: "default"}, updated); err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -176,44 +176,44 @@ var _ = Describe("SiteBackup Controller", func() {
 	var (
 		ctx        context.Context
 		reconciler *SiteBackupReconciler
-		siteBackup *vyogotechv1alpha1.SiteBackup
-		site       *vyogotechv1alpha1.FrappeSite
-		bench      *vyogotechv1alpha1.FrappeBench
+		siteBackup *vyogotechv1.SiteBackup
+		site       *vyogotechv1.FrappeSite
+		bench      *vyogotechv1.FrappeBench
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		bench = &vyogotechv1alpha1.FrappeBench{
+		bench = &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-bench",
 				Namespace: "default",
 			},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+			Spec: vyogotechv1.FrappeBenchSpec{
 				FrappeVersion: "15",
 			},
 		}
 
-		site = &vyogotechv1alpha1.FrappeSite{
+		site = &vyogotechv1.FrappeSite{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-site",
 				Namespace: "default",
 			},
-			Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			Spec: vyogotechv1.FrappeSiteSpec{
 				SiteName: "test-site.local",
-				BenchRef: &vyogotechv1alpha1.NamespacedName{
+				BenchRef: &vyogotechv1.NamespacedName{
 					Name:      bench.Name,
 					Namespace: bench.Namespace,
 				},
 			},
 		}
 
-		siteBackup = &vyogotechv1alpha1.SiteBackup{
+		siteBackup = &vyogotechv1.SiteBackup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-backup",
 				Namespace: "default",
 			},
-			Spec: vyogotechv1alpha1.SiteBackupSpec{
+			Spec: vyogotechv1.SiteBackupSpec{
 				Site: "test-site.local",
 			},
 		}
@@ -226,6 +226,10 @@ var _ = Describe("SiteBackup Controller", func() {
 		// Create bench and site
 		Expect(k8sClient.Create(ctx, bench)).To(Succeed())
 		Expect(k8sClient.Create(ctx, site)).To(Succeed())
+
+		// Mock site status to Ready
+		site.Status.Phase = vyogotechv1.FrappeSitePhaseReady
+		Expect(k8sClient.Status().Update(ctx, site)).To(Succeed())
 	})
 
 	AfterEach(func() {

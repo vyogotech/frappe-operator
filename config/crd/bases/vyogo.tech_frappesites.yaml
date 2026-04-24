@@ -14,7 +14,7 @@ spec:
     singular: frappesite
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: FrappeSite is the Schema for the frappesites API

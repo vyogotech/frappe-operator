@@ -19,7 +19,7 @@ package main
 import (
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 func int32Ptr(n int32) *int32 { return &n }
@@ -28,7 +28,7 @@ func Test_effectiveMaxFromBenches(t *testing.T) {
 	tests := []struct {
 		name    string
 		fromEnv int
-		items   []vyogotechv1alpha1.FrappeBench
+		items   []vyogotechv1.FrappeBench
 		want    int
 	}{
 		{
@@ -40,40 +40,40 @@ func Test_effectiveMaxFromBenches(t *testing.T) {
 		{
 			name:    "empty list uses env",
 			fromEnv: 5,
-			items:   []vyogotechv1alpha1.FrappeBench{},
+			items:   []vyogotechv1.FrappeBench{},
 			want:    5,
 		},
 		{
 			name:    "bench override higher than env",
 			fromEnv: 10,
-			items: []vyogotechv1alpha1.FrappeBench{
-				{Spec: vyogotechv1alpha1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(20)}},
+			items: []vyogotechv1.FrappeBench{
+				{Spec: vyogotechv1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(20)}},
 			},
 			want: 20,
 		},
 		{
 			name:    "env higher than bench",
 			fromEnv: 15,
-			items: []vyogotechv1alpha1.FrappeBench{
-				{Spec: vyogotechv1alpha1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(5)}},
+			items: []vyogotechv1.FrappeBench{
+				{Spec: vyogotechv1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(5)}},
 			},
 			want: 15,
 		},
 		{
 			name:    "max across multiple benches",
 			fromEnv: 10,
-			items: []vyogotechv1alpha1.FrappeBench{
-				{Spec: vyogotechv1alpha1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(8)}},
-				{Spec: vyogotechv1alpha1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(25)}},
-				{Spec: vyogotechv1alpha1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(12)}},
+			items: []vyogotechv1.FrappeBench{
+				{Spec: vyogotechv1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(8)}},
+				{Spec: vyogotechv1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(25)}},
+				{Spec: vyogotechv1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(12)}},
 			},
 			want: 25,
 		},
 		{
 			name:    "nil siteReconcileConcurrency ignored",
 			fromEnv: 10,
-			items: []vyogotechv1alpha1.FrappeBench{
-				{Spec: vyogotechv1alpha1.FrappeBenchSpec{SiteReconcileConcurrency: nil}},
+			items: []vyogotechv1.FrappeBench{
+				{Spec: vyogotechv1.FrappeBenchSpec{SiteReconcileConcurrency: nil}},
 			},
 			want: 10,
 		},
@@ -92,8 +92,8 @@ func Test_effectiveMaxFromBenches(t *testing.T) {
 		{
 			name:    "bench zero ignored",
 			fromEnv: 10,
-			items: []vyogotechv1alpha1.FrappeBench{
-				{Spec: vyogotechv1alpha1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(0)}},
+			items: []vyogotechv1.FrappeBench{
+				{Spec: vyogotechv1.FrappeBenchSpec{SiteReconcileConcurrency: int32Ptr(0)}},
 			},
 			want: 10,
 		},

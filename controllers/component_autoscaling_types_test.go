@@ -3,12 +3,12 @@ package controllers
 import (
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 func TestComponentAutoscaling_Defaults(t *testing.T) {
-	// Note: These tests will fail until types are implemented in api/v1alpha1/shared_types.go
-	config := vyogotechv1alpha1.ComponentAutoscaling{}
+	// Note: These tests will fail until types are implemented in api/v1/shared_types.go
+	config := vyogotechv1.ComponentAutoscaling{}
 	if config.Enabled != nil {
 		t.Error("Expected nil Enabled by default")
 	}
@@ -20,7 +20,7 @@ func TestComponentAutoscaling_ProviderValidation(t *testing.T) {
 }
 
 func TestKEDAScalingConfig_TriggerTypes(t *testing.T) {
-	config := vyogotechv1alpha1.KEDAScalingConfig{
+	config := vyogotechv1.KEDAScalingConfig{
 		Trigger: "cpu",
 	}
 	if config.Trigger != "cpu" {
@@ -29,7 +29,7 @@ func TestKEDAScalingConfig_TriggerTypes(t *testing.T) {
 }
 
 func TestHPAScalingConfig_MetricTypes(t *testing.T) {
-	config := vyogotechv1alpha1.HPAScalingConfig{
+	config := vyogotechv1.HPAScalingConfig{
 		Metric: "cpu",
 	}
 	if config.Metric != "cpu" {

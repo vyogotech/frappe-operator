@@ -1,7 +1,7 @@
 # Example: FrappeBench with Advanced Component Autoscaling
 # Demonstrates mixing HPA (for web) and KEDA (for workers) in a single bench
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: advanced-autoscale-bench

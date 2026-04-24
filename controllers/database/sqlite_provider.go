@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -41,7 +41,7 @@ func NewSQLiteProvider(client client.Client, scheme *runtime.Scheme) Provider {
 }
 
 // EnsureDatabase for SQLite - database file is created by Frappe itself
-func (p *SQLiteProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseInfo, error) {
+func (p *SQLiteProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseInfo, error) {
 	// SQLite database is file-based, created automatically by bench new-site
 	// No external provisioning needed
 	return &DatabaseInfo{
@@ -53,13 +53,13 @@ func (p *SQLiteProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1al
 }
 
 // IsReady for SQLite - always ready (no external dependencies)
-func (p *SQLiteProvider) IsReady(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (bool, error) {
+func (p *SQLiteProvider) IsReady(ctx context.Context, site *vyogotechv1.FrappeSite) (bool, error) {
 	// SQLite has no external dependencies, so it's always ready
 	return true, nil
 }
 
 // GetCredentials for SQLite - no credentials needed
-func (p *SQLiteProvider) GetCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (*DatabaseCredentials, error) {
+func (p *SQLiteProvider) GetCredentials(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseCredentials, error) {
 	// SQLite doesn't require credentials
 	return &DatabaseCredentials{
 		Username:   "", // Not applicable
@@ -69,7 +69,7 @@ func (p *SQLiteProvider) GetCredentials(ctx context.Context, site *vyogotechv1al
 }
 
 // Cleanup for SQLite - database files are in PVC, cleaned up with site
-func (p *SQLiteProvider) Cleanup(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
+func (p *SQLiteProvider) Cleanup(ctx context.Context, site *vyogotechv1.FrappeSite) error {
 	// SQLite database files are stored in the site's PVC
 	// They will be cleaned up automatically when the site is deleted
 	return nil
