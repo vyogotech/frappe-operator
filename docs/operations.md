@@ -267,7 +267,7 @@ spec:
 Create a SiteBackup resource:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: daily-backup
@@ -312,7 +312,7 @@ You can also modify other parameters, such as the retention policy or backup des
 ```bash
 # Create manual backup
 kubectl create -f - <<EOF
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteJob
 metadata:
   name: manual-backup-$(date +%Y%m%d-%H%M%S)
@@ -493,7 +493,7 @@ kubectl patch frappebench prod-bench --type=merge -p '{
 Run migrations after updates:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteJob
 metadata:
   name: migrate-prod-site
@@ -561,7 +561,7 @@ spec:
 Override security context for specific benches:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: compliance-bench
@@ -769,7 +769,7 @@ kubectl exec -it <pod> -- bench --site <site> restore <backup>
 ```bash
 # Create new site from backup
 kubectl apply -f - <<EOF
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: recovered-site

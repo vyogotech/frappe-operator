@@ -1,7 +1,7 @@
 # Example: FrappeBench with KEDA-based Worker Autoscaling
 # Demonstrates queue-based scaling with scale-to-zero support
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: worker-autoscale-bench

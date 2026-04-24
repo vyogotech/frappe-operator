@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +31,7 @@ import (
 )
 
 // ensureWorkers ensures all Worker Deployments exist
-func (r *FrappeBenchReconciler) ensureWorkers(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureWorkers(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
 	workerTypes := []string{"default", "long", "short"}
@@ -79,7 +79,7 @@ func (r *FrappeBenchReconciler) ensureWorkers(ctx context.Context, bench *vyogot
 	return nil
 }
 
-func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, componentName, queue string, replicas int32, config *vyogotechv1alpha1.ComponentAutoscaling, providerManaged bool) error {
+func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, bench *vyogotechv1.FrappeBench, componentName, queue string, replicas int32, config *vyogotechv1.ComponentAutoscaling, providerManaged bool) error {
 	logger := log.FromContext(ctx)
 
 	deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)
@@ -166,7 +166,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 	return r.Create(ctx, deploy)
 }
 
-func (r *FrappeBenchReconciler) getWorkerResources(bench *vyogotechv1alpha1.FrappeBench, componentName string) corev1.ResourceRequirements {
+func (r *FrappeBenchReconciler) getWorkerResources(bench *vyogotechv1.FrappeBench, componentName string) corev1.ResourceRequirements {
 	switch componentName {
 	case "worker-long":
 		return r.getWorkerLongResources(bench)

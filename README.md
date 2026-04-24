@@ -30,7 +30,10 @@ A production-ready Kubernetes operator that automates deployment, scaling, and m
 ### Install
 
 ```bash
-# Install with Helm (recommended)
+# Install via Operator Lifecycle Manager (OLM) / OperatorHub (Recommended)
+kubectl create -f https://operatorhub.io/install/frappe-operator.yaml
+
+# Or install with Helm
 helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
 helm install frappe-operator frappe-operator/frappe-operator \
   --namespace frappe-operator-system \
@@ -95,6 +98,12 @@ kubectl get crd | Select-String -SimpleMatch ".vyogo.tech" | ForEach-Object {
 **2. Uninstall the Operator itself:**
 
 Depending on how you installed the operator, use one of the following methods to remove the controller manager, RBAC, and namespace:
+
+**If installed via OLM:**
+```bash
+kubectl delete subscription my-frappe-operator -n operators
+kubectl delete clusterserviceversion $(kubectl get csv -n operators | grep frappe-operator | awk '{print $1}') -n operators
+```
 
 **If installed via Helm:**
 ```bash

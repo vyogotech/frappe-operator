@@ -47,7 +47,7 @@ Perfect for local development and testing.
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: dev-bench
@@ -60,7 +60,7 @@ spec:
     autoDetect: false
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: mysite
@@ -94,7 +94,7 @@ Production-ready configuration with proper resources and TLS.
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: prod-bench
@@ -171,7 +171,7 @@ spec:
         memory: "6Gi"
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: erp-site
@@ -231,7 +231,7 @@ One bench serving multiple customer sites - cost-effective SaaS model.
 ```yaml
 ---
 # Shared bench for all customers
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: saas-bench
@@ -265,7 +265,7 @@ spec:
 
 ---
 # Customer 1 - Shared database
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: customer1
@@ -287,7 +287,7 @@ spec:
 
 ---
 # Customer 2 - Shared database
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: customer2
@@ -309,7 +309,7 @@ spec:
 
 ---
 # Customer 3 - Dedicated database (enterprise tier)
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: enterprise-customer
@@ -342,7 +342,7 @@ Complete isolation with dedicated resources.
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: acme-corp-bench
@@ -379,7 +379,7 @@ spec:
     storageSize: "50Gi"
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: acme-erp
@@ -434,7 +434,7 @@ Each site with its own custom domain.
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: multi-domain-bench
@@ -445,7 +445,7 @@ spec:
 
 ---
 # Site 1: Custom domain
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: site-company-a
@@ -467,7 +467,7 @@ spec:
 
 ---
 # Site 2: Different custom domain
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: site-company-b
@@ -498,7 +498,7 @@ High-availability configuration with horizontal pod autoscaling.
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: ha-bench
@@ -531,7 +531,7 @@ spec:
     maxMemory: "8gb"
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: ha-site
@@ -626,7 +626,7 @@ This example shows autoscaling for **all components** - web (HPA) and workers (K
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: autoscaling-bench
@@ -724,7 +724,7 @@ spec:
       limits: { cpu: "1", memory: "2Gi" }
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: autoscaling-site
@@ -744,7 +744,7 @@ spec:
 Aggressive scale-to-zero for development environments to minimize costs:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: dev-autoscaling
@@ -850,7 +850,7 @@ Create an immediate backup of a site:
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: backup-demo-bench
@@ -861,7 +861,7 @@ spec:
       source: image
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: backup-demo-site
@@ -874,7 +874,7 @@ spec:
 
 ---
 # One-time backup with files and compression
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: demo-site-backup
@@ -891,7 +891,7 @@ Automatic daily backups at 2 AM:
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: demo-site-daily-backup
@@ -908,7 +908,7 @@ Backup only specific DocTypes while excluding sensitive data:
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: demo-site-selective-backup
@@ -940,7 +940,7 @@ Specify custom paths for different backup components:
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: demo-site-custom-paths
@@ -1009,7 +1009,7 @@ status:
 ```yaml
 ---
 # Daily full backup (2 AM)
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: prod-daily-full-backup
@@ -1021,7 +1021,7 @@ spec:
 
 ---
 # Hourly selective backup (business data only)
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: prod-hourly-business-backup
@@ -1060,7 +1060,7 @@ Connect multiple sites to a shared external database server with default bench c
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: external-db-bench
@@ -1078,7 +1078,7 @@ spec:
       name: shared-db-creds
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: site1-external
@@ -1096,7 +1096,7 @@ Each site with its own specific external host and credentials.
 
 ```yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: enterprise-site
@@ -1139,7 +1139,7 @@ Small, medium, and large resource tiers.
 #### Small Tier (Development/Testing)
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: small-bench
@@ -1172,7 +1172,7 @@ spec:
 #### Medium Tier (Small Production)
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: medium-bench
@@ -1205,7 +1205,7 @@ spec:
 #### Large Tier (Production)
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: large-bench

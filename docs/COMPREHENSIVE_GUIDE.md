@@ -253,7 +253,7 @@ FrappeBench (1)
 ### Creating a FrappeBench
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: production-bench
@@ -278,7 +278,7 @@ spec:
 ### Creating a FrappeSite
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: customer-site
@@ -345,7 +345,7 @@ data:
 Override defaults per bench:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: custom-bench
@@ -389,7 +389,7 @@ data:
 Multiple sites share one MariaDB instance:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: shared-bench
@@ -409,7 +409,7 @@ spec:
 Each site gets its own MariaDB instance:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: isolated-site
@@ -427,7 +427,7 @@ spec:
 Connect to RDS, Cloud SQL, or any external database:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: external-db-site
@@ -460,7 +460,7 @@ stringData:
 ### PostgreSQL Support
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: postgres-site
@@ -564,7 +564,7 @@ kubectl get secret <site-name>-mariadb-root -o jsonpath='{.data.password}' | bas
 Configure replica counts for each component:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: scaled-bench
@@ -582,7 +582,7 @@ spec:
 Scale workers based on queue length:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: autoscaled-bench
@@ -606,7 +606,7 @@ spec:
 Set CPU and memory limits:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: resource-limited-bench
@@ -655,7 +655,7 @@ redisConfig:
 Configure pod and container security:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: secure-bench
@@ -687,7 +687,7 @@ type: kubernetes.io/dockerconfigjson
 data:
   .dockerconfigjson: <base64-encoded-docker-config>
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: private-registry-bench
@@ -704,7 +704,7 @@ spec:
 Enable TLS for sites:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: secure-site
@@ -762,7 +762,7 @@ spec:
 Update Frappe version or apps:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: production-bench
@@ -789,7 +789,7 @@ kubectl rollout status deployment/production-bench-gunicorn
 Create a backup:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: daily-backup
@@ -809,7 +809,7 @@ spec:
 ### Restoring from Backup
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: restore-job
@@ -1049,7 +1049,7 @@ kubectl get frappesite customer-site -o yaml | grep -A 20 status
 ### FrappeBench Spec
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: example-bench
@@ -1115,7 +1115,7 @@ spec:
 ### FrappeSite Spec
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: example-site
@@ -1203,7 +1203,7 @@ status:
 
 **Bench:**
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: basic-bench
@@ -1216,7 +1216,7 @@ spec:
 
 **Site:**
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: basic-site
@@ -1232,7 +1232,7 @@ spec:
 
 **High-Availability Bench:**
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: prod-bench
@@ -1264,7 +1264,7 @@ spec:
 
 **Production Site:**
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: prod-site
@@ -1284,7 +1284,7 @@ spec:
 
 **OpenShift Bench:**
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: ocp-bench
@@ -1303,7 +1303,7 @@ spec:
 
 **OpenShift Site with Route:**
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: ocp-site
@@ -1332,7 +1332,7 @@ stringData:
   username: "frappe_user"
   password: "secure_password"
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: rds-site

@@ -8,7 +8,7 @@ import (
 	"context"
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -19,11 +19,11 @@ import (
 func TestPostgresProvider_NotImplemented(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	p := NewPostgresProvider(client, scheme)
 	ctx := context.Background()
-	site := &vyogotechv1alpha1.FrappeSite{ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"}}
+	site := &vyogotechv1.FrappeSite{ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"}}
 
 	_, err := p.EnsureDatabase(ctx, site)
 	if err == nil {

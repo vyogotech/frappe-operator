@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: scaling-bench
@@ -20,7 +20,7 @@ spec:
       provider: hpa
   storageSize: 2Gi
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: scaling-site

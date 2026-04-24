@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +30,7 @@ import (
 )
 
 // ensureRedis ensures the Redis StatefulSet and Service exist
-func (r *FrappeBenchReconciler) ensureRedis(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureRedis(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	// If external Redis is enabled, skip provisioning local resources
 	if bench.Spec.RedisConfig != nil && bench.Spec.RedisConfig.External {
 		log.FromContext(ctx).Info("External Redis enabled, skipping local provisioning", "bench", bench.Name)
@@ -50,7 +50,7 @@ func (r *FrappeBenchReconciler) ensureRedis(ctx context.Context, bench *vyogotec
 	return r.ensureRedisStatefulSet(ctx, bench, "redis-queue")
 }
 
-func (r *FrappeBenchReconciler) ensureRedisService(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, serviceType string) error {
+func (r *FrappeBenchReconciler) ensureRedisService(ctx context.Context, bench *vyogotechv1.FrappeBench, serviceType string) error {
 	logger := log.FromContext(ctx)
 
 	svcName := fmt.Sprintf("%s-%s", bench.Name, serviceType)
@@ -80,7 +80,7 @@ func (r *FrappeBenchReconciler) ensureRedisService(ctx context.Context, bench *v
 	return r.Create(ctx, svc)
 }
 
-func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, role string) error {
+func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, bench *vyogotechv1.FrappeBench, role string) error {
 	logger := log.FromContext(ctx)
 
 	stsName := fmt.Sprintf("%s-%s", bench.Name, role)
@@ -135,7 +135,7 @@ func (r *FrappeBenchReconciler) ensureRedisStatefulSet(ctx context.Context, benc
 }
 
 // resolveRedisCacheURL returns the Redis cache connection URL for the bench
-func (r *FrappeBenchReconciler) resolveRedisCacheURL(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+func (r *FrappeBenchReconciler) resolveRedisCacheURL(ctx context.Context, bench *vyogotechv1.FrappeBench) string {
 	// Default internal Redis URL
 	host := fmt.Sprintf("%s-redis-cache", bench.Name)
 	port := int32(6379)
@@ -172,7 +172,7 @@ func (r *FrappeBenchReconciler) resolveRedisCacheURL(ctx context.Context, bench 
 }
 
 // resolveRedisQueueURL returns the Redis queue connection URL for the bench
-func (r *FrappeBenchReconciler) resolveRedisQueueURL(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+func (r *FrappeBenchReconciler) resolveRedisQueueURL(ctx context.Context, bench *vyogotechv1.FrappeBench) string {
 	// Default internal Redis URL
 	host := fmt.Sprintf("%s-redis-queue", bench.Name)
 	port := int32(6379)

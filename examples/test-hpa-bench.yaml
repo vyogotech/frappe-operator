@@ -1,6 +1,6 @@
 # Simple FrappeBench with HPA autoscaling for E2E testing
 # Generated from configuration: /home/varun/projects/frappe-operator/test-config.conf
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: test-bench-hpa
