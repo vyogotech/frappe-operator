@@ -5,7 +5,7 @@ kubectl get frappebenches <span class="nt">-A</span> <span class="nt">-o</span> 
 <span class="c"># Trigger backups for all sites</span>
 <span class="k">for </span>site <span class="k">in</span> <span class="si">$(</span>kubectl get frappesites <span class="nt">-A</span> <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.items[*].metadata.name}'</span><span class="si">)</span><span class="p">;</span> <span class="k">do
   </span>kubectl create <span class="nt">-f</span> - <span class="o">&lt;&lt;</span><span class="no">EOF</span><span class="sh">
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: pre-upgrade-backup-</span><span class="k">${</span><span class="nv">site</span><span class="k">}</span><span class="sh">

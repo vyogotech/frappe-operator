@@ -121,7 +121,7 @@ spec:
 A Bench represents your application environment (source code and common infrastructure). Create `my-bench.yaml`:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: prod-bench
@@ -150,7 +150,7 @@ stringData:
   password: "AdminPassword123"  # CHANGE THIS
 ---
 # 2. The Site resource
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: prod-site

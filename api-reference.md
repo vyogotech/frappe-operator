@@ -4,7 +4,7 @@ Complete specification of Frappe Operator Custom Resource Definitions (CRDs).
 
 ## FrappeBench
 
-**API Group:** `vyogo.tech/v1alpha1`  
+**API Group:** `vyogo.tech/v1`  
 **Kind:** `FrappeBench`
 
 A FrappeBench represents a Frappe bench environment with shared infrastructure.
@@ -12,7 +12,7 @@ A FrappeBench represents a Frappe bench environment with shared infrastructure.
 ### Spec
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: <bench-name>
@@ -187,7 +187,7 @@ Redis or DragonFly configuration.
 
 ## FrappeSite
 
-**API Group:** `vyogo.tech/v1alpha1`  
+**API Group:** `vyogo.tech/v1`  
 **Kind:** `FrappeSite`
 
 A FrappeSite represents an individual Frappe site.
@@ -195,7 +195,7 @@ A FrappeSite represents an individual Frappe site.
 ### Spec
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: <site-name>
@@ -440,7 +440,7 @@ ingress:
 
 ## SiteUser
 
-**API Group:** `vyogo.tech/v1alpha1`  
+**API Group:** `vyogo.tech/v1`  
 **Kind:** `SiteUser`
 
 Manages users on a Frappe site.
@@ -448,7 +448,7 @@ Manages users on a Frappe site.
 ### Spec
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteUser
 metadata:
   name: <user-name>
@@ -481,7 +481,7 @@ spec:
 
 ## SiteWorkspace
 
-**API Group:** `vyogo.tech/v1alpha1`  
+**API Group:** `vyogo.tech/v1`  
 **Kind:** `SiteWorkspace`
 
 Creates a workspace on a site.
@@ -489,7 +489,7 @@ Creates a workspace on a site.
 ### Spec
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteWorkspace
 metadata:
   name: <workspace-name>
@@ -512,7 +512,7 @@ spec:
 
 ## SiteDashboard
 
-**API Group:** `vyogo.tech/v1alpha1`  
+**API Group:** `vyogo.tech/v1`  
 **Kind:** `SiteDashboard`
 
 Creates a dashboard on a site.
@@ -520,7 +520,7 @@ Creates a dashboard on a site.
 ### Spec
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteDashboard
 metadata:
   name: <dashboard-name>
@@ -543,7 +543,7 @@ spec:
 
 ## SiteDashboardChart
 
-**API Group:** `vyogo.tech/v1alpha1`  
+**API Group:** `vyogo.tech/v1`  
 **Kind:** `SiteDashboardChart`
 
 Creates a dashboard chart on a site.
@@ -551,7 +551,7 @@ Creates a dashboard chart on a site.
 ### Spec
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteDashboardChart
 metadata:
   name: <chart-name>
@@ -571,7 +571,7 @@ spec:
 
 ## SiteBackup
 
-**API Group:** `vyogo.tech/v1alpha1`  
+**API Group:** `vyogo.tech/v1`  
 **Kind:** `SiteBackup`
 
 Creates automated backups of Frappe sites using the `bench backup` command.
@@ -579,7 +579,7 @@ Creates automated backups of Frappe sites using the `bench backup` command.
 ### Spec
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: <backup-name>
@@ -705,7 +705,7 @@ status:
 
 ## SiteJob
 
-**API Group:** `vyogo.tech/v1alpha1`  
+**API Group:** `vyogo.tech/v1`  
 **Kind:** `SiteJob`
 
 Executes custom jobs on a site.
@@ -713,7 +713,7 @@ Executes custom jobs on a site.
 ### Spec
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteJob
 metadata:
   name: <job-name>
@@ -779,7 +779,7 @@ secretName: string         # TLS secret name (optional)
 ### Minimal Bench and Site
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: dev-bench
@@ -787,7 +787,7 @@ spec:
   frappeVersion: "version-15"
   appsJSON: '["erpnext"]'
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: mysite
@@ -802,7 +802,7 @@ spec:
 ### Production Setup
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: prod-bench
@@ -825,7 +825,7 @@ spec:
       requests: {cpu: "1", memory: "2Gi"}
       limits: {cpu: "2", memory: "4Gi"}
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: prod-site

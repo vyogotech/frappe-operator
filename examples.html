@@ -3,7 +3,7 @@
 <span class="nb">cd </span>frappe-operator/examples
 kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
 </code></pre></div></div><hr /> <h2 id="development-environment"> <a href="#development-environment" class="anchor-heading" aria-labelledby="development-environment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Development Environment </h2> <h3 id="minimal-local-setup"> <a href="#minimal-local-setup" class="anchor-heading" aria-labelledby="minimal-local-setup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Minimal Local Setup </h3> <p>Perfect for local development and testing.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">dev-bench</span>
@@ -16,7 +16,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
     <span class="na">autoDetect</span><span class="pi">:</span> <span class="no">false</span>
 
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">mysite</span>
@@ -34,7 +34,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
 <span class="c"># Add to /etc/hosts: 127.0.0.1 mysite.local</span>
 <span class="c"># Access: http://mysite.local:8080</span>
 </code></pre></div></div><hr /> <h2 id="production-deployment"> <a href="#production-deployment" class="anchor-heading" aria-labelledby="production-deployment"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Production Deployment </h2> <h3 id="single-site-production-setup"> <a href="#single-site-production-setup" class="anchor-heading" aria-labelledby="single-site-production-setup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Single-Site Production Setup </h3> <p>Production-ready configuration with proper resources and TLS.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">prod-bench</span>
@@ -111,7 +111,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
         <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">6Gi"</span>
 
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">erp-site</span>
@@ -160,7 +160,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
   <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">YourSecurePassword123!"</span>
 </code></pre></div></div><hr /> <h2 id="multi-tenant-saas"> <a href="#multi-tenant-saas" class="anchor-heading" aria-labelledby="multi-tenant-saas"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Multi-Tenant SaaS </h2> <h3 id="shared-bench-with-multiple-customer-sites"> <a href="#shared-bench-with-multiple-customer-sites" class="anchor-heading" aria-labelledby="shared-bench-with-multiple-customer-sites"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Shared Bench with Multiple Customer Sites </h3> <p>One bench serving multiple customer sites - cost-effective SaaS model.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
 <span class="c1"># Shared bench for all customers</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">saas-bench</span>
@@ -194,7 +194,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
 
 <span class="nn">---</span>
 <span class="c1"># Customer 1 - Shared database</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">customer1</span>
@@ -216,7 +216,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
 
 <span class="nn">---</span>
 <span class="c1"># Customer 2 - Shared database</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">customer2</span>
@@ -238,7 +238,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
 
 <span class="nn">---</span>
 <span class="c1"># Customer 3 - Dedicated database (enterprise tier)</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">enterprise-customer</span>
@@ -260,7 +260,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
       <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
       <span class="na">certManagerIssuer</span><span class="pi">:</span> <span class="s2">"</span><span class="s">letsencrypt-prod"</span>
 </code></pre></div></div><hr /> <h2 id="enterprise-setup"> <a href="#enterprise-setup" class="anchor-heading" aria-labelledby="enterprise-setup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Enterprise Setup </h2> <h3 id="dedicated-bench-for-enterprise-customer"> <a href="#dedicated-bench-for-enterprise-customer" class="anchor-heading" aria-labelledby="dedicated-bench-for-enterprise-customer"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Dedicated Bench for Enterprise Customer </h3> <p>Complete isolation with dedicated resources.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">acme-corp-bench</span>
@@ -297,7 +297,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
     <span class="na">storageSize</span><span class="pi">:</span> <span class="s2">"</span><span class="s">50Gi"</span>
 
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">acme-erp</span>
@@ -341,7 +341,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
   <span class="na">username</span><span class="pi">:</span> <span class="s2">"</span><span class="s">acme_admin@acme-mysql"</span>
   <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">YourAzureMySQLPassword"</span>
 </code></pre></div></div><hr /> <h2 id="custom-domains"> <a href="#custom-domains" class="anchor-heading" aria-labelledby="custom-domains"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Custom Domains </h2> <h3 id="custom-domain-per-site"> <a href="#custom-domain-per-site" class="anchor-heading" aria-labelledby="custom-domain-per-site"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Custom Domain per Site </h3> <p>Each site with its own custom domain.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">multi-domain-bench</span>
@@ -352,7 +352,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
 
 <span class="nn">---</span>
 <span class="c1"># Site 1: Custom domain</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">site-company-a</span>
@@ -374,7 +374,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
 
 <span class="nn">---</span>
 <span class="c1"># Site 2: Different custom domain</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">site-company-b</span>
@@ -394,7 +394,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
       <span class="na">enabled</span><span class="pi">:</span> <span class="no">true</span>
       <span class="na">certManagerIssuer</span><span class="pi">:</span> <span class="s2">"</span><span class="s">letsencrypt-prod"</span>
 </code></pre></div></div><hr /> <h2 id="high-availability"> <a href="#high-availability" class="anchor-heading" aria-labelledby="high-availability"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> High Availability </h2> <h3 id="ha-setup-with-auto-scaling"> <a href="#ha-setup-with-auto-scaling" class="anchor-heading" aria-labelledby="ha-setup-with-auto-scaling"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> HA Setup with Auto-Scaling </h3> <p>High-availability configuration with horizontal pod autoscaling.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">ha-bench</span>
@@ -427,7 +427,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
     <span class="na">maxMemory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">8gb"</span>
 
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">ha-site</span>
@@ -499,7 +499,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
           <span class="na">averageUtilization</span><span class="pi">:</span> <span class="m">75</span>
 </code></pre></div></div><hr /> <h2 id="component-autoscaling"> <a href="#component-autoscaling" class="anchor-heading" aria-labelledby="component-autoscaling"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Component Autoscaling </h2> <h3 id="provider-agnostic-autoscaling-for-all-components"> <a href="#provider-agnostic-autoscaling-for-all-components" class="anchor-heading" aria-labelledby="provider-agnostic-autoscaling-for-all-components"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Provider-Agnostic Autoscaling for All Components </h3> <p><strong>⚡ NEW in v3.0.0</strong>: Unified autoscaling for web components (HPA) and workers (KEDA) with provider abstraction.</p> <h4 id="prerequisites"> <a href="#prerequisites" class="anchor-heading" aria-labelledby="prerequisites"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Prerequisites </h4> <p><strong>HPA</strong>: Built-in to Kubernetes ✅<br /> <strong>KEDA</strong>: Automatically installed by <code class="language-plaintext highlighter-rouge">install.sh</code>, or manual installation:</p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl apply <span class="nt">-f</span> https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
 </code></pre></div></div> <h4 id="production-setup-with-full-autoscaling"> <a href="#production-setup-with-full-autoscaling" class="anchor-heading" aria-labelledby="production-setup-with-full-autoscaling"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Production Setup with Full Autoscaling </h4> <p>This example shows autoscaling for <strong>all components</strong> - web (HPA) and workers (KEDA):</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">autoscaling-bench</span>
@@ -597,7 +597,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
       <span class="na">limits</span><span class="pi">:</span> <span class="pi">{</span> <span class="nv">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1"</span><span class="pi">,</span> <span class="nv">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2Gi"</span> <span class="pi">}</span>
 
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">autoscaling-site</span>
@@ -610,7 +610,7 @@ kubectl apply <span class="nt">-f</span> minimal-bench-and-site.yaml
     <span class="na">provider</span><span class="pi">:</span> <span class="s">mariadb</span>
     <span class="na">mode</span><span class="pi">:</span> <span class="s">shared</span>
   <span class="na">domain</span><span class="pi">:</span> <span class="s2">"</span><span class="s">app.example.com"</span>
-</code></pre></div></div> <h4 id="cost-optimized-development-setup"> <a href="#cost-optimized-development-setup" class="anchor-heading" aria-labelledby="cost-optimized-development-setup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Cost-Optimized Development Setup </h4> <p>Aggressive scale-to-zero for development environments to minimize costs:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h4 id="cost-optimized-development-setup"> <a href="#cost-optimized-development-setup" class="anchor-heading" aria-labelledby="cost-optimized-development-setup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Cost-Optimized Development Setup </h4> <p>Aggressive scale-to-zero for development environments to minimize costs:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">dev-autoscaling</span>
@@ -672,7 +672,7 @@ kubectl <span class="nb">exec</span> <span class="nt">-n</span> production deplo
 <span class="c"># Watch worker pods scaling</span>
 kubectl get pods <span class="nt">-n</span> production <span class="nt">-l</span> <span class="nv">component</span><span class="o">=</span>worker-short <span class="nt">-w</span>
 </code></pre></div></div> <h4 id="benefits"> <a href="#benefits" class="anchor-heading" aria-labelledby="benefits"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Benefits </h4> <ul> <li>💰 <strong>Cost Savings</strong>: Workers scale to zero when idle (especially useful for dev/staging)</li> <li>📈 <strong>Auto-scaling</strong>: Automatically handles traffic spikes</li> <li>🎯 <strong>Queue-based</strong>: Scales based on actual job queue length, not CPU/memory</li> <li>⚙️ <strong>Configurable</strong>: Fine-tune scaling behavior per queue type</li> <li>🚀 <strong>Production-ready</strong>: Tested end-to-end in production environments</li> </ul> <h4 id="configuration-parameters"> <a href="#configuration-parameters" class="anchor-heading" aria-labelledby="configuration-parameters"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Configuration Parameters </h4> <div class="table-wrapper"><table> <thead> <tr> <th>Parameter</th> <th>Description</th> <th>Default</th> <th>Recommended</th> </tr> </thead> <tbody> <tr> <td><code class="language-plaintext highlighter-rouge">enabled</code></td> <td>Enable autoscaling</td> <td><code class="language-plaintext highlighter-rouge">false</code></td> <td><code class="language-plaintext highlighter-rouge">true</code> for production</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">provider</code></td> <td>Scaling provider (keda or hpa)</td> <td><code class="language-plaintext highlighter-rouge">hpa</code></td> <td><code class="language-plaintext highlighter-rouge">keda</code> for workers, <code class="language-plaintext highlighter-rouge">hpa</code> for web</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">minReplicas</code></td> <td>Minimum replicas (0 for scale-to-zero)</td> <td><code class="language-plaintext highlighter-rouge">1</code></td> <td><code class="language-plaintext highlighter-rouge">0</code> for dev, <code class="language-plaintext highlighter-rouge">1+</code> for prod</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">maxReplicas</code></td> <td>Maximum replicas</td> <td><code class="language-plaintext highlighter-rouge">10</code></td> <td>Based on load</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">staticReplicas</code></td> <td>Fixed replicas when disabled</td> <td><code class="language-plaintext highlighter-rouge">1</code></td> <td>Based on component</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">pollingInterval</code></td> <td>Metric check frequency (seconds)</td> <td><code class="language-plaintext highlighter-rouge">30</code></td> <td><code class="language-plaintext highlighter-rouge">10-30</code></td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">cooldownPeriod</code></td> <td>Wait before scale down (seconds)</td> <td><code class="language-plaintext highlighter-rouge">60</code></td> <td><code class="language-plaintext highlighter-rouge">30-60</code> for workers</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">keda.trigger</code></td> <td>KEDA trigger type (cpu/memory/redis)</td> <td><code class="language-plaintext highlighter-rouge">cpu</code></td> <td><code class="language-plaintext highlighter-rouge">redis</code> for workers</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">keda.targetValue</code></td> <td>Jobs per worker threshold</td> <td><code class="language-plaintext highlighter-rouge">"5"</code></td> <td><code class="language-plaintext highlighter-rouge">"2-5"</code> for short, <code class="language-plaintext highlighter-rouge">"5-10"</code> for long</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">hpa.metric</code></td> <td>HPA metric type (cpu/memory)</td> <td><code class="language-plaintext highlighter-rouge">cpu</code></td> <td><code class="language-plaintext highlighter-rouge">cpu</code> for web</td> </tr> <tr> <td><code class="language-plaintext highlighter-rouge">hpa.targetUtilization</code></td> <td>Target percentage (1-100)</td> <td><code class="language-plaintext highlighter-rouge">70</code></td> <td><code class="language-plaintext highlighter-rouge">70-80</code></td> </tr> </tbody> </table></div> <blockquote> <p><strong>Note</strong>: The new <code class="language-plaintext highlighter-rouge">componentAutoscaling</code> API replaces the deprecated <code class="language-plaintext highlighter-rouge">workerAutoscaling</code> API from v1.x.</p> </blockquote><hr /> <h2 id="site-backup-management"> <a href="#site-backup-management" class="anchor-heading" aria-labelledby="site-backup-management"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Site Backup Management </h2> <p><strong>⚡ NEW</strong>: Automated site backups using the <code class="language-plaintext highlighter-rouge">bench backup</code> command with full control over backup options and scheduling.</p> <h3 id="one-time-backup"> <a href="#one-time-backup" class="anchor-heading" aria-labelledby="one-time-backup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> One-Time Backup </h3> <p>Create an immediate backup of a site:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">backup-demo-bench</span>
@@ -683,7 +683,7 @@ kubectl get pods <span class="nt">-n</span> production <span class="nt">-l</span
       <span class="na">source</span><span class="pi">:</span> <span class="s">image</span>
 
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">backup-demo-site</span>
@@ -696,7 +696,7 @@ kubectl get pods <span class="nt">-n</span> production <span class="nt">-l</span
 
 <span class="nn">---</span>
 <span class="c1"># One-time backup with files and compression</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">demo-site-backup</span>
@@ -706,7 +706,7 @@ kubectl get pods <span class="nt">-n</span> production <span class="nt">-l</span
   <span class="na">compress</span><span class="pi">:</span> <span class="no">true</span> <span class="c1"># Compress backup files</span>
   <span class="na">verbose</span><span class="pi">:</span> <span class="no">true</span> <span class="c1"># Enable verbose output</span>
 </code></pre></div></div> <h3 id="scheduled-daily-backup"> <a href="#scheduled-daily-backup" class="anchor-heading" aria-labelledby="scheduled-daily-backup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Scheduled Daily Backup </h3> <p>Automatic daily backups at 2 AM:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">demo-site-daily-backup</span>
@@ -716,7 +716,7 @@ kubectl get pods <span class="nt">-n</span> production <span class="nt">-l</span
   <span class="na">withFiles</span><span class="pi">:</span> <span class="no">true</span>
   <span class="na">compress</span><span class="pi">:</span> <span class="no">true</span>
 </code></pre></div></div> <h3 id="selective-backup-with-filtering"> <a href="#selective-backup-with-filtering" class="anchor-heading" aria-labelledby="selective-backup-with-filtering"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Selective Backup with Filtering </h3> <p>Backup only specific DocTypes while excluding sensitive data:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">demo-site-selective-backup</span>
@@ -741,7 +741,7 @@ kubectl get pods <span class="nt">-n</span> production <span class="nt">-l</span
 
   <span class="na">verbose</span><span class="pi">:</span> <span class="no">true</span>
 </code></pre></div></div> <h3 id="custom-backup-paths"> <a href="#custom-backup-paths" class="anchor-heading" aria-labelledby="custom-backup-paths"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Custom Backup Paths </h3> <p>Specify custom paths for different backup components:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">demo-site-custom-paths</span>
@@ -777,7 +777,7 @@ kubectl get cronjob demo-site-daily-backup-backup
   <span class="na">message</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Backup</span><span class="nv"> </span><span class="s">completed</span><span class="nv"> </span><span class="s">successfully"</span>
 </code></pre></div></div> <h3 id="production-backup-strategy"> <a href="#production-backup-strategy" class="anchor-heading" aria-labelledby="production-backup-strategy"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Production Backup Strategy </h3> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
 <span class="c1"># Daily full backup (2 AM)</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">prod-daily-full-backup</span>
@@ -789,7 +789,7 @@ kubectl get cronjob demo-site-daily-backup-backup
 
 <span class="nn">---</span>
 <span class="c1"># Hourly selective backup (business data only)</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">prod-hourly-business-backup</span>
@@ -804,7 +804,7 @@ kubectl get cronjob demo-site-daily-backup-backup
     <span class="pi">-</span> <span class="s2">"</span><span class="s">Supplier"</span>
   <span class="na">compress</span><span class="pi">:</span> <span class="no">true</span>
 </code></pre></div></div> <h3 id="benefits-1"> <a href="#benefits-1" class="anchor-heading" aria-labelledby="benefits-1"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Benefits </h3> <ul> <li>🔄 <strong>Automated</strong>: Schedule recurring backups or trigger manual ones</li> <li>🎯 <strong>Flexible</strong>: Full control over what gets backed up</li> <li>📦 <strong>Efficient</strong>: Selective backups reduce storage and time</li> <li>🔒 <strong>Secure</strong>: Exclude sensitive data from backups</li> <li>📊 <strong>Monitored</strong>: Track backup status and history</li> <li>🏢 <strong>Production-ready</strong>: Designed for enterprise backup requirements</li> </ul><hr /><hr /> <h2 id="external-database-support"> <a href="#external-database-support" class="anchor-heading" aria-labelledby="external-database-support"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> External Database Support </h2> <p><strong>⚡ NEW in v2.4.0</strong>: Connect to databases managed outside of Kubernetes (e.g., AWS RDS, Managed MariaDB).</p> <h3 id="shared-external-database-rdscloud-sql"> <a href="#shared-external-database-rdscloud-sql" class="anchor-heading" aria-labelledby="shared-external-database-rdscloud-sql"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Shared External Database (RDS/Cloud SQL) </h3> <p>Connect multiple sites to a shared external database server with default bench configurations.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">external-db-bench</span>
@@ -822,7 +822,7 @@ kubectl get cronjob demo-site-daily-backup-backup
       <span class="na">name</span><span class="pi">:</span> <span class="s">shared-db-creds</span>
 
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">site1-external</span>
@@ -833,7 +833,7 @@ kubectl get cronjob demo-site-daily-backup-backup
   <span class="c1"># site1_db will be used by default (from siteName)</span>
   <span class="c1"># Credentials will be pulled from 'shared-db-creds'</span>
 </code></pre></div></div> <h3 id="dedicated-external-database-per-site"> <a href="#dedicated-external-database-per-site" class="anchor-heading" aria-labelledby="dedicated-external-database-per-site"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Dedicated External Database per Site </h3> <p>Each site with its own specific external host and credentials.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">enterprise-site</span>
@@ -856,7 +856,7 @@ kubectl get cronjob demo-site-daily-backup-backup
   <span class="na">username</span><span class="pi">:</span> <span class="s2">"</span><span class="s">admin_user"</span>
   <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">secure_password"</span>
   <span class="na">database</span><span class="pi">:</span> <span class="s2">"</span><span class="s">enterprise_prod"</span> <span class="c1"># Optional</span>
-</code></pre></div></div><hr /> <h2 id="resource-scaling"> <a href="#resource-scaling" class="anchor-heading" aria-labelledby="resource-scaling"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Resource Scaling </h2> <h3 id="three-tier-resource-configuration"> <a href="#three-tier-resource-configuration" class="anchor-heading" aria-labelledby="three-tier-resource-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Three-Tier Resource Configuration </h3> <p>Small, medium, and large resource tiers.</p> <h4 id="small-tier-developmenttesting"> <a href="#small-tier-developmenttesting" class="anchor-heading" aria-labelledby="small-tier-developmenttesting"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Small Tier (Development/Testing) </h4> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div><hr /> <h2 id="resource-scaling"> <a href="#resource-scaling" class="anchor-heading" aria-labelledby="resource-scaling"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Resource Scaling </h2> <h3 id="three-tier-resource-configuration"> <a href="#three-tier-resource-configuration" class="anchor-heading" aria-labelledby="three-tier-resource-configuration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Three-Tier Resource Configuration </h3> <p>Small, medium, and large resource tiers.</p> <h4 id="small-tier-developmenttesting"> <a href="#small-tier-developmenttesting" class="anchor-heading" aria-labelledby="small-tier-developmenttesting"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Small Tier (Development/Testing) </h4> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">small-bench</span>
@@ -884,7 +884,7 @@ kubectl get cronjob demo-site-daily-backup-backup
     <span class="na">workerDefault</span><span class="pi">:</span>
       <span class="na">requests</span><span class="pi">:</span> <span class="pi">{</span> <span class="nv">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">200m"</span><span class="pi">,</span> <span class="nv">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">256Mi"</span> <span class="pi">}</span>
       <span class="na">limits</span><span class="pi">:</span> <span class="pi">{</span> <span class="nv">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">400m"</span><span class="pi">,</span> <span class="nv">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">512Mi"</span> <span class="pi">}</span>
-</code></pre></div></div> <h4 id="medium-tier-small-production"> <a href="#medium-tier-small-production" class="anchor-heading" aria-labelledby="medium-tier-small-production"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Medium Tier (Small Production) </h4> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h4 id="medium-tier-small-production"> <a href="#medium-tier-small-production" class="anchor-heading" aria-labelledby="medium-tier-small-production"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Medium Tier (Small Production) </h4> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">medium-bench</span>
@@ -912,7 +912,7 @@ kubectl get cronjob demo-site-daily-backup-backup
     <span class="na">workerDefault</span><span class="pi">:</span>
       <span class="na">requests</span><span class="pi">:</span> <span class="pi">{</span> <span class="nv">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">500m"</span><span class="pi">,</span> <span class="nv">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">512Mi"</span> <span class="pi">}</span>
       <span class="na">limits</span><span class="pi">:</span> <span class="pi">{</span> <span class="nv">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1"</span><span class="pi">,</span> <span class="nv">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1Gi"</span> <span class="pi">}</span>
-</code></pre></div></div> <h4 id="large-tier-production"> <a href="#large-tier-production" class="anchor-heading" aria-labelledby="large-tier-production"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Large Tier (Production) </h4> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h4 id="large-tier-production"> <a href="#large-tier-production" class="anchor-heading" aria-labelledby="large-tier-production"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Large Tier (Production) </h4> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">large-bench</span>

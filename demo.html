@@ -45,7 +45,7 @@ oc get mariadb <span class="nt">-n</span> mariadb
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">frappe</span>
 <span class="nn">---</span>
-<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">bench-test</span>
@@ -78,7 +78,7 @@ oc get mariadb <span class="nt">-n</span> mariadb
       <span class="na">long</span><span class="pi">:</span> <span class="m">0</span>
 </code></pre></div></div> <p><strong>Verify Bench Creation:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>oc get frappebench <span class="nt">-n</span> frappe
 oc get pods <span class="nt">-n</span> frappe
-</code></pre></div></div><hr /> <h2 id="5-deploy-frappe-site"> <a href="#5-deploy-frappe-site" class="anchor-heading" aria-labelledby="5-deploy-frappe-site"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 5. Deploy Frappe Site </h2> <p>Deploy the actual Frappe Site and connect it to the MariaDB database.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div><hr /> <h2 id="5-deploy-frappe-site"> <a href="#5-deploy-frappe-site" class="anchor-heading" aria-labelledby="5-deploy-frappe-site"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> 5. Deploy Frappe Site </h2> <p>Deploy the actual Frappe Site and connect it to the MariaDB database.</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeSite</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">vyogotechdemo</span>

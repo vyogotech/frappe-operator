@@ -122,7 +122,7 @@ kubectl create quota production-quota <span class="se">\</span>
         <span class="na">severity</span><span class="pi">:</span> <span class="s">warning</span>
       <span class="na">annotations</span><span class="pi">:</span>
         <span class="na">summary</span><span class="pi">:</span> <span class="s2">"</span><span class="s">High</span><span class="nv"> </span><span class="s">memory</span><span class="nv"> </span><span class="s">usage</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">"</span>
-</code></pre></div></div><hr /> <h2 id="backup-and-restore"> <a href="#backup-and-restore" class="anchor-heading" aria-labelledby="backup-and-restore"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Backup and Restore </h2> <h3 id="automated-backups-with-sitebackup"> <a href="#automated-backups-with-sitebackup" class="anchor-heading" aria-labelledby="automated-backups-with-sitebackup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Automated Backups with SiteBackup </h3> <p>Create a SiteBackup resource:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div><hr /> <h2 id="backup-and-restore"> <a href="#backup-and-restore" class="anchor-heading" aria-labelledby="backup-and-restore"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Backup and Restore </h2> <h3 id="automated-backups-with-sitebackup"> <a href="#automated-backups-with-sitebackup" class="anchor-heading" aria-labelledby="automated-backups-with-sitebackup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Automated Backups with SiteBackup </h3> <p>Create a SiteBackup resource:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">SiteBackup</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">daily-backup</span>
@@ -151,7 +151,7 @@ kubectl create quota production-quota <span class="se">\</span>
 }'</span>
 </code></pre></div></div> <p>You can also modify other parameters, such as the retention policy or backup destination, and the operator will apply them to the scheduled job.</p> <h3 id="manual-backup"> <a href="#manual-backup" class="anchor-heading" aria-labelledby="manual-backup"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Manual Backup </h3> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Create manual backup</span>
 kubectl create <span class="nt">-f</span> - <span class="o">&lt;&lt;</span><span class="no">EOF</span><span class="sh">
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteJob
 metadata:
   name: manual-backup-</span><span class="si">$(</span><span class="nb">date</span> +%Y%m%d-%H%M%S<span class="si">)</span><span class="sh">
@@ -248,7 +248,7 @@ kubectl patch frappebench prod-bench <span class="nt">--type</span><span class="
     "appsJSON": "[\"erpnext\", \"hrms\", \"custom_app@v2.0.0\"]"
   }
 }'</span>
-</code></pre></div></div> <h3 id="site-migration"> <a href="#site-migration" class="anchor-heading" aria-labelledby="site-migration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Site Migration </h3> <p>Run migrations after updates:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h3 id="site-migration"> <a href="#site-migration" class="anchor-heading" aria-labelledby="site-migration"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Site Migration </h3> <p>Run migrations after updates:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">SiteJob</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">migrate-prod-site</span>
@@ -280,7 +280,7 @@ kubectl get deployment <span class="nt">-n</span> frappe-operator-system
           <span class="na">value</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2000"</span>
         <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">FRAPPE_DEFAULT_FSGROUP</span>
           <span class="na">value</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2000"</span>
-</code></pre></div></div> <h4 id="per-bench-security-override"> <a href="#per-bench-security-override" class="anchor-heading" aria-labelledby="per-bench-security-override"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Per-Bench Security Override </h4> <p>Override security context for specific benches:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1alpha1</span>
+</code></pre></div></div> <h4 id="per-bench-security-override"> <a href="#per-bench-security-override" class="anchor-heading" aria-labelledby="per-bench-security-override"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Per-Bench Security Override </h4> <p>Override security context for specific benches:</p> <div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">vyogo.tech/v1</span>
 <span class="na">kind</span><span class="pi">:</span> <span class="s">FrappeBench</span>
 <span class="na">metadata</span><span class="pi">:</span>
   <span class="na">name</span><span class="pi">:</span> <span class="s">compliance-bench</span>
@@ -417,7 +417,7 @@ kubectl apply <span class="nt">-f</span> sites/
 kubectl <span class="nb">exec</span> <span class="nt">-it</span> &lt;pod&gt; <span class="nt">--</span> bench <span class="nt">--site</span> &lt;site&gt; restore &lt;backup&gt;
 </code></pre></div></div> <h4 id="site-recovery"> <a href="#site-recovery" class="anchor-heading" aria-labelledby="site-recovery"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Site Recovery </h4> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Create new site from backup</span>
 kubectl apply <span class="nt">-f</span> - <span class="o">&lt;&lt;</span><span class="no">EOF</span><span class="sh">
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: recovered-site
