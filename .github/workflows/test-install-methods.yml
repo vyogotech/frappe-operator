@@ -71,14 +71,27 @@ jobs:
           helm upgrade --install keda keda/keda \
             --namespace frappe-operator-system --create-namespace --set crds.install=true --wait
 
-      - name: Deploy Operator via Helm
+      - name: Package and Deploy Operator via Local Helm Repo
         run: |
           cd helm/frappe-operator
           helm dependency update
           cd ../../
           
-          # Deploy without --wait to verify template renders and applies correctly
-          helm upgrade --install frappe-operator ./helm/frappe-operator \
+          # Create a local repo structure
+          mkdir -p /tmp/helm-test-repo
+          
+          # Package the chart into the local repo
+          helm package ./helm/frappe-operator --destination /tmp/helm-test-repo
+          
+          # Generate the repository index.yaml
+          helm repo index /tmp/helm-test-repo
+          
+          # Add the local directory as a helm repository using the file:// protocol
+          helm repo add local-test-repo file:///tmp/helm-test-repo
+          helm repo update
+          
+          # Deploy from the locally simulated repository to ensure packaging and indexing work
+          helm upgrade --install frappe-operator local-test-repo/frappe-operator \
             --namespace frappe-operator-system \
             --create-namespace \
             --set operator.image.repository=ghcr.io/vyogotech/frappe-operator \
@@ -86,7 +99,7 @@ jobs:
             --set keda.enabled=false \
             --set mariadb-operator.enabled=false
             
-          echo "✅ Helm template and deployment API objects successfully applied!"
+          echo "✅ Helm chart packaged, indexed, and successfully deployed from simulated repo!"
 
   test-olm-install:
     name: Test OLM bundle deployment
