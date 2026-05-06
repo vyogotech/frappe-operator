@@ -102,7 +102,8 @@ jobs:
           
           #### Using Helm
           ```bash
-          helm install frappe-operator oci://ghcr.io/${{ github.repository }}/helm/frappe-operator --version ${{ steps.version.outputs.VERSION }}
+          helm repo add frappe-operator https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/helm-repo
+          helm install frappe-operator frappe-operator/frappe-operator --version ${{ steps.version.outputs.VERSION }}
           ```
           
           ### Docker Image Platforms
