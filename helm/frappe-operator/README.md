@@ -63,6 +63,14 @@ helm install frappe-operator . \
   --create-namespace
 ```
 
+### Alternative: Operator Lifecycle Manager (OLM)
+
+If you prefer installing via OLM (OperatorHub) instead of Helm:
+
+```bash
+kubectl create -f https://operatorhub.io/install/frappe-operator.yaml
+```
+
 ### Custom Installation
 
 Create a `custom-values.yaml` file:
