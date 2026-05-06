@@ -205,5 +205,8 @@ else
 fi
 
 log "========================================="
+log "Final Resource State:"
+kubectl get frappesite,frappebench -n $NAMESPACE
+log "========================================="
 log "Scenario $SCENARIO on $PLATFORM PASSED!"
 log "========================================="

@@ -165,6 +165,11 @@ type FrappeSiteStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+//+kubebuilder:printcolumn:name="Bench",type=string,JSONPath=`.spec.benchRef.name`
+//+kubebuilder:printcolumn:name="URL",type=string,JSONPath=`.status.siteURL`
+//+kubebuilder:printcolumn:name="Apps",type=string,JSONPath=`.status.installedApps`
+//+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // FrappeSite is the Schema for the frappesites API
 type FrappeSite struct {

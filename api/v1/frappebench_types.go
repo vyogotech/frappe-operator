@@ -109,6 +109,10 @@ type FrappeBenchStatus struct {
 	// Map keys match component names from spec.componentAutoscaling
 	// +optional
 	ComponentScaling map[string]*ComponentScalingStatus `json:"componentScaling,omitempty"`
+
+	// InitializedImage records the image tag that was used during the last successful initialization
+	// +optional
+	InitializedImage string `json:"initializedImage,omitempty"`
 }
 
 //+kubebuilder:object:root=true
