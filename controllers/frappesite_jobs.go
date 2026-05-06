@@ -47,27 +47,33 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	// Check for site version annotation
 	versionAnnotation := "frappe.io/site-version"
 	siteVersionVal := site.Annotations[versionAnnotation]
+	if siteVersionVal == "" {
+		siteVersionVal = "default"
+	}
 	logger.Info("Checking site version annotation", "siteVersion", siteVersionVal)
+
+	// If already initialized with this exact version, return success immediately
+	if site.Status.ObservedSiteVersion == siteVersionVal && site.Status.Phase == vyogotechv1.FrappeSitePhaseReady {
+		return true, nil
+	}
 
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: site.Namespace}, job)
 	if err == nil {
 		// Job exists
 		jobVersionVal := job.Annotations[versionAnnotation]
+		if jobVersionVal == "" {
+			jobVersionVal = "default"
+		}
 		logger.Info("Job exists, checking version annotations", "jobName", jobName, "jobVersion", jobVersionVal, "siteVersion", siteVersionVal)
 
-		// Check if a specific version or update is requested
-		if siteVersionVal != "" {
-			if siteVersionVal != jobVersionVal {
-				logger.Info("Version change detected, deleting init job for update", "old", jobVersionVal, "new", siteVersionVal)
-				if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
-					return false, fmt.Errorf("failed to delete init job for update: %w", err)
-				}
-				// Requeue to create new job
-				return false, nil
+		// If the existing job has an older version, delete it to restart
+		if siteVersionVal != jobVersionVal {
+			logger.Info("Version change detected, deleting init job for update", "old", jobVersionVal, "new", siteVersionVal)
+			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+				return false, fmt.Errorf("failed to delete init job for update: %w", err)
 			}
-			logger.Info("Version values match, no action needed")
-		} else {
-			logger.Info("No version annotation requested")
+			// Requeue to create new job
+			return false, nil
 		}
 
 		// Job exists, check if it completed

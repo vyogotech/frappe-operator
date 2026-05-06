@@ -482,11 +482,16 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 
 	jobName := fmt.Sprintf("%s-init", bench.Name)
 	job := &batchv1.Job{}
+	expectedImage := r.getBenchImage(ctx, bench)
+
+	// Check if already initialized with the correct image
+	if bench.Status.InitializedImage == expectedImage {
+		return true, nil
+	}
 
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: bench.Namespace}, job)
 	if err == nil {
-		// Job exists, first check if the FrappeBench image tag has been updated
-		expectedImage := r.getBenchImage(ctx, bench)
+		// Job exists, check if the FrappeBench image tag has been updated
 		if len(job.Spec.Template.Spec.Containers) > 0 {
 			currentImage := job.Spec.Template.Spec.Containers[0].Image
 			if currentImage != expectedImage {
@@ -501,6 +506,11 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 
 		// Job exists and is up to date, check status
 		if job.Status.Succeeded > 0 {
+			// Job completed successfully, update the state
+			bench.Status.InitializedImage = expectedImage
+			if err := r.updateBenchStatus(ctx, bench, gitEnabled, fpmRepos); err != nil {
+				return false, fmt.Errorf("failed to update bench status with InitializedImage: %w", err)
+			}
 			return true, nil
 		}
 		// If job failed, report it early
