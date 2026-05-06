@@ -86,8 +86,14 @@ jobs:
           # Generate the repository index.yaml
           helm repo index /tmp/helm-test-repo
           
-          # Add the local directory as a helm repository using the file:// protocol
-          helm repo add local-test-repo file:///tmp/helm-test-repo
+          # Start a local Python HTTP server serving the repo on port 8080
+          cd /tmp/helm-test-repo
+          python3 -m http.server 8080 &
+          SERVER_PID=$!
+          sleep 2
+          
+          # Add the local directory as a helm repository using the HTTP server
+          helm repo add local-test-repo http://localhost:8080
           helm repo update
           
           # Deploy from the locally simulated repository to ensure packaging and indexing work
@@ -99,6 +105,8 @@ jobs:
             --set keda.enabled=false \
             --set mariadb-operator.enabled=false
             
+          # Clean up the local server
+          kill $SERVER_PID
           echo "✅ Helm chart packaged, indexed, and successfully deployed from simulated repo!"
 
   test-olm-install:
