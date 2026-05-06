@@ -24,7 +24,9 @@ A Helm chart for deploying the Frappe Operator with all required dependencies on
 The Helm chart automatically installs MariaDB Operator CRDs via a pre-install hook:
 
 ```bash
-helm install frappe-operator oci://ghcr.io/vyogotech/charts/frappe-operator \
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
+helm repo update
+helm install frappe-operator frappe-operator/frappe-operator \
   --namespace frappe-operator-system \
   --create-namespace
 ```
