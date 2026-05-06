@@ -134,9 +134,12 @@ if [ -d "./helm/frappe-operator" ]; then
     CHART_PATH="./helm/frappe-operator"
     echo "Using local Helm chart from ./helm/frappe-operator"
 else
-    # Try to use OCI registry
-    CHART_PATH="oci://ghcr.io/vyogotech/charts/frappe-operator"
-    echo "Using Helm chart from OCI registry"
+    # Try to use GitHub Pages Helm repository
+    echo "Adding Helm repository..."
+    helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
+    helm repo update
+    CHART_PATH="frappe-operator/frappe-operator"
+    echo "Using Helm chart from repository"
 fi
 
 # Install or upgrade the chart (upgrade --install handles both cases)
