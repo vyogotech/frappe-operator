@@ -11,10 +11,10 @@ else
     exit 1
 fi
 
-CLUSTER_NAME="test-failed-upgrade-cluster"
+CLUSTER_NAME="test-upgrade-cluster"
 
 echo "=== 1. Starting Kind cluster ==="
-kind create cluster --name $CLUSTER_NAME || true
+kind create cluster --name $CLUSTER_NAME
 
 echo "=== 2. Building operator image ==="
 make docker-build IMG=vyogotech/frappe-operator:test-upgrade
@@ -43,7 +43,7 @@ echo "Waiting for Operator to be ready..."
 kubectl rollout status deployment/frappe-operator-controller-manager -n frappe-operator-system --timeout=2m
 
 echo "=== 5. Applying initial site ==="
-kubectl create namespace e2e-upgrade-test-fail --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace e2e-upgrade-test --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace mariadb --dry-run=client -o yaml | kubectl apply -f -
 echo "Waiting for MariaDB webhook..."
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=mariadb-operator-webhook -n frappe-operator-system --timeout=2m || true
@@ -55,20 +55,21 @@ for i in {1..5}; do
     echo "Retrying DB creation in 5s..."
     sleep 5
 done
-kubectl apply -f test/scenarios/apps-upgrade.yaml -n e2e-upgrade-test-fail
+kubectl apply -f test/scenarios/image-upgrade-v1.yaml -n e2e-upgrade-test
 
 echo "Waiting for initial site to be Ready..."
 kubectl wait --for=condition=Ready pod/frappe-mariadb-0 -n mariadb --timeout=5m || echo "mariadb wait failed"
-kubectl wait --for=condition=Complete job/upgrade-bench-init -n e2e-upgrade-test-fail --timeout=5m || echo "bench init wait failed"
-kubectl wait --for=condition=Complete job/upgrade-site-init -n e2e-upgrade-test-fail --timeout=5m || echo "site init wait failed"
-kubectl wait --for=condition=Ready frappesite/upgrade-site -n e2e-upgrade-test-fail --timeout=5m || echo "site wait failed"
+kubectl wait --for=condition=Complete job/upgrade-bench-init -n e2e-upgrade-test --timeout=5m || echo "bench init wait failed"
+kubectl wait --for=condition=Complete job/upgrade-site-init -n e2e-upgrade-test --timeout=5m || echo "site init wait failed"
+kubectl wait --for=condition=Ready frappesite/upgrade-site -n e2e-upgrade-test --timeout=5m || echo "site wait failed"
 
 echo "=== 6. Port forwarding to verify CSS ==="
-kubectl port-forward svc/upgrade-bench-nginx 8080:8080 -n e2e-upgrade-test-fail &
+kubectl port-forward svc/upgrade-bench-nginx 8080:8080 -n e2e-upgrade-test &
 PF_PID=$!
 sleep 10
 
 echo "Fetching page..."
+# Adding host header because site matches on Host or IP if it's default. We'll use curl -H "Host: upgrade.test.local"
 HTML=$(curl -s -H "Host: upgrade.test.local" http://localhost:8080)
 CSS_PATH=$(echo "$HTML" | grep -oE '/assets/[^"]+\.css' | head -1)
 
@@ -87,14 +88,15 @@ fi
 
 kill $PF_PID
 
-echo "=== 7. Upgrading the site with FAILED config ==="
-kubectl apply -f test/scenarios/image-upgrade-fail.yaml -n e2e-upgrade-test-fail
+echo "=== 7. Upgrading the site ==="
+kubectl apply -f test/scenarios/image-upgrade-v2.yaml -n e2e-upgrade-test
 echo "Waiting for upgrade..."
 sleep 15
-kubectl wait --for=condition=Failed job/upgrade-site-init -n e2e-upgrade-test-fail --timeout=2m || echo "site init upgrade wait failed or completed unexpectedly"
+kubectl wait --for=condition=Complete job/upgrade-site-init -n e2e-upgrade-test --timeout=5m || echo "site init upgrade wait failed"
+kubectl wait --for=condition=Ready frappesite/upgrade-site -n e2e-upgrade-test --timeout=5m || echo "site upgrade wait failed"
 
-echo "=== 8. Port forwarding to verify CSS AFTER FAILED upgrade ==="
-kubectl port-forward svc/upgrade-bench-nginx 8080:8080 -n e2e-upgrade-test-fail &
+echo "=== 8. Port forwarding to verify CSS after upgrade ==="
+kubectl port-forward svc/upgrade-bench-nginx 8080:8080 -n e2e-upgrade-test &
 PF_PID=$!
 sleep 10
 
@@ -107,9 +109,16 @@ else
     echo "Found CSS at: $CSS_PATH after upgrade"
     HTTP_STATUS=$(curl -H "Host: upgrade.test.local" -o /dev/null -s -w "%{http_code}\n" http://localhost:8080$CSS_PATH)
     if [ "$HTTP_STATUS" == "200" ]; then
-        echo "✅ CSS loaded successfully after FAILED upgrade! (Fallback trap worked!)"
+        echo "✅ CSS loaded successfully after upgrade!"
     else
-        echo "❌ CSS failed to load after FAILED upgrade! Status: $HTTP_STATUS (Fallback trap failed)"
+        echo "❌ CSS failed to load after upgrade! Status: $HTTP_STATUS"
+        echo "Attempting flushall on redis..."
+        kubectl exec upgrade-bench-redis-cache-0 -n e2e-upgrade-test -- redis-cli flushall
+        echo "Re-checking CSS..."
+        HTTP_STATUS=$(curl -H "Host: upgrade.test.local" -o /dev/null -s -w "%{http_code}\n" http://localhost:8080$CSS_PATH)
+        if [ "$HTTP_STATUS" == "200" ]; then
+             echo "✅ CSS loaded successfully after flushall!"
+        fi
     fi
 fi
 

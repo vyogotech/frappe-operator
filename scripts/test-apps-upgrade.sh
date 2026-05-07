@@ -1,11 +1,14 @@
 #!/bin/bash
 set -e
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-if command -v podman &> /dev/null; then
+if command -v docker &> /dev/null; then
+    CONTAINER_TOOL="docker"
+elif command -v podman &> /dev/null; then
     export KIND_EXPERIMENTAL_PROVIDER=podman
     CONTAINER_TOOL="podman"
 else
-    CONTAINER_TOOL="docker"
+    echo "Neither docker nor podman found"
+    exit 1
 fi
 
 CLUSTER_NAME="test-apps-upgrade-cluster"
