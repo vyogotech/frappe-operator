@@ -64,6 +64,9 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		if jobVersionVal == "" {
 			jobVersionVal = "default"
 		}
+		if siteVersionVal == "" {
+			siteVersionVal = "default"
+		}
 
 		currentAppsList := strings.Join(site.Spec.Apps, ",")
 		jobAppsList := job.Annotations["frappe.io/apps-list"]
