@@ -86,6 +86,18 @@ else
     fi
 fi
 
+echo "Testing Admin Login..."
+ADMIN_PASSWORD=$(kubectl get secret upgrade-site-admin -n e2e-upgrade-test -o jsonpath='{.data.password}' | base64 -d)
+LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}\n" -H "Host: upgrade.test.local" -X POST http://localhost:8080/api/method/login -H "Content-Type: application/json" -d "{\"usr\":\"Administrator\",\"pwd\":\"$ADMIN_PASSWORD\"}")
+
+if [ "$LOGIN_STATUS" == "200" ]; then
+    echo "✅ Admin login successful!"
+else
+    echo "❌ Admin login failed! Status: $LOGIN_STATUS"
+    kill $PF_PID
+    exit 1
+fi
+
 kill $PF_PID
 
 echo "=== 7. Upgrading the site ==="
@@ -120,6 +132,18 @@ else
              echo "✅ CSS loaded successfully after flushall!"
         fi
     fi
+fi
+
+echo "Testing Admin Login after upgrade..."
+ADMIN_PASSWORD=$(kubectl get secret upgrade-site-admin -n e2e-upgrade-test -o jsonpath='{.data.password}' | base64 -d)
+LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}\n" -H "Host: upgrade.test.local" -X POST http://localhost:8080/api/method/login -H "Content-Type: application/json" -d "{\"usr\":\"Administrator\",\"pwd\":\"$ADMIN_PASSWORD\"}")
+
+if [ "$LOGIN_STATUS" == "200" ]; then
+    echo "✅ Admin login successful after upgrade!"
+else
+    echo "❌ Admin login failed after upgrade! Status: $LOGIN_STATUS"
+    kill $PF_PID
+    exit 1
 fi
 
 kill $PF_PID
