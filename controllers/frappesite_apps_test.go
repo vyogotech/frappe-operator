@@ -532,6 +532,9 @@ var _ = Describe("FrappeSite App Installation", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      site.Name + "-init",
 					Namespace: site.Namespace,
+					Annotations: map[string]string{
+						"frappe.io/apps-list": strings.Join(site.Spec.Apps, ","),
+					},
 				},
 				Status: batchv1.JobStatus{
 					Succeeded: 1,
@@ -609,6 +612,9 @@ var _ = Describe("FrappeSite App Installation", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      site.Name + "-init",
 					Namespace: site.Namespace,
+					Annotations: map[string]string{
+						"frappe.io/apps-list": strings.Join(site.Spec.Apps, ","),
+					},
 				},
 				Status: batchv1.JobStatus{
 					Active: 1,
