@@ -163,6 +163,11 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		}
 	}
 
+	isUpgrade := "false"
+	if site.Status.Phase == vyogotechv1.FrappeSitePhaseReady {
+		isUpgrade = "true"
+	}
+
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
 		"site_name":           []byte(site.Spec.SiteName),
@@ -174,6 +179,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		"redis_cache_address": []byte(redisCacheAddress),
 		"redis_queue_address": []byte(redisQueueAddress),
 		"skip_init":           []byte(strconv.FormatBool(site.Spec.SkipInit)),
+		"is_upgrade":          []byte(isUpgrade),
 	}
 
 	// Add database credentials

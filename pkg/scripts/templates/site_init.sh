@@ -4,6 +4,49 @@
 set -e
 umask 0002
 
+# Post-hook to ensure site remains functional (CSS loads) even if upgrade/migration fails
+cleanup() {
+    # Only clear cache if the site directory exists (prevents failing during initial new-site creation)
+    if [ -n "$SITE_NAME" ] && [ -d "/home/frappe/frappe-bench/sites/$SITE_NAME" ] && [ -f "/home/frappe/frappe-bench/sites/$SITE_NAME/site_config.json" ]; then
+        echo "Running post-execution hook: clearing cache to ensure static assets load from new image..."
+        
+        # 1. Try standard bench clear-cache first
+        if ! bench --site "$SITE_NAME" clear-cache; then
+            echo "⚠ Warning: 'bench clear-cache' failed (likely due to broken app code)."
+            echo "Attempting to flush Redis cache directly as a fallback..."
+            
+            # 2. Fallback to direct Redis flush if bench context is broken
+            if [ -n "$REDIS_CACHE_ADDRESS" ]; then
+                # REDIS_CACHE_ADDRESS is typically host:port
+                REDIS_HOST=$(echo "$REDIS_CACHE_ADDRESS" | cut -d':' -f1)
+                REDIS_PORT=$(echo "$REDIS_CACHE_ADDRESS" | cut -d':' -f2)
+                
+                # Use frappe's venv which guarantees the redis package is installed
+                env/bin/python -c "
+import redis, sys
+try:
+    r = redis.Redis(host='$REDIS_HOST', port=int('$REDIS_PORT'))
+    keys_deleted = 0
+    for key in r.scan_iter('*'):
+        # Preserve user sessions so we don't log everyone out during a failed upgrade
+        if b'session' not in key:
+            r.delete(key)
+            keys_deleted += 1
+    print(f'✓ Safely flushed {keys_deleted} non-session keys from Redis cache directly.')
+except Exception as e:
+    print(f'Failed to flush redis safely: {e}')
+    sys.exit(1)
+" || echo "✗ Warning: Direct Redis flush also failed."
+            else
+                echo "✗ No REDIS_CACHE_ADDRESS found, skipping direct flush."
+            fi
+        else
+            echo "✓ Cache cleared successfully."
+        fi
+    fi
+}
+trap cleanup EXIT
+
 echo "DEBUG: Running site_init.sh version $(date)"
 
 # Setup user for OpenShift compatibility (fixes getpwuid() error)
@@ -114,14 +157,19 @@ PYTHON_SCRIPT
 
 # --- Initialization Flow --- 
 
+IS_UPGRADE=$(cat /tmp/site-secrets/is_upgrade 2>/dev/null || echo "false")
+SKIP_INIT=$(cat /tmp/site-secrets/skip_init 2>/dev/null || echo "false")
+
 echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
 
 # If the site directory already exists, skip creation but update config
 if [[ -d "/home/frappe/frappe-bench/sites/$SITE_NAME" ]]; then
-    if [[ -f "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete" ]]; then
+    if [[ -f "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete" ]] || [[ "$IS_UPGRADE" == "true" ]] || [[ "$SKIP_INIT" == "true" ]]; then
         echo "Site $SITE_NAME already exists and is initialized; skipping new-site and updating config."
         goto_update_config=1
+        # Backfill the marker so future local checks pass
+        touch "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete"
     else
         echo "Warning: Site directory exists but .init_complete is missing! A previous new-site attempt failed halfway."
         echo "Cleaning up directory to allow bench new-site to recreate it cleanly..."
@@ -412,9 +460,7 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]] || [[
             echo "✓ Admin password synchronized with Kubernetes Secret."
         fi
 
-        echo "4. Clearing Site Cache..."
-        bench --site "$SITE_NAME" clear-cache
-        echo "✓ Site cache cleared (CSS/JS hashes reset)."
+        echo "4. Cache will be cleared automatically by the post-execution hook."
     fi
 else
     echo "ERROR: Unsupported DB provider: $DB_PROVIDER"

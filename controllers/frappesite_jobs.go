@@ -64,11 +64,15 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		if jobVersionVal == "" {
 			jobVersionVal = "default"
 		}
-		logger.Info("Job exists, checking version annotations", "jobName", jobName, "jobVersion", jobVersionVal, "siteVersion", siteVersionVal)
 
-		// If the existing job has an older version, delete it to restart
-		if siteVersionVal != jobVersionVal {
-			logger.Info("Version change detected, deleting init job for update", "old", jobVersionVal, "new", siteVersionVal)
+		currentAppsList := strings.Join(site.Spec.Apps, ",")
+		jobAppsList := job.Annotations["frappe.io/apps-list"]
+
+		logger.Info("Job exists, checking annotations", "jobName", jobName, "jobVersion", jobVersionVal, "siteVersion", siteVersionVal, "jobApps", jobAppsList, "siteApps", currentAppsList)
+
+		// If the existing job has an older version or different apps, delete it to restart
+		if siteVersionVal != jobVersionVal || currentAppsList != jobAppsList {
+			logger.Info("Init job outdated (version or apps changed), deleting to restart", "oldVersion", jobVersionVal, "newVersion", siteVersionVal, "oldApps", jobAppsList, "newApps", currentAppsList)
 			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
 				return false, fmt.Errorf("failed to delete init job for update: %w", err)
 			}
@@ -221,6 +225,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	if siteVersionVal != "" {
 		jobAnnotations[versionAnnotation] = siteVersionVal
 	}
+	jobAnnotations["frappe.io/apps-list"] = strings.Join(site.Spec.Apps, ",")
 
 	// Build the job
 	job = resources.NewJobBuilder(jobName, site.Namespace).
@@ -238,7 +243,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		WithOwner(site, r.Scheme).
 		MustBuild()
 
-	job.Spec.BackoffLimit = int32Ptr(1)
+	job.Spec.BackoffLimit = int32Ptr(0)
 
 	if err := r.Create(ctx, job); err != nil {
 		return false, err

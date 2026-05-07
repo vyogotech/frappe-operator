@@ -1,0 +1,84 @@
+name: E2E Upgrade Testing
+
+on:
+  push:
+    branches: [main, master, release, develop, 'feat/**']
+    paths:
+      - 'helm/**'
+      - 'controllers/**'
+      - 'api/**'
+      - 'pkg/**'
+      - 'scripts/**'
+      - 'test/**'
+      - '.github/workflows/e2e-upgrades.yml'
+  pull_request:
+    branches: [main, master, release]
+  workflow_dispatch:
+
+jobs:
+  test-css-upgrade:
+    name: Standard Upgrade (CSS Validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+          # Install Kind
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v1.35.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4.2.0
+
+      - name: Run Test
+        run: |
+          chmod +x scripts/test-css-upgrade.sh
+          ./scripts/test-css-upgrade.sh
+
+  test-failed-upgrade:
+    name: Failed Upgrade (Fallback Trap Validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v1.35.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4.2.0
+
+      - name: Run Test
+        run: |
+          chmod +x scripts/test-failed-upgrade.sh
+          ./scripts/test-failed-upgrade.sh
+
+  test-apps-upgrade:
+    name: Dynamic Apps Upgrade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v1.35.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4.2.0
+
+      - name: Run Test
+        run: |
+          chmod +x scripts/test-apps-upgrade.sh
+          ./scripts/test-apps-upgrade.sh
