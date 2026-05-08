@@ -60,6 +60,8 @@ kubectl apply -f test/scenarios/apps-upgrade.yaml -n e2e-upgrade-test
 echo "Waiting for initial site to be Ready..."
 kubectl wait --for=condition=Ready pod/frappe-mariadb-0 -n mariadb --timeout=5m || echo "mariadb wait failed"
 kubectl wait --for=condition=Complete job/upgrade-bench-init -n e2e-upgrade-test --timeout=5m || echo "bench init wait failed"
+# Give the operator a few seconds to create the site-init job
+sleep 15
 kubectl wait --for=condition=Complete job/upgrade-site-init -n e2e-upgrade-test --timeout=5m || echo "site init wait failed"
 kubectl wait --for=condition=Ready frappesite/upgrade-site -n e2e-upgrade-test --timeout=5m || echo "site wait failed"
 
