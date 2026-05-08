@@ -85,17 +85,14 @@ else
     fi
 fi
 
-echo "Testing Admin Login..."
+echo "Testing Admin Login UI with Playwright..."
 ADMIN_PASSWORD=$(kubectl get secret upgrade-site-admin -n e2e-upgrade-test-fail -o jsonpath='{.data.password}' | base64 -d)
-LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}\n" -H "Host: upgrade.test.local" -X POST http://localhost:8080/api/method/login -H "Content-Type: application/json" -d "{\"usr\":\"Administrator\",\"pwd\":\"$ADMIN_PASSWORD\"}")
-
-if [ "$LOGIN_STATUS" == "200" ]; then
-    echo "✅ Admin login successful!"
-else
-    echo "❌ Admin login failed! Status: $LOGIN_STATUS"
+if ! ADMIN_PASSWORD=$ADMIN_PASSWORD npm --prefix tests/e2e run test; then
+    echo "❌ Playwright UI Admin login failed!"
     kill $PF_PID
     exit 1
 fi
+echo "✅ Playwright UI Admin login successful!"
 
 kill $PF_PID
 
@@ -125,17 +122,14 @@ else
     fi
 fi
 
-echo "Testing Admin Login after FAILED upgrade..."
+echo "Testing Admin Login UI with Playwright after FAILED upgrade..."
 ADMIN_PASSWORD=$(kubectl get secret upgrade-site-admin -n e2e-upgrade-test-fail -o jsonpath='{.data.password}' | base64 -d)
-LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}\n" -H "Host: upgrade.test.local" -X POST http://localhost:8080/api/method/login -H "Content-Type: application/json" -d "{\"usr\":\"Administrator\",\"pwd\":\"$ADMIN_PASSWORD\"}")
-
-if [ "$LOGIN_STATUS" == "200" ]; then
-    echo "✅ Admin login successful after FAILED upgrade!"
-else
-    echo "❌ Admin login failed after FAILED upgrade! Status: $LOGIN_STATUS"
+if ! ADMIN_PASSWORD=$ADMIN_PASSWORD npm --prefix tests/e2e run test; then
+    echo "❌ Playwright UI Admin login failed after FAILED upgrade!"
     kill $PF_PID
     exit 1
 fi
+echo "✅ Playwright UI Admin login successful after FAILED upgrade!"
 
 kill $PF_PID
 echo "=== 9. Cleanup ==="
