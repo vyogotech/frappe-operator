@@ -29,4 +29,7 @@ test('admin login works and renders desk', async ({ page }) => {
   const setupWizard = page.locator('.setup-wizard-slide, .setup-wizard-wrapper, h1:has-text("Welcome")');
   
   await expect(navbar.or(setupWizard).first()).toBeVisible({ timeout: 15000 });
+
+  // Capture a screenshot to prove the test passed successfully
+  await page.screenshot({ path: 'test-results/success-login.png', fullPage: true });
 });
