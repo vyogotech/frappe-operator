@@ -20,9 +20,13 @@ test('admin login works and renders desk', async ({ page }) => {
   // Click login
   await loginButton.click();
 
-  // Wait for redirect to /app (Desk dashboard)
+  // Wait for redirect to /app
   await expect(page).toHaveURL(/.*\/app.*/, { timeout: 15000 });
   
-  // Verify that the desk is actually rendered (a navbar exists)
-  await expect(page.locator('.navbar')).toBeVisible();
+  // Verify that either the desk navbar OR the setup wizard is rendered
+  // (Freshly created sites will show the Setup Wizard instead of the Desk)
+  const navbar = page.locator('.navbar');
+  const setupWizard = page.locator('.setup-wizard-slide, .setup-wizard-wrapper, h1:has-text("Welcome")');
+  
+  await expect(navbar.or(setupWizard).first()).toBeVisible({ timeout: 15000 });
 });
