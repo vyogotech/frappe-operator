@@ -7,5 +7,5 @@ kind: Kustomization
 # For local development, override with: kustomize edit set image controller=<your-image>
 images:
 - name: controller
-  newName: controller
-  newTag: latest
+  newName: ghcr.io/vyogotech/frappe-operator
+  newTag: v4.1.0

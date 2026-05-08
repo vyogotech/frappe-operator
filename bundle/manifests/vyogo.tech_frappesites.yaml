@@ -14,7 +14,23 @@ spec:
     singular: frappesite
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.benchRef.name
+      name: Bench
+      type: string
+    - jsonPath: .status.siteURL
+      name: URL
+      type: string
+    - jsonPath: .status.installedApps
+      name: Apps
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: FrappeSite is the Schema for the frappesites API
