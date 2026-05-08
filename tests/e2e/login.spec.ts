@@ -4,8 +4,8 @@ test('admin login works and renders desk', async ({ page }) => {
   // Navigate to login
   await page.goto('/login');
 
-  // Verify the page has loaded CSS correctly by checking if a standard Frappe class or the login button is visible
-  const loginButton = page.locator('button:has-text("Login")');
+  // Verify the page has loaded CSS correctly by checking if the primary login button is visible
+  const loginButton = page.locator('.btn-login');
   await expect(loginButton).toBeVisible({ timeout: 10000 });
 
   // Input credentials
