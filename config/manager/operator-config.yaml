@@ -2,7 +2,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: frappe-operator-config
-  namespace: frappe-operator-system
 data:
   # Default domain suffix for auto-detected sites
   # Override per-bench or per-site as needed

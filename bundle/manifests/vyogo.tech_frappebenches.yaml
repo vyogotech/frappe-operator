@@ -2245,6 +2245,10 @@ spec:
                 description: GitEnabled indicates whether Git is enabled for this
                   bench
                 type: boolean
+              initializedImage:
+                description: InitializedImage records the image tag that was used
+                  during the last successful initialization
+                type: string
               installedApps:
                 description: InstalledApps lists the apps that have been successfully
                   installed
