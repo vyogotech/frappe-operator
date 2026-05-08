@@ -10,6 +10,7 @@ on:
       - 'pkg/**'
       - 'scripts/**'
       - 'test/**'
+      - 'tests/**'
       - '.github/workflows/e2e-upgrades.yml'
   pull_request:
     branches: [main, master, release]
