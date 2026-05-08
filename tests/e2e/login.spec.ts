@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 
 test('admin login works and renders desk', async ({ page }) => {
-  // Set host header so Frappe routes to the correct site
-  await page.setExtraHTTPHeaders({ 'Host': 'upgrade.test.local' });
   // Navigate to login
   await page.goto('/login');
 
