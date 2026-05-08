@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 4.0.0
+VERSION ?= 4.1.0
 CONTAINER_TOOL ?= podman
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -250,6 +250,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 	operator-sdk generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
+	sed -i.bak -e '/namespace: frappe-operator-system/d' bundle/manifests/frappe-operator-config_v1_configmap.yaml && rm bundle/manifests/*.bak || true
 	operator-sdk bundle validate ./bundle
 
 .PHONY: bundle-build
