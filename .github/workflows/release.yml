@@ -10,8 +10,13 @@ permissions:
   packages: write
 
 jobs:
+  e2e-tests:
+    name: Run E2E Tests Before Release
+    uses: ./.github/workflows/e2e-upgrades.yml
+
   build-and-release:
     name: Build and Release
+    needs: e2e-tests
     runs-on: ubuntu-latest
     
     steps:

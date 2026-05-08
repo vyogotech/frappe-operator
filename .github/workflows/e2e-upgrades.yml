@@ -15,6 +15,7 @@ on:
   pull_request:
     branches: [main, master, release]
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   test-css-upgrade:
