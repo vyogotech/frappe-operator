@@ -182,6 +182,6 @@ jobs:
             --repo k8s-operatorhub/community-operators \
             --title "Update frappe-operator to v${{ steps.version.outputs.VERSION }}" \
             --body "Automated release update for frappe-operator version ${{ steps.version.outputs.VERSION }}." \
-            --head "${{ github.repository_owner }}:frappe-operator-${{ steps.version.outputs.VERSION }}" \
+            --head "frappe-operator-${{ steps.version.outputs.VERSION }}" \
             --base main
 
