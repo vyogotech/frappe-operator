@@ -8,12 +8,14 @@ on:
       - develop
       - release
       - feature/**
+      - fix/**
+      - fix-*
     paths-ignore:
       - "*.md"
       - "_config.yml"
       - "docs/**"
   pull_request:
-    branches: [main, master, develop, release, feature/**]
+    branches: [main, master, develop, release, feature/**, fix/**, fix-*]
     paths-ignore:
       - "*.md"
       - "_config.yml"
@@ -31,7 +33,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: "1.22"
+          go-version: "1.25"
           cache: true
 
       - name: Install dependencies
@@ -94,12 +96,33 @@ jobs:
           tags: |
             type=sha,format=short
 
-      - name: Build and push Docker image
+      - name: Build local Docker image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: frappe-operator:local-scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: 'frappe-operator:local-scan'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Build and push multi-platform Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/release') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
