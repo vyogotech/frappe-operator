@@ -48,13 +48,19 @@ jobs:
           make manifests
           make bundle VERSION=${{ inputs.version }} IMG=ghcr.io/${{ github.repository }}:v${{ inputs.version }}
 
-      - name: Commit and Push Changes
+      - name: Commit and Push Changes to Branch
         run: |
+          git checkout -b release/bump-v${{ inputs.version }}
           git add -A
-          git commit -m "chore: bump version to v${{ inputs.version }} [skip ci]" || exit 0
-          git push https://x-access-token:${{ secrets.COMMUNITY_OP_PAT }}@github.com/${{ github.repository }}.git release
+          git commit -m "chore: bump version to v${{ inputs.version }}" || exit 0
+          git push https://x-access-token:${{ secrets.COMMUNITY_OP_PAT }}@github.com/${{ github.repository }}.git release/bump-v${{ inputs.version }} --force
 
-      - name: Create and Push Release Tag
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.COMMUNITY_OP_PAT }}
         run: |
-          git tag v${{ inputs.version }}
-          git push https://x-access-token:${{ secrets.COMMUNITY_OP_PAT }}@github.com/${{ github.repository }}.git v${{ inputs.version }}
+          gh pr create \
+            --title "chore: bump version to v${{ inputs.version }}" \
+            --body "Automated version bump and manifest regeneration for v${{ inputs.version }}." \
+            --head "release/bump-v${{ inputs.version }}" \
+            --base release
