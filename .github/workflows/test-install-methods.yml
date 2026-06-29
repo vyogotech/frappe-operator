@@ -16,7 +16,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Create Kind Cluster
         uses: helm/kind-action@v1.8.0
@@ -110,7 +110,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Create Kind Cluster
         uses: helm/kind-action@v1.10.0
