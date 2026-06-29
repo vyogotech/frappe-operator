@@ -13,6 +13,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
       - name: Create Kind Cluster
         uses: helm/kind-action@v1.8.0
         with:
@@ -32,20 +37,27 @@ jobs:
           helm upgrade --install keda keda/keda \
             --namespace frappe-operator-system --create-namespace --set crds.install=true --wait
 
-      - name: Generate consolidated install manifest
+      - name: Build Operator Image
         run: |
-          mkdir -p dist
-          make manifests
-          make kustomize
-          ./bin/kustomize build config/default > dist/install.yaml
+          make build
+          docker build -t ghcr.io/vyogotech/frappe-operator:local-install-test -f Dockerfile .
 
-      - name: Deploy Operator via install.yaml
+      - name: Load image into Kind
         run: |
-          # We use standard apply (without dry-run) to allow the Namespace to be physically created
-          # so subsequent namespaced resources do not fail discovery/validation.
-          kubectl apply -f dist/install.yaml
-          
-          echo "✅ dist/install.yaml passed strict server-side validation!"
+          kind load docker-image ghcr.io/vyogotech/frappe-operator:local-install-test --name install-yaml-test
+
+      - name: Deploy Operator via committed install.yaml
+        run: |
+          # Replace the release image tag in the committed install.yaml with our local test image
+          sed "s|image: ghcr.io/vyogotech/frappe-operator:.*|image: ghcr.io/vyogotech/frappe-operator:local-install-test|g" install.yaml > test-install.yaml
+          kubectl apply -f test-install.yaml
+
+      - name: Verify Controller Status
+        run: |
+          kubectl get deployments -n frappe-operator-system
+          kubectl wait deployment/frappe-operator-controller-manager -n frappe-operator-system --for=condition=Available --timeout=120s
+          kubectl get pods -n frappe-operator-system
+          echo "✅ Operator successfully deployed via committed install.yaml and running!"
 
   test-helm-install:
     name: Test Helm deployment
