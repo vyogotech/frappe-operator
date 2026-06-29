@@ -94,7 +94,28 @@ jobs:
           tags: |
             type=sha,format=short
 
-      - name: Build and push Docker image
+      - name: Build local Docker image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: frappe-operator:local-scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'frappe-operator:local-scan'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Build and push multi-platform Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
