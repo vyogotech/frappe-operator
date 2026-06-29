@@ -50,10 +50,10 @@ jobs:
 
       - name: Commit and Push Changes to Branch
         run: |
-          git checkout -b release/bump-v${{ inputs.version }}
+          git checkout -b release-bump-v${{ inputs.version }}
           git add -A
           git commit -m "chore: bump version to v${{ inputs.version }}" || exit 0
-          git push https://x-access-token:${{ secrets.COMMUNITY_OP_PAT }}@github.com/${{ github.repository }}.git release/bump-v${{ inputs.version }} --force
+          git push https://x-access-token:${{ secrets.COMMUNITY_OP_PAT }}@github.com/${{ github.repository }}.git release-bump-v${{ inputs.version }} --force
 
       - name: Create Pull Request
         env:
@@ -62,5 +62,5 @@ jobs:
           gh pr create \
             --title "chore: bump version to v${{ inputs.version }}" \
             --body "Automated version bump and manifest regeneration for v${{ inputs.version }}." \
-            --head "release/bump-v${{ inputs.version }}" \
+            --head "release-bump-v${{ inputs.version }}" \
             --base release
