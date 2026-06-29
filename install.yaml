@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/component: manager
     app.kubernetes.io/created-by: frappe-operator
-    app.kubernetes.io/instance: system
+    app.kubernetes.io/instance: frappe-operator-system
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: namespace
     app.kubernetes.io/part-of: frappe-operator
@@ -36,7 +36,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: FrappeBench is the Schema for the frappebenches API
@@ -66,8 +66,7 @@ spec:
                   Apps to install with their sources
                   Supports FPM packages, Git repositories, and pre-built images
                 items:
-                  description: AppSource defines where an app comes from and how to
-                    install it
+                  description: AppSource defines where an app comes from and how to install it
                   properties:
                     gitBranch:
                       description: |-
@@ -145,22 +144,19 @@ spec:
                           type: string
                         scaleDownStabilization:
                           default: 300
-                          description: ScaleDownStabilization in seconds before scaling
-                            down
+                          description: ScaleDownStabilization in seconds before scaling down
                           format: int32
                           minimum: 0
                           type: integer
                         scaleUpStabilization:
                           default: 0
-                          description: ScaleUpStabilization in seconds before scaling
-                            up
+                          description: ScaleUpStabilization in seconds before scaling up
                           format: int32
                           minimum: 0
                           type: integer
                         targetUtilization:
                           default: 70
-                          description: TargetUtilization is the target percentage
-                            (0-100)
+                          description: TargetUtilization is the target percentage (0-100)
                           format: int32
                           maximum: 100
                           minimum: 1
@@ -234,8 +230,7 @@ spec:
                   Map keys are component names: nginx, gunicorn, socketio, scheduler, worker-default, worker-long, worker-short
                 type: object
               componentResources:
-                description: ComponentResources defines resource requirements for
-                  each component
+                description: ComponentResources defines resource requirements for each component
                 properties:
                   gunicorn:
                     description: Gunicorn resources
@@ -247,8 +242,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Limits describes the maximum amount of compute
-                          resources allowed
+                        description: Limits describes the maximum amount of compute resources allowed
                         type: object
                       requests:
                         additionalProperties:
@@ -257,8 +251,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Requests describes the minimum amount of compute
-                          resources required
+                        description: Requests describes the minimum amount of compute resources required
                         type: object
                     type: object
                   nginx:
@@ -271,8 +264,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Limits describes the maximum amount of compute
-                          resources allowed
+                        description: Limits describes the maximum amount of compute resources allowed
                         type: object
                       requests:
                         additionalProperties:
@@ -281,8 +273,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Requests describes the minimum amount of compute
-                          resources required
+                        description: Requests describes the minimum amount of compute resources required
                         type: object
                     type: object
                   scheduler:
@@ -295,8 +286,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Limits describes the maximum amount of compute
-                          resources allowed
+                        description: Limits describes the maximum amount of compute resources allowed
                         type: object
                       requests:
                         additionalProperties:
@@ -305,8 +295,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Requests describes the minimum amount of compute
-                          resources required
+                        description: Requests describes the minimum amount of compute resources required
                         type: object
                     type: object
                   socketio:
@@ -319,8 +308,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Limits describes the maximum amount of compute
-                          resources allowed
+                        description: Limits describes the maximum amount of compute resources allowed
                         type: object
                       requests:
                         additionalProperties:
@@ -329,8 +317,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Requests describes the minimum amount of compute
-                          resources required
+                        description: Requests describes the minimum amount of compute resources required
                         type: object
                     type: object
                   workerDefault:
@@ -343,8 +330,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Limits describes the maximum amount of compute
-                          resources allowed
+                        description: Limits describes the maximum amount of compute resources allowed
                         type: object
                       requests:
                         additionalProperties:
@@ -353,8 +339,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Requests describes the minimum amount of compute
-                          resources required
+                        description: Requests describes the minimum amount of compute resources required
                         type: object
                     type: object
                   workerLong:
@@ -367,8 +352,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Limits describes the maximum amount of compute
-                          resources allowed
+                        description: Limits describes the maximum amount of compute resources allowed
                         type: object
                       requests:
                         additionalProperties:
@@ -377,8 +361,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Requests describes the minimum amount of compute
-                          resources required
+                        description: Requests describes the minimum amount of compute resources required
                         type: object
                     type: object
                   workerShort:
@@ -391,8 +374,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Limits describes the maximum amount of compute
-                          resources allowed
+                        description: Limits describes the maximum amount of compute resources allowed
                         type: object
                       requests:
                         additionalProperties:
@@ -401,14 +383,12 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Requests describes the minimum amount of compute
-                          resources required
+                        description: Requests describes the minimum amount of compute resources required
                         type: object
                     type: object
                 type: object
               dbConfig:
-                description: DBConfig defines default database configuration for all
-                  sites in this bench
+                description: DBConfig defines default database configuration for all sites in this bench
                 properties:
                   connectionSecretRef:
                     description: |-
@@ -416,12 +396,10 @@ spec:
                       Required for 'external' provider. Secret should contain: username, password, database (optional, defaults to siteName)
                     properties:
                       name:
-                        description: name is unique within a namespace to reference
-                          a secret resource.
+                        description: name is unique within a namespace to reference a secret resource.
                         type: string
                       namespace:
-                        description: namespace defines the space within which the
-                          secret name must be unique.
+                        description: namespace defines the space within which the secret name must be unique.
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
@@ -429,8 +407,7 @@ spec:
                     description: Host is the database hostname for external connections
                     type: string
                   image:
-                    description: Image is the database container image (for dedicated
-                      mode)
+                    description: Image is the database container image (for dedicated mode)
                     type: string
                   mariadbRef:
                     description: |-
@@ -449,8 +426,7 @@ spec:
                     type: object
                   mode:
                     default: shared
-                    description: 'Mode: shared (one DB instance, multiple site databases)
-                      or dedicated (one DB instance per site)'
+                    description: 'Mode: shared (one DB instance, multiple site databases) or dedicated (one DB instance per site)'
                     enum:
                     - shared
                     - dedicated
@@ -459,8 +435,7 @@ spec:
                     description: Port is the database port for external connections
                     type: string
                   postgresRef:
-                    description: PostgresRef references an existing PostgreSQL cluster
-                      (future)
+                    description: PostgresRef references an existing PostgreSQL cluster (future)
                     properties:
                       name:
                         description: Name of the resource
@@ -490,8 +465,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Limits describes the maximum amount of compute
-                          resources allowed
+                        description: Limits describes the maximum amount of compute resources allowed
                         type: object
                       requests:
                         additionalProperties:
@@ -500,8 +474,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Requests describes the minimum amount of compute
-                          resources required
+                        description: Requests describes the minimum amount of compute resources required
                         type: object
                     type: object
                   storageSize:
@@ -513,17 +486,14 @@ spec:
                     x-kubernetes-int-or-string: true
                 type: object
               domainConfig:
-                description: DomainConfig defines default domain behavior for sites
-                  on this bench
+                description: DomainConfig defines default domain behavior for sites on this bench
                 properties:
                   autoDetect:
                     default: true
-                    description: AutoDetect enables automatic domain detection from
-                      cluster
+                    description: AutoDetect enables automatic domain detection from cluster
                     type: boolean
                   ingressControllerRef:
-                    description: IngressControllerRef references the Ingress Controller
-                      service
+                    description: IngressControllerRef references the Ingress Controller service
                     properties:
                       name:
                         description: Name of the resource
@@ -559,18 +529,15 @@ spec:
                             Secret should contain keys: username, password
                           properties:
                             name:
-                              description: name is unique within a namespace to reference
-                                a secret resource.
+                              description: name is unique within a namespace to reference a secret resource.
                               type: string
                             namespace:
-                              description: namespace defines the space within which
-                                the secret name must be unique.
+                              description: namespace defines the space within which the secret name must be unique.
                               type: string
                           type: object
                           x-kubernetes-map-type: atomic
                         name:
-                          description: Name of the repository (e.g., "company-private",
-                            "frappe-community")
+                          description: Name of the repository (e.g., "company-private", "frappe-community")
                           type: string
                         priority:
                           default: 50
@@ -639,15 +606,13 @@ spec:
                     type: string
                 type: object
               podConfig:
-                description: PodConfig defines advanced pod configuration for all
-                  bench components
+                description: PodConfig defines advanced pod configuration for all bench components
                 properties:
                   affinity:
                     description: Affinity specifies pod affinity/anti-affinity rules
                     properties:
                       nodeAffinity:
-                        description: Describes node affinity scheduling rules for
-                          the pod.
+                        description: Describes node affinity scheduling rules for the pod.
                         properties:
                           preferredDuringSchedulingIgnoredDuringExecution:
                             description: |-
@@ -666,20 +631,17 @@ spec:
                                 (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
                               properties:
                                 preference:
-                                  description: A node selector term, associated with
-                                    the corresponding weight.
+                                  description: A node selector term, associated with the corresponding weight.
                                   properties:
                                     matchExpressions:
-                                      description: A list of node selector requirements
-                                        by node's labels.
+                                      description: A list of node selector requirements by node's labels.
                                       items:
                                         description: |-
                                           A node selector requirement is a selector that contains values, a key, and an operator
                                           that relates the key and values.
                                         properties:
                                           key:
-                                            description: The label key that the selector
-                                              applies to.
+                                            description: The label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -704,16 +666,14 @@ spec:
                                       type: array
                                       x-kubernetes-list-type: atomic
                                     matchFields:
-                                      description: A list of node selector requirements
-                                        by node's fields.
+                                      description: A list of node selector requirements by node's fields.
                                       items:
                                         description: |-
                                           A node selector requirement is a selector that contains values, a key, and an operator
                                           that relates the key and values.
                                         properties:
                                           key:
-                                            description: The label key that the selector
-                                              applies to.
+                                            description: The label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -740,8 +700,7 @@ spec:
                                   type: object
                                   x-kubernetes-map-type: atomic
                                 weight:
-                                  description: Weight associated with matching the
-                                    corresponding nodeSelectorTerm, in the range 1-100.
+                                  description: Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
                                   format: int32
                                   type: integer
                               required:
@@ -759,8 +718,7 @@ spec:
                               may or may not try to eventually evict the pod from its node.
                             properties:
                               nodeSelectorTerms:
-                                description: Required. A list of node selector terms.
-                                  The terms are ORed.
+                                description: Required. A list of node selector terms. The terms are ORed.
                                 items:
                                   description: |-
                                     A null or empty node selector term matches no objects. The requirements of
@@ -768,16 +726,14 @@ spec:
                                     The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
                                   properties:
                                     matchExpressions:
-                                      description: A list of node selector requirements
-                                        by node's labels.
+                                      description: A list of node selector requirements by node's labels.
                                       items:
                                         description: |-
                                           A node selector requirement is a selector that contains values, a key, and an operator
                                           that relates the key and values.
                                         properties:
                                           key:
-                                            description: The label key that the selector
-                                              applies to.
+                                            description: The label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -802,16 +758,14 @@ spec:
                                       type: array
                                       x-kubernetes-list-type: atomic
                                     matchFields:
-                                      description: A list of node selector requirements
-                                        by node's fields.
+                                      description: A list of node selector requirements by node's fields.
                                       items:
                                         description: |-
                                           A node selector requirement is a selector that contains values, a key, and an operator
                                           that relates the key and values.
                                         properties:
                                           key:
-                                            description: The label key that the selector
-                                              applies to.
+                                            description: The label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -845,9 +799,7 @@ spec:
                             x-kubernetes-map-type: atomic
                         type: object
                       podAffinity:
-                        description: Describes pod affinity scheduling rules (e.g.
-                          co-locate this pod in the same node, zone, etc. as some
-                          other pod(s)).
+                        description: Describes pod affinity scheduling rules (e.g. co-locate this pod in the same node, zone, etc. as some other pod(s)).
                         properties:
                           preferredDuringSchedulingIgnoredDuringExecution:
                             description: |-
@@ -861,13 +813,10 @@ spec:
                               "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
                               node(s) with the highest sum are the most preferred.
                             items:
-                              description: The weights of all of the matched WeightedPodAffinityTerm
-                                fields are added per-node to find the most preferred
-                                node(s)
+                              description: The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)
                               properties:
                                 podAffinityTerm:
-                                  description: Required. A pod affinity term, associated
-                                    with the corresponding weight.
+                                  description: Required. A pod affinity term, associated with the corresponding weight.
                                   properties:
                                     labelSelector:
                                       description: |-
@@ -875,17 +824,14 @@ spec:
                                         If it's null, this PodAffinityTerm matches with no Pods.
                                       properties:
                                         matchExpressions:
-                                          description: matchExpressions is a list
-                                            of label selector requirements. The requirements
-                                            are ANDed.
+                                          description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                           items:
                                             description: |-
                                               A label selector requirement is a selector that contains values, a key, and an operator that
                                               relates the key and values.
                                             properties:
                                               key:
-                                                description: key is the label key
-                                                  that the selector applies to.
+                                                description: key is the label key that the selector applies to.
                                                 type: string
                                               operator:
                                                 description: |-
@@ -955,17 +901,14 @@ spec:
                                         An empty selector ({}) matches all namespaces.
                                       properties:
                                         matchExpressions:
-                                          description: matchExpressions is a list
-                                            of label selector requirements. The requirements
-                                            are ANDed.
+                                          description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                           items:
                                             description: |-
                                               A label selector requirement is a selector that contains values, a key, and an operator that
                                               relates the key and values.
                                             properties:
                                               key:
-                                                description: key is the label key
-                                                  that the selector applies to.
+                                                description: key is the label key that the selector applies to.
                                                 type: string
                                               operator:
                                                 description: |-
@@ -1055,17 +998,14 @@ spec:
                                     If it's null, this PodAffinityTerm matches with no Pods.
                                   properties:
                                     matchExpressions:
-                                      description: matchExpressions is a list of label
-                                        selector requirements. The requirements are
-                                        ANDed.
+                                      description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                       items:
                                         description: |-
                                           A label selector requirement is a selector that contains values, a key, and an operator that
                                           relates the key and values.
                                         properties:
                                           key:
-                                            description: key is the label key that
-                                              the selector applies to.
+                                            description: key is the label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -1135,17 +1075,14 @@ spec:
                                     An empty selector ({}) matches all namespaces.
                                   properties:
                                     matchExpressions:
-                                      description: matchExpressions is a list of label
-                                        selector requirements. The requirements are
-                                        ANDed.
+                                      description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                       items:
                                         description: |-
                                           A label selector requirement is a selector that contains values, a key, and an operator that
                                           relates the key and values.
                                         properties:
                                           key:
-                                            description: key is the label key that
-                                              the selector applies to.
+                                            description: key is the label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -1203,9 +1140,7 @@ spec:
                             x-kubernetes-list-type: atomic
                         type: object
                       podAntiAffinity:
-                        description: Describes pod anti-affinity scheduling rules
-                          (e.g. avoid putting this pod in the same node, zone, etc.
-                          as some other pod(s)).
+                        description: Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s)).
                         properties:
                           preferredDuringSchedulingIgnoredDuringExecution:
                             description: |-
@@ -1219,13 +1154,10 @@ spec:
                               "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
                               node(s) with the highest sum are the most preferred.
                             items:
-                              description: The weights of all of the matched WeightedPodAffinityTerm
-                                fields are added per-node to find the most preferred
-                                node(s)
+                              description: The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)
                               properties:
                                 podAffinityTerm:
-                                  description: Required. A pod affinity term, associated
-                                    with the corresponding weight.
+                                  description: Required. A pod affinity term, associated with the corresponding weight.
                                   properties:
                                     labelSelector:
                                       description: |-
@@ -1233,17 +1165,14 @@ spec:
                                         If it's null, this PodAffinityTerm matches with no Pods.
                                       properties:
                                         matchExpressions:
-                                          description: matchExpressions is a list
-                                            of label selector requirements. The requirements
-                                            are ANDed.
+                                          description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                           items:
                                             description: |-
                                               A label selector requirement is a selector that contains values, a key, and an operator that
                                               relates the key and values.
                                             properties:
                                               key:
-                                                description: key is the label key
-                                                  that the selector applies to.
+                                                description: key is the label key that the selector applies to.
                                                 type: string
                                               operator:
                                                 description: |-
@@ -1313,17 +1242,14 @@ spec:
                                         An empty selector ({}) matches all namespaces.
                                       properties:
                                         matchExpressions:
-                                          description: matchExpressions is a list
-                                            of label selector requirements. The requirements
-                                            are ANDed.
+                                          description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                           items:
                                             description: |-
                                               A label selector requirement is a selector that contains values, a key, and an operator that
                                               relates the key and values.
                                             properties:
                                               key:
-                                                description: key is the label key
-                                                  that the selector applies to.
+                                                description: key is the label key that the selector applies to.
                                                 type: string
                                               operator:
                                                 description: |-
@@ -1413,17 +1339,14 @@ spec:
                                     If it's null, this PodAffinityTerm matches with no Pods.
                                   properties:
                                     matchExpressions:
-                                      description: matchExpressions is a list of label
-                                        selector requirements. The requirements are
-                                        ANDed.
+                                      description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                       items:
                                         description: |-
                                           A label selector requirement is a selector that contains values, a key, and an operator that
                                           relates the key and values.
                                         properties:
                                           key:
-                                            description: key is the label key that
-                                              the selector applies to.
+                                            description: key is the label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -1493,17 +1416,14 @@ spec:
                                     An empty selector ({}) matches all namespaces.
                                   properties:
                                     matchExpressions:
-                                      description: matchExpressions is a list of label
-                                        selector requirements. The requirements are
-                                        ANDed.
+                                      description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                       items:
                                         description: |-
                                           A label selector requirement is a selector that contains values, a key, and an operator that
                                           relates the key and values.
                                         properties:
                                           key:
-                                            description: key is the label key that
-                                              the selector applies to.
+                                            description: key is the label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -1632,12 +1552,10 @@ spec:
                     description: ConnectionSecretRef for external Redis
                     properties:
                       name:
-                        description: name is unique within a namespace to reference
-                          a secret resource.
+                        description: name is unique within a namespace to reference a secret resource.
                         type: string
                       namespace:
-                        description: namespace defines the space within which the
-                          secret name must be unique.
+                        description: namespace defines the space within which the secret name must be unique.
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
@@ -1673,8 +1591,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Limits describes the maximum amount of compute
-                          resources allowed
+                        description: Limits describes the maximum amount of compute resources allowed
                         type: object
                       requests:
                         additionalProperties:
@@ -1683,8 +1600,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Requests describes the minimum amount of compute
-                          resources required
+                        description: Requests describes the minimum amount of compute resources required
                         type: object
                     type: object
                   storageSize:
@@ -1704,12 +1620,10 @@ spec:
                 - type
                 type: object
               security:
-                description: Security defines security context settings for all pods
-                  in this bench
+                description: Security defines security context settings for all pods in this bench
                 properties:
                   podSecurityContext:
-                    description: PodSecurityContext holds pod-level security attributes
-                      and common container settings
+                    description: PodSecurityContext holds pod-level security attributes and common container settings
                     properties:
                       appArmorProfile:
                         description: |-
@@ -1823,20 +1737,16 @@ spec:
                           Note that this field cannot be set when spec.os.name is windows.
                         properties:
                           level:
-                            description: Level is SELinux level label that applies
-                              to the container.
+                            description: Level is SELinux level label that applies to the container.
                             type: string
                           role:
-                            description: Role is a SELinux role label that applies
-                              to the container.
+                            description: Role is a SELinux role label that applies to the container.
                             type: string
                           type:
-                            description: Type is a SELinux type label that applies
-                              to the container.
+                            description: Type is a SELinux type label that applies to the container.
                             type: string
                           user:
-                            description: User is a SELinux user label that applies
-                              to the container.
+                            description: User is a SELinux user label that applies to the container.
                             type: string
                         type: object
                       seccompProfile:
@@ -1921,8 +1831,7 @@ spec:
                               GMSA credential spec named by the GMSACredentialSpecName field.
                             type: string
                           gmsaCredentialSpecName:
-                            description: GMSACredentialSpecName is the name of the
-                              GMSA credential spec to use.
+                            description: GMSACredentialSpecName is the name of the GMSA credential spec to use.
                             type: string
                           hostProcess:
                             description: |-
@@ -1986,16 +1895,14 @@ spec:
                           add:
                             description: Added capabilities
                             items:
-                              description: Capability represent POSIX capabilities
-                                type
+                              description: Capability represent POSIX capabilities type
                               type: string
                             type: array
                             x-kubernetes-list-type: atomic
                           drop:
                             description: Removed capabilities
                             items:
-                              description: Capability represent POSIX capabilities
-                                type
+                              description: Capability represent POSIX capabilities type
                               type: string
                             type: array
                             x-kubernetes-list-type: atomic
@@ -2057,20 +1964,16 @@ spec:
                           Note that this field cannot be set when spec.os.name is windows.
                         properties:
                           level:
-                            description: Level is SELinux level label that applies
-                              to the container.
+                            description: Level is SELinux level label that applies to the container.
                             type: string
                           role:
-                            description: Role is a SELinux role label that applies
-                              to the container.
+                            description: Role is a SELinux role label that applies to the container.
                             type: string
                           type:
-                            description: Type is a SELinux type label that applies
-                              to the container.
+                            description: Type is a SELinux type label that applies to the container.
                             type: string
                           user:
-                            description: User is a SELinux user label that applies
-                              to the container.
+                            description: User is a SELinux user label that applies to the container.
                             type: string
                         type: object
                       seccompProfile:
@@ -2113,8 +2016,7 @@ spec:
                               GMSA credential spec named by the GMSACredentialSpecName field.
                             type: string
                           gmsaCredentialSpecName:
-                            description: GMSACredentialSpecName is the name of the
-                              GMSA credential spec to use.
+                            description: GMSACredentialSpecName is the name of the GMSA credential spec to use.
                             type: string
                           hostProcess:
                             description: |-
@@ -2141,8 +2043,7 @@ spec:
                 format: int32
                 type: integer
               storageClassName:
-                description: StorageClassName allows overriding the storage class
-                  for bench PVC
+                description: StorageClassName allows overriding the storage class for bench PVC
                 type: string
               storageSize:
                 default: 10Gi
@@ -2156,8 +2057,7 @@ spec:
             properties:
               componentScaling:
                 additionalProperties:
-                  description: ComponentScalingStatus reports the scaling status of
-                    a component
+                  description: ComponentScalingStatus reports the scaling status of a component
                   properties:
                     currentReplicas:
                       description: CurrentReplicas is the actual running replica count
@@ -2177,8 +2077,7 @@ spec:
                       description: 'Provider: "keda", "hpa", or "" (static)'
                       type: string
                     providerManaged:
-                      description: ProviderManaged indicates if the scaling provider
-                        manages this component
+                      description: ProviderManaged indicates if the scaling provider manages this component
                       type: boolean
                   required:
                   - currentReplicas
@@ -2191,11 +2090,9 @@ spec:
                   Map keys match component names from spec.componentAutoscaling
                 type: object
               conditions:
-                description: Conditions represent the latest available observations
-                  of the bench's state
+                description: Conditions represent the latest available observations of the bench's state
                 items:
-                  description: Condition contains details for one aspect of the current
-                    state of this API Resource.
+                  description: Condition contains details for one aspect of the current state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -2254,18 +2151,18 @@ spec:
                   type: string
                 type: array
               gitEnabled:
-                description: GitEnabled indicates whether Git is enabled for this
-                  bench
+                description: GitEnabled indicates whether Git is enabled for this bench
                 type: boolean
+              initializedImage:
+                description: InitializedImage records the image tag that was used during the last successful initialization
+                type: string
               installedApps:
-                description: InstalledApps lists the apps that have been successfully
-                  installed
+                description: InstalledApps lists the apps that have been successfully installed
                 items:
                   type: string
                 type: array
               observedGeneration:
-                description: ObservedGeneration reflects the generation of the most
-                  recently observed FrappeBench
+                description: ObservedGeneration reflects the generation of the most recently observed FrappeBench
                 format: int64
                 type: integer
               phase:
@@ -2293,7 +2190,23 @@ spec:
     singular: frappesite
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.benchRef.name
+      name: Bench
+      type: string
+    - jsonPath: .status.siteURL
+      name: URL
+      type: string
+    - jsonPath: .status.installedApps
+      name: Apps
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: FrappeSite is the Schema for the frappesites API
@@ -2319,16 +2232,13 @@ spec:
             description: FrappeSiteSpec defines the desired state of FrappeSite
             properties:
               adminPasswordSecretRef:
-                description: AdminPasswordSecretRef references the Secret containing
-                  admin password
+                description: AdminPasswordSecretRef references the Secret containing admin password
                 properties:
                   name:
-                    description: name is unique within a namespace to reference a
-                      secret resource.
+                    description: name is unique within a namespace to reference a secret resource.
                     type: string
                   namespace:
-                    description: namespace defines the space within which the secret
-                      name must be unique.
+                    description: namespace defines the space within which the secret name must be unique.
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
@@ -2342,8 +2252,7 @@ spec:
                   type: string
                 type: array
               benchRef:
-                description: BenchRef references the FrappeBench this site belongs
-                  to
+                description: BenchRef references the FrappeBench this site belongs to
                 properties:
                   name:
                     description: Name of the resource
@@ -2363,12 +2272,10 @@ spec:
                       Required for 'external' provider. Secret should contain: username, password, database (optional, defaults to siteName)
                     properties:
                       name:
-                        description: name is unique within a namespace to reference
-                          a secret resource.
+                        description: name is unique within a namespace to reference a secret resource.
                         type: string
                       namespace:
-                        description: namespace defines the space within which the
-                          secret name must be unique.
+                        description: namespace defines the space within which the secret name must be unique.
                         type: string
                     type: object
                     x-kubernetes-map-type: atomic
@@ -2376,8 +2283,7 @@ spec:
                     description: Host is the database hostname for external connections
                     type: string
                   image:
-                    description: Image is the database container image (for dedicated
-                      mode)
+                    description: Image is the database container image (for dedicated mode)
                     type: string
                   mariadbRef:
                     description: |-
@@ -2396,8 +2302,7 @@ spec:
                     type: object
                   mode:
                     default: shared
-                    description: 'Mode: shared (one DB instance, multiple site databases)
-                      or dedicated (one DB instance per site)'
+                    description: 'Mode: shared (one DB instance, multiple site databases) or dedicated (one DB instance per site)'
                     enum:
                     - shared
                     - dedicated
@@ -2406,8 +2311,7 @@ spec:
                     description: Port is the database port for external connections
                     type: string
                   postgresRef:
-                    description: PostgresRef references an existing PostgreSQL cluster
-                      (future)
+                    description: PostgresRef references an existing PostgreSQL cluster (future)
                     properties:
                       name:
                         description: Name of the resource
@@ -2437,8 +2341,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Limits describes the maximum amount of compute
-                          resources allowed
+                        description: Limits describes the maximum amount of compute resources allowed
                         type: object
                       requests:
                         additionalProperties:
@@ -2447,8 +2350,7 @@ spec:
                           - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: Requests describes the minimum amount of compute
-                          resources required
+                        description: Requests describes the minimum amount of compute resources required
                         type: object
                     type: object
                   storageSize:
@@ -2464,6 +2366,30 @@ spec:
                   Domain is the external domain for ingress
                   MUST match siteName (defaults to siteName if not specified)
                 type: string
+              encryptionKeySecretRef:
+                description: |-
+                  EncryptionKeySecretRef references a Secret containing an external encryption_key
+                  Key must be "encryption_key" in the referenced secret
+                properties:
+                  key:
+                    description: The key of the secret to select from.  Must be a valid secret key.
+                    type: string
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  optional:
+                    description: Specify whether the Secret or its key must be defined
+                    type: boolean
+                required:
+                - key
+                type: object
+                x-kubernetes-map-type: atomic
               ingress:
                 description: Ingress configuration
                 properties:
@@ -2496,15 +2422,13 @@ spec:
                 description: IngressClassName specifies the ingress class
                 type: string
               podConfig:
-                description: PodConfig defines advanced pod configuration for site-specific
-                  jobs (init, backup, etc.)
+                description: PodConfig defines advanced pod configuration for site-specific jobs (init, backup, etc.)
                 properties:
                   affinity:
                     description: Affinity specifies pod affinity/anti-affinity rules
                     properties:
                       nodeAffinity:
-                        description: Describes node affinity scheduling rules for
-                          the pod.
+                        description: Describes node affinity scheduling rules for the pod.
                         properties:
                           preferredDuringSchedulingIgnoredDuringExecution:
                             description: |-
@@ -2523,20 +2447,17 @@ spec:
                                 (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
                               properties:
                                 preference:
-                                  description: A node selector term, associated with
-                                    the corresponding weight.
+                                  description: A node selector term, associated with the corresponding weight.
                                   properties:
                                     matchExpressions:
-                                      description: A list of node selector requirements
-                                        by node's labels.
+                                      description: A list of node selector requirements by node's labels.
                                       items:
                                         description: |-
                                           A node selector requirement is a selector that contains values, a key, and an operator
                                           that relates the key and values.
                                         properties:
                                           key:
-                                            description: The label key that the selector
-                                              applies to.
+                                            description: The label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -2561,16 +2482,14 @@ spec:
                                       type: array
                                       x-kubernetes-list-type: atomic
                                     matchFields:
-                                      description: A list of node selector requirements
-                                        by node's fields.
+                                      description: A list of node selector requirements by node's fields.
                                       items:
                                         description: |-
                                           A node selector requirement is a selector that contains values, a key, and an operator
                                           that relates the key and values.
                                         properties:
                                           key:
-                                            description: The label key that the selector
-                                              applies to.
+                                            description: The label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -2597,8 +2516,7 @@ spec:
                                   type: object
                                   x-kubernetes-map-type: atomic
                                 weight:
-                                  description: Weight associated with matching the
-                                    corresponding nodeSelectorTerm, in the range 1-100.
+                                  description: Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
                                   format: int32
                                   type: integer
                               required:
@@ -2616,8 +2534,7 @@ spec:
                               may or may not try to eventually evict the pod from its node.
                             properties:
                               nodeSelectorTerms:
-                                description: Required. A list of node selector terms.
-                                  The terms are ORed.
+                                description: Required. A list of node selector terms. The terms are ORed.
                                 items:
                                   description: |-
                                     A null or empty node selector term matches no objects. The requirements of
@@ -2625,16 +2542,14 @@ spec:
                                     The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
                                   properties:
                                     matchExpressions:
-                                      description: A list of node selector requirements
-                                        by node's labels.
+                                      description: A list of node selector requirements by node's labels.
                                       items:
                                         description: |-
                                           A node selector requirement is a selector that contains values, a key, and an operator
                                           that relates the key and values.
                                         properties:
                                           key:
-                                            description: The label key that the selector
-                                              applies to.
+                                            description: The label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -2659,16 +2574,14 @@ spec:
                                       type: array
                                       x-kubernetes-list-type: atomic
                                     matchFields:
-                                      description: A list of node selector requirements
-                                        by node's fields.
+                                      description: A list of node selector requirements by node's fields.
                                       items:
                                         description: |-
                                           A node selector requirement is a selector that contains values, a key, and an operator
                                           that relates the key and values.
                                         properties:
                                           key:
-                                            description: The label key that the selector
-                                              applies to.
+                                            description: The label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -2702,9 +2615,7 @@ spec:
                             x-kubernetes-map-type: atomic
                         type: object
                       podAffinity:
-                        description: Describes pod affinity scheduling rules (e.g.
-                          co-locate this pod in the same node, zone, etc. as some
-                          other pod(s)).
+                        description: Describes pod affinity scheduling rules (e.g. co-locate this pod in the same node, zone, etc. as some other pod(s)).
                         properties:
                           preferredDuringSchedulingIgnoredDuringExecution:
                             description: |-
@@ -2718,13 +2629,10 @@ spec:
                               "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
                               node(s) with the highest sum are the most preferred.
                             items:
-                              description: The weights of all of the matched WeightedPodAffinityTerm
-                                fields are added per-node to find the most preferred
-                                node(s)
+                              description: The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)
                               properties:
                                 podAffinityTerm:
-                                  description: Required. A pod affinity term, associated
-                                    with the corresponding weight.
+                                  description: Required. A pod affinity term, associated with the corresponding weight.
                                   properties:
                                     labelSelector:
                                       description: |-
@@ -2732,17 +2640,14 @@ spec:
                                         If it's null, this PodAffinityTerm matches with no Pods.
                                       properties:
                                         matchExpressions:
-                                          description: matchExpressions is a list
-                                            of label selector requirements. The requirements
-                                            are ANDed.
+                                          description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                           items:
                                             description: |-
                                               A label selector requirement is a selector that contains values, a key, and an operator that
                                               relates the key and values.
                                             properties:
                                               key:
-                                                description: key is the label key
-                                                  that the selector applies to.
+                                                description: key is the label key that the selector applies to.
                                                 type: string
                                               operator:
                                                 description: |-
@@ -2812,17 +2717,14 @@ spec:
                                         An empty selector ({}) matches all namespaces.
                                       properties:
                                         matchExpressions:
-                                          description: matchExpressions is a list
-                                            of label selector requirements. The requirements
-                                            are ANDed.
+                                          description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                           items:
                                             description: |-
                                               A label selector requirement is a selector that contains values, a key, and an operator that
                                               relates the key and values.
                                             properties:
                                               key:
-                                                description: key is the label key
-                                                  that the selector applies to.
+                                                description: key is the label key that the selector applies to.
                                                 type: string
                                               operator:
                                                 description: |-
@@ -2912,17 +2814,14 @@ spec:
                                     If it's null, this PodAffinityTerm matches with no Pods.
                                   properties:
                                     matchExpressions:
-                                      description: matchExpressions is a list of label
-                                        selector requirements. The requirements are
-                                        ANDed.
+                                      description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                       items:
                                         description: |-
                                           A label selector requirement is a selector that contains values, a key, and an operator that
                                           relates the key and values.
                                         properties:
                                           key:
-                                            description: key is the label key that
-                                              the selector applies to.
+                                            description: key is the label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -2992,17 +2891,14 @@ spec:
                                     An empty selector ({}) matches all namespaces.
                                   properties:
                                     matchExpressions:
-                                      description: matchExpressions is a list of label
-                                        selector requirements. The requirements are
-                                        ANDed.
+                                      description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                       items:
                                         description: |-
                                           A label selector requirement is a selector that contains values, a key, and an operator that
                                           relates the key and values.
                                         properties:
                                           key:
-                                            description: key is the label key that
-                                              the selector applies to.
+                                            description: key is the label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -3060,9 +2956,7 @@ spec:
                             x-kubernetes-list-type: atomic
                         type: object
                       podAntiAffinity:
-                        description: Describes pod anti-affinity scheduling rules
-                          (e.g. avoid putting this pod in the same node, zone, etc.
-                          as some other pod(s)).
+                        description: Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s)).
                         properties:
                           preferredDuringSchedulingIgnoredDuringExecution:
                             description: |-
@@ -3076,13 +2970,10 @@ spec:
                               "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
                               node(s) with the highest sum are the most preferred.
                             items:
-                              description: The weights of all of the matched WeightedPodAffinityTerm
-                                fields are added per-node to find the most preferred
-                                node(s)
+                              description: The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)
                               properties:
                                 podAffinityTerm:
-                                  description: Required. A pod affinity term, associated
-                                    with the corresponding weight.
+                                  description: Required. A pod affinity term, associated with the corresponding weight.
                                   properties:
                                     labelSelector:
                                       description: |-
@@ -3090,17 +2981,14 @@ spec:
                                         If it's null, this PodAffinityTerm matches with no Pods.
                                       properties:
                                         matchExpressions:
-                                          description: matchExpressions is a list
-                                            of label selector requirements. The requirements
-                                            are ANDed.
+                                          description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                           items:
                                             description: |-
                                               A label selector requirement is a selector that contains values, a key, and an operator that
                                               relates the key and values.
                                             properties:
                                               key:
-                                                description: key is the label key
-                                                  that the selector applies to.
+                                                description: key is the label key that the selector applies to.
                                                 type: string
                                               operator:
                                                 description: |-
@@ -3170,17 +3058,14 @@ spec:
                                         An empty selector ({}) matches all namespaces.
                                       properties:
                                         matchExpressions:
-                                          description: matchExpressions is a list
-                                            of label selector requirements. The requirements
-                                            are ANDed.
+                                          description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                           items:
                                             description: |-
                                               A label selector requirement is a selector that contains values, a key, and an operator that
                                               relates the key and values.
                                             properties:
                                               key:
-                                                description: key is the label key
-                                                  that the selector applies to.
+                                                description: key is the label key that the selector applies to.
                                                 type: string
                                               operator:
                                                 description: |-
@@ -3270,17 +3155,14 @@ spec:
                                     If it's null, this PodAffinityTerm matches with no Pods.
                                   properties:
                                     matchExpressions:
-                                      description: matchExpressions is a list of label
-                                        selector requirements. The requirements are
-                                        ANDed.
+                                      description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                       items:
                                         description: |-
                                           A label selector requirement is a selector that contains values, a key, and an operator that
                                           relates the key and values.
                                         properties:
                                           key:
-                                            description: key is the label key that
-                                              the selector applies to.
+                                            description: key is the label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -3350,17 +3232,14 @@ spec:
                                     An empty selector ({}) matches all namespaces.
                                   properties:
                                     matchExpressions:
-                                      description: matchExpressions is a list of label
-                                        selector requirements. The requirements are
-                                        ANDed.
+                                      description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                       items:
                                         description: |-
                                           A label selector requirement is a selector that contains values, a key, and an operator that
                                           relates the key and values.
                                         properties:
                                           key:
-                                            description: key is the label key that
-                                              the selector applies to.
+                                            description: key is the label key that the selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -3491,12 +3370,10 @@ spec:
                     description: Annotations to add to the Route
                     type: object
                   enabled:
-                    description: Enabled controls whether Route should be created
-                      (defaults to true on OpenShift)
+                    description: Enabled controls whether Route should be created (defaults to true on OpenShift)
                     type: boolean
                   host:
-                    description: Host overrides the auto-generated hostname for the
-                      Route
+                    description: Host overrides the auto-generated hostname for the Route
                     type: string
                   tlsTermination:
                     default: edge
@@ -3548,18 +3425,15 @@ spec:
             description: FrappeSiteStatus defines the observed state of FrappeSite
             properties:
               appInstallationStatus:
-                description: AppInstallationStatus provides detailed status of app
-                  installation
+                description: AppInstallationStatus provides detailed status of app installation
                 type: string
               benchReady:
                 description: BenchReady indicates if the referenced bench is ready
                 type: boolean
               conditions:
-                description: Conditions represent the latest available observations
-                  of site's state
+                description: Conditions represent the latest available observations of site's state
                 items:
-                  description: Condition contains details for one aspect of the current
-                    state of this API Resource.
+                  description: Condition contains details for one aspect of the current state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -3613,19 +3487,16 @@ spec:
                   type: object
                 type: array
               databaseCredentialsSecret:
-                description: DatabaseCredentialsSecret is the name of the Secret with
-                  site-specific DB credentials
+                description: DatabaseCredentialsSecret is the name of the Secret with site-specific DB credentials
                 type: string
               databaseName:
                 description: DatabaseName is the actual database name created
                 type: string
               databaseReady:
-                description: DatabaseReady indicates if the database is provisioned
-                  and ready
+                description: DatabaseReady indicates if the database is provisioned and ready
                 type: boolean
               dbConnectionSecret:
-                description: DBConnectionSecret is the name of the Secret with DB
-                  credentials (legacy)
+                description: DBConnectionSecret is the name of the Secret with DB credentials (legacy)
                 type: string
               domainSource:
                 description: |-
@@ -3635,8 +3506,7 @@ spec:
               failedApps:
                 additionalProperties:
                   type: string
-                description: FailedApps lists apps that failed to install with error
-                  messages
+                description: FailedApps lists apps that failed to install with error messages
                 type: object
               installedApps:
                 description: |-
@@ -3646,10 +3516,12 @@ spec:
                   type: string
                 type: array
               observedGeneration:
-                description: ObservedGeneration reflects the generation of the most
-                  recently observed FrappeSite spec
+                description: ObservedGeneration reflects the generation of the most recently observed FrappeSite spec
                 format: int64
                 type: integer
+              observedSiteVersion:
+                description: ObservedSiteVersion reflects the frappe.io/site-version annotation value most recently processed
+                type: string
               phase:
                 description: Phase is the current phase
                 type: string
@@ -3681,7 +3553,7 @@ spec:
     singular: frappeworkpace
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: FrappeWorkpace is the Schema for the frappeworkpaces API
@@ -3707,8 +3579,7 @@ spec:
             description: FrappeWorkpaceSpec defines the desired state of FrappeWorkpace
             properties:
               foo:
-                description: Foo is an example field of FrappeWorkpace. Edit frappeworkpace_types.go
-                  to remove/update
+                description: Foo is an example field of FrappeWorkpace. Edit frappeworkpace_types.go to remove/update
                 type: string
             type: object
           status:
@@ -3735,7 +3606,7 @@ spec:
     singular: sitebackup
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: SiteBackup is the Schema for the sitebackups API
@@ -3766,28 +3637,23 @@ spec:
                   If empty, uses the default site backup location
                 type: string
               backupPathConf:
-                description: BackupPathConf specifies the path to save the config
-                  file
+                description: BackupPathConf specifies the path to save the config file
                 type: string
               backupPathDB:
-                description: BackupPathDB specifies the path to save the database
-                  file
+                description: BackupPathDB specifies the path to save the database file
                 type: string
               backupPathFiles:
-                description: BackupPathFiles specifies the path to save the public
-                  file
+                description: BackupPathFiles specifies the path to save the public file
                 type: string
               backupPathPrivateFiles:
-                description: BackupPathPrivateFiles specifies the path to save the
-                  private file
+                description: BackupPathPrivateFiles specifies the path to save the private file
                 type: string
               compress:
                 default: false
                 description: Compress compresses the backup files
                 type: boolean
               exclude:
-                description: Exclude specifies the DocTypes to not backup, separated
-                  by commas
+                description: Exclude specifies the DocTypes to not backup, separated by commas
                 items:
                   type: string
                 type: array
@@ -3796,8 +3662,7 @@ spec:
                 description: IgnoreBackupConf ignores excludes/includes set in config
                 type: boolean
               include:
-                description: Include specifies the DocTypes to backup, separated by
-                  commas
+                description: Include specifies the DocTypes to backup, separated by commas
                 items:
                   type: string
                 type: array
@@ -3819,12 +3684,10 @@ spec:
                     description: S3 configuration
                     properties:
                       accessKeySecret:
-                        description: AccessKeySecret references a secret key containing
-                          the Access Key ID
+                        description: AccessKeySecret references a secret key containing the Access Key ID
                         properties:
                           key:
-                            description: The key of the secret to select from.  Must
-                              be a valid secret key.
+                            description: The key of the secret to select from.  Must be a valid secret key.
                             type: string
                           name:
                             default: ""
@@ -3836,8 +3699,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                           optional:
-                            description: Specify whether the Secret or its key must
-                              be defined
+                            description: Specify whether the Secret or its key must be defined
                             type: boolean
                         required:
                         - key
@@ -3847,19 +3709,16 @@ spec:
                         description: Bucket name
                         type: string
                       endpoint:
-                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com"
-                          or minio URL)
+                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com" or minio URL)
                         type: string
                       region:
                         description: Region (standard S3 region)
                         type: string
                       secretKeySecret:
-                        description: SecretKeySecret references a secret key containing
-                          the Secret Access Key
+                        description: SecretKeySecret references a secret key containing the Secret Access Key
                         properties:
                           key:
-                            description: The key of the secret to select from.  Must
-                              be a valid secret key.
+                            description: The key of the secret to select from.  Must be a valid secret key.
                             type: string
                           name:
                             default: ""
@@ -3871,8 +3730,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                           optional:
-                            description: Specify whether the Secret or its key must
-                              be defined
+                            description: Specify whether the Secret or its key must be defined
                             type: boolean
                         required:
                         - key
@@ -3918,8 +3776,7 @@ spec:
                 description: LastBackupJob is the name of the last backup job or cronjob
                 type: string
               message:
-                description: Message provides additional information about the backup
-                  status
+                description: Message provides additional information about the backup status
                 type: string
               phase:
                 description: Phase indicates the current phase of the backup
@@ -3946,11 +3803,10 @@ spec:
     singular: sitedashboardchart
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
-        description: SiteDashboardChart is the Schema for the sitedashboardcharts
-          API
+        description: SiteDashboardChart is the Schema for the sitedashboardcharts API
         properties:
           apiVersion:
             description: |-
@@ -3973,8 +3829,7 @@ spec:
             description: SiteDashboardChartSpec defines the desired state of SiteDashboardChart
             properties:
               foo:
-                description: Foo is an example field of SiteDashboardChart. Edit sitedashboardchart_types.go
-                  to remove/update
+                description: Foo is an example field of SiteDashboardChart. Edit sitedashboardchart_types.go to remove/update
                 type: string
             type: object
           status:
@@ -4001,7 +3856,7 @@ spec:
     singular: sitedashboard
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: SiteDashboard is the Schema for the sitedashboards API
@@ -4027,8 +3882,7 @@ spec:
             description: SiteDashboardSpec defines the desired state of SiteDashboard
             properties:
               foo:
-                description: Foo is an example field of SiteDashboard. Edit sitedashboard_types.go
-                  to remove/update
+                description: Foo is an example field of SiteDashboard. Edit sitedashboard_types.go to remove/update
                 type: string
             type: object
           status:
@@ -4055,7 +3909,7 @@ spec:
     singular: sitejob
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: SiteJob is the Schema for the sitejobs API
@@ -4081,8 +3935,7 @@ spec:
             description: SiteJobSpec defines the desired state of SiteJob
             properties:
               foo:
-                description: Foo is an example field of SiteJob. Edit sitejob_types.go
-                  to remove/update
+                description: Foo is an example field of SiteJob. Edit sitejob_types.go to remove/update
                 type: string
             type: object
           status:
@@ -4119,7 +3972,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: SiteRestore is the Schema for the siterestores API
@@ -4145,12 +3998,10 @@ spec:
             description: SiteRestoreSpec defines the desired state of SiteRestore
             properties:
               adminPasswordSecretRef:
-                description: AdminPasswordSecretRef references a secret key containing
-                  the new admin password
+                description: AdminPasswordSecretRef references a secret key containing the new admin password
                 properties:
                   key:
-                    description: The key of the secret to select from.  Must be a
-                      valid secret key.
+                    description: The key of the secret to select from.  Must be a valid secret key.
                     type: string
                   name:
                     default: ""
@@ -4169,8 +4020,7 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               benchRef:
-                description: BenchRef references the bench where the site should be
-                  restored
+                description: BenchRef references the bench where the site should be restored
                 properties:
                   name:
                     description: Name of the resource
@@ -4182,23 +4032,19 @@ spec:
                 - name
                 type: object
               databaseBackupSource:
-                description: DatabaseBackupSource specifies where to get the SQL backup
-                  from
+                description: DatabaseBackupSource specifies where to get the SQL backup from
                 properties:
                   localPath:
-                    description: LocalPath is the path relative to the bench root
-                      (e.g., "sites/site1.local/private/backups/xyz.sql")
+                    description: LocalPath is the path relative to the bench root (e.g., "sites/site1.local/private/backups/xyz.sql")
                     type: string
                   s3:
                     description: S3 specifies a file in S3-compatible storage
                     properties:
                       accessKeySecret:
-                        description: AccessKeySecret references a secret key containing
-                          the Access Key ID
+                        description: AccessKeySecret references a secret key containing the Access Key ID
                         properties:
                           key:
-                            description: The key of the secret to select from.  Must
-                              be a valid secret key.
+                            description: The key of the secret to select from.  Must be a valid secret key.
                             type: string
                           name:
                             default: ""
@@ -4210,8 +4056,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                           optional:
-                            description: Specify whether the Secret or its key must
-                              be defined
+                            description: Specify whether the Secret or its key must be defined
                             type: boolean
                         required:
                         - key
@@ -4221,8 +4066,7 @@ spec:
                         description: Bucket name
                         type: string
                       endpoint:
-                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com"
-                          or minio URL)
+                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com" or minio URL)
                         type: string
                       key:
                         description: Key is the path/name of the file in the bucket
@@ -4231,12 +4075,10 @@ spec:
                         description: Region (standard S3 region)
                         type: string
                       secretKeySecret:
-                        description: SecretKeySecret references a secret key containing
-                          the Secret Access Key
+                        description: SecretKeySecret references a secret key containing the Secret Access Key
                         properties:
                           key:
-                            description: The key of the secret to select from.  Must
-                              be a valid secret key.
+                            description: The key of the secret to select from.  Must be a valid secret key.
                             type: string
                           name:
                             default: ""
@@ -4248,8 +4090,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                           optional:
-                            description: Specify whether the Secret or its key must
-                              be defined
+                            description: Specify whether the Secret or its key must be defined
                             type: boolean
                         required:
                         - key
@@ -4272,23 +4113,19 @@ spec:
                 description: Force bypasses the warning if a site downgrade is detected
                 type: boolean
               privateFilesSource:
-                description: PrivateFilesSource specifies where to get the private
-                  files backup from
+                description: PrivateFilesSource specifies where to get the private files backup from
                 properties:
                   localPath:
-                    description: LocalPath is the path relative to the bench root
-                      (e.g., "sites/site1.local/private/backups/xyz.sql")
+                    description: LocalPath is the path relative to the bench root (e.g., "sites/site1.local/private/backups/xyz.sql")
                     type: string
                   s3:
                     description: S3 specifies a file in S3-compatible storage
                     properties:
                       accessKeySecret:
-                        description: AccessKeySecret references a secret key containing
-                          the Access Key ID
+                        description: AccessKeySecret references a secret key containing the Access Key ID
                         properties:
                           key:
-                            description: The key of the secret to select from.  Must
-                              be a valid secret key.
+                            description: The key of the secret to select from.  Must be a valid secret key.
                             type: string
                           name:
                             default: ""
@@ -4300,8 +4137,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                           optional:
-                            description: Specify whether the Secret or its key must
-                              be defined
+                            description: Specify whether the Secret or its key must be defined
                             type: boolean
                         required:
                         - key
@@ -4311,8 +4147,7 @@ spec:
                         description: Bucket name
                         type: string
                       endpoint:
-                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com"
-                          or minio URL)
+                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com" or minio URL)
                         type: string
                       key:
                         description: Key is the path/name of the file in the bucket
@@ -4321,12 +4156,10 @@ spec:
                         description: Region (standard S3 region)
                         type: string
                       secretKeySecret:
-                        description: SecretKeySecret references a secret key containing
-                          the Secret Access Key
+                        description: SecretKeySecret references a secret key containing the Secret Access Key
                         properties:
                           key:
-                            description: The key of the secret to select from.  Must
-                              be a valid secret key.
+                            description: The key of the secret to select from.  Must be a valid secret key.
                             type: string
                           name:
                             default: ""
@@ -4338,8 +4171,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                           optional:
-                            description: Specify whether the Secret or its key must
-                              be defined
+                            description: Specify whether the Secret or its key must be defined
                             type: boolean
                         required:
                         - key
@@ -4358,23 +4190,19 @@ spec:
                     type: object
                 type: object
               publicFilesSource:
-                description: PublicFilesSource specifies where to get the public files
-                  backup from
+                description: PublicFilesSource specifies where to get the public files backup from
                 properties:
                   localPath:
-                    description: LocalPath is the path relative to the bench root
-                      (e.g., "sites/site1.local/private/backups/xyz.sql")
+                    description: LocalPath is the path relative to the bench root (e.g., "sites/site1.local/private/backups/xyz.sql")
                     type: string
                   s3:
                     description: S3 specifies a file in S3-compatible storage
                     properties:
                       accessKeySecret:
-                        description: AccessKeySecret references a secret key containing
-                          the Access Key ID
+                        description: AccessKeySecret references a secret key containing the Access Key ID
                         properties:
                           key:
-                            description: The key of the secret to select from.  Must
-                              be a valid secret key.
+                            description: The key of the secret to select from.  Must be a valid secret key.
                             type: string
                           name:
                             default: ""
@@ -4386,8 +4214,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                           optional:
-                            description: Specify whether the Secret or its key must
-                              be defined
+                            description: Specify whether the Secret or its key must be defined
                             type: boolean
                         required:
                         - key
@@ -4397,8 +4224,7 @@ spec:
                         description: Bucket name
                         type: string
                       endpoint:
-                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com"
-                          or minio URL)
+                        description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com" or minio URL)
                         type: string
                       key:
                         description: Key is the path/name of the file in the bucket
@@ -4407,12 +4233,10 @@ spec:
                         description: Region (standard S3 region)
                         type: string
                       secretKeySecret:
-                        description: SecretKeySecret references a secret key containing
-                          the Secret Access Key
+                        description: SecretKeySecret references a secret key containing the Secret Access Key
                         properties:
                           key:
-                            description: The key of the secret to select from.  Must
-                              be a valid secret key.
+                            description: The key of the secret to select from.  Must be a valid secret key.
                             type: string
                           name:
                             default: ""
@@ -4424,8 +4248,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                           optional:
-                            description: Specify whether the Secret or its key must
-                              be defined
+                            description: Specify whether the Secret or its key must be defined
                             type: boolean
                         required:
                         - key
@@ -4459,8 +4282,7 @@ spec:
                 format: date-time
                 type: string
               message:
-                description: Message provides additional information about the restore
-                  status
+                description: Message provides additional information about the restore status
                 type: string
               phase:
                 description: Phase indicates the current phase of the restore
@@ -4490,7 +4312,7 @@ spec:
     singular: siteuser
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: SiteUser is the Schema for the siteusers API
@@ -4516,8 +4338,7 @@ spec:
             description: SiteUserSpec defines the desired state of SiteUser
             properties:
               foo:
-                description: Foo is an example field of SiteUser. Edit siteuser_types.go
-                  to remove/update
+                description: Foo is an example field of SiteUser. Edit siteuser_types.go to remove/update
                 type: string
             type: object
           status:
@@ -4544,7 +4365,7 @@ spec:
     singular: siteworkspace
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: SiteWorkspace is the Schema for the siteworkspaces API
@@ -4570,8 +4391,7 @@ spec:
             description: SiteWorkspaceSpec defines the desired state of SiteWorkspace
             properties:
               foo:
-                description: Foo is an example field of SiteWorkspace. Edit siteworkspace_types.go
-                  to remove/update
+                description: Foo is an example field of SiteWorkspace. Edit siteworkspace_types.go to remove/update
                 type: string
             type: object
           status:
@@ -4959,6 +4779,32 @@ subjects:
   namespace: frappe-operator-system
 ---
 apiVersion: v1
+data:
+  defaultDomainSuffix: .myplatform.com
+  defaultFrappeImage: ghcr.io/vyogotech/frappe_base:latest
+  defaultMariaDBImage: docker.io/library/mariadb:10.6
+  defaultNginxImage: docker.io/library/nginx:1.25-alpine
+  defaultPostgresImage: docker.io/library/postgres:15-alpine
+  defaultRedisImage: docker.io/library/redis:7-alpine
+  fpmCliPath: /usr/local/bin/fpm
+  fpmRepositories: |
+    [
+      {
+        "name": "frappe-community",
+        "url": "https://fpm.frappe.io",
+        "priority": 100
+      }
+    ]
+  gitEnabled: "false"
+  ingressControllerNamespace: ingress-nginx
+  ingressControllerService: ingress-nginx-controller
+  maxConcurrentSiteReconciles: "10"
+kind: ConfigMap
+metadata:
+  name: frappe-operator-frappe-operator-config
+  namespace: frappe-operator-system
+---
+apiVersion: v1
 kind: Service
 metadata:
   labels:
@@ -5051,7 +4897,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: ghcr.io/vyogotech/frappe-operator:4.0.0
+        image: ghcr.io/vyogotech/frappe-operator:v4.1.0
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:

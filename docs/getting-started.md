@@ -31,7 +31,7 @@ Install the operator and its CRDs:
 
 ```bash
 # Install CRDs and operator
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/config/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.yaml
 
 # Verify installation
 kubectl get deployment -n frappe-operator-system
@@ -552,6 +552,6 @@ kubectl delete statefulset mariadb
 kubectl delete service mariadb
 
 # Uninstall operator (optional)
-kubectl delete -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/config/install.yaml
+kubectl delete -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.yaml
 ```
 
