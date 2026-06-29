@@ -156,7 +156,7 @@ jobs:
           GH_TOKEN: ${{ secrets.COMMUNITY_OP_PAT }}
         run: |
           # Fork (if not already forked) and clone the repository
-          gh repo fork k8s-operatorhub/community-operators --clone --remote-name fork
+          gh repo fork k8s-operatorhub/community-operators --clone
           cd community-operators
           
           # Create directory for the new operator version
@@ -172,7 +172,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
           git commit -m "Update frappe-operator to ${{ steps.version.outputs.VERSION }}"
-          git push fork frappe-operator-${{ steps.version.outputs.VERSION }}
+          git push origin frappe-operator-${{ steps.version.outputs.VERSION }}
           
           # Open Pull Request targeting the community-operators master/main branch
           gh pr create \
