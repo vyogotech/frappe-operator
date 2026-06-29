@@ -92,7 +92,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Run script package tests
         run: |
@@ -175,7 +175,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Test script rendering
         run: |
