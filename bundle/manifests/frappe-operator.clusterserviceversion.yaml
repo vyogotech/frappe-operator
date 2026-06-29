@@ -127,10 +127,10 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime,Database
-    createdAt: "2026-05-08T02:51:31Z"
-    operators.operatorframework.io/builder: operator-sdk-v1.42.2
+    createdAt: "2026-06-29T11:10:48Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.34.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: frappe-operator.v4.1.0
+  name: frappe-operator.v4.1.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -491,7 +491,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: ghcr.io/vyogotech/frappe-operator:v4.1.0
+                image: ghcr.io/vyogotech/frappe-operator:v4.1.1
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -583,5 +583,4 @@ spec:
   provider:
     name: Vyogo Tech
     url: https://vyogo.tech
-  version: 4.1.0
-  replaces: frappe-operator.v4.0.0
+  version: 4.1.1
