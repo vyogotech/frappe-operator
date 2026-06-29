@@ -24,7 +24,7 @@ rm -f Makefile.bak
 
 # 2. Update Kustomization
 echo "Updating config/manager/kustomization.yaml..."
-sed -i.bak -e "s/newTag: .*/newTag: $CLEAN_VERSION/" config/manager/kustomization.yaml
+sed -i.bak -e "s/newTag: .*/newTag: $V_VERSION/" config/manager/kustomization.yaml
 rm -f config/manager/kustomization.yaml.bak
 
 # 3. Update Helm Chart values.yaml
@@ -42,7 +42,7 @@ rm -f helm/frappe-operator/Chart.yaml.bak
 if [ -f "install.yaml" ]; then
     echo "Updating install.yaml..."
     # Looks for 'image: ghcr.io/vyogotech/frappe-operator:...' and updates the tag
-    sed -i.bak -e "s|image: ghcr.io/vyogotech/frappe-operator:.*|image: ghcr.io/vyogotech/frappe-operator:$CLEAN_VERSION|g" install.yaml
+    sed -i.bak -e "s|image: ghcr.io/vyogotech/frappe-operator:.*|image: ghcr.io/vyogotech/frappe-operator:$V_VERSION|g" install.yaml
     rm -f install.yaml.bak
 fi
 
