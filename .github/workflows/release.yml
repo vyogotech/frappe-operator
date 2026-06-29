@@ -151,6 +151,13 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Get Fork Owner Username
+        id: fork_owner
+        env:
+          GH_TOKEN: ${{ secrets.COMMUNITY_OP_PAT }}
+        run: |
+          echo "USER=$(gh api user --jq .login)" >> $GITHUB_OUTPUT
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -200,6 +207,6 @@ jobs:
             --repo k8s-operatorhub/community-operators \
             --title "Update frappe-operator to v${{ steps.version.outputs.VERSION }}" \
             --body "Automated release update for frappe-operator version ${{ steps.version.outputs.VERSION }}." \
-            --head "frappe-operator-${{ steps.version.outputs.VERSION }}" \
+            --head "${{ steps.fork_owner.outputs.USER }}:frappe-operator-${{ steps.version.outputs.VERSION }}" \
             --base main
 
