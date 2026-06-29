@@ -52,9 +52,9 @@ jobs:
         run: |
           git add -A
           git commit -m "chore: bump version to v${{ inputs.version }} [skip ci]" || exit 0
-          git push origin release
+          git push https://x-access-token:${{ secrets.COMMUNITY_OP_PAT }}@github.com/${{ github.repository }}.git release
 
       - name: Create and Push Release Tag
         run: |
           git tag v${{ inputs.version }}
-          git push origin v${{ inputs.version }}
+          git push https://x-access-token:${{ secrets.COMMUNITY_OP_PAT }}@github.com/${{ github.repository }}.git v${{ inputs.version }}
