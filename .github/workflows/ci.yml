@@ -8,12 +8,14 @@ on:
       - develop
       - release
       - feature/**
+      - fix/**
+      - fix-*
     paths-ignore:
       - "*.md"
       - "_config.yml"
       - "docs/**"
   pull_request:
-    branches: [main, master, develop, release, feature/**]
+    branches: [main, master, develop, release, feature/**, fix/**, fix-*]
     paths-ignore:
       - "*.md"
       - "_config.yml"
