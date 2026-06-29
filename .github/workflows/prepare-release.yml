@@ -1,0 +1,52 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version to release (e.g. 4.1.1)'
+        required: true
+        type: string
+
+jobs:
+  bump-and-tag:
+    name: Bump Version and Tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run Version Bump
+        run: |
+          chmod +x ./scripts/bump-version.sh
+          ./scripts/bump-version.sh ${{ inputs.version }}
+
+      - name: Regenerate OLM Bundle and Manifests
+        run: |
+          make manifests
+          make bundle VERSION=${{ inputs.version }} IMG=ghcr.io/${{ github.repository }}:v${{ inputs.version }}
+
+      - name: Commit and Push Changes
+        run: |
+          git add -A
+          git commit -m "chore: bump version to v${{ inputs.version }} [skip ci]" || exit 0
+          git push origin release
+
+      - name: Create and Push Release Tag
+        run: |
+          git tag v${{ inputs.version }}
+          git push origin v${{ inputs.version }}
