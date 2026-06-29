@@ -59,7 +59,7 @@ kubectl delete validatingwebhookconfiguration frappe-operator-validating-webhook
 kubectl delete mutatingwebhookconfiguration frappe-operator-mutating-webhook-configuration
 
 <span class="c"># Reinstall operator</span>
-kubectl apply <span class="nt">-f</span> config/install.yaml
+kubectl apply <span class="nt">-f</span> install.yaml
 </code></pre></div></div><hr /> <h2 id="bench-issues"> <a href="#bench-issues" class="anchor-heading" aria-labelledby="bench-issues"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Bench Issues </h2> <h3 id="bench-not-becoming-ready"> <a href="#bench-not-becoming-ready" class="anchor-heading" aria-labelledby="bench-not-becoming-ready"><svg viewBox="0 0 16 16" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a> Bench Not Becoming Ready </h3> <p><strong>Problem:</strong> FrappeBench status shows <code class="language-plaintext highlighter-rouge">ready: false</code>.</p> <p><strong>Diagnosis:</strong></p> <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check bench status</span>
 kubectl get frappebench &lt;bench-name&gt; <span class="nt">-o</span> yaml | <span class="nb">grep</span> <span class="nt">-A</span> 10 status
 
