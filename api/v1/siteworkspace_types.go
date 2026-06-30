@@ -28,8 +28,8 @@ type SiteWorkspaceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of SiteWorkspace. Edit siteworkspace_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Description provides a human-readable explanation of the SiteWorkspace.
+	Description string `json:"description,omitempty"`
 }
 
 // SiteWorkspaceStatus defines the observed state of SiteWorkspace

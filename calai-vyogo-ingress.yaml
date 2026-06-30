@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: calai-vyogo
+  namespace: calai
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  labels:
+    app.kubernetes.io/instance: calai
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: calai
+    app.kubernetes.io/version: latest
+    helm.sh/chart: calai-0.1.0
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: calai.vyogo.tech
+    http:
+      paths:
+      - backend:
+          service:
+            name: calai-app
+            port:
+              number: 3000
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - calai.vyogo.tech
+    secretName: calai-vyogo-tls

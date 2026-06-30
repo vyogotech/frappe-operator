@@ -3578,8 +3578,8 @@ spec:
           spec:
             description: FrappeWorkpaceSpec defines the desired state of FrappeWorkpace
             properties:
-              foo:
-                description: Foo is an example field of FrappeWorkpace. Edit frappeworkpace_types.go to remove/update
+              description:
+                description: Description provides a human-readable explanation of the FrappeWorkpace.
                 type: string
             type: object
           status:
@@ -3828,8 +3828,8 @@ spec:
           spec:
             description: SiteDashboardChartSpec defines the desired state of SiteDashboardChart
             properties:
-              foo:
-                description: Foo is an example field of SiteDashboardChart. Edit sitedashboardchart_types.go to remove/update
+              description:
+                description: Description provides a human-readable explanation of the SiteDashboardChart.
                 type: string
             type: object
           status:
@@ -3881,8 +3881,8 @@ spec:
           spec:
             description: SiteDashboardSpec defines the desired state of SiteDashboard
             properties:
-              foo:
-                description: Foo is an example field of SiteDashboard. Edit sitedashboard_types.go to remove/update
+              description:
+                description: Description provides a human-readable explanation of the SiteDashboard.
                 type: string
             type: object
           status:
@@ -3934,8 +3934,8 @@ spec:
           spec:
             description: SiteJobSpec defines the desired state of SiteJob
             properties:
-              foo:
-                description: Foo is an example field of SiteJob. Edit sitejob_types.go to remove/update
+              description:
+                description: Description provides a human-readable explanation of the SiteJob.
                 type: string
             type: object
           status:
@@ -4337,8 +4337,8 @@ spec:
           spec:
             description: SiteUserSpec defines the desired state of SiteUser
             properties:
-              foo:
-                description: Foo is an example field of SiteUser. Edit siteuser_types.go to remove/update
+              description:
+                description: Description provides a human-readable explanation of the SiteUser.
                 type: string
             type: object
           status:
@@ -4390,8 +4390,8 @@ spec:
           spec:
             description: SiteWorkspaceSpec defines the desired state of SiteWorkspace
             properties:
-              foo:
-                description: Foo is an example field of SiteWorkspace. Edit siteworkspace_types.go to remove/update
+              description:
+                description: Description provides a human-readable explanation of the SiteWorkspace.
                 type: string
             type: object
           status:

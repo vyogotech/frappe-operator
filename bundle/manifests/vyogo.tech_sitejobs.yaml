@@ -39,9 +39,9 @@ spec:
           spec:
             description: SiteJobSpec defines the desired state of SiteJob
             properties:
-              foo:
-                description: Foo is an example field of SiteJob. Edit sitejob_types.go
-                  to remove/update
+              description:
+                description: Description provides a human-readable explanation of
+                  the SiteJob.
                 type: string
             type: object
           status:
