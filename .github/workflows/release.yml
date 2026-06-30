@@ -171,10 +171,33 @@ jobs:
           curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
           chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
 
+      - name: Fetch all tags
+        run: git fetch --tags --force
+
       - name: Generate OLM Bundle
         run: |
+          PREVIOUS_VERSION=$(git tag -l "v*" --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^v${{ steps.version.outputs.VERSION }}$" | head -n 1 | sed 's/^v//')
+          if [ -n "$PREVIOUS_VERSION" ]; then
+            REPLACES_ARG="REPLACES=frappe-operator.v${PREVIOUS_VERSION}"
+          else
+            REPLACES_ARG=""
+          fi
+          
           make manifests
-          make bundle VERSION=${{ steps.version.outputs.VERSION }} IMG=ghcr.io/${{ github.repository }}:v${{ steps.version.outputs.VERSION }}
+          make bundle VERSION=${{ steps.version.outputs.VERSION }} IMG=ghcr.io/${{ github.repository }}:v${{ steps.version.outputs.VERSION }} $REPLACES_ARG
+          
+          # Inject containerImage annotation required by OperatorHub
+          python3 -c "
+          import sys
+          path = 'bundle/manifests/frappe-operator.clusterserviceversion.yaml'
+          with open(path, 'r') as f:
+              content = f.read()
+          target = '  annotations:\n'
+          replacement = f'  annotations:\n    containerImage: ghcr.io/vyogotech/frappe-operator:v{sys.argv[1]}\n'
+          content = content.replace(target, replacement, 1)
+          with open(path, 'w') as f:
+              f.write(content)
+          " ${{ steps.version.outputs.VERSION }}
 
       - name: Fork and Clone Community Operators Repository
         env:
