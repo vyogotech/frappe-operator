@@ -175,29 +175,37 @@ jobs:
         run: git fetch --tags --force
 
       - name: Generate OLM Bundle
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           PREVIOUS_VERSION=$(git tag -l "v*" --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^v${{ steps.version.outputs.VERSION }}$" | head -n 1 | sed 's/^v//')
-          if [ -n "$PREVIOUS_VERSION" ]; then
-            REPLACES_ARG="REPLACES=frappe-operator.v${PREVIOUS_VERSION}"
-          else
-            REPLACES_ARG=""
-          fi
+          export PREVIOUS_VERSION
           
           make manifests
-          make bundle VERSION=${{ steps.version.outputs.VERSION }} IMG=ghcr.io/${{ github.repository }}:v${{ steps.version.outputs.VERSION }} $REPLACES_ARG
+          make bundle VERSION=${{ steps.version.outputs.VERSION }} IMG=ghcr.io/${{ github.repository }}:v${{ steps.version.outputs.VERSION }}
           
-          # Inject containerImage annotation required by OperatorHub
+          # Inject containerImage annotation and replaces upgrade path required by OperatorHub
           python3 -c "
-          import sys
+          import os
           path = 'bundle/manifests/frappe-operator.clusterserviceversion.yaml'
           with open(path, 'r') as f:
               content = f.read()
-          target = '  annotations:\n'
-          replacement = f'  annotations:\n    containerImage: ghcr.io/vyogotech/frappe-operator:v{sys.argv[1]}\n'
-          content = content.replace(target, replacement, 1)
+          
+          # Inject containerImage annotation
+          target_ann = '  annotations:\n'
+          replacement_ann = f'  annotations:\n    containerImage: ghcr.io/vyogotech/frappe-operator:v{os.environ[\"VERSION\"]}\n'
+          content = content.replace(target_ann, replacement_ann, 1)
+          
+          # Inject replaces field if previous version exists
+          prev = os.environ.get('PREVIOUS_VERSION')
+          if prev:
+              target_spec = 'spec:\n'
+              replacement_spec = f'spec:\n  replaces: frappe-operator.v{prev}\n'
+              content = content.replace(target_spec, replacement_spec, 1)
+              
           with open(path, 'w') as f:
               f.write(content)
-          " ${{ steps.version.outputs.VERSION }}
+          "
 
       - name: Fork and Clone Community Operators Repository
         env:
