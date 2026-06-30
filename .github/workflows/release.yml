@@ -186,6 +186,12 @@ jobs:
           # Fork (if not already forked) and clone the repository
           gh repo fork k8s-operatorhub/community-operators --clone
           cd community-operators
+
+          # Add upstream and sync the fork's main branch with upstream main
+          git remote add upstream https://github.com/k8s-operatorhub/community-operators.git -f
+          git checkout main
+          git reset --hard upstream/main
+          git push origin main --force
           
           # Create directory for the new operator version
           OPERATOR_DIR="operators/frappe-operator/${{ steps.version.outputs.VERSION }}"
