@@ -245,5 +245,5 @@ jobs:
             --title "Update frappe-operator to v${{ steps.version.outputs.VERSION }}" \
             --body "Automated release update for frappe-operator version ${{ steps.version.outputs.VERSION }}." \
             --head "${{ steps.fork_owner.outputs.USER }}:frappe-operator-${{ steps.version.outputs.VERSION }}" \
-            --base main
+            --base main || echo "Pull Request already exists or could not be created."
 
