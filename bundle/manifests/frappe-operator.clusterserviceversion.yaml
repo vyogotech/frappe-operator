@@ -127,8 +127,8 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime,Database
-    createdAt: "2026-06-29T11:10:48Z"
-    operators.operatorframework.io/builder: operator-sdk-v1.34.1
+    createdAt: "2026-06-30T00:36:25Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: frappe-operator.v4.1.1
   namespace: placeholder

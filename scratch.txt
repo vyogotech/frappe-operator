@@ -1,0 +1,12 @@
+To implement all of these architectural and security changes, we would be moving this from a "Proof of Concept" script into a production-grade enterprise system. 
+
+Here is a breakdown of what is actually needed to build this, sorted from easiest to hardest, along with the testing difficulty for each phase.
+
+### Phase 1: The "Quick Wins" (Security Baseline & Event-Driven Indexing)
+**What is needed:**
+* **Authentication:** Add standard FastAPI API-key middleware to both `skill-manager` and `skills-service` endpoints.
+* **File Watching:** Replace the manual `/reload` endpoint with Python's `watchdog` library in `skills-service` so it automatically re-indexes the moment a file is saved to the directory.
+* **Path Traversal Protection:** Add standard `os.path.abspath()` validation when the manager downloads a skill.
+
+**Testing Difficulty: 🟢 EASY**
+<truncated 3219 bytes>
