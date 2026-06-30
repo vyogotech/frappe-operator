@@ -73,6 +73,25 @@ REDIS_QUEUE_ADDRESS=$(cat /tmp/site-secrets/redis_queue_address 2>/dev/null || e
 SKIP_INIT=$(cat /tmp/site-secrets/skip_init 2>/dev/null || echo "false")
 ENCRYPTION_KEY=$(cat /tmp/site-secrets/encryption_key 2>/dev/null || echo "")
 
+# Sync assets from the image cache to the Persistent Volume BEFORE migration/initialization
+# This guarantees that even if database migration fails, assets are present for the web service
+if [ -d "/home/frappe/assets_cache" ]; then
+    echo "Syncing pre-built assets from image to PVC..."
+    mkdir -p sites/assets
+    # Use -R to copy recursively. We want to overwrite old assets with new ones from the image.
+    cp -R /home/frappe/assets_cache/* sites/assets/ || echo "Warning: Failed to sync assets"
+fi
+
+# Create or update common_site_config.json BEFORE migration/initialization
+echo "Creating common_site_config.json..."
+cat > sites/common_site_config.json <<EOF
+{
+  "redis_cache": "redis://${REDIS_CACHE_ADDRESS}",
+  "redis_queue": "redis://${REDIS_QUEUE_ADDRESS}",
+  "socketio_port": 9000
+}
+EOF
+
 # Centralized function to intelligently merge site_config.json without destroying existing keys
 update_site_config_json() {
     echo "Intelligently updating site_config.json..."
@@ -467,24 +486,6 @@ else
     exit 1
 fi
 
-# Create or update common_site_config.json
-echo "Creating common_site_config.json..."
-cat > sites/common_site_config.json <<EOF
-{
-  "redis_cache": "redis://${REDIS_CACHE_ADDRESS}",
-  "redis_queue": "redis://${REDIS_QUEUE_ADDRESS}",
-  "socketio_port": 9000
-}
-EOF
-
-# Sync assets from the image cache to the Persistent Volume
-if [ -d "/home/frappe/assets_cache" ]; then
-    echo "Syncing pre-built assets from image to PVC..."
-    mkdir -p sites/assets
-    # Use -R to copy recursively. We want to overwrite old assets with new ones from the image.
-    # But we don't want to delete files (unless we use rsync --delete which might be risky or unavailable)
-    cp -R /home/frappe/assets_cache/* sites/assets/ || echo "Warning: Failed to sync assets"
-fi
 
 echo "Site $SITE_NAME created successfully!"
 
