@@ -39,9 +39,9 @@ spec:
           spec:
             description: FrappeWorkpaceSpec defines the desired state of FrappeWorkpace
             properties:
-              foo:
-                description: Foo is an example field of FrappeWorkpace. Edit frappeworkpace_types.go
-                  to remove/update
+              description:
+                description: Description provides a human-readable explanation of
+                  the FrappeWorkpace.
                 type: string
             type: object
           status:

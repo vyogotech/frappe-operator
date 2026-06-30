@@ -39,9 +39,9 @@ spec:
           spec:
             description: SiteWorkspaceSpec defines the desired state of SiteWorkspace
             properties:
-              foo:
-                description: Foo is an example field of SiteWorkspace. Edit siteworkspace_types.go
-                  to remove/update
+              description:
+                description: Description provides a human-readable explanation of
+                  the SiteWorkspace.
                 type: string
             type: object
           status:

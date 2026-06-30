@@ -39,9 +39,9 @@ spec:
           spec:
             description: SiteUserSpec defines the desired state of SiteUser
             properties:
-              foo:
-                description: Foo is an example field of SiteUser. Edit siteuser_types.go
-                  to remove/update
+              description:
+                description: Description provides a human-readable explanation of
+                  the SiteUser.
                 type: string
             type: object
           status:
