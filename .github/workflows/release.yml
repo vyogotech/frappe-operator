@@ -218,8 +218,9 @@ jobs:
           gh repo fork k8s-operatorhub/community-operators --clone
           cd community-operators
 
-          # Add upstream and sync the fork's main branch with upstream main
-          git remote add upstream https://github.com/k8s-operatorhub/community-operators.git -f
+          # Add upstream (tolerating if it already exists) and sync the fork's main branch with upstream main
+          git remote add upstream https://github.com/k8s-operatorhub/community-operators.git || true
+          git fetch upstream
           git checkout main
           git reset --hard upstream/main
           git push origin main --force
