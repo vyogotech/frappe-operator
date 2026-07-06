@@ -77,6 +77,21 @@ type FrappeBenchSpec struct {
 	// PodConfig defines advanced pod configuration for all bench components
 	// +optional
 	PodConfig *PodConfig `json:"podConfig,omitempty"`
+
+	// Observability defines APM integration configuration (Prometheus/OpenTelemetry)
+	// +optional
+	Observability *ObservabilityConfig `json:"observability,omitempty"`
+}
+
+// ObservabilityConfig defines configuration for OpenTelemetry / Prometheus APM integration
+type ObservabilityConfig struct {
+	// EnableTelemetry enables the injection of the Prometheus/OTel sidecar container
+	// +optional
+	EnableTelemetry bool `json:"enableTelemetry,omitempty"`
+
+	// OtelExporterEndpoint specifies the destination endpoint for OpenTelemetry traces/metrics
+	// +optional
+	OtelExporterEndpoint string `json:"otelExporterEndpoint,omitempty"`
 }
 
 // FrappeBenchStatus defines the observed state of FrappeBench

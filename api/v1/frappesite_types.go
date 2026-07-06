@@ -86,6 +86,17 @@ type FrappeSiteSpec struct {
 	// When true, the initialization job only performs migrations and configuration updates.
 	// +optional
 	SkipInit bool `json:"skipInit,omitempty"`
+
+	// ObjectStorage defines S3-compatible object storage configuration
+	// +optional
+	ObjectStorage *S3Config `json:"objectStorage,omitempty"`
+
+	// UpgradeStrategy defines the strategy used during site image upgrades.
+	// Options: Recreate, Canary (experimental)
+	// +kubebuilder:validation:Enum=Recreate;Canary
+	// +kubebuilder:default=Recreate
+	// +optional
+	UpgradeStrategy string `json:"upgradeStrategy,omitempty"`
 }
 
 // FrappeSitePhase represents the current phase

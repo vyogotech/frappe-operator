@@ -26,6 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -196,6 +197,57 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 			changed = true
 		}
 
+		// Reconcile Observability sidecar container
+		hasSidecar := false
+		sidecarIdx := -1
+		for idx, c := range deploy.Spec.Template.Spec.Containers {
+			if c.Name == "otel-collector" {
+				hasSidecar = true
+				sidecarIdx = idx
+				break
+			}
+		}
+
+		wantSidecar := bench.Spec.Observability != nil && bench.Spec.Observability.EnableTelemetry
+		if wantSidecar {
+			endpoint := "http://localhost:4317"
+			if bench.Spec.Observability.OtelExporterEndpoint != "" {
+				endpoint = bench.Spec.Observability.OtelExporterEndpoint
+			}
+			expectedArgs := []string{"--config=yaml:\n" + r.getOtelConfig(endpoint)}
+			if !hasSidecar {
+				newSidecar := corev1.Container{
+					Name:  "otel-collector",
+					Image: "otel/opentelemetry-collector-contrib:latest",
+					Args:  expectedArgs,
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("64Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+					},
+					SecurityContext: r.getContainerSecurityContext(ctx, bench),
+				}
+				deploy.Spec.Template.Spec.Containers = append(deploy.Spec.Template.Spec.Containers, newSidecar)
+				changed = true
+			} else {
+				if len(deploy.Spec.Template.Spec.Containers[sidecarIdx].Args) == 0 || deploy.Spec.Template.Spec.Containers[sidecarIdx].Args[0] != expectedArgs[0] {
+					deploy.Spec.Template.Spec.Containers[sidecarIdx].Args = expectedArgs
+					changed = true
+				}
+			}
+		} else if hasSidecar {
+			deploy.Spec.Template.Spec.Containers = append(
+				deploy.Spec.Template.Spec.Containers[:sidecarIdx],
+				deploy.Spec.Template.Spec.Containers[sidecarIdx+1:]...,
+			)
+			changed = true
+		}
+
 		if changed {
 			return r.Update(ctx, deploy)
 		}
@@ -236,7 +288,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 
 	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
 
-	deploy, err = resources.NewDeploymentBuilder(deployName, bench.Namespace).
+	deployBuilder := resources.NewDeploymentBuilder(deployName, bench.Namespace).
 		WithLabels(extraLabels).
 		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, componentName)).
@@ -249,8 +301,35 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 		WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
 		WithContainer(container).
 		WithPVCVolume("sites", pvcName).
-		WithOwner(bench, r.Scheme).
-		Build()
+		WithOwner(bench, r.Scheme)
+
+	if bench.Spec.Observability != nil && bench.Spec.Observability.EnableTelemetry {
+		endpoint := "http://localhost:4317"
+		if bench.Spec.Observability.OtelExporterEndpoint != "" {
+			endpoint = bench.Spec.Observability.OtelExporterEndpoint
+		}
+		newSidecar := corev1.Container{
+			Name:  "otel-collector",
+			Image: "otel/opentelemetry-collector-contrib:latest",
+			Args: []string{
+				"--config=yaml:\n" + r.getOtelConfig(endpoint),
+			},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("128Mi"),
+				},
+			},
+			SecurityContext: r.getContainerSecurityContext(ctx, bench),
+		}
+		deployBuilder.WithContainer(newSidecar)
+	}
+
+	deploy, err = deployBuilder.Build()
 	if err != nil {
 		return err
 	}
@@ -590,4 +669,25 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 	}
 
 	return r.Create(ctx, deploy)
+}
+
+func (r *FrappeBenchReconciler) getOtelConfig(endpoint string) string {
+	return `receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'gunicorn'
+          static_configs:
+            - targets: ['localhost:8000']
+exporters:
+  otlp:
+    endpoint: ` + endpoint + `
+    tls:
+      insecure: true
+service:
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      exporters: [otlp]
+`
 }
