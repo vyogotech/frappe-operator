@@ -626,6 +626,18 @@ spec:
                     description: Tag is the image tag
                     type: string
                 type: object
+              observability:
+                description: Observability defines APM integration configuration (Prometheus/OpenTelemetry)
+                properties:
+                  enableTelemetry:
+                    description: EnableTelemetry enables the injection of the Prometheus/OTel
+                      sidecar container
+                    type: boolean
+                  otelExporterEndpoint:
+                    description: OtelExporterEndpoint specifies the destination endpoint
+                      for OpenTelemetry traces/metrics
+                    type: string
+                type: object
               podConfig:
                 description: PodConfig defines advanced pod configuration for all
                   bench components

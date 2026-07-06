@@ -132,6 +132,38 @@ try:
 except FileNotFoundError:
     encryption_key = ""
 
+# Read S3 credentials if configured
+try:
+    with open('/tmp/site-secrets/s3_key', 'r') as f:
+        s3_key = f.read().strip()
+except FileNotFoundError:
+    s3_key = ""
+try:
+    with open('/tmp/site-secrets/s3_secret', 'r') as f:
+        s3_secret = f.read().strip()
+except FileNotFoundError:
+    s3_secret = ""
+try:
+    with open('/tmp/site-secrets/s3_endpoint', 'r') as f:
+        s3_endpoint = f.read().strip()
+except FileNotFoundError:
+    s3_endpoint = ""
+try:
+    with open('/tmp/site-secrets/s3_bucket', 'r') as f:
+        s3_bucket = f.read().strip()
+except FileNotFoundError:
+    s3_bucket = ""
+try:
+    with open('/tmp/site-secrets/s3_region', 'r') as f:
+        s3_region = f.read().strip()
+except FileNotFoundError:
+    s3_region = ""
+try:
+    with open('/tmp/site-secrets/s3_use_ssl', 'r') as f:
+        s3_use_ssl = f.read().strip().lower() == "true"
+except FileNotFoundError:
+    s3_use_ssl = True
+
 site_path = f"/home/frappe/frappe-bench/sites/{site_name}"
 config_file = os.path.join(site_path, "site_config.json")
 
@@ -165,6 +197,17 @@ config['db_type'] = db_provider
 # If an external encryption_key was securely provided, inject it
 if encryption_key:
     config['encryption_key'] = encryption_key
+
+# If S3 object storage is configured, inject keys
+if s3_key and s3_secret and s3_bucket:
+    config['s3_key'] = s3_key
+    config['s3_secret'] = s3_secret
+    config['s3_bucket'] = s3_bucket
+    if s3_endpoint:
+        config['s3_endpoint_url'] = s3_endpoint
+    if s3_region:
+        config['s3_region'] = s3_region
+    config['s3_use_ssl'] = s3_use_ssl
 
 # Write back reliably
 with open(config_file, 'w') as f:

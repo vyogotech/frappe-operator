@@ -266,6 +266,46 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		}
 	}
 
+	// Fetch ObjectStorage credentials if provided
+	if site.Spec.ObjectStorage != nil {
+		secretData["s3_endpoint"] = []byte(site.Spec.ObjectStorage.Endpoint)
+		secretData["s3_bucket"] = []byte(site.Spec.ObjectStorage.Bucket)
+		secretData["s3_region"] = []byte(site.Spec.ObjectStorage.Region)
+		secretData["s3_use_ssl"] = []byte(strconv.FormatBool(site.Spec.ObjectStorage.UseSSL))
+
+		// Fetch access key
+		var accessKeySecret corev1.Secret
+		accessKeyName := types.NamespacedName{
+			Name:      site.Spec.ObjectStorage.AccessKeySecret.Name,
+			Namespace: site.Namespace,
+		}
+		if err := r.Get(ctx, accessKeyName, &accessKeySecret); err != nil {
+			logger.Error(err, "Failed to get S3 access key secret", "secret", accessKeyName)
+			return err
+		}
+		accessKeyVal, ok := accessKeySecret.Data[site.Spec.ObjectStorage.AccessKeySecret.Key]
+		if !ok {
+			return fmt.Errorf("key %s not found in S3 access key secret %s", site.Spec.ObjectStorage.AccessKeySecret.Key, accessKeyName.Name)
+		}
+		secretData["s3_key"] = accessKeyVal
+
+		// Fetch secret key
+		var secretKeySecret corev1.Secret
+		secretKeyName := types.NamespacedName{
+			Name:      site.Spec.ObjectStorage.SecretKeySecret.Name,
+			Namespace: site.Namespace,
+		}
+		if err := r.Get(ctx, secretKeyName, &secretKeySecret); err != nil {
+			logger.Error(err, "Failed to get S3 secret key secret", "secret", secretKeyName)
+			return err
+		}
+		secretKeyVal, ok := secretKeySecret.Data[site.Spec.ObjectStorage.SecretKeySecret.Key]
+		if !ok {
+			return fmt.Errorf("key %s not found in S3 secret key secret %s", site.Spec.ObjectStorage.SecretKeySecret.Key, secretKeyName.Name)
+		}
+		secretData["s3_secret"] = secretKeyVal
+	}
+
 	// Create or update the secret
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

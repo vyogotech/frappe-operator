@@ -57,6 +57,45 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		return true, nil
 	}
 
+	isUpgrade := site.Status.Phase == vyogotechv1.FrappeSitePhaseReady
+	if isUpgrade && site.Spec.UpgradeStrategy == "Canary" {
+		backupName := fmt.Sprintf("%s-pre-upgrade", site.Name)
+		backup := &vyogotechv1.SiteBackup{}
+		err := r.Get(ctx, types.NamespacedName{Name: backupName, Namespace: site.Namespace}, backup)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				logger.Info("Creating pre-upgrade backup before running migration", "backup", backupName)
+				newBackup := &vyogotechv1.SiteBackup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      backupName,
+						Namespace: site.Namespace,
+					},
+					Spec: vyogotechv1.SiteBackupSpec{
+						Site:         site.Name,
+						BackupPathDB: fmt.Sprintf("sites/%s/private/backups/pre-upgrade.sql", site.Name),
+					},
+				}
+				if err := controllerutil.SetControllerReference(site, newBackup, r.Scheme); err != nil {
+					return false, err
+				}
+				if err := r.Create(ctx, newBackup); err != nil {
+					return false, fmt.Errorf("failed to create pre-upgrade backup: %w", err)
+				}
+				return false, nil // Requeue to wait for backup
+			}
+			return false, err
+		}
+
+		if backup.Status.Phase != "Succeeded" {
+			if backup.Status.Phase == "Failed" {
+				return false, fmt.Errorf("pre-upgrade backup failed: %s", backup.Status.Message)
+			}
+			logger.Info("Pre-upgrade backup is in progress, waiting...", "phase", backup.Status.Phase)
+			return false, nil // Requeue and wait
+		}
+		logger.Info("Pre-upgrade backup completed successfully, proceeding with migration")
+	}
+
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: site.Namespace}, job)
 	if err == nil {
 		// Job exists
@@ -125,6 +164,65 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 			logger.Error(nil, "Site initialization job permanently failed", "job", jobName, "failedCount", job.Status.Failed)
 			r.Recorder.Event(site, corev1.EventTypeWarning, "SiteInitializationFailed",
 				fmt.Sprintf("Site initialization job permanently failed after %d attempt(s)", job.Status.Failed))
+
+			if isUpgrade && site.Spec.UpgradeStrategy == "Canary" {
+				rollbackName := fmt.Sprintf("%s-rollback", site.Name)
+				restore := &vyogotechv1.SiteRestore{}
+				err := r.Get(ctx, types.NamespacedName{Name: rollbackName, Namespace: site.Namespace}, restore)
+				if err != nil {
+					if errors.IsNotFound(err) {
+						logger.Info("Initiating automated database rollback due to failed migration", "restore", rollbackName)
+						newRestore := &vyogotechv1.SiteRestore{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      rollbackName,
+								Namespace: site.Namespace,
+							},
+							Spec: vyogotechv1.SiteRestoreSpec{
+								Site: site.Name,
+								BenchRef: vyogotechv1.NamespacedName{
+									Name:      bench.Name,
+									Namespace: bench.Namespace,
+								},
+								DatabaseBackupSource: vyogotechv1.BackupSource{
+									LocalPath: fmt.Sprintf("sites/%s/private/backups/pre-upgrade.sql", site.Name),
+								},
+								Force: true,
+							},
+						}
+						if err := controllerutil.SetControllerReference(site, newRestore, r.Scheme); err != nil {
+							return false, err
+						}
+						if err := r.Create(ctx, newRestore); err != nil {
+							return false, fmt.Errorf("failed to create rollback restore resource: %w", err)
+						}
+						return false, nil
+					}
+					return false, err
+				}
+
+				if restore.Status.Phase != "Succeeded" {
+					if restore.Status.Phase == "Failed" {
+						return false, fmt.Errorf("automated database rollback failed: %s", restore.Status.Message)
+					}
+					logger.Info("Automated rollback in progress, waiting...", "phase", restore.Status.Phase)
+					return false, nil
+				}
+
+				logger.Info("Automated database rollback completed successfully. Reverting site version and cleaning up failed job.")
+
+				// Clean up resources: delete failed job and rollback restore CR
+				_ = r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground))
+				_ = r.Delete(ctx, restore, client.PropagationPolicy(metav1.DeletePropagationBackground))
+
+				// Delete the pre-upgrade backup resource as well so we can trigger again in future upgrades
+				backupName := fmt.Sprintf("%s-pre-upgrade", site.Name)
+				preBackup := &vyogotechv1.SiteBackup{}
+				if err := r.Get(ctx, types.NamespacedName{Name: backupName, Namespace: site.Namespace}, preBackup); err == nil {
+					_ = r.Delete(ctx, preBackup)
+				}
+
+				return false, fmt.Errorf("migration failed and database was successfully rolled back to pre-upgrade state")
+			}
 
 			// Collect pod logs for debugging
 			podList := &corev1.PodList{}
