@@ -184,7 +184,7 @@ data:
     ]
   
   # Image defaults
-  defaultFrappeImage: "docker.io/frappe/erpnext:latest"
+  defaultFrappeImage: "ghcr.io/vyogotech/erpnext-for-operator:version-16"
   defaultMariaDBImage: "docker.io/library/mariadb:10.6"
   defaultPostgresImage: "docker.io/library/postgres:15-alpine"
   defaultRedisImage: "docker.io/library/redis:7-alpine"
@@ -202,6 +202,17 @@ helm upgrade frappe-operator frappe-operator/frappe-operator \
 **Direct ConfigMap Edit:**
 ```bash
 kubectl edit configmap frappe-operator-config -n frappe-operator-system
+```
+
+### Environment Variables
+
+You can inject custom environment variables into Frappe application pods by defining them in the `FrappeBench` spec:
+
+```yaml
+spec:
+  env:
+    - name: MY_CUSTOM_VAR
+      value: "production"
 ```
 
 ---
@@ -333,11 +344,11 @@ Set defaults in the operator ConfigMap:
 ```yaml
 # In frappe-operator-config ConfigMap
 data:
-  defaultFrappeImage: "myregistry.com/frappe/erpnext:latest"
-  defaultMariaDBImage: "myregistry.com/library/mariadb:10.6"
-  defaultPostgresImage: "myregistry.com/library/postgres:15-alpine"
-  defaultRedisImage: "myregistry.com/library/redis:7-alpine"
-  defaultNginxImage: "myregistry.com/library/nginx:1.25-alpine"
+  defaultFrappeImage: "ghcr.io/vyogotech/erpnext-for-operator:version-16"
+  defaultMariaDBImage: "docker.io/library/mariadb:10.6"
+  defaultPostgresImage: "docker.io/library/postgres:15-alpine"
+  defaultRedisImage: "docker.io/library/redis:7-alpine"
+  defaultNginxImage: "docker.io/library/nginx:1.25-alpine"
 ```
 
 ### Bench-Level Override
@@ -365,7 +376,7 @@ When `frappeVersion` is specified:
 
 - If `imageConfig.repository` is set but `tag` is not → version is used as tag
 - If using ConfigMap defaults → version replaces tag in default image
-- If no defaults → `docker.io/frappe/erpnext:{version}` is used
+- If no defaults → `ghcr.io/vyogotech/erpnext-for-operator:{version}` is used
 
 ### Air-Gapped Environments
 
@@ -373,7 +384,7 @@ For air-gapped deployments, configure all images in the operator ConfigMap:
 
 ```yaml
 data:
-  defaultFrappeImage: "internal-registry.company.com/frappe/erpnext:latest"
+  defaultFrappeImage: "internal-registry.company.com/frappe/erpnext:version-16"
   defaultMariaDBImage: "internal-registry.company.com/library/mariadb:10.6"
   defaultPostgresImage: "internal-registry.company.com/library/postgres:15-alpine"
   defaultRedisImage: "internal-registry.company.com/library/redis:7-alpine"
@@ -1064,8 +1075,8 @@ spec:
   
   # Optional: Image configuration
   imageConfig:
-    repository: "docker.io/frappe/erpnext"
-    tag: "latest"
+    repository: "ghcr.io/vyogotech/erpnext-for-operator"
+    tag: "version-16"
     pullPolicy: Always
     pullSecrets:
       - name: registry-credentials
