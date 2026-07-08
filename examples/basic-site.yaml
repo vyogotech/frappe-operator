@@ -14,11 +14,13 @@ spec:
   
   # Site domain - for local testing use .localhost
   siteName: dev.localhost
+  ingressClassName: traefik
   
   # Apps to install (optional)
   # Uncomment to install apps - they must be available in the bench
-  # apps:
-  #   - erpnext
+  apps:
+    - erpnext
+    - hrms
   
   # Database configuration
   dbConfig:
@@ -31,7 +33,7 @@ spec:
   # Ingress (optional for local development)
   ingress:
     enabled: true
-    className: nginx
+    className: traefik
 
 # The operator will automatically:
 # 1. Create database and user via MariaDB Operator

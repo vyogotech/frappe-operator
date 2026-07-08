@@ -8,6 +8,10 @@ metadata:
 spec:
   frappeVersion: "version-15"
   
+  imageConfig:
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-15
+
   # Apps to install
   apps:
     - name: erpnext

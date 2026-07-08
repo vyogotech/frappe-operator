@@ -73,7 +73,7 @@ func TestGetBenchImage_VersionPrefix(t *testing.T) {
 			name:             "custom tag like latest stays unchanged",
 			frappeVersion:    "latest",
 			imageConfig:      nil,
-			expectedContains: ":latest",
+			expectedContains: ":version-16",
 		},
 	}
 

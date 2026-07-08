@@ -5,24 +5,34 @@ package constants
 // Supports multiple registries for air-gapped and enterprise environments
 
 import (
+	"os"
+
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Default Images - Docker Hub
-const (
+// helper to read env with fallback
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
+// Default Images - GitHub Packages / Docker Hub
+var (
 	// Core Frappe/ERPNext images
-	DefaultFrappeImage = "docker.io/frappe/erpnext:latest"
-	DefaultBenchImage  = "docker.io/frappe/erpnext:latest"
+	DefaultFrappeImage = getEnv("DEFAULT_FRAPPE_IMAGE", "ghcr.io/vyogotech/erpnext-for-operator:version-16")
+	DefaultBenchImage  = getEnv("DEFAULT_BENCH_IMAGE", "ghcr.io/vyogotech/erpnext-for-operator:version-16")
 
 	// Database images
-	DefaultMariaDBImage  = "docker.io/library/mariadb:10.6"
-	DefaultPostgresImage = "docker.io/library/postgres:15-alpine"
-	DefaultRedisImage    = "docker.io/library/redis:7-alpine"
+	DefaultMariaDBImage  = getEnv("DEFAULT_MARIADB_IMAGE", "docker.io/library/mariadb:10.6")
+	DefaultPostgresImage = getEnv("DEFAULT_POSTGRES_IMAGE", "docker.io/library/postgres:15-alpine")
+	DefaultRedisImage    = getEnv("DEFAULT_REDIS_IMAGE", "docker.io/library/redis:7-alpine")
 
 	// Infrastructure images
-	DefaultNginxImage   = "docker.io/library/nginx:1.25-alpine"
-	DefaultAlpineImage  = "docker.io/library/alpine:latest"
-	DefaultBusyboxImage = "docker.io/library/busybox:latest"
+	DefaultNginxImage   = getEnv("DEFAULT_NGINX_IMAGE", "docker.io/library/nginx:1.25-alpine")
+	DefaultAlpineImage  = getEnv("DEFAULT_ALPINE_IMAGE", "docker.io/library/alpine:latest")
+	DefaultBusyboxImage = getEnv("DEFAULT_BUSYBOX_IMAGE", "docker.io/library/busybox:latest")
 )
 
 // KEDA Images for autoscaling
@@ -122,7 +132,7 @@ func GetFrappeImage(version string) string {
 	if version == "" || version == "latest" {
 		return DefaultFrappeImage
 	}
-	return "docker.io/frappe/erpnext:" + version
+	return "ghcr.io/vyogotech/erpnext-for-operator:" + version
 }
 
 // GetBenchImage returns the bench image with version
@@ -130,5 +140,5 @@ func GetBenchImage(version string) string {
 	if version == "" || version == "latest" {
 		return DefaultBenchImage
 	}
-	return "docker.io/frappe/erpnext:" + version
+	return "ghcr.io/vyogotech/erpnext-for-operator:" + version
 }

@@ -70,7 +70,7 @@ func (r *FrappeSiteReconciler) getBenchImage(ctx context.Context, bench *vyogote
 
 	// Priority 3: Fall back to constants with version
 	if bench.Spec.FrappeVersion != "" && bench.Spec.FrappeVersion != "latest" {
-		return fmt.Sprintf("docker.io/frappe/erpnext:%s", bench.Spec.FrappeVersion)
+		return fmt.Sprintf("ghcr.io/vyogotech/erpnext-for-operator:%s", bench.Spec.FrappeVersion)
 	}
 	return constants.DefaultFrappeImage
 }

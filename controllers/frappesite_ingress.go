@@ -61,6 +61,8 @@ func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotec
 	ingressClassName := "nginx" // Default
 	if site.Spec.IngressClassName != "" {
 		ingressClassName = site.Spec.IngressClassName
+	} else if site.Spec.Ingress != nil && site.Spec.Ingress.ClassName != "" {
+		ingressClassName = site.Spec.Ingress.ClassName
 	}
 
 	// Validate IngressClass existence (optional/warning)
