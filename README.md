@@ -106,6 +106,24 @@ Check the [`examples/`](examples/) directory for ready-to-use configurations:
 
 [See all resources →](https://vyogotech.github.io/frappe-operator/api-reference)
 
+## Default Image Configuration & Externalization
+
+By default, the operator deploys sites and benches using our pre-built production-ready images:
+* **Frappe / ERPNext**: `ghcr.io/vyogotech/erpnext-for-operator:version-16`
+
+### Externalization & Customization
+You can dynamically override all default operator images at runtime without rebuilding the operator code. This can be configured in two ways:
+
+1. **Environment Variables**: Define any of the following environment variables on the operator controller deployment:
+   * `DEFAULT_FRAPPE_IMAGE` (defaults to `ghcr.io/vyogotech/erpnext-for-operator:version-16`)
+   * `DEFAULT_BENCH_IMAGE` (defaults to `ghcr.io/vyogotech/erpnext-for-operator:version-16`)
+   * `DEFAULT_MARIADB_IMAGE` (defaults to `docker.io/library/mariadb:10.6`)
+   * `DEFAULT_POSTGRES_IMAGE` (defaults to `docker.io/library/postgres:15-alpine`)
+   * `DEFAULT_REDIS_IMAGE` (defaults to `docker.io/library/redis:7-alpine`)
+   * `DEFAULT_NGINX_IMAGE` (defaults to `docker.io/library/nginx:1.25-alpine`)
+2. **ConfigMap Defaults**: Define `defaultFrappeImage` (and others) in the `frappe-operator-config` ConfigMap.
+3. **Bench Override**: Set `spec.imageConfig.repository` and `spec.imageConfig.tag` directly on a `FrappeBench` resource.
+
 ## Requirements
 
 **Minimum:**

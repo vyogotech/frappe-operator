@@ -54,8 +54,8 @@ func TestFrappeBenchReconciler_getBenchImage(t *testing.T) {
 		client := fake.NewClientBuilder().WithScheme(scheme).Build()
 		r := &FrappeBenchReconciler{Client: client}
 		image := r.getBenchImage(context.TODO(), bench)
-		if image != "docker.io/frappe/erpnext:v15" {
-			t.Errorf("Expected docker.io/frappe/erpnext:v15, got %s", image)
+		if image != "ghcr.io/vyogotech/erpnext-for-operator:v15" {
+			t.Errorf("Expected ghcr.io/vyogotech/erpnext-for-operator:v15, got %s", image)
 		}
 	})
 

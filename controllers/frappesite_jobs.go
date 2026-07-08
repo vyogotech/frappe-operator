@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
@@ -67,6 +68,34 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 			logger.Info("No version annotation requested")
 		}
 
+		// Check if apps in Spec are different from the apps the Job was created with
+		jobApps, hasAnnotation := job.Annotations["vyogo.tech/apps"]
+		appsChanged := false
+		if hasAnnotation {
+			appsChanged = jobApps != strings.Join(site.Spec.Apps, ",")
+		} else if site.Status.Phase == vyogotechv1alpha1.FrappeSitePhaseReady {
+			// Fallback for legacy jobs when site is already Ready
+			if len(site.Spec.Apps) != len(site.Status.InstalledApps) {
+				appsChanged = true
+			} else {
+				for i, app := range site.Spec.Apps {
+					if app != site.Status.InstalledApps[i] {
+						appsChanged = true
+						break
+					}
+				}
+			}
+		}
+
+		if appsChanged {
+			logger.Info("App installation spec changed, deleting init job for update", "old", jobApps, "new", strings.Join(site.Spec.Apps, ","))
+			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+				return false, fmt.Errorf("failed to delete init job for app update: %w", err)
+			}
+			// Requeue to create new job
+			return false, nil
+		}
+
 		// Job exists, check if it completed
 		if job.Status.Succeeded > 0 {
 			logger.Info("Site initialization job completed successfully", "job", jobName)
@@ -84,6 +113,15 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 			}
 
 			return true, nil
+		}
+
+		if job.Status.Active > 0 {
+			// Job is still running
+			logger.Info("Site initialization job in progress", "job", jobName)
+			if len(site.Spec.Apps) > 0 {
+				site.Status.AppInstallationStatus = fmt.Sprintf("Installing %d app(s)... (attempts: %d)", len(site.Spec.Apps), job.Status.Failed+1)
+			}
+			return false, nil
 		}
 
 		if job.Status.Failed > 0 {
@@ -118,12 +156,8 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 
 			return false, fmt.Errorf("site initialization job failed")
 		}
-		// Job is still running
-		logger.Info("Site initialization job in progress", "job", jobName)
-		if len(site.Spec.Apps) > 0 {
-			site.Status.AppInstallationStatus = fmt.Sprintf("Installing %d app(s)...", len(site.Spec.Apps))
-		}
-		return false, nil
+
+		return false, fmt.Errorf("site initialization job is in an unknown state")
 	}
 
 	if !errors.IsNotFound(err) {
@@ -186,7 +220,9 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		Build()
 
 	// Prepare job annotations
-	jobAnnotations := map[string]string{}
+	jobAnnotations := map[string]string{
+		"vyogo.tech/apps": strings.Join(site.Spec.Apps, ","),
+	}
 	if siteVersionVal != "" {
 		jobAnnotations[versionAnnotation] = siteVersionVal
 	}
@@ -329,7 +365,7 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 			WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
 			WithContainer(container).
 			WithPVCVolume("sites", fmt.Sprintf("%s-sites", bench.Name)).
-			WithSecretVolume("deletion-secret", deletionSecretName, resources.Int32Ptr(0400)).
+			WithSecretVolume("deletion-secret", deletionSecretName, resources.Int32Ptr(0444)).
 			WithOwner(site, r.Scheme).
 			MustBuild()
 
@@ -349,11 +385,15 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 		return nil
 	}
 
-	if job.Status.Failed > 0 {
-		return fmt.Errorf("site deletion job failed")
+	if job.Status.Active > 0 {
+		return fmt.Errorf("site deletion job is still running")
 	}
 
-	return fmt.Errorf("site deletion job is still running")
+	if job.Status.Failed > 0 {
+		return fmt.Errorf("site deletion job failed after all attempts")
+	}
+
+	return fmt.Errorf("site deletion job is in an unknown state")
 }
 
 // resolveRedisURL returns the Redis connection URL for the bench
