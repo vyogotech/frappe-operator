@@ -28,19 +28,19 @@ kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/latest/do
 
 ```bash
 # Step 1: Create shared MariaDB instance (one time)
-kubectl apply -f mariadb-shared-instance.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/mariadb-shared-instance.yaml
 
 # Wait for MariaDB to be ready
 kubectl wait --for=condition=Ready mariadb/frappe-mariadb --timeout=300s
 
 # Step 2: Create a bench
-kubectl apply -f basic-bench.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-bench.yaml
 
 # Wait for bench to be ready
 kubectl wait --for=condition=Ready frappebench/dev-bench --timeout=300s
 
 # Step 3: Create a site
-kubectl apply -f basic-site.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-site.yaml
 
 # Wait for site database to be provisioned
 kubectl wait --for=condition=Ready database/dev-site-db --timeout=120s
@@ -56,10 +56,10 @@ kubectl get secret dev-site-admin -o jsonpath='{.data.password}' | base64 -d
 
 ```bash
 # Create bench (if not already created)
-kubectl apply -f basic-bench.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-bench.yaml
 
 # Create site with dedicated MariaDB
-kubectl apply -f site-dedicated-mariadb.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/site-dedicated-mariadb.yaml
 
 # The operator automatically creates:
 # - Dedicated MariaDB instance
