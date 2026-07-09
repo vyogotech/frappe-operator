@@ -605,6 +605,16 @@ spec:
                     description: Tag is the image tag
                     type: string
                 type: object
+              observability:
+                description: Observability defines APM integration configuration (Prometheus/OpenTelemetry)
+                properties:
+                  enableTelemetry:
+                    description: EnableTelemetry enables the injection of the Prometheus/OTel sidecar container
+                    type: boolean
+                  otelExporterEndpoint:
+                    description: OtelExporterEndpoint specifies the destination endpoint for OpenTelemetry traces/metrics
+                    type: string
+                type: object
               podConfig:
                 description: PodConfig defines advanced pod configuration for all bench components
                 properties:
@@ -2421,6 +2431,72 @@ spec:
               ingressClassName:
                 description: IngressClassName specifies the ingress class
                 type: string
+              objectStorage:
+                description: ObjectStorage defines S3-compatible object storage configuration
+                properties:
+                  accessKeySecret:
+                    description: AccessKeySecret references a secret key containing the Access Key ID
+                    properties:
+                      key:
+                        description: The key of the secret to select from.  Must be a valid secret key.
+                        type: string
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      optional:
+                        description: Specify whether the Secret or its key must be defined
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  bucket:
+                    description: Bucket name
+                    type: string
+                  endpoint:
+                    description: Endpoint is the S3 service endpoint (e.g., "https://s3.amazonaws.com" or minio URL)
+                    type: string
+                  region:
+                    description: Region (standard S3 region)
+                    type: string
+                  secretKeySecret:
+                    description: SecretKeySecret references a secret key containing the Secret Access Key
+                    properties:
+                      key:
+                        description: The key of the secret to select from.  Must be a valid secret key.
+                        type: string
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      optional:
+                        description: Specify whether the Secret or its key must be defined
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  useSSL:
+                    default: true
+                    description: UseSSL enables SSL/TLS for the connection
+                    type: boolean
+                required:
+                - accessKeySecret
+                - bucket
+                - endpoint
+                - secretKeySecret
+                type: object
               podConfig:
                 description: PodConfig defines advanced pod configuration for site-specific jobs (init, backup, etc.)
                 properties:
@@ -3417,6 +3493,15 @@ spec:
                     description: SecretName containing TLS certificate
                     type: string
                 type: object
+              upgradeStrategy:
+                default: Recreate
+                description: |-
+                  UpgradeStrategy defines the strategy used during site image upgrades.
+                  Options: Recreate, Canary (experimental)
+                enum:
+                - Recreate
+                - Canary
+                type: string
             required:
             - benchRef
             - siteName
