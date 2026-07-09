@@ -20,10 +20,9 @@ metadata:
 spec:
   frappeVersion: "v15.0.0"
   
-  # Image Configuration
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
-    tag: latest
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-15
     pullPolicy: Always
 
   # Apps to install
