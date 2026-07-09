@@ -474,7 +474,7 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 			WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
 			WithContainer(container).
 			WithPVCVolume("sites", fmt.Sprintf("%s-sites", bench.Name)).
-			WithSecretVolume("deletion-secret", deletionSecretName, resources.Int32Ptr(0400)).
+			WithSecretVolume("deletion-secret", deletionSecretName, resources.Int32Ptr(0444)).
 			WithOwner(site, r.Scheme).
 			MustBuild()
 

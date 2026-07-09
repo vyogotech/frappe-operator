@@ -37,10 +37,10 @@ metadata:
   namespace: frappe
 spec:
   frappeVersion: "version-15"
-  # rmallam image (includes frappe + erpnext; amd64)
+  # vyogotech image (includes frappe + erpnext; amd64)
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-3db38eb
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-15
     pullPolicy: IfNotPresent
   apps:
     - name: erpnext
