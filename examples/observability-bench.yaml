@@ -1,0 +1,16 @@
+apiVersion: vyogo.tech/v1
+kind: FrappeBench
+metadata:
+  name: observability-bench
+  namespace: default
+spec:
+  frappeVersion: "version-15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-15
+  apps:
+    - name: erpnext
+      source: image
+  observability:
+    enableTelemetry: true
+    otelExporterEndpoint: "http://otel-collector.monitoring.svc.cluster.local:4317"
