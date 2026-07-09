@@ -74,10 +74,10 @@ Frappe Operator brings the power of Kubernetes orchestration to Frappe deploymen
 curl -fsSL https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.sh | bash
 
 # Create a bench
-kubectl apply -f examples/basic-bench.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-bench.yaml
 
 # Create a site
-kubectl apply -f examples/basic-site.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-site.yaml
 ```
 
 ## Documentation Structure
