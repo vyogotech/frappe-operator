@@ -52,6 +52,8 @@ jobs:
           # We might need mariadb and keda CRDs to successfully dry-run test files that reference them
           # Install mariadb CRDs
           kubectl apply -f https://github.com/mariadb-operator/mariadb-operator/releases/latest/download/crds.yaml
+          # Install KEDA CRDs
+          kubectl apply -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1-crds.yaml
           
       - name: Validate examples/ (Server Dry Run)
         run: |

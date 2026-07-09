@@ -64,7 +64,10 @@ else
     log "Metrics API already available."
 fi
 
-# 2. (Removed independent MariaDB/KEDA installation - now handled by Frappe Operator chart)
+# 2. Pre-install KEDA CRDs (since Helm does not install sub-chart CRDs automatically)
+log "Pre-installing KEDA CRDs..."
+kubectl apply -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1-crds.yaml
+
 
 # 3. Setup Scenario Namespace
 log "Creating scenario namespace: $NAMESPACE"
