@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
@@ -508,4 +509,39 @@ func TestEnsureRedisStatefulSet_UpdateImmutability(t *testing.T) {
 	if updatedSts.Labels["bench"] != benchName {
 		t.Errorf("Expected bench label to be updated, got %v. Metadata: %+v", updatedSts.Labels, updatedSts.ObjectMeta)
 	}
+
+	t.Run("ensureGunicorn with telemetry sidecar", func(t *testing.T) {
+		benchWithTelemetry := bench.DeepCopy()
+		benchWithTelemetry.Spec.Observability = &vyogotechv1.ObservabilityConfig{
+			EnableTelemetry:      true,
+			OtelExporterEndpoint: "http://otel-collector.monitoring:4317",
+		}
+
+		client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(benchWithTelemetry).Build()
+		r := &FrappeBenchReconciler{Client: client, Scheme: scheme}
+
+		if err := r.ensureGunicorn(context.TODO(), benchWithTelemetry); err != nil {
+			t.Fatalf("ensureGunicorn failed: %v", err)
+		}
+
+		deploy := &appsv1.Deployment{}
+		err := client.Get(context.TODO(), types.NamespacedName{Name: benchName + "-gunicorn", Namespace: namespace}, deploy)
+		if err != nil {
+			t.Fatalf("Failed to get gunicorn deployment: %v", err)
+		}
+
+		// Check that the otel-collector container is injected
+		var hasOtel bool
+		for _, container := range deploy.Spec.Template.Spec.Containers {
+			if container.Name == "otel-collector" {
+				hasOtel = true
+				if len(container.Args) == 0 || !strings.Contains(container.Args[0], "http://otel-collector.monitoring:4317") {
+					t.Errorf("OTel collector missing correct exporter endpoint argument, got args: %v", container.Args)
+				}
+			}
+		}
+		if !hasOtel {
+			t.Error("OTel collector sidecar not injected")
+		}
+	})
 }

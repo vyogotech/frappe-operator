@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,6 +27,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -148,6 +150,73 @@ var _ = Describe("FrappeSite Lifecycle", func() {
 
 			contSec := reconciler.getContainerSecurityContext(ctx, bench)
 			Expect(contSec.RunAsUser).To(BeNil())
+		})
+	})
+
+	Describe("Object Storage Credentials Injection", func() {
+		It("should inject S3 config and credentials into initialization secret", func() {
+			site.Spec.ObjectStorage = &vyogotechv1.S3Config{
+				Endpoint: "http://minio:9000",
+				Bucket:   "mybucket",
+				Region:   "us-east-1",
+				UseSSL:   false,
+				AccessKeySecret: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "s3-credentials"},
+					Key:                  "access-key",
+				},
+				SecretKeySecret: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "s3-credentials"},
+					Key:                  "secret-key",
+				},
+			}
+
+			// Pre-create the credentials secret in the fake client
+			s3Secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "s3-credentials",
+					Namespace: namespace,
+				},
+				Data: map[string][]byte{
+					"access-key": []byte("myaccesskey"),
+					"secret-key": []byte("mysecretkey"),
+				},
+			}
+			Expect(fakeClient.Create(ctx, s3Secret)).To(Succeed())
+
+			// Pre-create the encryption key secret (as ensureInitSecrets requires it or generates one)
+			encSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-site-encryption-key",
+					Namespace: namespace,
+				},
+				Data: map[string][]byte{
+					"encryption_key": []byte("myencryptionkey"),
+				},
+			}
+			Expect(fakeClient.Create(ctx, encSecret)).To(Succeed())
+
+			// Set the Spec encryption key ref to point to it
+			site.Spec.EncryptionKeySecretRef = &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "test-site-encryption-key"},
+				Key:                  "encryption_key",
+			}
+
+			// Call ensureInitSecrets
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.example.com", nil, nil, "admin123", "redis://cache", "redis://queue")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Get the generated initialization secret
+			initSecretName := fmt.Sprintf("%s-init-secrets", site.Name)
+			initSecret := &corev1.Secret{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: initSecretName, Namespace: namespace}, initSecret)).To(Succeed())
+
+			// Verify ObjectStorage keys exist in secret
+			Expect(string(initSecret.Data["s3_endpoint"])).To(Equal("http://minio:9000"))
+			Expect(string(initSecret.Data["s3_bucket"])).To(Equal("mybucket"))
+			Expect(string(initSecret.Data["s3_region"])).To(Equal("us-east-1"))
+			Expect(string(initSecret.Data["s3_use_ssl"])).To(Equal("false"))
+			Expect(string(initSecret.Data["s3_key"])).To(Equal("myaccesskey"))
+			Expect(string(initSecret.Data["s3_secret"])).To(Equal("mysecretkey"))
 		})
 	})
 })

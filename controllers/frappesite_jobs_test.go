@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -87,7 +88,7 @@ var _ = Describe("FrappeSite Jobs", func() {
 		_ = batchv1.AddToScheme(scheme)
 		_ = routev1.AddToScheme(scheme)
 
-		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(bench).WithStatusSubresource(&vyogotechv1.FrappeSite{}).Build()
+		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(bench).WithStatusSubresource(&vyogotechv1.FrappeSite{}, &vyogotechv1.SiteRestore{}, &vyogotechv1.SiteBackup{}).Build()
 
 		reconciler = &FrappeSiteReconciler{
 			Client:   fakeClient,
@@ -253,6 +254,114 @@ var _ = Describe("FrappeSite Jobs", func() {
 
 			_, _ = reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
 			Eventually(fakeRecorder.Events).Should(Receive(ContainSubstring("SiteInitializationFailed")))
+		})
+	})
+
+	Describe("Canary Upgrade Strategy", func() {
+		var (
+			dbInfo  *database.DatabaseInfo
+			dbCreds *database.DatabaseCredentials
+		)
+
+		BeforeEach(func() {
+			dbInfo = &database.DatabaseInfo{Provider: "mariadb", Name: "test"}
+			dbCreds = &database.DatabaseCredentials{Username: "test", Password: "pwd"}
+
+			// Set site status phase to Ready and observed version to version-15 to simulate a running site
+			site.Status.Phase = vyogotechv1.FrappeSitePhaseReady
+			site.Status.ObservedSiteVersion = "version-15"
+			site.Annotations = map[string]string{
+				"frappe.io/site-version": "version-15",
+			}
+			site.Spec.UpgradeStrategy = "Canary"
+		})
+
+		It("should trigger a backup before starting the migration on image tag update", func() {
+			// Trigger upgrade by changing annotation version tag
+			site.Annotations["frappe.io/site-version"] = "version-16"
+
+			// Create the site in fake client
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+
+			// Run reconcile loop (ensureSiteInitialized)
+			done, err := reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(done).To(BeFalse()) // Should not be complete since we are waiting for backup
+
+			// Verify that the pre-upgrade SiteBackup resource was created
+			backupName := fmt.Sprintf("%s-pre-upgrade", site.Name)
+			backup := &vyogotechv1.SiteBackup{}
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: backupName, Namespace: site.Namespace}, backup)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(backup.Spec.Site).To(Equal(site.Name))
+		})
+
+		It("should initiate automatic database rollback if the migration job fails permanently", func() {
+			// Trigger upgrade by changing annotation version tag
+			site.Annotations["frappe.io/site-version"] = "version-16"
+
+			// Create pre-upgrade backup in Succeeded state
+			backupName := fmt.Sprintf("%s-pre-upgrade", site.Name)
+			backup := &vyogotechv1.SiteBackup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      backupName,
+					Namespace: site.Namespace,
+				},
+				Spec: vyogotechv1.SiteBackupSpec{
+					Site: site.Name,
+				},
+				Status: vyogotechv1.SiteBackupStatus{
+					Phase: "Succeeded",
+				},
+			}
+			Expect(fakeClient.Create(ctx, backup)).To(Succeed())
+
+			// Create migration initialization job in failed state
+			failedJobName := fmt.Sprintf("%s-init", site.Name)
+			failedJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      failedJobName,
+					Namespace: site.Namespace,
+					Annotations: map[string]string{
+						"frappe.io/site-version": "version-16",
+					},
+				},
+				Status: batchv1.JobStatus{
+					Failed: 1,
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobFailed,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+			}
+			Expect(fakeClient.Create(ctx, failedJob)).To(Succeed())
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+
+			// Run reconcile - should not error yet, but initiate rollback and return false, nil
+			done, err := reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(done).To(BeFalse())
+
+			// Verify that rollback SiteRestore resource was created
+			restoreName := fmt.Sprintf("%s-rollback", site.Name)
+			restore := &vyogotechv1.SiteRestore{}
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: restoreName, Namespace: site.Namespace}, restore)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(restore.Spec.Site).To(Equal(site.Name))
+			Expect(restore.Spec.DatabaseBackupSource.LocalPath).To(Equal(fmt.Sprintf("sites/%s/private/backups/pre-upgrade.sql", site.Name)))
+			Expect(restore.Spec.Force).To(BeTrue())
+
+			// Update the restore status to Succeeded to simulate a completed rollback
+			restore.Status.Phase = "Succeeded"
+			Expect(fakeClient.Status().Update(ctx, restore)).To(Succeed())
+
+			// Run reconcile again - now it should return an error indicating migration failed but rollback succeeded
+			done, err = reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("migration failed and database was successfully rolled back"))
+			Expect(done).To(BeFalse())
 		})
 	})
 })

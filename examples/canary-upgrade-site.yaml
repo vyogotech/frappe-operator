@@ -1,0 +1,10 @@
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: canary-upgrade-site
+  namespace: default
+spec:
+  benchRef:
+    name: dev-bench
+  siteName: canary-site.local
+  upgradeStrategy: Canary

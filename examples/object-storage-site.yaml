@@ -1,0 +1,20 @@
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: object-storage-site
+  namespace: default
+spec:
+  benchRef:
+    name: dev-bench
+  siteName: s3-site.local
+  objectStorage:
+    endpoint: "https://minio.storage.svc.cluster.local:9000"
+    bucket: "frappe-backups"
+    region: "us-east-1"
+    useSSL: false
+    accessKeySecret:
+      name: s3-credentials
+      key: access-key
+    secretKeySecret:
+      name: s3-credentials
+      key: secret-key
