@@ -10,13 +10,6 @@ on:
       - 'feature/**'
       - 'fix/**'
       - 'feat/**'
-    paths:
-      - 'helm/**'
-      - 'controllers/**'
-      - 'api/**'
-      - 'scripts/**'
-      - 'test/**'
-      - '.github/workflows/comprehensive-e2e.yml'
   pull_request:
     branches: [main, master, develop, release, 'feature/**', 'fix/**', 'feat/**']
   workflow_dispatch:
