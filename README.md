@@ -47,11 +47,11 @@ kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/latest/do
 
 ```bash
 # 1. Create MariaDB instance
-kubectl apply -f examples/mariadb-shared-instance.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/mariadb-shared-instance.yaml
 
 # 2. Deploy a basic site
-kubectl apply -f examples/basic-bench.yaml
-kubectl apply -f examples/basic-site.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-bench.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-site.yaml
 
 # 3. Monitor deployment
 kubectl get frappebench,frappesite -w

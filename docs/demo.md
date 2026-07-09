@@ -111,8 +111,8 @@ metadata:
 spec:
   frappeVersion: "15.0.0"
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-7bc7484
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-15
     pullPolicy: Always
   storageClassName: crc-csi-hostpath-provisioner
   storageSize: 2Gi
