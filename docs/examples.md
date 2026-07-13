@@ -11,6 +11,7 @@ Real-world deployment patterns and configuration examples for Frappe Operator.
 - [Production Deployment](#production-deployment)
 - [Multi-Tenant SaaS](#multi-tenant-saas)
 - [Enterprise Setup](#enterprise-setup)
+- [External Database and Redis](#external-database-and-redis) **📊 Support Status**
 - [Custom Domains](#custom-domains)
 - [High Availability](#high-availability)
 - [Component Autoscaling](#component-autoscaling) **⚡ NEW**
@@ -423,6 +424,223 @@ stringData:
   username: "acme_admin@acme-mysql"
   password: "YourAzureMySQLPassword"
 ```
+
+---
+
+## External Database and Redis
+
+### Support Status and Configuration
+
+The Frappe Operator provides varying levels of support for external databases and Redis instances.
+
+#### External MariaDB/MySQL Support
+
+**Status:** ⚠️ **PLANNED** (Not Yet Implemented)
+
+External database support is documented in the API and examples but **not yet fully implemented** in the current version (v1.0.0).
+
+**API Definition (Available but not functional):**
+
+```yaml
+# This configuration is defined in the API but NOT fully implemented
+---
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: external-db-site
+  namespace: production
+spec:
+  benchRef:
+    name: prod-bench
+  siteName: "erp.example.com"
+  
+  dbConfig:
+    mode: external  # ⚠️ Not yet implemented in MariaDBProvider
+    connectionSecretRef:
+      name: external-db-credentials
+
+---
+# External database credentials secret format
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-db-credentials
+  namespace: production
+type: Opaque
+stringData:
+  host: "mysql.rds.amazonaws.com"        # Database hostname
+  port: "3306"                            # Database port
+  database: "erp_production"              # Database name
+  username: "frappe_user"                 # Database user
+  password: "your-secure-password-here"   # Database password
+```
+
+**Current Status:**
+- ❌ The `mode: external` option is defined in the CRD but returns "unsupported database mode" error
+- ❌ The MariaDBProvider (`controllers/database/mariadb_provider.go:270-277`) only handles `shared` and `dedicated` modes
+- ❌ ConnectionSecretRef field exists but is not used in the implementation
+- ✅ **Workaround:** Use MariaDB Operator CRs to reference external databases (see below)
+
+**Current Workaround - Using MariaDB Operator with External Database:**
+
+You can reference an external database by creating MariaDB Operator custom resources that point to your external instance:
+
+```yaml
+---
+# Create a MariaDB CR that points to external database
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: external-mariadb
+  namespace: production
+spec:
+  # Configure this to point to your external MariaDB instance
+  # (Requires MariaDB Operator configuration for external databases)
+  # See: https://github.com/mariadb-operator/mariadb-operator
+
+---
+# Reference it in your FrappeSite
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeSite
+metadata:
+  name: mysite
+  namespace: production
+spec:
+  benchRef:
+    name: prod-bench
+  siteName: "erp.example.com"
+  
+  dbConfig:
+    mode: shared  # Use shared mode with mariadbRef
+    mariadbRef:
+      name: external-mariadb  # Reference your external DB
+      namespace: production
+```
+
+**Planned Use Cases (Future Release):**
+- AWS RDS for MariaDB/MySQL
+- Azure Database for MySQL
+- Google Cloud SQL for MySQL
+- Self-managed external MariaDB/MySQL instances
+- High-availability managed database services
+
+**Roadmap:**
+Direct external database support (with `mode: external`) is planned for a future release (v1.1+).
+
+---
+
+#### External Redis Support
+
+**Status:** ⚠️ **PLANNED** (Not Yet Implemented)
+
+External Redis support is defined in the API but **not yet implemented** in the current version (v1.0.0).
+
+**API Definition (Available but not functional):**
+
+```yaml
+# This configuration is defined in the API but NOT yet implemented
+apiVersion: vyogo.tech/v1alpha1
+kind: FrappeBench
+metadata:
+  name: external-redis-bench
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: erpnext
+      source: image
+  
+  redisConfig:
+    type: redis
+    # ConnectionSecretRef is defined but not yet implemented
+    connectionSecretRef:
+      name: external-redis-credentials  # ⚠️ Not yet functional
+```
+
+**Current Status:**
+- ❌ The `ConnectionSecretRef` field exists in the API (`api/v1alpha1/shared_types.go:240`)
+- ❌ Implementation is marked as TODO in the codebase (`controllers/frappebench_resources.go:1504`)
+- ❌ The operator currently only supports **in-cluster Redis** deployments
+- ✅ In-cluster Redis (managed by operator) works perfectly
+
+**Current Behavior:**
+The operator automatically deploys Redis instances within the cluster for:
+- **Redis Cache** - Session storage and caching
+- **Redis Queue** - Background job queue management
+
+You can configure the in-cluster Redis with:
+```yaml
+redisConfig:
+  type: redis          # or 'dragonfly' for better performance
+  maxMemory: "4gb"     # Memory limit
+  storageSize: "10Gi"  # Persistent storage size
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "4Gi"
+```
+
+**Roadmap:**
+External Redis support is planned for a future release (v1.1+). When implemented, it will support:
+- AWS ElastiCache for Redis
+- Azure Cache for Redis
+- Google Cloud Memorystore
+- Self-managed external Redis instances
+
+---
+
+#### Redis Architecture and Data Isolation
+
+**Important:** Redis is **shared at the bench level**, not isolated per site.
+
+**How it Works:**
+- Each `FrappeBench` creates **two Redis instances**:
+  - `{bench-name}-redis-cache` - For session storage and caching
+  - `{bench-name}-redis-queue` - For background job queues
+- **All sites on the same bench share these Redis instances**
+- Sites use the default Redis database (db 0) - no database number isolation
+- Data isolation is handled by **Frappe's key prefixes**, not separate Redis databases
+
+**Example Architecture:**
+```
+FrappeBench: saas-bench
+├── Redis Cache (shared)
+│   └── All sites: customer1, customer2, customer3
+├── Redis Queue (shared)
+│   └── All sites: customer1, customer2, customer3
+└── MariaDB
+    ├── Database: customer1_db (isolated)
+    ├── Database: customer2_db (isolated)
+    └── Database: customer3_db (isolated)
+```
+
+**Key Points:**
+- ✅ **Database:** Each site gets its own isolated MariaDB database
+- ⚠️ **Redis:** All sites on the same bench share Redis (namespaced by keys)
+- 💡 **Best Practice:** For complete isolation, use dedicated benches per customer/site
+
+**Site Configuration Generated:**
+```json
+{
+  "host_name": "customer1.example.com",
+  "redis_cache": "redis://saas-bench-redis-cache:6379",
+  "redis_queue": "redis://saas-bench-redis-queue:6379"
+}
+```
+
+---
+
+#### Summary Table
+
+| Feature | Status | Version | Isolation Level | Use Cases |
+|---------|--------|---------|----------------|-----------|
+| **External MariaDB/MySQL** | ⚠️ Planned | v1.1+ | Per-site (with workaround) | AWS RDS, Azure Database, Cloud SQL |
+| **Shared MariaDB** | ✅ Supported | v1.0.0+ | Per-site database | Multi-tenant, cost-effective |
+| **Dedicated MariaDB** | ✅ Supported | v1.0.0+ | Per-site instance | Enterprise, isolated databases |
+| **In-cluster Redis** | ✅ Supported | v1.0.0+ | **Bench-level (shared)** | Default deployment, fully managed |
+| **In-cluster Dragonfly** | ✅ Supported | v1.0.0+ | **Bench-level (shared)** | High-performance alternative |
+| **External Redis** | ⚠️ Planned | v1.1+ | TBD | ElastiCache, Azure Cache, Memorystore |
+| **PostgreSQL** | ⚠️ Planned | v1.1.0+ | Per-site database | PostgreSQL provider |
+| **SQLite** | ✅ Supported | v1.0.0+ | Per-site file | Frappe v16+ sites |
 
 ---
 
