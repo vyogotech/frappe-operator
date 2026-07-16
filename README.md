@@ -248,7 +248,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 | **Object storage integration** | ❌ | ✅ |
 | **SiteDashboard & charts** | ❌ | ✅ |
 
-📬 **Enterprise inquiries:** hello@vyogo.tech
+📬 **Enterprise inquiries:** dev@vyogo.tech
 
 ## License
 
@@ -256,12 +256,10 @@ The current release (`v4.x`) is available under the **Apache License 2.0** — s
 
 Starting from `v5.0`, Frappe Operator will be released under a dual-license model:
 - **Community Edition:** open-source license (Apache 2.0 or AGPLv3)
-- **Enterprise Edition:** commercial license — contact [hello@vyogo.tech](mailto:hello@vyogo.tech)
+- **Enterprise Edition:** commercial license — contact [dev@vyogo.tech](mailto:dev@vyogo.tech)
 
-> **Note for commercial users:** If you are using or planning to use this operator as part of a hosted or managed Frappe/ERPNext service offered to third parties, please contact us at hello@vyogo.tech to discuss licensing options before the v5.0 release.
+> **Note for commercial users:** If you are using or planning to use this operator as part of a hosted or managed Frappe/ERPNext service offered to third parties, please contact us at dev@vyogo.tech to discuss licensing options before the v5.0 release.
 
 ---
-
-**Built with ❤️ by [Vyogo Technologies](https://vyogo.tech)**
 
 ⭐ **[Star this project](https://github.com/vyogotech/frappe-operator)** if you find it useful!
