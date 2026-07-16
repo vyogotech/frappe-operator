@@ -11,7 +11,7 @@
 > Frappe Operator is transitioning to a **Community + Enterprise** edition model.
 > The current release (`v4.0.0`) remains available under Apache 2.0 as the **final fully-open release**.
 >
-> Starting with the next version (`v5.0`), the operator will be split into:
+> Starting with the next version (`v4.2.0`), the operator will be split into:
 > - **Community Edition** (free, open-source) — Core bench and site management
 > - **Enterprise Edition** (commercial license) — Advanced features for production cloud deployments
 >
@@ -252,9 +252,9 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-The current release (`v4.x`) is available under the **Apache License 2.0** — see [LICENSE](LICENSE) for details.
+The current release (`v4.0.0`) is available under the **Apache License 2.0** — see [LICENSE](LICENSE) for details.
 
-Starting from `v5.0`, Frappe Operator will be released under a dual-license model:
+Starting from `v4.2.0`, Frappe Operator will be released under a dual-license model:
 - **Community Edition:** open-source license (Apache 2.0 or AGPLv3)
 - **Enterprise Edition:** commercial license — contact [dev@vyogo.tech](mailto:dev@vyogo.tech)
 
