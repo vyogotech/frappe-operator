@@ -220,6 +220,8 @@ webhook:
 certController:
   # -- Specifies whether the cert-controller should be created.
   enabled: true
+  serviceAccount:
+    name: mariadb-cert-controller
   image:
     repository: ghcr.io/mariadb-operator/mariadb-operator
     pullPolicy: IfNotPresent
