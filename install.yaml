@@ -4897,7 +4897,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: ghcr.io/vyogotech/frappe-operator:v4.1.1
+        image: ghcr.io/vyogotech/frappe-operator:v4.1.2
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
