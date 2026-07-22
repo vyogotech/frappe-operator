@@ -8,4 +8,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: ghcr.io/vyogotech/frappe-operator
-  newTag: v4.1.1
+  newTag: v4.1.2
