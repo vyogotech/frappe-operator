@@ -23,7 +23,6 @@ import (
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
-	"github.com/vyogotech/frappe-operator/pkg/backoff"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -137,9 +136,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				})
 				_ = r.updateStatus(ctx, site)
 
-				attempt := r.getRequeueAttempt(site)
-				_ = r.patchRequeueAttempt(ctx, site, attempt+1)
-				return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(15*time.Second, attempt, requeueBackoffMax)}, nil
+				return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 			}
 
 			// Cleanup remaining resources if any
@@ -185,9 +182,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Message: fmt.Sprintf("Failed to get referenced bench: %v", err),
 		})
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
-		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(30*time.Second, attempt, requeueBackoffMax)}, nil
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if bench.Status.Phase != "Ready" {
@@ -199,9 +194,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Message: fmt.Sprintf("Bench %s is not ready", bench.Name),
 		})
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
-		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(requeueBackoffBase, attempt, requeueBackoffMax)}, nil
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 
 	r.setCondition(site, metav1.Condition{
@@ -239,9 +232,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Message: "Database is being provisioned",
 		})
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
-		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(requeueBackoffBase, attempt, requeueBackoffMax)}, nil
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 
 	r.setCondition(site, metav1.Condition{
@@ -268,9 +259,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if !siteReady {
 		site.Status.Phase = vyogotechv1.FrappeSitePhaseProvisioning
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
-		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(requeueBackoffBase, attempt, requeueBackoffMax)}, nil
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 
 	// External Access (Ingress/Route)
