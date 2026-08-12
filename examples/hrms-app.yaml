@@ -1,0 +1,11 @@
+apiVersion: vyogo.tech/v1
+kind: SiteApp
+metadata:
+  name: e2e-site-app-hrms
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  appName: hrms
+  gitRepo: "https://github.com/frappe/hrms"
+  gitBranch: "version-15"
