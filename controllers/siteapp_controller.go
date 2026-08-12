@@ -248,46 +248,90 @@ EOF
 
 cd /home/frappe/frappe-bench/sites
 
-if [ -n "$GIT_REPO" ]; then
+# Branch for frappe-official dependencies, derived from the bench's Frappe
+# version (e.g. "15.0.0" -> "version-15"); falls back to the repo default.
+DEP_BRANCH=""
+if [ -n "$FRAPPE_VERSION" ]; then
+  FV_MAJOR=$(echo "$FRAPPE_VERSION" | grep -oE '[0-9]+' | head -1)
+  [ -n "$FV_MAJOR" ] && DEP_BRANCH="version-$FV_MAJOR"
+fi
+
+# clone_app <name> <git_repo> <git_branch> — clone + link + frontend build +
+# pip deps + register in apps.txt/apps.pth. No-op if repo is empty.
+clone_app() {
+  local name="$1" repo="$2" branch="$3"
+  [ -z "$repo" ] && return 0
   mkdir -p apps
-  if [ ! -d "apps/$APP_NAME" ]; then
-    echo "Cloning $APP_NAME from $GIT_REPO..."
-    git clone --depth 1 ${GIT_BRANCH:+-b $GIT_BRANCH} "$GIT_REPO" "apps/$APP_NAME" || true
+  if [ ! -d "apps/$name" ]; then
+    echo "Cloning $name from $repo (branch: ${branch:-default})..."
+    if [ -n "$branch" ]; then
+      git clone --depth 1 -b "$branch" "$repo" "apps/$name" 2>/dev/null || git clone --depth 1 "$repo" "apps/$name" || true
+    else
+      git clone --depth 1 "$repo" "apps/$name" || true
+    fi
   fi
-  ln -sf $(pwd)/apps/$APP_NAME /home/frappe/frappe-bench/apps/$APP_NAME 2>/dev/null || true
-  if [ -d "apps/$APP_NAME/$APP_NAME/public" ]; then
-    echo "Creating asset symlink for $APP_NAME..."
-    ln -sf $(pwd)/apps/$APP_NAME/$APP_NAME/public /home/frappe/frappe-bench/sites/assets/$APP_NAME 2>/dev/null || true
+  ln -sf $(pwd)/apps/$name /home/frappe/frappe-bench/apps/$name 2>/dev/null || true
+  if [ -d "apps/$name/$name/public" ]; then
+    ln -sf $(pwd)/apps/$name/$name/public /home/frappe/frappe-bench/sites/assets/$name 2>/dev/null || true
   fi
-  # Only build frontend if dist/ doesn't already exist (skip in prod - pre-built assets expected)
-  if [ -f "apps/$APP_NAME/frontend/package.json" ] && [ ! -d "apps/$APP_NAME/frontend/dist" ]; then
-    echo "Building frontend assets for $APP_NAME (no pre-built dist found)..."
-    (cd "apps/$APP_NAME/frontend" && (yarn build 2>/dev/null || npm run build 2>/dev/null || true))
-  elif [ -f "apps/$APP_NAME/frontend/package.json" ] && [ -d "apps/$APP_NAME/frontend/dist" ]; then
-    echo "Skipping frontend build for $APP_NAME (pre-built dist already exists)."
+  if [ -f "apps/$name/frontend/package.json" ] && [ ! -d "apps/$name/frontend/dist" ]; then
+    echo "Building frontend assets for $name..."
+    (cd "apps/$name/frontend" && (yarn build 2>/dev/null || npm run build 2>/dev/null || true))
   fi
-  if [ -d "apps/$APP_NAME" ]; then
-    echo "Installing Python dependencies for $APP_NAME..."
-    pip install --target /tmp/pip $(pwd)/apps/$APP_NAME 2>/dev/null || true
-    rm -rf /tmp/pip/click /tmp/pip/click-*.dist-info 2>/dev/null || true
+  if [ -d "apps/$name" ]; then
+    echo "Installing Python dependencies for $name..."
+    pip install --target /tmp/pip $(pwd)/apps/$name 2>/dev/null || true
   fi
-fi
+  rm -rf /tmp/pip/click /tmp/pip/click-*.dist-info 2>/dev/null || true
+  if [ -f apps.txt ] && [ -w apps.txt ]; then
+    grep -q "^$name$" apps.txt 2>/dev/null || echo "$name" >> apps.txt
+  fi
+  grep -q "^/home/frappe/frappe-bench/sites/apps/$name$" apps.pth 2>/dev/null || echo "/home/frappe/frappe-bench/sites/apps/$name" >> apps.pth
+}
 
-if [ -f apps.txt ] && [ -w apps.txt ]; then
-  if ! grep -q "^$APP_NAME$" apps.txt 2>/dev/null; then
-    echo "$APP_NAME" >> apps.txt || true
+# read_required_apps <name> — print the app's required_apps (dependency app
+# names) declared in its hooks.py, space-separated.
+read_required_apps() {
+  local hooks="apps/$1/$1/hooks.py"
+  [ -f "$hooks" ] || return 0
+  python3 - "$hooks" <<'PY' 2>/dev/null
+import re, sys
+c = open(sys.argv[1]).read()
+m = re.search(r'required_apps\s*=\s*\[(.*?)\]', c, re.S)
+if m:
+    print(' '.join(re.findall(r'["\']([\w_]+)["\']', m.group(1))))
+PY
+}
+
+# 1) Clone the target app (needed to read its dependency list).
+clone_app "$APP_NAME" "$GIT_REPO" "$GIT_BRANCH"
+
+# 2) Auto-install required_apps (dependencies) FIRST, in declared order, before
+# the target app — e.g. Frappe HRMS declares required_apps=["erpnext"], so
+# erpnext is installed first. frappe-official deps are cloned from
+# github.com/frappe/<dep> at the bench's version branch.
+INSTALLED=$(bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}')
+for dep in $(read_required_apps "$APP_NAME"); do
+  [ "$dep" = "frappe" ] && continue
+  if echo "$INSTALLED" | grep -qx "$dep"; then
+    echo "Dependency '$dep' already installed on $SITE_NAME — skipping."
+    continue
   fi
-fi
+  echo "Auto-installing dependency '$dep' (required by $APP_NAME)..."
+  clone_app "$dep" "https://github.com/frappe/$dep" "$DEP_BRANCH"
+  cd /home/frappe/frappe-bench
+  bench --site "$SITE_NAME" install-app "$dep" --force
+  # Rebuild the module→app map so the target app's doctypes (which may live in a
+  # module the dependency just added, e.g. hrms's "HR") resolve correctly on the
+  # first attempt instead of erroring "No module named frappe.core.doctype.*".
+  bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
+  cd /home/frappe/frappe-bench/sites
+done
 
-if ! grep -q "^/home/frappe/frappe-bench/sites/apps/$APP_NAME$" apps.pth 2>/dev/null; then
-  echo "/home/frappe/frappe-bench/sites/apps/$APP_NAME" >> apps.pth || true
-fi
-
+# 3) Install the target app.
 cd /home/frappe/frappe-bench
 echo "Installing app $APP_NAME on site $SITE_NAME..."
-# Do NOT swallow install failures: if the app is not in the bench and no git
-# source was provided (or the install genuinely fails), the job must fail so the
-# SiteApp status reflects reality instead of a false success.
+# Do NOT swallow install failures: the SiteApp status must reflect reality.
 bench --site "$SITE_NAME" install-app "$APP_NAME" --force
 
 echo "Building assets for $APP_NAME..."
@@ -333,6 +377,7 @@ bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
 									{Name: "SITE_NAME", Value: site.Spec.SiteName},
 									{Name: "GIT_REPO", Value: siteApp.Spec.GitRepo},
 									{Name: "GIT_BRANCH", Value: siteApp.Spec.GitBranch},
+									{Name: "FRAPPE_VERSION", Value: bench.Spec.FrappeVersion},
 									{Name: "USER", Value: "frappe"},
 								},
 								VolumeMounts: []corev1.VolumeMount{
