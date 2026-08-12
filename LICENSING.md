@@ -69,7 +69,7 @@ license.
 
 ## Version history
 
-- **≤ v4.x** was released under the Apache License 2.0. Those released versions
+- **v4.1.x and earlier** (every release before v4.2.0) was published under the Apache License 2.0. Those releases
   remain available under Apache 2.0 — this license change applies **going
   forward**.
 - **From this release onward**, Frappe Operator is licensed under the Elastic
