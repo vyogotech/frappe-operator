@@ -25,7 +25,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 4.2.0
-    created: "2026-08-12T08:26:39.492891863Z"
+    created: "2026-08-12T08:26:54.893361217Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -40,7 +40,7 @@ entries:
       - autoscaling
       version: 2.16.1
     description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
-    digest: 98a8300808e7f23562b9085316e7898c4a1a8ebcb9cae10fb17b958e2ef39455
+    digest: c6cf2dbbe1ab7cefcc53e7054a96580f8b0d1811d1ef81a2fbf63efe285a877d
     home: https://github.com/vyogotech/frappe-operator
     icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/main/docs/assets/icon.png
     keywords:
@@ -84,7 +84,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 3.2.1
-    created: "2026-08-12T08:26:39.481351394Z"
+    created: "2026-08-12T08:26:54.882015953Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -143,7 +143,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 3.2.0
-    created: "2026-08-12T08:26:39.470350038Z"
+    created: "2026-08-12T08:26:54.871161987Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -202,7 +202,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 3.1.0
-    created: "2026-08-12T08:26:39.458583426Z"
+    created: "2026-08-12T08:26:54.859686708Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -261,7 +261,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 3.0.0
-    created: "2026-08-12T08:26:39.447805841Z"
+    created: "2026-08-12T08:26:54.848834885Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -320,7 +320,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 2.6.4
-    created: "2026-08-12T08:26:39.435929774Z"
+    created: "2026-08-12T08:26:54.837323656Z"
     description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
     digest: b0eabdaf2aaeecc65d06231654e00c46070125b4bbbd6074b272dffb5a429124
     home: https://github.com/vyogotech/frappe-operator
@@ -366,7 +366,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 2.6.3
-    created: "2026-08-12T08:26:39.432375709Z"
+    created: "2026-08-12T08:26:54.833549915Z"
     description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
     digest: 058919e87ac557e204e343c78f5f62f21d9a5d90dce75849ff6e87c8403bc3be
     home: https://github.com/vyogotech/frappe-operator
@@ -412,7 +412,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: v2.5.0
-    created: "2026-08-12T08:26:39.503220362Z"
+    created: "2026-08-12T08:26:54.90363102Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -447,4 +447,4 @@ entries:
     urls:
     - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-v2.5.0.tgz
     version: v2.5.0
-generated: "2026-08-12T08:26:39.427418336Z"
+generated: "2026-08-12T08:26:54.829003744Z"
