@@ -17,7 +17,7 @@
 >   parties as a **hosted or managed service** (a Frappe/ERPNext cloud, managed
 >   hosting, or multi-tenant SaaS) built on its functionality.
 >
-> Releases up to and including `v4.x` remain available under Apache 2.0; this
+> Releases before `v4.2.0` (v4.1.x and earlier) remain available under Apache 2.0; this
 > change applies going forward. See **[LICENSING.md](LICENSING.md)** for the full
 > plain-English breakdown, including how this relates to Frappe (MIT) and ERPNext (GPLv3).
 >
@@ -242,7 +242,7 @@ Frappe Operator is licensed under the **Elastic License 2.0 (ELv2)** — a
   parties as a **hosted or managed service** (e.g. a Frappe/ERPNext cloud,
   managed hosting, or multi-tenant SaaS built on its functionality).
 
-Releases up to and including `v4.x` were published under the Apache License 2.0
+Every release before `v4.2.0` (v4.1.x and earlier) was published under the Apache License 2.0
 and remain available under those terms; this change applies going forward.
 
 Frappe Operator orchestrates Frappe (MIT) and ERPNext (GPLv3) at arm's length as
