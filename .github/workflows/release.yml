@@ -139,7 +139,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # DISABLED as of v4.2.0: Frappe Operator is now licensed under the Elastic
+  # License 2.0 (source-available, NOT an OSI-approved open-source license).
+  # OperatorHub / k8s-operatorhub community-operators only accepts open-source
+  # operators, so submitting the bundle there is no longer applicable and would
+  # be rejected. Left in place (guarded off) rather than deleted; re-enable only
+  # if the project ever returns to an OSI open-source license.
   submit-to-operatorhub:
+    if: false
     name: Submit OLM Bundle to OperatorHub
     needs: build-and-release
     runs-on: ubuntu-latest
