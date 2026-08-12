@@ -250,7 +250,14 @@ separate processes/containers — see [LICENSING.md](LICENSING.md#relationship-t
 
 📬 **Commercial / managed-hosting inquiries:** [dev@vyogo.tech](mailto:dev@vyogo.tech) · 🌐 [vyogo.tech](https://vyogo.tech)
 
-> **Note for commercial users:** If you are using or planning to use this operator as part of a hosted or managed Frappe/ERPNext service offered to third parties, please contact us at dev@vyogo.tech to discuss licensing options before the v5.0 release.
+## Trademarks
+
+**Vyogo™** and **Vyogo Cloud™** are trademarks of Vyogo. The Elastic License 2.0
+grants rights to the **software**, not to the **marks** — you may refer to the
+project by name, but you may not use the Vyogo marks to brand your own product
+or a managed service, or to imply endorsement. See **[TRADEMARK.md](TRADEMARK.md)**
+for the full policy. "Frappe" and "ERPNext" are trademarks of Frappe Technologies
+Pvt. Ltd.; this project is not affiliated with or endorsed by them.
 
 ---
 
