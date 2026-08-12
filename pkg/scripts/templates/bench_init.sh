@@ -51,10 +51,39 @@ EOF
 
 # Sync assets from the image cache to the Persistent Volume
 if [ -d "/home/frappe/assets_cache" ]; then
-    echo "Syncing pre-built assets from image to PVC..."
+    echo "Syncing pre-built assets from image to PVC (preserving dynamic app hashes)..."
     mkdir -p sites/assets
-    # Use -R to overwrite existing files, ensuring new assets and config maps are applied
-    cp -R /home/frappe/assets_cache/* sites/assets/ || true
+    # Copy asset subdirectories with -rn (no-clobber) so new assets copy without overwriting existing files
+    cp -rn /home/frappe/assets_cache/* sites/assets/ 2>/dev/null || true
+
+    # Intelligently MERGE assets.json to update core hashes while preserving dynamic app hashes
+    python3 -c "
+import json, os
+
+cache_json = '/home/frappe/assets_cache/assets.json'
+site_json = 'sites/assets/assets.json'
+
+if os.path.exists(cache_json):
+    try:
+        with open(cache_json, 'r') as f:
+            new_assets = json.load(f)
+
+        current_assets = {}
+        if os.path.exists(site_json):
+            try:
+                with open(site_json, 'r') as f:
+                    current_assets = json.load(f)
+            except Exception:
+                pass
+
+        current_assets.update(new_assets)
+
+        with open(site_json, 'w') as f:
+            json.dump(current_assets, f, indent=2)
+        print('✓ Intelligently merged assets.json without losing dynamic app hashes')
+    except Exception as e:
+        print(f'Warning: assets.json merge failed: {e}')
+" || echo "Warning: Failed to merge assets.json"
 fi
 
 echo "Bench configuration complete"

@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,21 +26,68 @@ import (
 
 // SiteUserSpec defines the desired state of SiteUser
 type SiteUserSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// SiteRef specifies the target FrappeSite custom resource.
+	// +kubebuilder:validation:Required
+	SiteRef *NamespacedName `json:"siteRef"`
 
-	// Description provides a human-readable explanation of the SiteUser.
-	Description string `json:"description,omitempty"`
+	// Email specifies the user's primary email address (acts as Frappe User name).
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=3
+	Email string `json:"email"`
+
+	// FirstName specifies the user's first name.
+	// +kubebuilder:validation:Required
+	FirstName string `json:"firstName"`
+
+	// LastName specifies the user's last name.
+	// +optional
+	LastName string `json:"lastName,omitempty"`
+
+	// UserType specifies "System User" or "Website User". Defaults to "System User".
+	// +optional
+	// +kubebuilder:default="System User"
+	UserType string `json:"userType,omitempty"`
+
+	// SendPasswordReset determines whether to trigger a password reset email upon creation.
+	// +optional
+	SendPasswordReset bool `json:"sendPasswordReset,omitempty"`
+
+	// Roles lists the Frappe roles to assign to this user.
+	// +optional
+	Roles []string `json:"roles,omitempty"`
+
+	// APIKeySecretRef specifies an optional Secret to store the auto-generated API Key and API Secret.
+	// +optional
+	APIKeySecretRef *corev1.LocalObjectReference `json:"apiKeySecretRef,omitempty"`
 }
 
 // SiteUserStatus defines the observed state of SiteUser
 type SiteUserStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Phase represents the current state of the SiteUser (Pending, Provisioning, Ready, Failed).
+	Phase string `json:"phase,omitempty"`
+
+	// AssignedRoles lists the roles currently assigned in Frappe.
+	AssignedRoles []string `json:"assignedRoles,omitempty"`
+
+	// APIKeysGenerated indicates whether Frappe API keys were generated and exported to the Secret.
+	APIKeysGenerated bool `json:"apiKeysGenerated,omitempty"`
+
+	// SecretName stores the name of the Secret holding the API key/secret.
+	SecretName string `json:"secretName,omitempty"`
+
+	// ObservedGeneration is the most recent generation observed by the controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Conditions represent the latest available observations of the SiteUser's state.
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
+//+kubebuilder:printcolumn:name="Email",type="string",JSONPath=".spec.email"
+//+kubebuilder:printcolumn:name="Site",type="string",JSONPath=".spec.siteRef.name"
+//+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // SiteUser is the Schema for the siteusers API
 type SiteUser struct {

@@ -1,0 +1,26 @@
+apiVersion: vyogo.tech/v1
+kind: SiteUser
+metadata:
+  name: e2e-test-user
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  email: testuser@e2e.apps-crc.testing
+  firstName: Test
+  lastName: User
+  sendPasswordReset: false
+  roles:
+    - System Manager
+    - Accounts User
+---
+apiVersion: vyogo.tech/v1
+kind: SiteRole
+metadata:
+  name: e2e-auditor-role
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  roleName: Auditor
+  deskAccess: true

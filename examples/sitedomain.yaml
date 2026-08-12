@@ -1,0 +1,16 @@
+apiVersion: vyogo.tech/v1
+kind: SiteDomain
+metadata:
+  name: client-acme-domain
+  namespace: default
+spec:
+  siteRef:
+    name: central-site-25mar2026
+  domain: "erp.acmecorp.com"
+  tls:
+    enabled: true
+    issuerRef:
+      name: letsencrypt-production
+      kind: ClusterIssuer
+    secretName: acme-domain-tls
+  redirectPrimary: false
