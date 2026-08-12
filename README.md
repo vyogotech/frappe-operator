@@ -1,25 +1,28 @@
 # Frappe Operator
 
 [![Release](https://img.shields.io/github/v/release/vyogotech/frappe-operator)](https://github.com/vyogotech/frappe-operator/releases)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
 [![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](https://vyogotech.github.io/frappe-operator/)
 
 > [!IMPORTANT]
-> **⚡ Moving to an Open-Core Model**
+> **⚡ Now licensed under the Elastic License 2.0**
 >
-> Frappe Operator is transitioning to a **Community + Enterprise** edition model.
-> The current release (`v4.0.0`) remains available under Apache 2.0 as the **final fully-open release**.
+> Frappe Operator has moved to the **[Elastic License 2.0 (ELv2)](LICENSE)** — a
+> **source-available** license. In short: **free for general use, not free to run as a managed cloud service.**
 >
-> Starting with the next version (`v4.2.0`), the operator will be split into:
-> - **Community Edition** (free, open-source) — Core bench and site management
-> - **Enterprise Edition** (commercial license) — Advanced features for production cloud deployments
+> - ✅ **Free** to use, self-host, modify, and redistribute — including in
+>   production for your own organization or your own dedicated customer instances.
+> - 💼 **Requires a commercial license** if you offer Frappe Operator to third
+>   parties as a **hosted or managed service** (a Frappe/ERPNext cloud, managed
+>   hosting, or multi-tenant SaaS) built on its functionality.
 >
-> **Enterprise features moving to a paid tier include:** automated backups & restore, autoscaling (KEDA/HPA), SiteJob runner, SiteUser management, multi-workspace isolation, OpenTelemetry, canary upgrades, and object storage integration.
+> Releases up to and including `v4.x` remain available under Apache 2.0; this
+> change applies going forward. See **[LICENSING.md](LICENSING.md)** for the full
+> plain-English breakdown, including how this relates to Frappe (MIT) and ERPNext (GPLv3).
 >
-> If you are using this operator commercially — especially to offer managed Frappe/ERPNext hosting to third parties — **please [reach out to us](mailto:dev@vyogo.tech) for a commercial license** before the v5.0 transition.
->
-> 📬 **Commercial inquiries:** dev@vyogo.tech | 🌐 [vyogo.tech](https://vyogo.tech)
+> Building a managed Frappe/ERPNext hosting business on this? Talk to us first.
+> 📬 **Commercial / hosting inquiries:** dev@vyogo.tech | 🌐 [vyogo.tech](https://vyogo.tech)
 
 A production-ready Kubernetes operator that automates deployment, scaling, and management of [Frappe Framework](https://frappeframework.com/) applications (including ERPNext) on Kubernetes.
 
@@ -225,38 +228,27 @@ The project uses a flexible configuration system for testing that eliminates har
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 > [!NOTE]
-> As the project transitions to an open-core model, future contributions to enterprise features will require a Contributor License Agreement (CLA). Community edition contributions remain open as before.
-
-## Edition Comparison
-
-| Feature | Community (Free) | Enterprise (Commercial) |
-|---------|:---:|:---:|
-| FrappeBench — deploy bench infrastructure | ✅ | ✅ |
-| FrappeSite — create & manage sites | ✅ | ✅ |
-| Basic Ingress (nginx, Traefik) | ✅ | ✅ |
-| MariaDB / External DB integration | ✅ | ✅ |
-| ARM64 + AMD64 support | ✅ | ✅ |
-| OpenShift compatibility | ✅ | ✅ |
-| **SiteBackup — automated backups** | ❌ | ✅ |
-| **SiteRestore — point-in-time restore** | ❌ | ✅ |
-| **SiteJob — run bench commands** | ❌ | ✅ |
-| **SiteUser — user lifecycle management** | ❌ | ✅ |
-| **KEDA / HPA autoscaling** | ❌ | ✅ |
-| **Multi-workspace isolation** | ❌ | ✅ |
-| **OpenTelemetry tracing** | ❌ | ✅ |
-| **Canary upgrades** | ❌ | ✅ |
-| **Object storage integration** | ❌ | ✅ |
-| **SiteDashboard & charts** | ❌ | ✅ |
-
-📬 **Enterprise inquiries:** dev@vyogo.tech
+> Frappe Operator is licensed under the Elastic License 2.0. Contributions are accepted under the same license, and contributors may be asked to sign a Contributor License Agreement (CLA). See [LICENSING.md](LICENSING.md).
 
 ## License
 
-The current release (`v4.0.0`) is available under the **Apache License 2.0** — see [LICENSE](LICENSE) for details.
+Frappe Operator is licensed under the **Elastic License 2.0 (ELv2)** — a
+**source-available** license. See [LICENSE](LICENSE) for the full text and
+[LICENSING.md](LICENSING.md) for a plain-English breakdown.
 
-Starting from `v4.2.0`, Frappe Operator will be released under a dual-license model:
-- **Community Edition:** open-source license (Apache 2.0 or AGPLv3)
-- **Enterprise Edition:** commercial license — contact [dev@vyogo.tech](mailto:dev@vyogo.tech)
+- ✅ **Free** to use, self-host, modify, and redistribute — including in
+  production for your own organization and your own dedicated customer instances.
+- 💼 **A commercial license is required** to offer Frappe Operator to third
+  parties as a **hosted or managed service** (e.g. a Frappe/ERPNext cloud,
+  managed hosting, or multi-tenant SaaS built on its functionality).
+
+Releases up to and including `v4.x` were published under the Apache License 2.0
+and remain available under those terms; this change applies going forward.
+
+Frappe Operator orchestrates Frappe (MIT) and ERPNext (GPLv3) at arm's length as
+separate processes/containers — see [LICENSING.md](LICENSING.md#relationship-to-frappe-and-erpnext).
+
+📬 **Commercial / managed-hosting inquiries:** [dev@vyogo.tech](mailto:dev@vyogo.tech) · 🌐 [vyogo.tech](https://vyogo.tech)
 
 > **Note for commercial users:** If you are using or planning to use this operator as part of a hosted or managed Frappe/ERPNext service offered to third parties, please contact us at dev@vyogo.tech to discuss licensing options before the v5.0 release.
 
