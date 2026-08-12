@@ -1,0 +1,18 @@
+apiVersion: vyogo.tech/v1
+kind: SiteUser
+metadata:
+  name: reporting-service-account
+  namespace: default
+spec:
+  siteRef:
+    name: central-site-25mar2026
+  email: "reporting-bot@atxinvox.com.au"
+  firstName: "Reporting"
+  lastName: "Service Account"
+  userType: "System User"
+  sendPasswordReset: false
+  roles:
+    - "System Manager"
+    - "Accounts User"
+  apiKeySecretRef:
+    name: reporting-service-api-keys

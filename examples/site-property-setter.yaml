@@ -1,0 +1,13 @@
+apiVersion: vyogo.tech/v1
+kind: SitePropertySetter
+metadata:
+  name: e2e-supplier-email-reqd
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  docType: "Supplier"
+  fieldName: "email_id"
+  property: "reqd"
+  propertyType: "Check"
+  value: "1"

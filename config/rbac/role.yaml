@@ -165,12 +165,26 @@ rules:
   - frappebenches
   - frappesites
   - frappeworkpaces
+  - siteapikeys
+  - siteapps
   - sitebackups
+  - siteclientscripts
+  - siteconfigs
+  - sitecrons
+  - sitecustomfields
   - sitedashboardcharts
   - sitedashboards
+  - sitedomains
   - sitejobs
+  - sitemigrations
+  - sitepropertysetters
+  - sitequotas
   - siterestores
+  - siteroles
+  - siteserverscripts
+  - siteuserpermissions
   - siteusers
+  - sitewebhooks
   - siteworkspaces
   verbs:
   - create
@@ -186,11 +200,19 @@ rules:
   - frappebenches/finalizers
   - frappesites/finalizers
   - frappeworkpaces/finalizers
+  - siteapikeys/finalizers
+  - siteapps/finalizers
   - sitebackups/finalizers
+  - siteconfigs/finalizers
+  - sitecrons/finalizers
   - sitedashboardcharts/finalizers
   - sitedashboards/finalizers
+  - sitedomains/finalizers
   - sitejobs/finalizers
+  - sitemigrations/finalizers
+  - sitequotas/finalizers
   - siterestores/finalizers
+  - siteroles/finalizers
   - siteusers/finalizers
   - siteworkspaces/finalizers
   verbs:
@@ -201,12 +223,26 @@ rules:
   - frappebenches/status
   - frappesites/status
   - frappeworkpaces/status
+  - siteapikeys/status
+  - siteapps/status
   - sitebackups/status
+  - siteclientscripts/status
+  - siteconfigs/status
+  - sitecrons/status
+  - sitecustomfields/status
   - sitedashboardcharts/status
   - sitedashboards/status
+  - sitedomains/status
   - sitejobs/status
+  - sitemigrations/status
+  - sitepropertysetters/status
+  - sitequotas/status
   - siterestores/status
+  - siteroles/status
+  - siteserverscripts/status
+  - siteuserpermissions/status
   - siteusers/status
+  - sitewebhooks/status
   - siteworkspaces/status
   verbs:
   - get

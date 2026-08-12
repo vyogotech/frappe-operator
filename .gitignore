@@ -298,3 +298,18 @@ dist/
 PRIVATE.md
 dev-notes.md
 personal-*.yaml
+
+# Image/build tarballs (never commit — bloats history)
+*.tar
+
+# One-off scratch & dev helper scripts
+scratch.txt
+patch_bundle.py
+patch_csv.py
+fix_lints_2.sh
+
+# Downloaded/temp working dirs and test outputs
+tmp-dl/
+tmp-dl-2/
+test-results/
+playwright-report/

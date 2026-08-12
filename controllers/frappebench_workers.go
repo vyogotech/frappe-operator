@@ -112,6 +112,21 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 			changed = true
 		}
 
+		hasPythonPath := false
+		for _, e := range deploy.Spec.Template.Spec.Containers[0].Env {
+			if e.Name == "PYTHONPATH" {
+				hasPythonPath = true
+				break
+			}
+		}
+		if !hasPythonPath {
+			deploy.Spec.Template.Spec.Containers[0].Env = append(deploy.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+				Name:  "PYTHONPATH",
+				Value: "/tmp/pip:/home/frappe/frappe-bench/sites/apps",
+			})
+			changed = true
+		}
+
 		if changed {
 			return r.Update(ctx, deploy)
 		}
@@ -140,6 +155,7 @@ func (r *FrappeBenchReconciler) ensureWorkerDeployment(ctx context.Context, benc
 		WithResources(workerResources).
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		WithEnv("USER", "frappe").
+		WithEnv("PYTHONPATH", "/tmp/pip:/home/frappe/frappe-bench/sites/apps").
 		Build()
 
 	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))

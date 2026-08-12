@@ -1,0 +1,10 @@
+apiVersion: vyogo.tech/v1
+kind: SiteApp
+metadata:
+  name: central-site-au-localisation
+  namespace: default
+spec:
+  siteRef:
+    name: central-site-25mar2026
+  appName: "erpnext_australian_localisation"
+  autoMigrate: true

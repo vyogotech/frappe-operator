@@ -1,0 +1,13 @@
+apiVersion: vyogo.tech/v1
+kind: SiteWebhook
+metadata:
+  name: e2e-invoice-submitted
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  webhookDoctype: "Sales Invoice"
+  webhookEvent: "on_submit"
+  requestUrl: "http://payment-manager.frappe.svc.cluster.local:8080/v1/invoices"
+  requestStructure: "JSON"
+  enabled: true

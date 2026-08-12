@@ -1,0 +1,10 @@
+apiVersion: vyogo.tech/v1
+kind: SiteMigration
+metadata:
+  name: migrate-release-v2
+  namespace: default
+spec:
+  siteRef:
+    name: central-site-25mar2026
+  skipFixtures: false
+  force: false

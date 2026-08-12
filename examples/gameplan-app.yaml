@@ -1,0 +1,10 @@
+apiVersion: vyogo.tech/v1
+kind: SiteApp
+metadata:
+  name: e2e-site-app-gameplan
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  appName: gameplan
+  gitRepo: "https://github.com/frappe/gameplan"

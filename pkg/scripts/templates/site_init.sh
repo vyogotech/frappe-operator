@@ -76,10 +76,39 @@ ENCRYPTION_KEY=$(cat /tmp/site-secrets/encryption_key 2>/dev/null || echo "")
 # Sync assets from the image cache to the Persistent Volume BEFORE migration/initialization
 # This guarantees that even if database migration fails, assets are present for the web service
 if [ -d "/home/frappe/assets_cache" ]; then
-    echo "Syncing pre-built assets from image to PVC..."
+    echo "Syncing pre-built assets from image to PVC (preserving dynamic app hashes)..."
     mkdir -p sites/assets
-    # Use -R to copy recursively. We want to overwrite old assets with new ones from the image.
-    cp -R /home/frappe/assets_cache/* sites/assets/ || echo "Warning: Failed to sync assets"
+    # Copy asset subdirectories with -rn (no-clobber) so new assets copy without overwriting existing files
+    cp -rn /home/frappe/assets_cache/* sites/assets/ 2>/dev/null || true
+
+    # Intelligently MERGE assets.json to update core hashes while preserving dynamic app hashes
+    python3 -c "
+import json, os
+
+cache_json = '/home/frappe/assets_cache/assets.json'
+site_json = 'sites/assets/assets.json'
+
+if os.path.exists(cache_json):
+    try:
+        with open(cache_json, 'r') as f:
+            new_assets = json.load(f)
+
+        current_assets = {}
+        if os.path.exists(site_json):
+            try:
+                with open(site_json, 'r') as f:
+                    current_assets = json.load(f)
+            except Exception:
+                pass
+
+        current_assets.update(new_assets)
+
+        with open(site_json, 'w') as f:
+            json.dump(current_assets, f, indent=2)
+        print('✓ Intelligently merged assets.json without losing dynamic app hashes')
+    except Exception as e:
+        print(f'Warning: assets.json merge failed: {e}')
+" || echo "Warning: Failed to merge assets.json"
 fi
 
 # Create or update common_site_config.json BEFORE migration/initialization
@@ -182,20 +211,46 @@ SKIP_INIT=$(cat /tmp/site-secrets/skip_init 2>/dev/null || echo "false")
 echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
 
-# If the site directory already exists, skip creation but update config
-if [[ -d "/home/frappe/frappe-bench/sites/$SITE_NAME" ]]; then
-    if [[ -f "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete" ]] || [[ "$IS_UPGRADE" == "true" ]] || [[ "$SKIP_INIT" == "true" ]]; then
-        echo "Site $SITE_NAME already exists and is initialized; skipping new-site and updating config."
-        goto_update_config=1
-        # Backfill the marker so future local checks pass
-        touch "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete"
-    else
-        echo "Warning: Site directory exists but .init_complete is missing! A previous new-site attempt failed halfway."
-        echo "Cleaning up directory to allow bench new-site to recreate it cleanly..."
-        rm -rf "/home/frappe/frappe-bench/sites/$SITE_NAME"
-        goto_update_config=0
-    fi
+# Check directly against database if tables & frappe app are already initialized
+DB_HAS_FRAPPE=$(python3 << 'PYTHON_CHECK'
+import os, sys
+
+try:
+    with open('/tmp/site-secrets/db_host', 'r') as f: db_host = f.read().strip()
+    with open('/tmp/site-secrets/db_port', 'r') as f: db_port = f.read().strip()
+    with open('/tmp/site-secrets/db_name', 'r') as f: db_name = f.read().strip()
+    with open('/tmp/site-secrets/db_user', 'r') as f: db_user = f.read().strip()
+    with open('/tmp/site-secrets/db_password', 'r') as f: db_password = f.read().strip()
+    with open('/tmp/site-secrets/db_provider', 'r') as f: db_provider = f.read().strip()
+
+    if db_provider in ['mariadb', 'external']:
+        import MySQLdb
+        db = MySQLdb.connect(host=db_host, port=int(db_port), user=db_user, passwd=db_password, db=db_name)
+        cur = db.cursor()
+        cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s AND table_name = 'tabInstalled Application'", (db_name,))
+        if cur.fetchone()[0] > 0:
+            cur.execute("SELECT COUNT(*) FROM `tabInstalled Application` WHERE app_name = 'frappe'")
+            if cur.fetchone()[0] > 0:
+                print("true")
+                sys.exit(0)
+except Exception as e:
+    pass
+
+print("false")
+PYTHON_CHECK
+)
+
+# Decision: Database status is the single source of truth (or explicit IS_UPGRADE/SKIP_INIT flags):
+if [[ "$DB_HAS_FRAPPE" == "true" ]] || [[ "$IS_UPGRADE" == "true" ]] || [[ "$SKIP_INIT" == "true" ]]; then
+    echo "✓ Database for $SITE_NAME is already initialized with Frappe; skipping new-site and updating config."
+    goto_update_config=1
+    mkdir -p "/home/frappe/frappe-bench/sites/$SITE_NAME"
+    touch "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete"
 else
+    if [[ -d "/home/frappe/frappe-bench/sites/$SITE_NAME" ]]; then
+        echo "Warning: Site directory exists but DB is uninitialized! Cleaning up directory for fresh new-site..."
+        rm -rf "/home/frappe/frappe-bench/sites/$SITE_NAME"
+    fi
     goto_update_config=0
 fi
 

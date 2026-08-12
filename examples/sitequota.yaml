@@ -1,0 +1,12 @@
+apiVersion: vyogo.tech/v1
+kind: SiteQuota
+metadata:
+  name: tenant-quota-pro
+  namespace: default
+spec:
+  siteRef:
+    name: central-site-25mar2026
+  maxDbSizeMb: 5000
+  maxStorageMb: 20000
+  maxUsers: 25
+  actionOnExceeded: Warn

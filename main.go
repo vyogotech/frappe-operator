@@ -185,6 +185,70 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteUser")
 		os.Exit(1)
 	}
+	if err = (&controllers.SiteRoleReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siterole-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteRole")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteAppReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteapp-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteApp")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteConfigReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteconfig-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteConfig")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteDomainReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitedomain-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteDomain")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteCronReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitecron-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteCron")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteAPIKeyReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteapikey-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteAPIKey")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteQuotaReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitequota-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteQuota")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteMigrationReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitemigration-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteMigration")
+		os.Exit(1)
+	}
 	if err = (&controllers.FrappeWorkpaceReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
@@ -239,6 +303,54 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("siterestore-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteRestore")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteCustomFieldReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitecustomfield-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteCustomField")
+		os.Exit(1)
+	}
+	if err = (&controllers.SitePropertySetterReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitepropertysetter-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SitePropertySetter")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteServerScriptReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteserverscript-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteServerScript")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteClientScriptReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteclientscript-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteClientScript")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteWebhookReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitewebhook-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteWebhook")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteUserPermissionReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteuserpermission-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteUserPermission")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

@@ -1,0 +1,18 @@
+apiVersion: vyogo.tech/v1
+kind: SiteClientScript
+metadata:
+  name: e2e-customer-button
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  dt: "Customer"
+  script: |
+    frappe.ui.form.on('Customer', {
+        refresh(frm) {
+            frm.add_custom_button('Check Verification', () => {
+                frappe.msgprint('Customer verified!');
+            });
+        }
+    });
+  enabled: true
