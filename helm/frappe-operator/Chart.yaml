@@ -37,7 +37,7 @@ dependencies:
 annotations:
   # Artifact Hub annotations
   artifacthub.io/category: database
-  artifacthub.io/license: Apache-2.0
+  artifacthub.io/license: Elastic-2.0
   artifacthub.io/prerelease: "false"
   artifacthub.io/operator: "true"
   artifacthub.io/operatorCapabilities: Full Lifecycle
