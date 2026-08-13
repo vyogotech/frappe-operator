@@ -102,12 +102,29 @@ echo "=== 7. Upgrading the site with FAILED config ==="
 kubectl apply -f test/scenarios/image-upgrade-fail.yaml -n e2e-upgrade-test-fail
 echo "Waiting for upgrade..."
 sleep 15
-kubectl wait --for=condition=Failed job/upgrade-site-init -n e2e-upgrade-test-fail --timeout=2m || echo "site init upgrade wait failed or completed unexpectedly"
+# The bad scenario installs hrms (slow get-app) BEFORE hitting the bogus
+# `nonexistentapp`, so allow time for the job to reach the Failed state.
+kubectl wait --for=condition=Failed job/upgrade-site-init -n e2e-upgrade-test-fail --timeout=8m || echo "site init upgrade wait failed or completed unexpectedly"
 
 echo "=== 8. Port forwarding to verify CSS AFTER FAILED upgrade ==="
 kubectl port-forward svc/upgrade-bench-nginx 8080:8080 -n e2e-upgrade-test-fail &
 PF_PID=$!
 sleep 10
+
+# The fallback trap keeps the site on the last working version when an upgrade
+# fails, but the roll-out/roll-back transition briefly returns 500. Poll until
+# the site recovers before asserting — a WORKING fallback restores service within
+# a few minutes; a genuinely BROKEN one never does and the test still fails below.
+echo "Waiting for the fallback to restore the site (post-failed-upgrade)..."
+for i in $(seq 1 60); do
+    STATUS=$(curl -H "Host: upgrade.test.local" -o /dev/null -s -w "%{http_code}" http://localhost:8080/login || echo 000)
+    if [ "$STATUS" == "200" ]; then
+        echo "Site recovered (HTTP 200) after $((i*5))s — fallback trap held."
+        break
+    fi
+    echo "  site not serving yet (HTTP $STATUS), waiting… ($((i*5))s)"
+    sleep 5
+done
 
 HTML=$(curl -s -H "Host: upgrade.test.local" http://localhost:8080)
 CSS_PATH=$(echo "$HTML" | grep -oE '/assets/[^"]+\.css' | head -1)
