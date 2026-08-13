@@ -28,6 +28,24 @@ else
     kind load docker-image vyogotech/frappe-operator:test-upgrade --name $CLUSTER_NAME
 fi
 
+echo "=== 3b. Preloading Frappe app images into Kind ==="
+# Preload both the base image (initial site) and the custom-apps image (failed upgrade
+# target) so pods resolve them locally under pullPolicy: IfNotPresent instead of
+# re-pulling ~2GB from ghcr on every reconcile. Without this, a slow/rate-limited CI
+# pull leaves the upgrade init job Pending (never reaching Failed) and the fallback
+# pods stuck ContainerCreating, so the waits below timed out non-deterministically.
+for FRAPPE_IMG in ghcr.io/vyogotech/frappe_base:latest ghcr.io/vyogotech/frappe_custom_apps:latest; do
+    if [ "$CONTAINER_TOOL" == "podman" ]; then
+        podman pull "$FRAPPE_IMG"
+        TAR="$(echo "$FRAPPE_IMG" | tr '/:' '__').tar"
+        podman save -o "$TAR" "$FRAPPE_IMG"
+        kind load image-archive "$TAR" --name $CLUSTER_NAME
+    else
+        docker pull "$FRAPPE_IMG"
+        kind load docker-image "$FRAPPE_IMG" --name $CLUSTER_NAME
+    fi
+done
+
 echo "=== 4. Installing Operator via Helm ==="
 helm dependency update ./helm/frappe-operator
 helm upgrade --install frappe-operator ./helm/frappe-operator \
@@ -125,6 +143,21 @@ for i in $(seq 1 60); do
     echo "  site not serving yet (HTTP $STATUS), waiting… ($((i*5))s)"
     sleep 5
 done
+
+# If the fallback never restored service, dump diagnostics so a genuine fallback
+# regression is debuggable from CI logs rather than an opaque login failure.
+if [ "$STATUS" != "200" ]; then
+    echo "::group::DIAGNOSTICS: fallback did not restore the site (HTTP $STATUS)"
+    kubectl get pods -n e2e-upgrade-test-fail -o wide || true
+    kubectl get events -n e2e-upgrade-test-fail --sort-by=.lastTimestamp | tail -30 || true
+    echo "--- upgrade-site-init job + pod (should reach Failed on the bogus app) ---"
+    kubectl describe job/upgrade-site-init -n e2e-upgrade-test-fail | tail -40 || true
+    kubectl describe pod -l job-name=upgrade-site-init -n e2e-upgrade-test-fail | sed -n '/Events:/,$p' || true
+    kubectl logs -l job-name=upgrade-site-init -n e2e-upgrade-test-fail --tail=60 || true
+    echo "--- gunicorn/nginx pods (fallback serving path) ---"
+    kubectl describe pod -l 'app in (upgrade-bench-gunicorn,upgrade-bench-nginx)' -n e2e-upgrade-test-fail | sed -n '/Events:/,$p' || true
+    echo "::endgroup::"
+fi
 
 HTML=$(curl -s -H "Host: upgrade.test.local" http://localhost:8080)
 CSS_PATH=$(echo "$HTML" | grep -oE '/assets/[^"]+\.css' | head -1)
