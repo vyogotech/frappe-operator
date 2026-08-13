@@ -10,7 +10,7 @@ operator:
   image:
     repository: ghcr.io/vyogotech/frappe-operator
     pullPolicy: IfNotPresent
-    tag: "v4.2.1"
+    tag: "v4.2.2"
   
   imagePullSecrets: []
   nameOverride: ""
