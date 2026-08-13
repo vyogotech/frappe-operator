@@ -3596,6 +3596,322 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
+  name: siteapikeys.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteAPIKey
+    listKind: SiteAPIKeyList
+    plural: siteapikeys
+    singular: siteapikey
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.user
+      name: User
+      type: string
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteAPIKey is the Schema for the siteapikeys API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteAPIKeySpec defines the desired state of SiteAPIKey
+            properties:
+              secretName:
+                description: SecretName specifies the target K8s Secret where api_key and api_secret will be stored.
+                minLength: 1
+                type: string
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+              user:
+                description: User specifies the Frappe user email for whom the API key is generated (e.g. "Administrator" or "integration@acme.com").
+                minLength: 1
+                type: string
+            required:
+            - secretName
+            - siteRef
+            - user
+            type: object
+          status:
+            description: SiteAPIKeyStatus defines the observed state of SiteAPIKey
+            properties:
+              apiKeyGenerated:
+                description: APIKeyGenerated indicates whether the API key was generated.
+                type: boolean
+              conditions:
+                description: Conditions represent the latest available observations of the SiteAPIKey's state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state (Pending, Ready, Failed).
+                type: string
+              secretCreated:
+                description: SecretCreated indicates whether the target K8s Secret was created.
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: siteapps.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteApp
+    listKind: SiteAppList
+    plural: siteapps
+    singular: siteapp
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.appName
+      name: App
+      type: string
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteApp is the Schema for the siteapps API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteAppSpec defines the desired state of SiteApp
+            properties:
+              appName:
+                description: AppName specifies the name of the Frappe Python module/app (e.g. "erpnext_australian_localisation").
+                minLength: 1
+                type: string
+              autoMigrate:
+                default: true
+                description: AutoMigrate determines whether to trigger database migration after app installation. Defaults to true.
+                type: boolean
+              gitBranch:
+                description: GitBranch specifies the Git branch or tag to clone (defaults to "main" or "master").
+                type: string
+              gitRepo:
+                description: GitRepo specifies an optional Git repository URL to dynamically fetch the app source code if not already in the bench.
+                type: string
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - appName
+            - siteRef
+            type: object
+          status:
+            description: SiteAppStatus defines the observed state of SiteApp
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations of the SiteApp's state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              installedVersion:
+                description: InstalledVersion stores the version or commit of the installed app.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the SiteApp (Pending, Installing, Ready, Failed, Uninstalling).
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: sitebackups.vyogo.tech
 spec:
   group: vyogo.tech
@@ -3793,6 +4109,684 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
+  name: siteclientscripts.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteClientScript
+    listKind: SiteClientScriptList
+    plural: siteclientscripts
+    singular: siteclientscript
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .spec.dt
+      name: DocType
+      type: string
+    - jsonPath: .spec.enabled
+      name: Enabled
+      type: boolean
+    - jsonPath: .status.phase
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteClientScript is the Schema for the siteclientscripts API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteClientScriptSpec defines the desired state of SiteClientScript
+            properties:
+              dt:
+                description: DT specifies the target DocType for the JavaScript client script.
+                minLength: 1
+                type: string
+              enabled:
+                default: true
+                description: Enabled specifies whether the client script is enabled. Defaults to true.
+                type: boolean
+              script:
+                description: Script specifies the JavaScript client script.
+                type: string
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - dt
+            - script
+            - siteRef
+            type: object
+          status:
+            description: SiteClientScriptStatus defines the observed state of SiteClientScript
+            properties:
+              conditions:
+                description: Conditions represents the latest available observations of the resource state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the SiteClientScript (Pending, Ready, Failed).
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: siteconfigs.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteConfig
+    listKind: SiteConfigList
+    plural: siteconfigs
+    singular: siteconfig
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteConfig is the Schema for the siteconfigs API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteConfigSpec defines the desired state of SiteConfig
+            properties:
+              customConfig:
+                additionalProperties:
+                  type: string
+                description: CustomConfig defines arbitrary key-value pairs to set in site_config.json.
+                type: object
+              encryptionKeySecretRef:
+                description: EncryptionKeySecretRef specifies a K8s secret holding an encryption_key to inject into site_config.json.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              maintenanceMode:
+                description: MaintenanceMode determines whether maintenance mode is enabled for the site.
+                type: boolean
+              maxFileSize:
+                description: MaxFileSize specifies the maximum upload file size in bytes (max_file_size in site_config.json).
+                format: int64
+                type: integer
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - siteRef
+            type: object
+          status:
+            description: SiteConfigStatus defines the observed state of SiteConfig
+            properties:
+              appliedKeys:
+                description: AppliedKeys lists the configuration keys successfully merged into site_config.json.
+                items:
+                  type: string
+                type: array
+              conditions:
+                description: Conditions represent the latest available observations of the SiteConfig's state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the SiteConfig (Pending, Ready, Failed).
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: sitecrons.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteCron
+    listKind: SiteCronList
+    plural: sitecrons
+    singular: sitecron
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.schedule
+      name: Schedule
+      type: string
+    - jsonPath: .spec.method
+      name: Method
+      type: string
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteCron is the Schema for the sitecrons API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteCronSpec defines the desired state of SiteCron
+            properties:
+              method:
+                description: Method specifies the Frappe Python method to execute (e.g. "saas_platform.api.sync_nightly_sales").
+                minLength: 3
+                type: string
+              schedule:
+                description: Schedule specifies the cron schedule string (e.g. "0 2 * * *").
+                minLength: 5
+                type: string
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+              suspended:
+                description: Suspended determines whether the cron schedule is currently paused.
+                type: boolean
+              timeoutSeconds:
+                default: 3600
+                description: TimeoutSeconds specifies execution timeout in seconds. Defaults to 3600.
+                format: int64
+                type: integer
+            required:
+            - method
+            - schedule
+            - siteRef
+            type: object
+          status:
+            description: SiteCronStatus defines the observed state of SiteCron
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations of the SiteCron's state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              cronJobName:
+                description: CronJobName stores the generated Kubernetes CronJob name.
+                type: string
+              lastScheduleTime:
+                description: LastScheduleTime is the last time the cron job was scheduled.
+                format: date-time
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state (Pending, Active, Suspended, Failed).
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: sitecustomfields.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteCustomField
+    listKind: SiteCustomFieldList
+    plural: sitecustomfields
+    singular: sitecustomfield
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .spec.dt
+      name: DocType
+      type: string
+    - jsonPath: .spec.fieldname
+      name: Field
+      type: string
+    - jsonPath: .spec.fieldtype
+      name: Type
+      type: string
+    - jsonPath: .status.phase
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteCustomField is the Schema for the sitecustomfields API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteCustomFieldSpec defines the desired state of SiteCustomField
+            properties:
+              default:
+                description: Default specifies the default value for the field.
+                type: string
+              dt:
+                description: DT specifies the target DocType to extend (e.g. "Customer", "Sales Order").
+                minLength: 1
+                type: string
+              fieldname:
+                description: FieldName specifies the name of the custom field (e.g. "custom_vat_number").
+                minLength: 1
+                type: string
+              fieldtype:
+                description: FieldType specifies the Frappe field type (Data, Select, Link, Int, Currency, Check, Text, etc.).
+                type: string
+              hidden:
+                description: Hidden specifies whether the field is hidden (1 or 0).
+                type: integer
+              insertAfter:
+                description: InsertAfter specifies the field name after which this custom field will be placed.
+                type: string
+              label:
+                description: Label specifies the human-readable label shown in Desk UI.
+                type: string
+              options:
+                description: Options specifies field options (e.g. Link target DocType or select options list).
+                type: string
+              readOnly:
+                description: ReadOnly specifies whether the field is read-only (1 or 0).
+                type: integer
+              reqd:
+                description: Reqd specifies whether the field is mandatory (1 or 0).
+                type: integer
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - dt
+            - fieldname
+            - fieldtype
+            - label
+            - siteRef
+            type: object
+          status:
+            description: SiteCustomFieldStatus defines the observed state of SiteCustomField
+            properties:
+              conditions:
+                description: Conditions represents the latest available observations of the resource state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the SiteCustomField (Pending, Ready, Failed).
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: sitedashboardcharts.vyogo.tech
 spec:
   group: vyogo.tech
@@ -3899,6 +4893,195 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
+  name: sitedomains.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteDomain
+    listKind: SiteDomainList
+    plural: sitedomains
+    singular: sitedomain
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.domain
+      name: Domain
+      type: string
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteDomain is the Schema for the sitedomains API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteDomainSpec defines the desired state of SiteDomain
+            properties:
+              domain:
+                description: Domain specifies the custom domain name (e.g. "erp.acmecorp.com").
+                minLength: 3
+                type: string
+              redirectPrimary:
+                description: RedirectPrimary determines whether to 301-redirect old site traffic to this custom domain.
+                type: boolean
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+              tls:
+                description: TLS defines cert-manager SSL/TLS certificate configuration.
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled determines whether to generate an automated TLS certificate.
+                    type: boolean
+                  issuerRef:
+                    description: IssuerRef references a cert-manager ClusterIssuer or Issuer.
+                    properties:
+                      apiGroup:
+                        description: |-
+                          APIGroup is the group for the resource being referenced.
+                          If APIGroup is not specified, the specified Kind must be in the core API group.
+                          For any other third-party types, APIGroup is required.
+                        type: string
+                      kind:
+                        description: Kind is the type of resource being referenced
+                        type: string
+                      name:
+                        description: Name is the name of resource being referenced
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  secretName:
+                    description: SecretName specifies the target K8s Secret to store the TLS cert/key.
+                    type: string
+                type: object
+            required:
+            - domain
+            - siteRef
+            type: object
+          status:
+            description: SiteDomainStatus defines the observed state of SiteDomain
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations of the SiteDomain's state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              dnsConfigured:
+                description: DNSConfigured indicates whether public DNS lookup resolves to the cluster ingress.
+                type: boolean
+              ingressName:
+                description: IngressName stores the name of the generated Kubernetes Ingress.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state (Pending, DNSUnreachable, Provisioning, Ready, Failed).
+                type: string
+              tlsCertificateIssued:
+                description: TLSCertificateIssued indicates whether cert-manager issued a valid SSL cert.
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: sitejobs.vyogo.tech
 spec:
   group: vyogo.tech
@@ -3940,6 +5123,506 @@ spec:
             type: object
           status:
             description: SiteJobStatus defines the observed state of SiteJob
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: sitemigrations.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteMigration
+    listKind: SiteMigrationList
+    plural: sitemigrations
+    singular: sitemigration
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.jobName
+      name: Job
+      type: string
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteMigration is the Schema for the sitemigrations API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteMigrationSpec defines the desired state of SiteMigration
+            properties:
+              force:
+                description: Force determines whether to force migration even if schema is unchanged.
+                type: boolean
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+              skipFixtures:
+                description: SkipFixtures determines whether to skip fixture synchronization during migration.
+                type: boolean
+            required:
+            - siteRef
+            type: object
+          status:
+            description: SiteMigrationStatus defines the observed state of SiteMigration
+            properties:
+              completionTime:
+                description: CompletionTime indicates when the migration completed.
+                format: date-time
+                type: string
+              conditions:
+                description: Conditions represent the latest available observations of the SiteMigration's state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              jobName:
+                description: JobName stores the name of the Kubernetes Job executing bench migrate.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state (Pending, Migrating, Succeeded, Failed).
+                type: string
+              startTime:
+                description: StartTime indicates when the migration started.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: sitepropertysetters.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SitePropertySetter
+    listKind: SitePropertySetterList
+    plural: sitepropertysetters
+    singular: sitepropertysetter
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .spec.docType
+      name: DocType
+      type: string
+    - jsonPath: .spec.fieldName
+      name: Field
+      type: string
+    - jsonPath: .spec.property
+      name: Property
+      type: string
+    - jsonPath: .spec.value
+      name: Value
+      type: string
+    - jsonPath: .status.phase
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SitePropertySetter is the Schema for the sitepropertysetters API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SitePropertySetterSpec defines the desired state of SitePropertySetter
+            properties:
+              docType:
+                description: DocType specifies the target DocType (e.g. "Customer", "Supplier").
+                minLength: 1
+                type: string
+              fieldName:
+                description: FieldName specifies the field name to override (leave empty if setting DocType-level property).
+                type: string
+              property:
+                description: Property specifies the property to set (e.g. "reqd", "read_only", "hidden", "label", "default").
+                type: string
+              propertyType:
+                default: Check
+                description: PropertyType specifies the data type of the property ("Check", "Data", "Select", "Int", etc.). Defaults to "Check".
+                type: string
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+              value:
+                description: Value specifies the new property value (e.g. "1", "0", or text string).
+                type: string
+            required:
+            - docType
+            - property
+            - siteRef
+            - value
+            type: object
+          status:
+            description: SitePropertySetterStatus defines the observed state of SitePropertySetter
+            properties:
+              conditions:
+                description: Conditions represents the latest available observations of the resource state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the SitePropertySetter (Pending, Ready, Failed).
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: sitequotas.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteQuota
+    listKind: SiteQuotaList
+    plural: sitequotas
+    singular: sitequota
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.quotaExceeded
+      name: Exceeded
+      type: boolean
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteQuota is the Schema for the sitequotas API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteQuotaSpec defines the desired state of SiteQuota
+            properties:
+              actionOnExceeded:
+                default: Warn
+                description: 'ActionOnExceeded specifies action when quota is exceeded: "Warn", "ReadOnly", or "Maintenance".'
+                type: string
+              maxDbSizeMb:
+                description: MaxDBSizeMB specifies maximum database size limit in megabytes.
+                format: int64
+                type: integer
+              maxStorageMb:
+                description: MaxStorageMB specifies maximum file attachment storage limit in megabytes.
+                format: int64
+                type: integer
+              maxUsers:
+                description: MaxUsers specifies maximum active users limit.
+                format: int32
+                type: integer
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - siteRef
+            type: object
+          status:
+            description: SiteQuotaStatus defines the observed state of SiteQuota
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations of the SiteQuota's state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              currentDbSizeMb:
+                description: CurrentDBSizeMB is the observed DB size in megabytes.
+                format: int64
+                type: integer
+              currentStorageMb:
+                description: CurrentStorageMB is the observed storage usage in megabytes.
+                format: int64
+                type: integer
+              currentUsers:
+                description: CurrentUsers is the observed count of active users.
+                format: int32
+                type: integer
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state (Normal, Warning, QuotaExceeded, Failed).
+                type: string
+              quotaExceeded:
+                description: QuotaExceeded indicates whether any quota limit is currently breached.
+                type: boolean
             type: object
         type: object
     served: true
@@ -4302,6 +5985,496 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
+  name: siteroles.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteRole
+    listKind: SiteRoleList
+    plural: siteroles
+    singular: siterole
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.roleName
+      name: Role
+      type: string
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteRole is the Schema for the siteroles API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteRoleSpec defines the desired state of SiteRole
+            properties:
+              deskAccess:
+                default: true
+                description: DeskAccess determines whether users with this role can log into Frappe Desk. Defaults to true.
+                type: boolean
+              disabled:
+                description: Disabled determines whether the role is disabled in Frappe. Defaults to false.
+                type: boolean
+              roleName:
+                description: RoleName specifies the name of the Frappe Role (e.g. "API Integrator").
+                minLength: 1
+                type: string
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - roleName
+            - siteRef
+            type: object
+          status:
+            description: SiteRoleStatus defines the observed state of SiteRole
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations of the SiteRole's state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the SiteRole (Pending, Ready, Failed).
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: siteserverscripts.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteServerScript
+    listKind: SiteServerScriptList
+    plural: siteserverscripts
+    singular: siteserverscript
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .spec.scriptType
+      name: Type
+      type: string
+    - jsonPath: .spec.referenceDocType
+      name: DocType
+      type: string
+    - jsonPath: .spec.eventType
+      name: Event
+      type: string
+    - jsonPath: .status.phase
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteServerScript is the Schema for the siteserverscripts API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteServerScriptSpec defines the desired state of SiteServerScript
+            properties:
+              apiMethod:
+                description: APIMethod specifies the route path for "API" type server scripts (e.g. "my_custom_endpoint").
+                type: string
+              disabled:
+                description: Disabled specifies whether the script is disabled. Defaults to false.
+                type: boolean
+              eventType:
+                description: EventType specifies the event hook ("Before Insert", "Before Save", "After Save", "Before Submit", "After Submit", "Before Cancel", "After Cancel", "Before Delete").
+                type: string
+              referenceDocType:
+                description: ReferenceDocType specifies the DocType for "DocType Event" or "Permission Query" scripts.
+                type: string
+              script:
+                description: Script specifies the Python script code.
+                type: string
+              scriptType:
+                description: ScriptType specifies the Server Script type ("DocType Event", "API", "Permission Query").
+                enum:
+                - DocType Event
+                - API
+                - Permission Query
+                type: string
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - script
+            - scriptType
+            - siteRef
+            type: object
+          status:
+            description: SiteServerScriptStatus defines the observed state of SiteServerScript
+            properties:
+              conditions:
+                description: Conditions represents the latest available observations of the resource state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the SiteServerScript (Pending, Ready, Failed).
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: siteuserpermissions.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteUserPermission
+    listKind: SiteUserPermissionList
+    plural: siteuserpermissions
+    singular: siteuserpermission
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .spec.user
+      name: User
+      type: string
+    - jsonPath: .spec.allow
+      name: Allow
+      type: string
+    - jsonPath: .spec.forValue
+      name: For Value
+      type: string
+    - jsonPath: .status.phase
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteUserPermission is the Schema for the siteuserpermissions API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteUserPermissionSpec defines the desired state of SiteUserPermission
+            properties:
+              allow:
+                description: Allow specifies the DocType to restrict (e.g. "Company", "Warehouse", "Territory").
+                minLength: 1
+                type: string
+              applyToAllDoctypes:
+                default: true
+                description: ApplyToAllDocTypes specifies whether this restriction applies across all linked DocTypes. Defaults to true.
+                type: boolean
+              forValue:
+                description: ForValue specifies the target document ID/value to allow (e.g. "Acme Corp", "Main Warehouse").
+                minLength: 1
+                type: string
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+              user:
+                description: User specifies the target Frappe user email (e.g. "john.doe@example.com").
+                minLength: 1
+                type: string
+            required:
+            - allow
+            - forValue
+            - siteRef
+            - user
+            type: object
+          status:
+            description: SiteUserPermissionStatus defines the observed state of SiteUserPermission
+            properties:
+              conditions:
+                description: Conditions represents the latest available observations of the resource state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the SiteUserPermission (Pending, Ready, Failed).
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: siteusers.vyogo.tech
 spec:
   group: vyogo.tech
@@ -4479,6 +6652,180 @@ spec:
                 type: string
               secretName:
                 description: SecretName stores the name of the Secret holding the API key/secret.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: sitewebhooks.vyogo.tech
+spec:
+  group: vyogo.tech
+  names:
+    kind: SiteWebhook
+    listKind: SiteWebhookList
+    plural: sitewebhooks
+    singular: sitewebhook
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.siteRef.name
+      name: Site
+      type: string
+    - jsonPath: .spec.webhookDoctype
+      name: DocType
+      type: string
+    - jsonPath: .spec.webhookEvent
+      name: Event
+      type: string
+    - jsonPath: .spec.requestUrl
+      name: URL
+      type: string
+    - jsonPath: .status.phase
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: SiteWebhook is the Schema for the sitewebhooks API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SiteWebhookSpec defines the desired state of SiteWebhook
+            properties:
+              enabled:
+                default: true
+                description: Enabled specifies whether the webhook is enabled. Defaults to true.
+                type: boolean
+              requestStructure:
+                default: JSON
+                description: RequestStructure specifies the HTTP request content type ("JSON", "Form URL-Encoded"). Defaults to "JSON".
+                type: string
+              requestUrl:
+                description: RequestURL specifies the target endpoint URL to post webhook payloads.
+                type: string
+              siteRef:
+                description: SiteRef specifies the target FrappeSite custom resource.
+                properties:
+                  name:
+                    description: Name of the resource
+                    type: string
+                  namespace:
+                    description: Namespace of the resource
+                    type: string
+                required:
+                - name
+                type: object
+              webhookDoctype:
+                description: WebhookDocType specifies the DocType that triggers this webhook (e.g. "Sales Order", "Customer").
+                minLength: 1
+                type: string
+              webhookEvent:
+                description: WebhookEvent specifies the document event ("on_change", "on_update", "on_submit", "on_cancel", "on_trash").
+                enum:
+                - on_change
+                - on_update
+                - on_submit
+                - on_cancel
+                - on_trash
+                type: string
+            required:
+            - requestUrl
+            - siteRef
+            - webhookDoctype
+            - webhookEvent
+            type: object
+          status:
+            description: SiteWebhookStatus defines the observed state of SiteWebhook
+            properties:
+              conditions:
+                description: Conditions represents the latest available observations of the resource state.
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current state of the SiteWebhook (Pending, Ready, Failed).
                 type: string
             type: object
         type: object

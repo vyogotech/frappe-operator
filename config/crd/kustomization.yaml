@@ -12,6 +12,20 @@ resources:
 - bases/vyogo.tech_sitejobs.yaml
 - bases/vyogo.tech_sitebackups.yaml
 - bases/vyogo.tech_siterestores.yaml
+- bases/vyogo.tech_siteapikeys.yaml
+- bases/vyogo.tech_siteapps.yaml
+- bases/vyogo.tech_siteclientscripts.yaml
+- bases/vyogo.tech_siteconfigs.yaml
+- bases/vyogo.tech_sitecrons.yaml
+- bases/vyogo.tech_sitecustomfields.yaml
+- bases/vyogo.tech_sitedomains.yaml
+- bases/vyogo.tech_sitemigrations.yaml
+- bases/vyogo.tech_sitepropertysetters.yaml
+- bases/vyogo.tech_sitequotas.yaml
+- bases/vyogo.tech_siteroles.yaml
+- bases/vyogo.tech_siteserverscripts.yaml
+- bases/vyogo.tech_siteuserpermissions.yaml
+- bases/vyogo.tech_sitewebhooks.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
