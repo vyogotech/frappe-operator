@@ -211,9 +211,16 @@ SKIP_INIT=$(cat /tmp/site-secrets/skip_init 2>/dev/null || echo "false")
 echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
 
-# Check directly against database if tables & frappe app are already initialized
+# Check directly against the database whether Frappe is already installed.
+# Emits exactly one of:
+#   "true"    - connected, the frappe app is installed (site exists)
+#   "false"   - connected, and the install table is genuinely absent (empty DB)
+#   "unknown" - could NOT determine (connection/query error, or non-SQL provider)
+# The "unknown" state is critical: a transient DB error (e.g. "Packet sequence number
+# wrong") must never be conflated with "empty", or we would destroy and recreate a
+# live, working site during a failed/racy upgrade.
 DB_HAS_FRAPPE=$(python3 << 'PYTHON_CHECK'
-import os, sys
+import sys
 
 try:
     with open('/tmp/site-secrets/db_host', 'r') as f: db_host = f.read().strip()
@@ -223,33 +230,51 @@ try:
     with open('/tmp/site-secrets/db_password', 'r') as f: db_password = f.read().strip()
     with open('/tmp/site-secrets/db_provider', 'r') as f: db_provider = f.read().strip()
 
-    if db_provider in ['mariadb', 'external']:
-        import MySQLdb
-        db = MySQLdb.connect(host=db_host, port=int(db_port), user=db_user, passwd=db_password, db=db_name)
-        cur = db.cursor()
-        cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s AND table_name = 'tabInstalled Application'", (db_name,))
-        if cur.fetchone()[0] > 0:
-            cur.execute("SELECT COUNT(*) FROM `tabInstalled Application` WHERE app_name = 'frappe'")
-            if cur.fetchone()[0] > 0:
-                print("true")
-                sys.exit(0)
-except Exception as e:
-    pass
+    if db_provider not in ('mariadb', 'external'):
+        print("unknown"); sys.exit(0)
 
-print("false")
+    import MySQLdb
+    db = MySQLdb.connect(host=db_host, port=int(db_port), user=db_user, passwd=db_password, db=db_name)
+    cur = db.cursor()
+    cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s AND table_name = 'tabInstalled Application'", (db_name,))
+    if cur.fetchone()[0] == 0:
+        print("false"); sys.exit(0)          # connected, table absent -> genuinely empty
+    cur.execute("SELECT COUNT(*) FROM `tabInstalled Application` WHERE app_name = 'frappe'")
+    print("true" if cur.fetchone()[0] > 0 else "false")
+except Exception as e:
+    sys.stderr.write("DB init-check could not determine site state: %s\n" % e)
+    print("unknown")                          # do NOT assume empty on error
 PYTHON_CHECK
 )
 
-# Decision: Database status is the single source of truth (or explicit IS_UPGRADE/SKIP_INIT flags):
-if [[ "$DB_HAS_FRAPPE" == "true" ]] || [[ "$IS_UPGRADE" == "true" ]] || [[ "$SKIP_INIT" == "true" ]]; then
-    echo "✓ Database for $SITE_NAME is already initialized with Frappe; skipping new-site and updating config."
+# Durable local evidence that this site was already initialized. These live on the
+# sites PVC, so they survive bench image changes (unlike the racy is_upgrade flag,
+# which is derived from site.Status.Phase==Ready and can flip to false mid-rollout).
+SITE_DIR="/home/frappe/frappe-bench/sites/$SITE_NAME"
+SITE_ALREADY_INITIALIZED="false"
+if [[ -f "$SITE_DIR/.init_complete" ]] || [[ -f "$SITE_DIR/site_config.json" ]]; then
+    SITE_ALREADY_INITIALIZED="true"
+fi
+
+# Decision — skip the destructive new-site whenever ANYTHING indicates the site already
+# exists: DB confirms frappe, an explicit upgrade/skip flag, durable local evidence, OR
+# the DB state is merely unknown while a site directory is present. We create fresh ONLY
+# when we are confident the site is new: the DB is definitively empty AND there is no
+# local evidence of a prior init. This prevents a transient DB error or a racy is_upgrade
+# from wiping a working site during a failed upgrade (the fallback-trap guarantee).
+if [[ "$DB_HAS_FRAPPE" == "true" ]] || [[ "$IS_UPGRADE" == "true" ]] || [[ "$SKIP_INIT" == "true" ]] \
+   || [[ "$SITE_ALREADY_INITIALIZED" == "true" ]] \
+   || { [[ "$DB_HAS_FRAPPE" == "unknown" ]] && [[ -d "$SITE_DIR" ]]; }; then
+    echo "✓ Site $SITE_NAME already initialized (db=$DB_HAS_FRAPPE upgrade=$IS_UPGRADE skip=$SKIP_INIT local=$SITE_ALREADY_INITIALIZED); skipping new-site and updating config."
     goto_update_config=1
-    mkdir -p "/home/frappe/frappe-bench/sites/$SITE_NAME"
-    touch "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete"
+    mkdir -p "$SITE_DIR"
+    touch "$SITE_DIR/.init_complete"
 else
-    if [[ -d "/home/frappe/frappe-bench/sites/$SITE_NAME" ]]; then
-        echo "Warning: Site directory exists but DB is uninitialized! Cleaning up directory for fresh new-site..."
-        rm -rf "/home/frappe/frappe-bench/sites/$SITE_NAME"
+    if [[ -d "$SITE_DIR" ]]; then
+        # Reached only when the DB is CONFIRMED empty AND there is no durable local
+        # evidence of a prior init — i.e. a genuinely stale/half-created directory.
+        echo "Warning: Site directory exists but DB is confirmed uninitialized and no init marker present; cleaning up for a fresh new-site..."
+        rm -rf "$SITE_DIR"
     fi
     goto_update_config=0
 fi
