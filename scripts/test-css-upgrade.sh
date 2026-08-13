@@ -103,13 +103,30 @@ echo "=== 7. Upgrading the site ==="
 kubectl apply -f test/scenarios/apps-upgrade-v2.yaml -n e2e-upgrade-test
 echo "Waiting for upgrade..."
 sleep 15
-kubectl wait --for=condition=Complete job/upgrade-site-init -n e2e-upgrade-test --timeout=5m || echo "site init upgrade wait failed"
-kubectl wait --for=condition=Ready frappesite/upgrade-site -n e2e-upgrade-test --timeout=5m || echo "site upgrade wait failed"
+# Adding HRMS runs get-app (git clone) + install-app + `bench migrate`, which is
+# legitimately slow and variable on CI runners, so allow generous time. The
+# frappesite only reports Ready once the migration completes.
+kubectl wait --for=condition=Complete job/upgrade-site-init -n e2e-upgrade-test --timeout=12m || echo "site init upgrade wait failed"
+kubectl wait --for=condition=Ready frappesite/upgrade-site -n e2e-upgrade-test --timeout=12m || echo "site upgrade wait failed"
 
 echo "=== 8. Port forwarding to verify CSS after upgrade ==="
 kubectl port-forward svc/upgrade-bench-nginx 8080:8080 -n e2e-upgrade-test &
 PF_PID=$!
 sleep 10
+
+# Gate the CSS/login checks on the site actually serving: while `bench migrate`
+# runs, Frappe returns 500, so poll until it recovers rather than asserting
+# against a mid-migration site (up to ~5 min).
+echo "Waiting for the upgraded site to serve requests (post-migration)..."
+for i in $(seq 1 60); do
+    STATUS=$(curl -H "Host: upgrade.test.local" -o /dev/null -s -w "%{http_code}" http://localhost:8080/login || echo 000)
+    if [ "$STATUS" == "200" ]; then
+        echo "Site is serving (HTTP 200) after $((i*5))s."
+        break
+    fi
+    echo "  site not ready yet (HTTP $STATUS), waiting… ($((i*5))s)"
+    sleep 5
+done
 
 HTML=$(curl -s -H "Host: upgrade.test.local" http://localhost:8080)
 CSS_PATH=$(echo "$HTML" | grep -oE '/assets/[^"]+\.css' | head -1)
