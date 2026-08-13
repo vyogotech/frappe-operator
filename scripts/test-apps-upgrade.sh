@@ -29,6 +29,21 @@ else
     kind load docker-image vyogotech/frappe-operator:test-upgrade --name $CLUSTER_NAME
 fi
 
+echo "=== 3b. Preloading Frappe app image into Kind ==="
+# The scenarios use pullPolicy: IfNotPresent. Preload the app image once (a single
+# retryable pull we control) so pods resolve it locally instead of re-pulling ~2GB
+# from ghcr on every reconcile — that per-reconcile registry round-trip is what made
+# the upgrade job time out non-deterministically on CI runners.
+FRAPPE_IMG="ghcr.io/vyogotech/frappe_base:latest"
+if [ "$CONTAINER_TOOL" == "podman" ]; then
+    podman pull "$FRAPPE_IMG"
+    podman save -o frappe_base.tar "$FRAPPE_IMG"
+    kind load image-archive frappe_base.tar --name $CLUSTER_NAME
+else
+    docker pull "$FRAPPE_IMG"
+    kind load docker-image "$FRAPPE_IMG" --name $CLUSTER_NAME
+fi
+
 echo "=== 4. Installing Operator via Helm ==="
 helm dependency update ./helm/frappe-operator
 helm upgrade --install frappe-operator ./helm/frappe-operator \
@@ -80,8 +95,12 @@ echo "Waiting for Operator to detect app change, delete old job, and create a ne
 sleep 15
 
 echo "Waiting for upgraded site to become Ready..."
-kubectl wait --for=condition=Complete job/upgrade-site-init -n $NAMESPACE --timeout=5m || echo "site upgrade job wait failed"
-kubectl wait --for=condition=Ready frappesite/upgrade-site -n $NAMESPACE --timeout=5m || echo "site upgrade wait failed"
+# installedApps is written from spec only once the upgrade init job Completes, so the
+# assertion below depends on the job actually finishing. Adding an app runs migrate
+# (and get-app/install-app when present), which is legitimately slow/variable on CI —
+# allow generous time so a slow-but-successful upgrade isn't read as a failure.
+kubectl wait --for=condition=Complete job/upgrade-site-init -n $NAMESPACE --timeout=12m || echo "site upgrade job wait failed"
+kubectl wait --for=condition=Ready frappesite/upgrade-site -n $NAMESPACE --timeout=12m || echo "site upgrade wait failed"
 
 echo "[4/4] Upgrade complete! Verifying deployed apps..."
 INSTALLED_APPS=$(kubectl get frappesite upgrade-site -n $NAMESPACE -o jsonpath='{.status.installedApps}')
@@ -91,6 +110,13 @@ if [[ "$INSTALLED_APPS" == *"hrms"* ]]; then
     echo "✅ SUCCESS: The operator automatically detected the app change, bypassed destructive init via IS_UPGRADE, and installed HRMS!"
 else
     echo "❌ FAILED: HRMS is missing from installed apps."
+    echo "::group::DIAGNOSTICS: upgrade did not reach installedApps=[...hrms]"
+    kubectl get pods -n $NAMESPACE -o wide || true
+    kubectl get events -n $NAMESPACE --sort-by=.lastTimestamp | tail -30 || true
+    kubectl describe job/upgrade-site-init -n $NAMESPACE | tail -40 || true
+    kubectl describe pod -l job-name=upgrade-site-init -n $NAMESPACE | sed -n '/Events:/,$p' || true
+    kubectl logs -l job-name=upgrade-site-init -n $NAMESPACE --tail=60 || true
+    echo "::endgroup::"
     exit 1
 fi
 
