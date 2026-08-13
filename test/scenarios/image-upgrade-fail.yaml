@@ -7,7 +7,7 @@ spec:
   imageConfig:
     repository: ghcr.io/vyogotech/frappe_custom_apps
     tag: latest
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
   storageSize: 2Gi
 ---
 apiVersion: vyogo.tech/v1

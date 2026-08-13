@@ -28,6 +28,23 @@ else
     kind load docker-image vyogotech/frappe-operator:test-upgrade --name $CLUSTER_NAME
 fi
 
+echo "=== 3b. Preloading Frappe app image into Kind ==="
+# The scenarios use the Frappe app image with pullPolicy: IfNotPresent. Preload it
+# into the Kind node once (a single retryable pull we control) so the site-init job
+# and the gunicorn/nginx pods never re-pull ~2GB from ghcr on every reconcile. That
+# registry round-trip on each upgrade is what made this job flaky on CI runners:
+# a slow/rate-limited pull left the rolled gunicorn stuck ContainerCreating (site 500)
+# and the upgrade init job Pending, so the waits below timed out non-deterministically.
+FRAPPE_IMG="ghcr.io/vyogotech/frappe_base:latest"
+if [ "$CONTAINER_TOOL" == "podman" ]; then
+    podman pull "$FRAPPE_IMG"
+    podman save -o frappe_base.tar "$FRAPPE_IMG"
+    kind load image-archive frappe_base.tar --name $CLUSTER_NAME
+else
+    docker pull "$FRAPPE_IMG"
+    kind load docker-image "$FRAPPE_IMG" --name $CLUSTER_NAME
+fi
+
 echo "=== 4. Installing Operator via Helm ==="
 helm dependency update ./helm/frappe-operator
 helm upgrade --install frappe-operator ./helm/frappe-operator \
@@ -127,6 +144,21 @@ for i in $(seq 1 60); do
     echo "  site not ready yet (HTTP $STATUS), waiting… ($((i*5))s)"
     sleep 5
 done
+
+# If the site still isn't serving, dump diagnostics so a real failure is debuggable
+# from the CI logs (image pull vs. migrate hang vs. crashloop) rather than opaque.
+if [ "$STATUS" != "200" ]; then
+    echo "::group::DIAGNOSTICS: site not serving after upgrade (HTTP $STATUS)"
+    kubectl get pods -n e2e-upgrade-test -o wide || true
+    kubectl get events -n e2e-upgrade-test --sort-by=.lastTimestamp | tail -30 || true
+    echo "--- upgrade-site-init job + pod ---"
+    kubectl describe job/upgrade-site-init -n e2e-upgrade-test | tail -40 || true
+    kubectl describe pod -l job-name=upgrade-site-init -n e2e-upgrade-test | sed -n '/Events:/,$p' || true
+    kubectl logs -l job-name=upgrade-site-init -n e2e-upgrade-test --tail=60 || true
+    echo "--- gunicorn/nginx pods (fallback serving path) ---"
+    kubectl describe pod -l 'app in (upgrade-bench-gunicorn,upgrade-bench-nginx)' -n e2e-upgrade-test | sed -n '/Events:/,$p' || true
+    echo "::endgroup::"
+fi
 
 HTML=$(curl -s -H "Host: upgrade.test.local" http://localhost:8080)
 CSS_PATH=$(echo "$HTML" | grep -oE '/assets/[^"]+\.css' | head -1)
