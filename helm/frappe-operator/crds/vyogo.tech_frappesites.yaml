@@ -131,6 +131,14 @@ spec:
                     required:
                     - name
                     type: object
+                  maxStatementTimeSeconds:
+                    description: |-
+                      MaxStatementTimeSeconds bounds how long a single SQL statement may run, protecting
+                      the database from runaway queries (noisy-neighbor). It is applied via my.cnf on
+                      operator-provisioned (dedicated-mode) MariaDB only; for shared/external databases
+                      set max_statement_time on your own instance. 0 or unset leaves it unbounded.
+                    format: int64
+                    type: integer
                   mode:
                     default: shared
                     description: 'Mode: shared (one DB instance, multiple site databases)

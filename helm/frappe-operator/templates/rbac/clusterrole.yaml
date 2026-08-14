@@ -31,8 +31,10 @@ rules:
   resources:
   - configmaps
   - events
+  - limitranges
   - persistentvolumeclaims
   - pods
+  - resourcequotas
   - secrets
   - services
   verbs:

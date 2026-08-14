@@ -375,6 +375,14 @@ func (p *MariaDBProviderUnstructured) createDedicatedMariaDB(ctx context.Context
 		},
 	}
 
+	// Query governor: bound single-statement runtime on this operator-provisioned
+	// (dedicated) instance so a runaway query can't monopolise it (noisy-neighbor
+	// protection). Shared/external databases are user-owned and set this themselves.
+	if p.config.MaxStatementTimeSeconds != nil && *p.config.MaxStatementTimeSeconds > 0 {
+		spec := mariadb.Object["spec"].(map[string]interface{})
+		spec["myCnf"] = fmt.Sprintf("[mariadb]\nmax_statement_time=%d\n", *p.config.MaxStatementTimeSeconds)
+	}
+
 	if err := controllerutil.SetControllerReference(site, mariadb, p.scheme); err != nil {
 		return "", "", err
 	}

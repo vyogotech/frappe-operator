@@ -77,6 +77,13 @@ type FrappeBenchSpec struct {
 	// PodConfig defines advanced pod configuration for all bench components
 	// +optional
 	PodConfig *PodConfig `json:"podConfig,omitempty"`
+
+	// NamespacePolicy, when set, makes the operator maintain a ResourceQuota and/or a
+	// LimitRange in the bench's namespace as a noisy-neighbor guardrail for the tenant.
+	// Intended for a one-bench-per-tenant-namespace layout. Clearing it removes the
+	// operator-managed ResourceQuota/LimitRange.
+	// +optional
+	NamespacePolicy *NamespacePolicy `json:"namespacePolicy,omitempty"`
 }
 
 // FrappeBenchStatus defines the observed state of FrappeBench
