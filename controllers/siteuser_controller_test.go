@@ -95,12 +95,12 @@ func TestSiteUserReconciler_Reconcile_SuccessWithAPIKeys(t *testing.T) {
 		}
 		if r.URL.Path == "/api/resource/User/bot%40example.com" || r.URL.Path == "/api/resource/User/bot@example.com" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"data": {"name": "bot@example.com"}}`))
+			_, _ = w.Write([]byte(`{"data": {"name": "bot@example.com"}}`))
 			return
 		}
 		if r.URL.Path == "/api/method/frappe.core.doctype.user.user.generate_keys" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"message": {"api_key": "mykey", "api_secret": "mysecret"}}`))
+			_, _ = w.Write([]byte(`{"message": {"api_key": "mykey", "api_secret": "mysecret"}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
