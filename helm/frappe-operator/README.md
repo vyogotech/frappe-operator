@@ -120,6 +120,9 @@ helm install frappe-operator . \
 |-----------|-------------|---------|
 | `operator.replicaCount` | Number of operator replicas | `1` |
 | `operatorConfig.maxConcurrentSiteReconciles` | Max concurrent FrappeSite reconciles (tune for 100+ sites) | `"10"` |
+| `operatorConfig.maxConcurrentReconciles` | Max concurrent reconciles for the FrappeBench + all site-child controllers (SiteApp, SiteConfig, ...); raise for 500+ sites | `"5"` |
+| `operatorConfig.clientQps` | Optional kube API client QPS for the operator (empty = controller-runtime default) | `""` |
+| `operatorConfig.clientBurst` | Optional kube API client Burst for the operator (empty = controller-runtime default) | `""` |
 | `operator.image.repository` | Operator image repository | `ghcr.io/vyogotech/frappe-operator` |
 | `operator.image.tag` | Operator image tag | `v1.0.0` |
 | `operator.resources.limits.cpu` | CPU limit | `500m` |

@@ -155,7 +155,19 @@ operatorConfig:
   # Max concurrent FrappeSite reconciles (default 10). Tune for 100s of sites.
   # Can be overridden per-bench via spec.siteReconcileConcurrency (operator uses max).
   maxConcurrentSiteReconciles: "10"
-  
+
+  # Max concurrent reconciles for the FrappeBench controller and every site-child
+  # resource controller (SiteApp, SiteConfig, SiteUser, SiteBackup, ...). Default 5.
+  # Without this these controllers run at 1 and serialize batch operations across a
+  # large fleet; raise for 500+ sites. FrappeSite uses maxConcurrentSiteReconciles above.
+  maxConcurrentReconciles: "5"
+
+  # Optional API client throughput for the operator. Higher reconcile concurrency is
+  # only useful if the shared kube client rate limiter can keep up during mass
+  # provisioning. Leave empty to keep controller-runtime defaults (QPS 20 / Burst 30).
+  clientQps: ""
+  clientBurst: ""
+
   # Override KEDA values if needed
   # resources:
   #   operator:
