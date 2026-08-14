@@ -28,9 +28,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/rest"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	crcfg "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -102,6 +104,43 @@ func getMaxConcurrentSiteReconciles(mgr ctrl.Manager) int {
 	return effectiveMaxFromBenches(fromEnv, items)
 }
 
+// defaultMaxConcurrentReconciles is the worker concurrency applied to the FrappeBench
+// controller and every site-child resource controller (SiteApp, SiteConfig, SiteUser,
+// SiteBackup, ...) via the manager's global controller config. controller-runtime
+// otherwise defaults these to 1, serializing batch operations across many sites.
+const defaultMaxConcurrentReconciles = 5
+
+// getMaxConcurrentReconciles returns the global (non-FrappeSite) controller worker
+// concurrency. FrappeSite keeps its own per-bench tuning via getMaxConcurrentSiteReconciles
+// and is unaffected. Tunable via FRAPPE_MAX_CONCURRENT_RECONCILES (operator ConfigMap).
+func getMaxConcurrentReconciles() int {
+	n := defaultMaxConcurrentReconciles
+	if s := os.Getenv("FRAPPE_MAX_CONCURRENT_RECONCILES"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			n = v
+		}
+	}
+	return n
+}
+
+// applyClientThrottle raises the API client's QPS/Burst from the rest config when
+// FRAPPE_CLIENT_QPS / FRAPPE_CLIENT_BURST are set. Higher reconcile concurrency is only
+// useful if the shared client rate limiter can keep up during mass provisioning; leaving
+// the env unset preserves controller-runtime's conservative defaults.
+func applyClientThrottle(cfg *rest.Config) (float32, int) {
+	if s := os.Getenv("FRAPPE_CLIENT_QPS"); s != "" {
+		if v, err := strconv.ParseFloat(s, 32); err == nil && v > 0 {
+			cfg.QPS = float32(v)
+		}
+	}
+	if s := os.Getenv("FRAPPE_CLIENT_BURST"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			cfg.Burst = v
+		}
+	}
+	return cfg.QPS, cfg.Burst
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -119,13 +158,25 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	restCfg := ctrl.GetConfigOrDie()
+	qps, burst := applyClientThrottle(restCfg)
+	maxReconciles := getMaxConcurrentReconciles()
+
+	mgr, err := ctrl.NewManager(restCfg, ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsserver.Options{BindAddress: metricsAddr},
 		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "bd4753fa.vyogo.tech",
+		// Global worker concurrency for the FrappeBench controller and every site-child
+		// resource controller (SiteApp, SiteConfig, SiteUser, ...). Without this they run
+		// at controller-runtime's default of 1 and serialize batch operations across many
+		// sites. FrappeSite overrides this with its own per-bench value in SetupWithManager,
+		// so its tuning is preserved.
+		Controller: crcfg.Controller{
+			MaxConcurrentReconciles: maxReconciles,
+		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -142,6 +193,8 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+	setupLog.Info("controller concurrency configured",
+		"maxConcurrentReconciles", maxReconciles, "clientQPS", qps, "clientBurst", burst)
 
 	// Detect OpenShift
 	isOpenShift := controllers.IsRouteAPIAvailable(mgr.GetConfig())

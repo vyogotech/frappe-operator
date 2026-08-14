@@ -34,6 +34,10 @@ data:
   # Max concurrent FrappeSite reconciles (default 10). Tune for 100s of sites.
   # Can be overridden per-bench via spec.siteReconcileConcurrency (operator uses max).
   maxConcurrentSiteReconciles: "10"
+
+  # Max concurrent reconciles for the FrappeBench controller and all site-child
+  # resource controllers (SiteApp, SiteConfig, ...). Default 5; raise for 500+ sites.
+  maxConcurrentReconciles: "5"
   
   # Default image configuration
   # These defaults are used when not specified in bench.spec.imageConfig
