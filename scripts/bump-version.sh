@@ -29,7 +29,11 @@ rm -f config/manager/kustomization.yaml.bak
 
 # 3. Update Helm Chart values.yaml
 echo "Updating helm/frappe-operator/values.yaml..."
-awk -v new_tag="$V_VERSION" '/operator:/ {in_operator=1} in_operator && /tag: ".*"/ {sub(/tag: ".+"/, "tag: \"" new_tag "\""); in_operator=0} {print}' helm/frappe-operator/values.yaml > helm/frappe-operator/values.yaml.tmp && mv helm/frappe-operator/values.yaml.tmp helm/frappe-operator/values.yaml
+# Anchor to the top-level `operator:` key only. The old unanchored /operator:/ also
+# matched `mariadb-operator:`, re-arming the substitution so the next tag it found (the
+# `mariadb:` image tag, e.g. "10.6") got overwritten with the operator version. `done`
+# guards against replacing more than the operator image tag.
+awk -v new_tag="$V_VERSION" '/^operator:/ {in_operator=1} in_operator && !done && /tag: ".*"/ {sub(/tag: ".+"/, "tag: \"" new_tag "\""); in_operator=0; done=1} {print}' helm/frappe-operator/values.yaml > helm/frappe-operator/values.yaml.tmp && mv helm/frappe-operator/values.yaml.tmp helm/frappe-operator/values.yaml
 rm -f helm/frappe-operator/values.yaml.bak
 
 # 4. Update Helm Chart.yaml
