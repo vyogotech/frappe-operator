@@ -29,7 +29,7 @@ func TestFrappeClient_Authenticate(t *testing.T) {
 			if r.FormValue("usr") == "Administrator" && r.FormValue("pwd") == "secretpass" {
 				http.SetCookie(w, &http.Cookie{Name: "sid", Value: "test-session-id"})
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"message": "Logged In"}`))
+				_, _ = w.Write([]byte(`{"message": "Logged In"}`))
 				return
 			}
 			w.WriteHeader(http.StatusUnauthorized)
@@ -62,7 +62,7 @@ func TestFrappeClient_EnsureRole(t *testing.T) {
 			if r.Method == http.MethodGet {
 				if roleExists {
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"data": {"name": "TestRole"}}`))
+					_, _ = w.Write([]byte(`{"data": {"name": "TestRole"}}`))
 				} else {
 					w.WriteHeader(http.StatusNotFound)
 				}
@@ -70,14 +70,14 @@ func TestFrappeClient_EnsureRole(t *testing.T) {
 			}
 			if r.Method == http.MethodPut {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"data": {"name": "TestRole"}}`))
+				_, _ = w.Write([]byte(`{"data": {"name": "TestRole"}}`))
 				return
 			}
 		}
 		if r.URL.Path == "/api/resource/Role" && r.Method == http.MethodPost {
 			roleExists = true
 			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte(`{"data": {"name": "TestRole"}}`))
+			_, _ = w.Write([]byte(`{"data": {"name": "TestRole"}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -111,7 +111,7 @@ func TestFrappeClient_EnsureUser_And_GenerateAPIKeys(t *testing.T) {
 			if r.Method == http.MethodGet {
 				if userExists {
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"data": {"name": "test@example.com"}}`))
+					_, _ = w.Write([]byte(`{"data": {"name": "test@example.com"}}`))
 				} else {
 					w.WriteHeader(http.StatusNotFound)
 				}
@@ -121,12 +121,12 @@ func TestFrappeClient_EnsureUser_And_GenerateAPIKeys(t *testing.T) {
 		if r.URL.Path == "/api/resource/User" && r.Method == http.MethodPost {
 			userExists = true
 			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte(`{"data": {"name": "test@example.com"}}`))
+			_, _ = w.Write([]byte(`{"data": {"name": "test@example.com"}}`))
 			return
 		}
 		if r.URL.Path == "/api/method/frappe.core.doctype.user.user.generate_keys" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"message": {"api_key": "key123", "api_secret": "secret456"}}`))
+			_, _ = w.Write([]byte(`{"message": {"api_key": "key123", "api_secret": "secret456"}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)

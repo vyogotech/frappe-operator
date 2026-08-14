@@ -52,13 +52,13 @@ func TestSiteAppReconciler_Reconcile_SuccessAndUninstall(t *testing.T) {
 		if r.URL.Path == "/api/method/frappe.installer.install_app" {
 			appInstalled = true
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"message": "Installed"}`))
+			_, _ = w.Write([]byte(`{"message": "Installed"}`))
 			return
 		}
 		if r.URL.Path == "/api/method/frappe.installer.uninstall_app" {
 			appUninstalled = true
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"message": "Uninstalled"}`))
+			_, _ = w.Write([]byte(`{"message": "Uninstalled"}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
