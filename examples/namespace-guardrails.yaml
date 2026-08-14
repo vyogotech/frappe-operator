@@ -1,0 +1,39 @@
+# Noisy-neighbor hardening for a tenant bench:
+#   - namespacePolicy: the operator maintains a ResourceQuota (total tenant caps) and a
+#     LimitRange (default + max per-container limits) in this namespace, so no single
+#     pod or the tenant as a whole can starve the node.
+#   - dbConfig.maxStatementTimeSeconds: on a dedicated (operator-provisioned) MariaDB,
+#     bounds how long any single SQL statement may run (kills runaway reports). For
+#     shared/external databases, set max_statement_time on your own MariaDB instead.
+apiVersion: vyogo.tech/v1
+kind: FrappeBench
+metadata:
+  name: guarded-bench
+  namespace: frappe
+spec:
+  frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+  storageSize: 2Gi
+  dbConfig:
+    provider: mariadb
+    mode: dedicated
+    storageSize: 5Gi
+    maxStatementTimeSeconds: 30
+  namespacePolicy:
+    resourceQuota:
+      requests.cpu: "4"
+      requests.memory: 8Gi
+      limits.cpu: "8"
+      limits.memory: 16Gi
+      pods: "40"
+    defaultRequests:
+      cpu: 50m
+      memory: 128Mi
+    defaultLimits:
+      cpu: "1"
+      memory: 1Gi
+    maxLimits:
+      cpu: "2"
+      memory: 2Gi

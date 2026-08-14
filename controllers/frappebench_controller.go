@@ -72,6 +72,7 @@ const frappeBenchFinalizer = "vyogo.tech/bench-finalizer"
 //+kubebuilder:rbac:groups=keda.sh,resources=scaledobjects/finalizers,verbs=update
 //+kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+//+kubebuilder:rbac:groups="",resources=resourcequotas;limitranges,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -134,6 +135,13 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		logger.Error(err, "Failed to merge FPM repositories")
 	}
 	logger.Info("FPM repositories configured", "count", len(fpmRepos))
+
+	// Ensure namespace guardrails (ResourceQuota / LimitRange) before workloads are
+	// created, so default limits apply and tenant caps are in force. Non-fatal.
+	if err := r.ensureNamespacePolicy(ctx, bench); err != nil {
+		logger.Error(err, "Failed to ensure namespace policy")
+		r.Recorder.Event(bench, corev1.EventTypeWarning, "NamespacePolicyFailed", fmt.Sprintf("Failed to apply namespace policy: %v", err))
+	}
 
 	// Ensure storage
 	if err := r.ensureBenchStorage(ctx, bench); err != nil {
