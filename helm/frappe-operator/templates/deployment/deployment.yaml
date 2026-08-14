@@ -44,6 +44,20 @@ spec:
               name: frappe-operator-config
               key: maxConcurrentSiteReconciles
               optional: true
+        - name: FRAPPE_MAX_CONCURRENT_RECONCILES
+          valueFrom:
+            configMapKeyRef:
+              name: frappe-operator-config
+              key: maxConcurrentReconciles
+              optional: true
+        {{- if .Values.operatorConfig.clientQps }}
+        - name: FRAPPE_CLIENT_QPS
+          value: {{ .Values.operatorConfig.clientQps | quote }}
+        {{- end }}
+        {{- if .Values.operatorConfig.clientBurst }}
+        - name: FRAPPE_CLIENT_BURST
+          value: {{ .Values.operatorConfig.clientBurst | quote }}
+        {{- end }}
         ports:
         - containerPort: {{ .Values.manager.metrics.port }}
           name: metrics

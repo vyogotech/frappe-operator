@@ -7318,6 +7318,7 @@ data:
   gitEnabled: "false"
   ingressControllerNamespace: ingress-nginx
   ingressControllerService: ingress-nginx-controller
+  maxConcurrentReconciles: "5"
   maxConcurrentSiteReconciles: "10"
 kind: ConfigMap
 metadata:

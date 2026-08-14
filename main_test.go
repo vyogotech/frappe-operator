@@ -20,9 +20,67 @@ import (
 	"testing"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
+	"k8s.io/client-go/rest"
 )
 
 func int32Ptr(n int32) *int32 { return &n }
+
+func TestGetMaxConcurrentReconciles(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		set  bool
+		want int
+	}{
+		{name: "unset uses default", set: false, want: defaultMaxConcurrentReconciles},
+		{name: "valid override", env: "12", set: true, want: 12},
+		{name: "zero ignored", env: "0", set: true, want: defaultMaxConcurrentReconciles},
+		{name: "negative ignored", env: "-3", set: true, want: defaultMaxConcurrentReconciles},
+		{name: "garbage ignored", env: "abc", set: true, want: defaultMaxConcurrentReconciles},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("FRAPPE_MAX_CONCURRENT_RECONCILES", "")
+			if tt.set {
+				t.Setenv("FRAPPE_MAX_CONCURRENT_RECONCILES", tt.env)
+			}
+			if got := getMaxConcurrentReconciles(); got != tt.want {
+				t.Errorf("getMaxConcurrentReconciles() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestApplyClientThrottle(t *testing.T) {
+	// Unset env leaves the rest.Config untouched (controller-runtime defaults preserved).
+	t.Run("unset preserves config", func(t *testing.T) {
+		cfg := &rest.Config{QPS: 20, Burst: 30}
+		qps, burst := applyClientThrottle(cfg)
+		if qps != 20 || burst != 30 {
+			t.Errorf("applyClientThrottle() = (%v,%d), want (20,30)", qps, burst)
+		}
+	})
+	// Valid env overrides QPS/Burst.
+	t.Run("env overrides", func(t *testing.T) {
+		t.Setenv("FRAPPE_CLIENT_QPS", "75")
+		t.Setenv("FRAPPE_CLIENT_BURST", "150")
+		cfg := &rest.Config{QPS: 20, Burst: 30}
+		qps, burst := applyClientThrottle(cfg)
+		if qps != 75 || burst != 150 {
+			t.Errorf("applyClientThrottle() = (%v,%d), want (75,150)", qps, burst)
+		}
+	})
+	// Invalid values are ignored.
+	t.Run("garbage ignored", func(t *testing.T) {
+		t.Setenv("FRAPPE_CLIENT_QPS", "nope")
+		t.Setenv("FRAPPE_CLIENT_BURST", "-5")
+		cfg := &rest.Config{QPS: 20, Burst: 30}
+		qps, burst := applyClientThrottle(cfg)
+		if qps != 20 || burst != 30 {
+			t.Errorf("applyClientThrottle() = (%v,%d), want (20,30)", qps, burst)
+		}
+	})
+}
 
 func Test_effectiveMaxFromBenches(t *testing.T) {
 	tests := []struct {
