@@ -110,6 +110,38 @@ type DatabaseConfig struct {
 	// Required for 'external' provider. Secret should contain: username, password, database (optional, defaults to siteName)
 	// +optional
 	ConnectionSecretRef *corev1.SecretReference `json:"connectionSecretRef,omitempty"`
+
+	// MaxStatementTimeSeconds bounds how long a single SQL statement may run, protecting
+	// the database from runaway queries (noisy-neighbor). It is applied via my.cnf on
+	// operator-provisioned (dedicated-mode) MariaDB only; for shared/external databases
+	// set max_statement_time on your own instance. 0 or unset leaves it unbounded.
+	// +optional
+	MaxStatementTimeSeconds *int64 `json:"maxStatementTimeSeconds,omitempty"`
+}
+
+// NamespacePolicy configures namespace-level resource guardrails that the operator
+// maintains in the FrappeBench's namespace to protect against noisy neighbors.
+type NamespacePolicy struct {
+	// ResourceQuota caps total resource usage across the namespace. Keys are standard
+	// ResourceQuota resource names, e.g. requests.cpu, requests.memory, limits.cpu,
+	// limits.memory, pods, persistentvolumeclaims, requests.storage. Empty = no quota.
+	// +optional
+	ResourceQuota corev1.ResourceList `json:"resourceQuota,omitempty"`
+
+	// DefaultRequests sets the default per-container resource requests applied
+	// namespace-wide via a LimitRange, so pods without explicit requests are bounded.
+	// +optional
+	DefaultRequests corev1.ResourceList `json:"defaultRequests,omitempty"`
+
+	// DefaultLimits sets the default per-container resource limits applied namespace-wide
+	// via a LimitRange, so a pod without explicit limits cannot hog a node.
+	// +optional
+	DefaultLimits corev1.ResourceList `json:"defaultLimits,omitempty"`
+
+	// MaxLimits sets the maximum per-container limits enforced by the LimitRange; a pod
+	// requesting more than this is rejected. Empty = no maximum.
+	// +optional
+	MaxLimits corev1.ResourceList `json:"maxLimits,omitempty"`
 }
 
 // IngressConfig defines Ingress configuration

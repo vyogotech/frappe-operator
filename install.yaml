@@ -424,6 +424,14 @@ spec:
                     required:
                     - name
                     type: object
+                  maxStatementTimeSeconds:
+                    description: |-
+                      MaxStatementTimeSeconds bounds how long a single SQL statement may run, protecting
+                      the database from runaway queries (noisy-neighbor). It is applied via my.cnf on
+                      operator-provisioned (dedicated-mode) MariaDB only; for shared/external databases
+                      set max_statement_time on your own instance. 0 or unset leaves it unbounded.
+                    format: int64
+                    type: integer
                   mode:
                     default: shared
                     description: 'Mode: shared (one DB instance, multiple site databases) or dedicated (one DB instance per site)'
@@ -604,6 +612,59 @@ spec:
                   tag:
                     description: Tag is the image tag
                     type: string
+                type: object
+              namespacePolicy:
+                description: |-
+                  NamespacePolicy, when set, makes the operator maintain a ResourceQuota and/or a
+                  LimitRange in the bench's namespace as a noisy-neighbor guardrail for the tenant.
+                  Intended for a one-bench-per-tenant-namespace layout. Clearing it removes the
+                  operator-managed ResourceQuota/LimitRange.
+                properties:
+                  defaultLimits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      DefaultLimits sets the default per-container resource limits applied namespace-wide
+                      via a LimitRange, so a pod without explicit limits cannot hog a node.
+                    type: object
+                  defaultRequests:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      DefaultRequests sets the default per-container resource requests applied
+                      namespace-wide via a LimitRange, so pods without explicit requests are bounded.
+                    type: object
+                  maxLimits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      MaxLimits sets the maximum per-container limits enforced by the LimitRange; a pod
+                      requesting more than this is rejected. Empty = no maximum.
+                    type: object
+                  resourceQuota:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      ResourceQuota caps total resource usage across the namespace. Keys are standard
+                      ResourceQuota resource names, e.g. requests.cpu, requests.memory, limits.cpu,
+                      limits.memory, pods, persistentvolumeclaims, requests.storage. Empty = no quota.
+                    type: object
                 type: object
               podConfig:
                 description: PodConfig defines advanced pod configuration for all bench components
@@ -2300,6 +2361,14 @@ spec:
                     required:
                     - name
                     type: object
+                  maxStatementTimeSeconds:
+                    description: |-
+                      MaxStatementTimeSeconds bounds how long a single SQL statement may run, protecting
+                      the database from runaway queries (noisy-neighbor). It is applied via my.cnf on
+                      operator-provisioned (dedicated-mode) MariaDB only; for shared/external databases
+                      set max_statement_time on your own instance. 0 or unset leaves it unbounded.
+                    format: int64
+                    type: integer
                   mode:
                     default: shared
                     description: 'Mode: shared (one DB instance, multiple site databases) or dedicated (one DB instance per site)'
@@ -6954,7 +7023,9 @@ rules:
   - ""
   resources:
   - configmaps
+  - limitranges
   - persistentvolumeclaims
+  - resourcequotas
   - secrets
   - services
   verbs:
