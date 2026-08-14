@@ -120,9 +120,20 @@ echo "=== 7. Upgrading the site with FAILED config ==="
 kubectl apply -f test/scenarios/image-upgrade-fail.yaml -n e2e-upgrade-test-fail
 echo "Waiting for upgrade..."
 sleep 15
-# The bad scenario installs hrms (slow get-app) BEFORE hitting the bogus
-# `nonexistentapp`, so allow time for the job to reach the Failed state.
-kubectl wait --for=condition=Failed job/upgrade-site-init -n e2e-upgrade-test-fail --timeout=8m || echo "site init upgrade wait failed or completed unexpectedly"
+# The upgrade re-runs the site-init job. With the fallback guard in place the job reaches
+# a terminal state — Complete when the bogus app is safely skipped (the expected path), or
+# Failed if the operator genuinely can't converge — rather than hanging. Poll for either
+# instead of blindly waiting the full timeout for a Failed condition that no longer occurs
+# (that wasted ~8 min every run once the site-init fallback fix landed).
+echo "Waiting for the upgrade job to reach a terminal state..."
+for i in $(seq 1 144); do   # up to 12 min
+    ctypes=$(kubectl get job/upgrade-site-init -n e2e-upgrade-test-fail -o jsonpath='{.status.conditions[*].type}' 2>/dev/null)
+    if echo "$ctypes" | grep -qE "Complete|Failed"; then
+        echo "  upgrade job reached terminal state after $((i*5))s: [$ctypes]"
+        break
+    fi
+    sleep 5
+done
 
 echo "=== 8. Port forwarding to verify CSS AFTER FAILED upgrade ==="
 kubectl port-forward svc/upgrade-bench-nginx 8080:8080 -n e2e-upgrade-test-fail &
