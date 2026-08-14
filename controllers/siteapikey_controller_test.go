@@ -49,7 +49,7 @@ func TestSiteAPIKeyReconciler_Reconcile_Success(t *testing.T) {
 	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
 		Status: vyogotechv1.FrappeSiteStatus{
-			Phase: vyogotechv1.FrappeSitePhaseReady,
+			Phase:   vyogotechv1.FrappeSitePhaseReady,
 			SiteURL: "http://central.atxinvox.com.au",
 		},
 	}

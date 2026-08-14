@@ -54,7 +54,7 @@ func TestSiteRoleReconciler_Reconcile_Success(t *testing.T) {
 		if r.URL.Path == "/api/resource/Role" && r.Method == http.MethodPost {
 			roleCreated = true
 			w.WriteHeader(http.StatusCreated)
-			w.Write([]byte(`{"data": {"name": "Auditor"}}`))
+			_, _ = w.Write([]byte(`{"data": {"name": "Auditor"}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)

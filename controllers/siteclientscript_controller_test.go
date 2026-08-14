@@ -40,7 +40,7 @@ func TestSiteClientScriptReconciler_Reconcile(t *testing.T) {
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"message": "ok"}`))
+		_, _ = w.Write([]byte(`{"message": "ok"}`))
 	}))
 	defer mockServer.Close()
 
@@ -106,7 +106,7 @@ func TestSiteClientScriptReconciler_Reconcile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Requeue {
+	if res.RequeueAfter > 0 {
 		t.Errorf("expected no requeue, got %v", res)
 	}
 
