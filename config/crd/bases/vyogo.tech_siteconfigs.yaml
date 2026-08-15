@@ -52,8 +52,10 @@ spec:
               customConfig:
                 additionalProperties:
                   type: string
-                description: CustomConfig defines arbitrary key-value pairs to set
-                  in site_config.json.
+                description: |-
+                  CustomConfig defines arbitrary key-value pairs to set in site_config.json.
+                  Values that parse as JSON (objects, arrays, numbers, booleans) are applied as such;
+                  everything else is applied as a string.
                 type: object
               encryptionKeySecretRef:
                 description: EncryptionKeySecretRef specifies a K8s secret holding
@@ -79,6 +81,62 @@ spec:
                   bytes (max_file_size in site_config.json).
                 format: int64
                 type: integer
+              objectStorage:
+                description: |-
+                  ObjectStorage, when set, configures the site to offload File attachments to an
+                  S3-compatible object store via the cloud_storage app (baked into the bench image).
+                  The operator assembles the cloud_storage_settings block in site_config.json, sourcing
+                  the access key/secret from CredentialsSecretRef so they never appear in the CR.
+                properties:
+                  accessKeyKey:
+                    description: AccessKeyKey is the Secret key holding the access
+                      key. Defaults to "access_key".
+                    type: string
+                  bucket:
+                    description: Bucket is the S3 bucket name.
+                    type: string
+                  credentialsSecretRef:
+                    description: CredentialsSecretRef references a Secret holding
+                      the S3 credentials.
+                    properties:
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  endpointUrl:
+                    description: EndpointURL is the S3 endpoint (e.g. "https://s3.amazonaws.com",
+                      "http://minio:9000").
+                    type: string
+                  folder:
+                    description: |-
+                      Folder is the key prefix within the bucket. Defaults to the site name, giving each
+                      site its own prefix when a bucket is shared across tenants.
+                    type: string
+                  presignedUrlExpirySeconds:
+                    description: |-
+                      PresignedURLExpirySeconds is the TTL for presigned download URLs (cloud_storage
+                      "expiration"). Defaults to 120.
+                    format: int64
+                    type: integer
+                  region:
+                    description: Region is the S3 region (e.g. "us-east-1").
+                    type: string
+                  secretKeyKey:
+                    description: SecretKeyKey is the Secret key holding the secret
+                      key. Defaults to "secret".
+                    type: string
+                required:
+                - bucket
+                - credentialsSecretRef
+                - endpointUrl
+                type: object
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
                 properties:

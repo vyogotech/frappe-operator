@@ -40,8 +40,54 @@ type SiteConfigSpec struct {
 	EncryptionKeySecretRef *corev1.LocalObjectReference `json:"encryptionKeySecretRef,omitempty"`
 
 	// CustomConfig defines arbitrary key-value pairs to set in site_config.json.
+	// Values that parse as JSON (objects, arrays, numbers, booleans) are applied as such;
+	// everything else is applied as a string.
 	// +optional
 	CustomConfig map[string]string `json:"customConfig,omitempty"`
+
+	// ObjectStorage, when set, configures the site to offload File attachments to an
+	// S3-compatible object store via the cloud_storage app (baked into the bench image).
+	// The operator assembles the cloud_storage_settings block in site_config.json, sourcing
+	// the access key/secret from CredentialsSecretRef so they never appear in the CR.
+	// +optional
+	ObjectStorage *ObjectStorageConfig `json:"objectStorage,omitempty"`
+}
+
+// ObjectStorageConfig configures S3-compatible File offload via the cloud_storage app.
+type ObjectStorageConfig struct {
+	// Bucket is the S3 bucket name.
+	// +kubebuilder:validation:Required
+	Bucket string `json:"bucket"`
+
+	// EndpointURL is the S3 endpoint (e.g. "https://s3.amazonaws.com", "http://minio:9000").
+	// +kubebuilder:validation:Required
+	EndpointURL string `json:"endpointUrl"`
+
+	// Region is the S3 region (e.g. "us-east-1").
+	// +optional
+	Region string `json:"region,omitempty"`
+
+	// Folder is the key prefix within the bucket. Defaults to the site name, giving each
+	// site its own prefix when a bucket is shared across tenants.
+	// +optional
+	Folder string `json:"folder,omitempty"`
+
+	// PresignedURLExpirySeconds is the TTL for presigned download URLs (cloud_storage
+	// "expiration"). Defaults to 120.
+	// +optional
+	PresignedURLExpirySeconds *int64 `json:"presignedUrlExpirySeconds,omitempty"`
+
+	// CredentialsSecretRef references a Secret holding the S3 credentials.
+	// +kubebuilder:validation:Required
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
+	// AccessKeyKey is the Secret key holding the access key. Defaults to "access_key".
+	// +optional
+	AccessKeyKey string `json:"accessKeyKey,omitempty"`
+
+	// SecretKeyKey is the Secret key holding the secret key. Defaults to "secret".
+	// +optional
+	SecretKeyKey string `json:"secretKeyKey,omitempty"`
 }
 
 // SiteConfigStatus defines the observed state of SiteConfig

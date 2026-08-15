@@ -22,6 +22,7 @@ import (
 	"time"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,7 +42,7 @@ func TestSiteConfigReconciler_Reconcile_Success(t *testing.T) {
 	maxSize := int64(50000000)
 
 	siteConfig := &vyogotechv1.SiteConfig{
-		ObjectMeta: metav1.ObjectMeta{Name: "config1", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "config1", Namespace: "default", Generation: 1},
 		Spec: vyogotechv1.SiteConfigSpec{
 			SiteRef:         &vyogotechv1.NamespacedName{Name: "site1"},
 			MaintenanceMode: &mMode,
@@ -51,33 +52,51 @@ func TestSiteConfigReconciler_Reconcile_Success(t *testing.T) {
 	}
 	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeSiteSpec{SiteName: "site1.local", BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"}},
 		Status:     vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
 	}
-
-	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteConfig, site).WithStatusSubresource(siteConfig).Build()
-	r := &SiteConfigReconciler{
-		Client:   client,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
 	}
 
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteConfig, site, bench).WithStatusSubresource(siteConfig, &batchv1.Job{}).Build()
+	r := &SiteConfigReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
 	ctx := context.Background()
-	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "config1", Namespace: "default"}})
-	if err != nil {
+	key := types.NamespacedName{Name: "config1", Namespace: "default"}
+
+	// First reconcile creates the apply Job and reports Applying (async, Job-based).
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
 		t.Fatalf("Reconcile failed: %v", err)
 	}
-
-	updatedConfig := &vyogotechv1.SiteConfig{}
-	err = client.Get(ctx, types.NamespacedName{Name: "config1", Namespace: "default"}, updatedConfig)
-	if err != nil {
-		t.Fatalf("failed to fetch updated site config: %v", err)
+	updated := &vyogotechv1.SiteConfig{}
+	if err := client.Get(ctx, key, updated); err != nil {
+		t.Fatalf("fetch config: %v", err)
+	}
+	if updated.Status.Phase != "Applying" {
+		t.Fatalf("expected phase Applying after first reconcile, got %s", updated.Status.Phase)
+	}
+	job := &batchv1.Job{}
+	if err := client.Get(ctx, types.NamespacedName{Name: "config1-apply-1", Namespace: "default"}, job); err != nil {
+		t.Fatalf("expected apply Job config1-apply-1: %v", err)
 	}
 
-	if updatedConfig.Status.Phase != "Ready" {
-		t.Errorf("expected phase Ready, got %s", updatedConfig.Status.Phase)
+	// Simulate the Job completing, then reconcile again -> Ready with the applied keys.
+	job.Status.Succeeded = 1
+	if err := client.Status().Update(ctx, job); err != nil {
+		t.Fatalf("update job status: %v", err)
 	}
-	if len(updatedConfig.Status.AppliedKeys) != 3 {
-		t.Errorf("expected 3 applied keys, got %d", len(updatedConfig.Status.AppliedKeys))
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+		t.Fatalf("Reconcile (post-job) failed: %v", err)
+	}
+	if err := client.Get(ctx, key, updated); err != nil {
+		t.Fatalf("fetch config: %v", err)
+	}
+	if updated.Status.Phase != "Ready" {
+		t.Errorf("expected phase Ready, got %s", updated.Status.Phase)
+	}
+	if len(updated.Status.AppliedKeys) != 3 {
+		t.Errorf("expected 3 applied keys (maintenance_mode, max_file_size, allow_consecutive_logins), got %d (%v)", len(updated.Status.AppliedKeys), updated.Status.AppliedKeys)
 	}
 }
 
