@@ -138,6 +138,9 @@ func buildConfigPlan(sc *vyogotechv1.SiteConfig, domain string) (cmds []string, 
 				LocalObjectReference: os.CredentialsSecretRef, Key: skKey,
 			}}},
 		)
+		// Activate the app on the site (it is baked into the bench image but must be
+		// installed per site). Tolerate "already installed" so re-applies are idempotent.
+		cmds = append(cmds, "bench --site "+shellQuote(domain)+" install-app cloud_storage || echo 'cloud_storage already installed'")
 		cmds = append(cmds, `python3 -c 'import os,json,subprocess;`+
 			`c=json.loads(os.environ["CS_BASE_JSON"]);`+
 			`c["access_key"]=os.environ["CS_ACCESS_KEY"];c["secret"]=os.environ["CS_SECRET"];`+

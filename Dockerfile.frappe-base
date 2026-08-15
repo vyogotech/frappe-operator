@@ -1,0 +1,35 @@
+# Vyogo Frappe bench base image with S3 File offload baked in.
+#
+# Adds the AgriTheory `cloud_storage` app (S3-compatible File attachments) plus its
+# required system libraries to the official Frappe/ERPNext image, so tenants can offload
+# uploads to object storage without a runtime `bench get-app` (which is fragile in a
+# running pod — no yarn, no sudo). The app is only *activated* per site by installing it
+# (site apps list) and setting cloud_storage_settings via SiteConfig.spec.objectStorage.
+#
+# Build:
+#   docker build -f Dockerfile.frappe-base \
+#     --build-arg FRAPPE_VERSION=v15 \
+#     -t ghcr.io/vyogotech/frappe_base:latest .
+#
+# The image tag this produces is what FrappeBench.spec.imageConfig points at by default.
+
+ARG FRAPPE_VERSION=v15
+FROM frappe/erpnext:${FRAPPE_VERSION}
+
+# cloud_storage needs libmagic (MIME sniffing) and libreoffice (document preview/convert).
+# libreoffice-nogui keeps the layer smaller than the full desktop package.
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libmagic1 libreoffice-nogui \
+    && rm -rf /var/lib/apt/lists/*
+
+USER frappe
+WORKDIR /home/frappe/frappe-bench
+
+# Fetch + build the app at image-build time (node/yarn are present in the official image,
+# so the asset build that fails in a minimal running pod succeeds here).
+ARG CLOUD_STORAGE_REPO=https://github.com/agritheory/cloud_storage
+ARG CLOUD_STORAGE_BRANCH=version-15
+RUN bench get-app --branch "${CLOUD_STORAGE_BRANCH}" "${CLOUD_STORAGE_REPO}"
+
+# The app is present in apps/ and pip-installed; activation is per-site via install-app.
