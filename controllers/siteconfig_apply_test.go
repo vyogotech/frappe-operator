@@ -63,6 +63,7 @@ func TestBuildConfigPlan(t *testing.T) {
 		`set-config encryption_key "$CFG_ENCRYPTION_KEY"`,
 		"set-config 'greeting' 'hello world'", // plain string (not JSON)
 		"set-config -p 'obj' '{\"a\":1}'",     // JSON object -> parsed
+		"install-app cloud_storage",           // objectStorage self-activates the app
 		"cloud_storage_settings",              // via the python assembler
 		`--site 'repro.localhost'`,
 	}
