@@ -49,6 +49,7 @@ type SiteBackupReconciler struct {
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitebackups,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitebackups/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitebackups/finalizers,verbs=update
+//+kubebuilder:rbac:groups=vyogo.tech,resources=siteconfigs,verbs=get;list;watch
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 
@@ -188,6 +189,29 @@ func (r *SiteBackupReconciler) handleFinalizer(ctx context.Context, siteBackup *
 	return nil
 }
 
+// warnIfObjectStorage emits a warning when a --with-files backup is requested for a site
+// that offloads its Files to S3 object storage. Those files live in the bucket, not on the
+// sites PVC, so `bench backup --with-files` cannot capture them — the file source of truth
+// is the bucket (enable versioning). Detection is read-only: it looks for a SiteConfig in
+// the namespace that references this site with objectStorage set.
+func (r *SiteBackupReconciler) warnIfObjectStorage(ctx context.Context, sb *vyogotechv1.SiteBackup) {
+	if !sb.Spec.WithFiles {
+		return
+	}
+	var list vyogotechv1.SiteConfigList
+	if err := r.List(ctx, &list, client.InNamespace(sb.Namespace)); err != nil {
+		return
+	}
+	for i := range list.Items {
+		sc := &list.Items[i]
+		if sc.Spec.ObjectStorage != nil && sc.Spec.SiteRef != nil && sc.Spec.SiteRef.Name == sb.Spec.Site {
+			r.Recorder.Event(sb, corev1.EventTypeWarning, "FilesInObjectStorage",
+				"Site offloads Files to S3 object storage; --with-files will not capture them. Ensure bucket versioning for file durability.")
+			return
+		}
+	}
+}
+
 // reconcileOneTimeBackup handles one-time backup creation and status updates
 func (r *SiteBackupReconciler) reconcileOneTimeBackup(ctx context.Context, siteBackup *vyogotechv1.SiteBackup, bench *vyogotechv1.FrappeBench) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -201,6 +225,7 @@ func (r *SiteBackupReconciler) reconcileOneTimeBackup(ctx context.Context, siteB
 			// Job is finished, do not recreate
 			return ctrl.Result{}, nil
 		}
+		r.warnIfObjectStorage(ctx, siteBackup)
 		job = r.buildBackupJob(siteBackup, bench)
 		if err := r.Create(ctx, job); err != nil {
 			logger.Error(err, "Failed to create backup job")
@@ -237,6 +262,7 @@ func (r *SiteBackupReconciler) reconcileScheduledBackup(ctx context.Context, sit
 	logger := log.FromContext(ctx)
 	cronJobName := siteBackup.Name + "-backup"
 
+	r.warnIfObjectStorage(ctx, siteBackup)
 	desiredCronJob := r.buildBackupCronJob(siteBackup, bench)
 	currentCronJob := &batchv1.CronJob{}
 	err := r.Get(ctx, client.ObjectKey{Name: cronJobName, Namespace: siteBackup.Namespace}, currentCronJob)
