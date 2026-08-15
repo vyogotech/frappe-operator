@@ -138,9 +138,18 @@ func buildConfigPlan(sc *vyogotechv1.SiteConfig, domain string) (cmds []string, 
 				LocalObjectReference: os.CredentialsSecretRef, Key: skKey,
 			}}},
 		)
+		// cloud_storage's after_install hook shells out to `sudo apt-get` to ensure its OS
+		// packages. Those are already baked into the bench image, but there is no sudo in
+		// a Job pod — so drop a no-op sudo shim on PATH to let the hook complete cleanly.
+		cmds = append(cmds, `mkdir -p /tmp/csbin && printf '#!/bin/sh\nexit 0\n' > /tmp/csbin/sudo && chmod +x /tmp/csbin/sudo && export PATH="/tmp/csbin:$PATH"`)
 		// Activate the app on the site (it is baked into the bench image but must be
-		// installed per site). Tolerate "already installed" so re-applies are idempotent.
-		cmds = append(cmds, "bench --site "+shellQuote(domain)+" install-app cloud_storage || echo 'cloud_storage already installed'")
+		// installed per site). Tolerate "already installed" so re-applies are idempotent,
+		// then migrate to sync cloud_storage's File custom fields (its file-version child
+		// table) — without this, the File upload hook raises and offload fails.
+		cmds = append(cmds,
+			"bench --site "+shellQuote(domain)+" install-app cloud_storage || echo 'cloud_storage already installed'",
+			"bench --site "+shellQuote(domain)+" migrate",
+		)
 		cmds = append(cmds, `python3 -c 'import os,json,subprocess;`+
 			`c=json.loads(os.environ["CS_BASE_JSON"]);`+
 			`c["access_key"]=os.environ["CS_ACCESS_KEY"];c["secret"]=os.environ["CS_SECRET"];`+
@@ -182,11 +191,14 @@ func buildConfigJob(sc *vyogotechv1.SiteConfig, bench *vyogotechv1.FrappeBench, 
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Command:         []string{"bash", "-c", script},
 						Env:             env,
-						VolumeMounts: []corev1.VolumeMount{{
-							Name:      "sites",
-							MountPath: "/home/frappe/frappe-bench/sites",
-							SubPath:   "sites",
-						}},
+						// Match the bench deployments' PVC layout: site data lives under the
+						// "frappe-sites" subPath (assets under "frappe-sites/assets"). Mounting
+						// the wrong subPath yields an empty sites dir and bench can't find
+						// apps.txt / the site.
+						VolumeMounts: []corev1.VolumeMount{
+							{Name: "sites", MountPath: "/home/frappe/frappe-bench/sites", SubPath: "frappe-sites"},
+							{Name: "sites", MountPath: "/home/frappe/frappe-bench/sites/assets", SubPath: "frappe-sites/assets"},
+						},
 					}},
 					Volumes: []corev1.Volume{{
 						Name: "sites",
