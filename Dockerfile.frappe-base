@@ -1,23 +1,28 @@
 # Vyogo Frappe bench base image with S3 File offload baked in.
 #
-# Adds the AgriTheory `cloud_storage` app (S3-compatible File attachments) plus its
-# required system libraries to the official Frappe/ERPNext image, so tenants can offload
-# uploads to object storage without a runtime `bench get-app` (which is fragile in a
-# running pod — no yarn, no sudo). The app is only *activated* per site by installing it
-# (site apps list) and setting cloud_storage_settings via SiteConfig.spec.objectStorage.
+# Extends the operator's own bench base image (frappe_base) with the AgriTheory
+# `cloud_storage` app (S3-compatible File attachments). It must build FROM frappe_base
+# rather than the upstream frappe/erpnext image: frappe_base carries the operator-specific
+# entrypoint / asset handling that the bench deployments expect (the upstream image's
+# "link fresh assets to volume" entrypoint fights the operator's sites PVC mount and
+# crash-loops gunicorn).
+#
+# frappe_base is a minimal runtime image without yarn, so the app is fetched with
+# --skip-assets (its Python file-offload backend needs no built JS; the cloud_storage UI
+# bundle is a follow-up — add yarn to frappe_base or a multi-stage asset build for it).
 #
 # Build:
 #   docker build -f Dockerfile.frappe-base \
-#     --build-arg FRAPPE_VERSION=v15 \
+#     --build-arg BASE_IMAGE=ghcr.io/vyogotech/frappe_base:latest \
 #     -t ghcr.io/vyogotech/frappe_base:latest .
 #
-# The image tag this produces is what FrappeBench.spec.imageConfig points at by default.
+# The tag this produces is what FrappeBench.spec.imageConfig points at by default.
 
-ARG FRAPPE_VERSION=v15
-FROM frappe/erpnext:${FRAPPE_VERSION}
+ARG BASE_IMAGE=ghcr.io/vyogotech/frappe_base:latest
+FROM ${BASE_IMAGE}
 
-# cloud_storage needs libmagic (MIME sniffing) and libreoffice (document preview/convert).
-# libreoffice-nogui keeps the layer smaller than the full desktop package.
+# cloud_storage needs libmagic (MIME sniffing; already present in frappe_base) and, for
+# document preview/convert, libreoffice. libreoffice-nogui keeps the layer smaller.
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libmagic1 libreoffice-nogui \
@@ -26,10 +31,10 @@ RUN apt-get update \
 USER frappe
 WORKDIR /home/frappe/frappe-bench
 
-# Fetch + build the app at image-build time (node/yarn are present in the official image,
-# so the asset build that fails in a minimal running pod succeeds here).
 ARG CLOUD_STORAGE_REPO=https://github.com/agritheory/cloud_storage
 ARG CLOUD_STORAGE_BRANCH=version-15
-RUN bench get-app --branch "${CLOUD_STORAGE_BRANCH}" "${CLOUD_STORAGE_REPO}"
+# --skip-assets: frappe_base has no yarn; the file-offload backend does not need built JS.
+RUN bench get-app --skip-assets --branch "${CLOUD_STORAGE_BRANCH}" "${CLOUD_STORAGE_REPO}"
 
-# The app is present in apps/ and pip-installed; activation is per-site via install-app.
+# The app is present in apps/ and pip-installed; activation is per-site via install-app
+# (driven by SiteConfig.spec.objectStorage).
