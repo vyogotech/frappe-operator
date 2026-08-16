@@ -1,9 +1,28 @@
 # Frappe Operator
 
 [![Release](https://img.shields.io/github/v/release/vyogotech/frappe-operator)](https://github.com/vyogotech/frappe-operator/releases)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
 [![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](https://vyogotech.github.io/frappe-operator/)
+
+> [!IMPORTANT]
+> **⚡ Now licensed under the Elastic License 2.0**
+>
+> Frappe Operator has moved to the **[Elastic License 2.0 (ELv2)](LICENSE)** — a
+> **source-available** license. In short: **free for general use, not free to run as a managed cloud service.**
+>
+> - ✅ **Free** to use, self-host, modify, and redistribute — including in
+>   production for your own organization or your own dedicated customer instances.
+> - 💼 **Requires a commercial license** if you offer Frappe Operator to third
+>   parties as a **hosted or managed service** (a Frappe/ERPNext cloud, managed
+>   hosting, or multi-tenant SaaS) built on its functionality.
+>
+> Releases before `v4.2.0` (v4.1.x and earlier) remain available under Apache 2.0; this
+> change applies going forward. See **[LICENSING.md](LICENSING.md)** for the full
+> plain-English breakdown, including how this relates to Frappe (MIT) and ERPNext (GPLv3).
+>
+> Building a managed Frappe/ERPNext hosting business on this? Talk to us first.
+> 📬 **Commercial / hosting inquiries:** dev@vyogo.tech | 🌐 [vyogo.tech](https://vyogo.tech)
 
 A production-ready Kubernetes operator that automates deployment, scaling, and management of [Frappe Framework](https://frappeframework.com/) applications (including ERPNext) on Kubernetes.
 
@@ -30,7 +49,10 @@ A production-ready Kubernetes operator that automates deployment, scaling, and m
 ### Install
 
 ```bash
-# Install with Helm (recommended)
+# Install via Operator Lifecycle Manager (OLM) / OperatorHub (Recommended)
+kubectl create -f https://operatorhub.io/install/frappe-operator.yaml
+
+# Or install with Helm
 helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
 helm install frappe-operator frappe-operator/frappe-operator \
   --namespace frappe-operator-system \
@@ -44,11 +66,11 @@ kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/latest/do
 
 ```bash
 # 1. Create MariaDB instance
-kubectl apply -f examples/mariadb-shared-instance.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/mariadb-shared-instance.yaml
 
 # 2. Deploy a basic site
-kubectl apply -f examples/basic-bench.yaml
-kubectl apply -f examples/basic-site.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-bench.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-site.yaml
 
 # 3. Monitor deployment
 kubectl get frappebench,frappesite -w
@@ -61,7 +83,57 @@ kubectl port-forward svc/basic-bench-nginx 8080:8080
 # Open http://localhost:8080
 ```
 
+### Triggering a Site Update for a New Image
+
+If you have updated the image in your `FrappeBench` (e.g. pushed a new tag to the registry) and need the operator to re-run the initialization job to pick it up, simply update or increment the `frappe.io/site-version` annotation on your `FrappeSite`:
+
+```bash
+kubectl annotate frappesite basic-site frappe.io/site-version="sha-1db505941e7bbe6c47f79ca805e007e20a638aa2" --overwrite
+```
+This signals the operator to delete the old `bench-init` job and spin up a new one using the updated `ImageConfig`.
+
 **That's it!** You now have a running Frappe site.
+
+### Uninstalling the Operator
+
+If you are just testing and want to clean up your cluster, delete your site and bench resources first, then clean up the CRDs and operator resources.
+
+**1. Clean up Frappe resources and CRDs:**
+
+**Bash / Zsh**:
+```bash
+kubectl delete CustomResourceDefinition $(kubectl get CustomResourceDefinition | grep -F ".vyogo.tech" | awk '{print $1}')
+```
+
+**PowerShell**:
+```powershell
+kubectl get crd | Select-String -SimpleMatch ".vyogo.tech" | ForEach-Object {
+    ($_.ToString().Split()[0])
+} | ForEach-Object {
+    kubectl delete crd $_
+}
+```
+
+**2. Uninstall the Operator itself:**
+
+Depending on how you installed the operator, use one of the following methods to remove the controller manager, RBAC, and namespace:
+
+**If installed via OLM:**
+```bash
+kubectl delete subscription my-frappe-operator -n operators
+kubectl delete clusterserviceversion $(kubectl get csv -n operators | grep frappe-operator | awk '{print $1}') -n operators
+```
+
+**If installed via Helm:**
+```bash
+helm uninstall frappe-operator --namespace frappe-operator-system
+kubectl delete namespace frappe-operator-system
+```
+
+**If installed via kubectl (install.yaml):**
+```bash
+kubectl delete -f https://github.com/vyogotech/frappe-operator/releases/latest/download/install.yaml
+```
 
 ## Documentation
 
@@ -106,24 +178,6 @@ Check the [`examples/`](examples/) directory for ready-to-use configurations:
 | **SiteJob** | Run bench commands | [API Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitejob) |
 
 [See all resources →](https://vyogotech.github.io/frappe-operator/api-reference)
-
-## Default Image Configuration & Externalization
-
-By default, the operator deploys sites and benches using our pre-built production-ready images:
-* **Frappe / ERPNext**: `ghcr.io/vyogotech/erpnext-for-operator:version-16`
-
-### Externalization & Customization
-You can dynamically override all default operator images at runtime without rebuilding the operator code. This can be configured in two ways:
-
-1. **Environment Variables**: Define any of the following environment variables on the operator controller deployment:
-   * `DEFAULT_FRAPPE_IMAGE` (defaults to `ghcr.io/vyogotech/erpnext-for-operator:version-16`)
-   * `DEFAULT_BENCH_IMAGE` (defaults to `ghcr.io/vyogotech/erpnext-for-operator:version-16`)
-   * `DEFAULT_MARIADB_IMAGE` (defaults to `docker.io/library/mariadb:10.6`)
-   * `DEFAULT_POSTGRES_IMAGE` (defaults to `docker.io/library/postgres:15-alpine`)
-   * `DEFAULT_REDIS_IMAGE` (defaults to `docker.io/library/redis:7-alpine`)
-   * `DEFAULT_NGINX_IMAGE` (defaults to `docker.io/library/nginx:1.25-alpine`)
-2. **ConfigMap Defaults**: Define `defaultFrappeImage` (and others) in the `frappe-operator-config` ConfigMap.
-3. **Bench Override**: Set `spec.imageConfig.repository` and `spec.imageConfig.tag` directly on a `FrappeBench` resource.
 
 ## Requirements
 
@@ -174,12 +228,38 @@ The project uses a flexible configuration system for testing that eliminates har
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+> [!NOTE]
+> Frappe Operator is licensed under the Elastic License 2.0. Contributions are accepted under the same license, and contributors may be asked to sign a Contributor License Agreement (CLA). See [LICENSING.md](LICENSING.md).
+
 ## License
 
-Apache License 2.0 - see [LICENSE](LICENSE) for details.
+Frappe Operator is licensed under the **Elastic License 2.0 (ELv2)** — a
+**source-available** license. See [LICENSE](LICENSE) for the full text and
+[LICENSING.md](LICENSING.md) for a plain-English breakdown.
+
+- ✅ **Free** to use, self-host, modify, and redistribute — including in
+  production for your own organization and your own dedicated customer instances.
+- 💼 **A commercial license is required** to offer Frappe Operator to third
+  parties as a **hosted or managed service** (e.g. a Frappe/ERPNext cloud,
+  managed hosting, or multi-tenant SaaS built on its functionality).
+
+Every release before `v4.2.0` (v4.1.x and earlier) was published under the Apache License 2.0
+and remain available under those terms; this change applies going forward.
+
+Frappe Operator orchestrates Frappe (MIT) and ERPNext (GPLv3) at arm's length as
+separate processes/containers — see [LICENSING.md](LICENSING.md#relationship-to-frappe-and-erpnext).
+
+📬 **Commercial / managed-hosting inquiries:** [dev@vyogo.tech](mailto:dev@vyogo.tech) · 🌐 [vyogo.tech](https://vyogo.tech)
+
+## Trademarks
+
+**Vyogo™** and **Vyogo Cloud™** are trademarks of Vyogo. The Elastic License 2.0
+grants rights to the **software**, not to the **marks** — you may refer to the
+project by name, but you may not use the Vyogo marks to brand your own product
+or a managed service, or to imply endorsement. See **[TRADEMARK.md](TRADEMARK.md)**
+for the full policy. "Frappe" and "ERPNext" are trademarks of Frappe Technologies
+Pvt. Ltd.; this project is not affiliated with or endorsed by them.
 
 ---
-
-**Built with ❤️ by [Vyogo Technologies](https://vyogo.tech)**
 
 ⭐ **[Star this project](https://github.com/vyogotech/frappe-operator)** if you find it useful!
