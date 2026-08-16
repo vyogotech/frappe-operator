@@ -71,12 +71,16 @@ func (p *ExternalProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1
 		return nil, fmt.Errorf("database host is required (either in spec or secret)")
 	}
 
-	if port == "" {
-		port = "3306" // Default for MariaDB/MySQL
-	}
-
 	if dbType == "mariadb" && site.Spec.DBConfig.Provider != "external" && site.Spec.DBConfig.Provider != "" {
 		dbType = site.Spec.DBConfig.Provider
+	}
+
+	if port == "" {
+		if dbType == "postgres" || site.Spec.DBConfig.Provider == "postgres" {
+			port = "5432"
+		} else {
+			port = "3306" // Default for MariaDB/MySQL
+		}
 	}
 
 	return &DatabaseInfo{

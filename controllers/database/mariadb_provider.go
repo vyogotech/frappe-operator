@@ -245,7 +245,53 @@ func (p *MariaDBProviderUnstructured) GetCredentials(ctx context.Context, site *
 
 // Cleanup removes database resources
 func (p *MariaDBProviderUnstructured) Cleanup(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
-	// Resources will be automatically cleaned up via owner references
+	if site.Spec.DeletionPolicy != "Delete" {
+		// DeletionPolicy is Retain (default), do not delete database resources
+		return nil
+	}
+
+	// Manual cleanup of orphaned resources because they no longer have OwnerReferences
+	resources := []struct {
+		gvk  schema.GroupVersionKind
+		name string
+	}{
+		{GrantGVK, fmt.Sprintf("%s-grant", site.Name)},
+		{UserGVK, fmt.Sprintf("%s-user", site.Name)},
+		{DatabaseGVK, fmt.Sprintf("%s-db", site.Name)},
+	}
+
+	for _, res := range resources {
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(res.gvk)
+		obj.SetName(res.name)
+		obj.SetNamespace(site.Namespace)
+		if err := p.client.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete %s %s: %w", res.gvk.Kind, res.name, err)
+		}
+	}
+
+	// Delete the password secret
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-db-password", site.Name),
+			Namespace: site.Namespace,
+		},
+	}
+	if err := p.client.Delete(ctx, secret); err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete password secret: %w", err)
+	}
+
+	// If dedicated mode, also delete the MariaDB instance
+	if site.Spec.DBConfig.Mode == "dedicated" {
+		mariadb := &unstructured.Unstructured{}
+		mariadb.SetGroupVersionKind(MariaDBGVK)
+		mariadb.SetName(fmt.Sprintf("%s-mariadb", site.Name))
+		mariadb.SetNamespace(site.Namespace)
+		if err := p.client.Delete(ctx, mariadb); err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete dedicated MariaDB instance: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -373,9 +419,10 @@ func (p *MariaDBProviderUnstructured) createDedicatedMariaDB(ctx context.Context
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(site, mariadb, p.scheme); err != nil {
-		return "", "", err
-	}
+	// Do not set OwnerReference so that Retain policy works
+	// if err := controllerutil.SetControllerReference(site, mariadb, p.scheme); err != nil {
+	// 	return "", "", err
+	// }
 
 	if err := p.client.Create(ctx, mariadb); err != nil {
 		return "", "", fmt.Errorf("failed to create MariaDB instance: %w", err)
@@ -405,9 +452,10 @@ func (p *MariaDBProviderUnstructured) ensureDatabaseCR(ctx context.Context, site
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(site, database, p.scheme); err != nil {
-		return err
-	}
+	// Do not set OwnerReference for Database to support DeletionPolicy: Retain
+	// if err := controllerutil.SetControllerReference(site, database, p.scheme); err != nil {
+	// 	return err
+	// }
 
 	// Check if exists
 	existing := &unstructured.Unstructured{}
@@ -419,6 +467,13 @@ func (p *MariaDBProviderUnstructured) ensureDatabaseCR(ctx context.Context, site
 
 	if errors.IsNotFound(err) {
 		return p.client.Create(ctx, database)
+	} else if err == nil {
+		// Strip OwnerReference from legacy sites to ensure Retain policy works
+		if len(existing.GetOwnerReferences()) > 0 {
+			existing.SetOwnerReferences(nil)
+			return p.client.Update(ctx, existing)
+		}
+		return nil
 	}
 
 	return err
@@ -444,13 +499,22 @@ func (p *MariaDBProviderUnstructured) ensureUserCR(ctx context.Context, site *vy
 		passwordSecret.StringData = map[string]string{
 			"password": p.generatePassword(16),
 		}
-		if err := controllerutil.SetControllerReference(site, passwordSecret, p.scheme); err != nil {
-			return "", err
-		}
+		// Do not set OwnerReference to support DeletionPolicy: Retain
+		// if err := controllerutil.SetControllerReference(site, passwordSecret, p.scheme); err != nil {
+		// 	return "", err
+		// }
 		if err := p.client.Create(ctx, passwordSecret); err != nil {
 			return "", err
 		}
-	} else if err != nil {
+	} else if err == nil {
+		// Strip OwnerReference from legacy sites
+		if len(passwordSecret.GetOwnerReferences()) > 0 {
+			passwordSecret.SetOwnerReferences(nil)
+			if err := p.client.Update(ctx, passwordSecret); err != nil {
+				return "", err
+			}
+		}
+	} else {
 		return "", err
 	}
 
@@ -478,9 +542,10 @@ func (p *MariaDBProviderUnstructured) ensureUserCR(ctx context.Context, site *vy
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(site, user, p.scheme); err != nil {
-		return "", err
-	}
+	// Do not set OwnerReference to support DeletionPolicy: Retain
+	// if err := controllerutil.SetControllerReference(site, user, p.scheme); err != nil {
+	// 	return "", err
+	// }
 
 	// Check if exists
 	existingUser := &unstructured.Unstructured{}
@@ -494,7 +559,15 @@ func (p *MariaDBProviderUnstructured) ensureUserCR(ctx context.Context, site *vy
 		if err := p.client.Create(ctx, user); err != nil {
 			return "", err
 		}
-	} else if err != nil {
+	} else if err == nil {
+		// Strip OwnerReference from legacy sites
+		if len(existingUser.GetOwnerReferences()) > 0 {
+			existingUser.SetOwnerReferences(nil)
+			if err := p.client.Update(ctx, existingUser); err != nil {
+				return "", err
+			}
+		}
+	} else {
 		return "", err
 	}
 
@@ -535,9 +608,10 @@ func (p *MariaDBProviderUnstructured) ensureGrantCR(ctx context.Context, site *v
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(site, grant, p.scheme); err != nil {
-		return err
-	}
+	// Do not set OwnerReference to support DeletionPolicy: Retain
+	// if err := controllerutil.SetControllerReference(site, grant, p.scheme); err != nil {
+	// 	return err
+	// }
 
 	// Check if exists
 	existing := &unstructured.Unstructured{}
@@ -549,6 +623,13 @@ func (p *MariaDBProviderUnstructured) ensureGrantCR(ctx context.Context, site *v
 
 	if errors.IsNotFound(err) {
 		return p.client.Create(ctx, grant)
+	} else if err == nil {
+		// Strip OwnerReference from legacy sites
+		if len(existing.GetOwnerReferences()) > 0 {
+			existing.SetOwnerReferences(nil)
+			return p.client.Update(ctx, existing)
+		}
+		return nil
 	}
 
 	return err

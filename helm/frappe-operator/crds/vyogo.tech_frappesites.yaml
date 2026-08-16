@@ -180,6 +180,17 @@ spec:
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                 type: object
+              deletionPolicy:
+                default: Retain
+                description: |-
+                  DeletionPolicy defines what happens to database resources when FrappeSite CR is deleted.
+                  Applies to both MariaDB and PostgreSQL.
+                  - Retain (default): Deletes Ingress/Route only to take site offline. Preserves Database & Secrets for GitOps safety.
+                  - Delete: Performs hard deletion of Database and User.
+                enum:
+                - Retain
+                - Delete
+                type: string
               domain:
                 description: |-
                   Domain is the external domain for ingress

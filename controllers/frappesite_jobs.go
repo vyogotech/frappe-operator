@@ -254,6 +254,12 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
 	logger := log.FromContext(ctx)
 
+	// Skip site deletion job if DeletionPolicy is Retain
+	if site.Spec.DeletionPolicy != "Delete" {
+		logger.Info("DeletionPolicy is Retain. Skipping bench drop-site job to preserve data.")
+		return nil
+	}
+
 	// Get the referenced bench
 	bench := &vyogotechv1alpha1.FrappeBench{}
 	benchKey := types.NamespacedName{

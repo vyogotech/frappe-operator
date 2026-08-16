@@ -71,7 +71,7 @@ func NewProvider(config vyogotechv1alpha1.DatabaseConfig, client client.Client, 
 	case "mariadb":
 		return NewMariaDBProvider(client, scheme), nil
 	case "postgres":
-		return nil, fmt.Errorf("PostgreSQL provider not yet implemented - planned for v1.1.0")
+		return NewPostgresProvider(client, scheme), nil
 	case "sqlite":
 		return NewSQLiteProvider(client, scheme), nil
 	case "external":

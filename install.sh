@@ -12,6 +12,7 @@ NAMESPACE="${NAMESPACE:-frappe-operator-system}"
 IMAGE_REPO="${IMAGE_REPO:-ghcr.io/vyogotech/frappe-operator}"
 IMAGE_TAG="${IMAGE_TAG:-v1.0.0}"
 INSTALL_MARIADB_CRDS="${INSTALL_MARIADB_CRDS:-true}"
+INSTALL_POSTGRES_OPERATOR="${INSTALL_POSTGRES_OPERATOR:-false}"
 INSTALL_INGRESS="${INSTALL_INGRESS:-false}"
 INSTALL_KEDA="${INSTALL_KEDA:-true}"
 
@@ -71,6 +72,18 @@ if [ "$INSTALL_MARIADB_CRDS" = "true" ]; then
     echo "Waiting for CRDs to be established..."
     sleep 5
     kubectl wait --for condition=established --timeout=60s crd mariadbs.k8s.mariadb.com || true
+    echo ""
+fi
+
+# Step 1.5: Install Percona Postgres Operator
+if [ "$INSTALL_POSTGRES_OPERATOR" = "true" ]; then
+    echo -e "${YELLOW}Step 1.5: Installing Percona Postgres Operator (including CRDs)...${NC}"
+    
+    if kubectl apply --server-side -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/v2.3.1/deploy/bundle.yaml 2>/dev/null; then
+        echo -e "${GREEN}✓ Percona Postgres Operator installed${NC}"
+    else
+        echo -e "${RED}✗ Failed to install Percona Postgres Operator${NC}"
+    fi
     echo ""
 fi
 

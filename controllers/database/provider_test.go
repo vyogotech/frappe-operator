@@ -75,18 +75,16 @@ func TestNewProvider(t *testing.T) {
 		_ = p
 	})
 
-	t.Run("postgres returns error", func(t *testing.T) {
+	t.Run("postgres", func(t *testing.T) {
 		config := vyogotechv1alpha1.DatabaseConfig{Provider: "postgres"}
 		p, err := NewProvider(config, client, scheme)
-		if err == nil {
-			t.Fatal("NewProvider(postgres) expected error")
+		if err != nil {
+			t.Fatalf("NewProvider(postgres) error: %v", err)
 		}
-		if p != nil {
-			t.Error("NewProvider(postgres) should return nil provider")
+		if p == nil {
+			t.Fatal("NewProvider(postgres) returned nil provider")
 		}
-		if err != nil && err.Error() == "" {
-			t.Error("expected non-empty error message")
-		}
+		_ = p
 	})
 
 	t.Run("unknown provider returns error", func(t *testing.T) {

@@ -81,6 +81,15 @@ type FrappeSiteSpec struct {
 	// When true, the initialization job only performs migrations and configuration updates.
 	// +optional
 	SkipInit bool `json:"skipInit,omitempty"`
+
+	// DeletionPolicy defines what happens to database resources when FrappeSite CR is deleted.
+	// Applies to both MariaDB and PostgreSQL.
+	// - Retain (default): Deletes Ingress/Route only to take site offline. Preserves Database & Secrets for GitOps safety.
+	// - Delete: Performs hard deletion of Database and User.
+	// +kubebuilder:validation:Enum=Retain;Delete
+	// +kubebuilder:default=Retain
+	// +optional
+	DeletionPolicy string `json:"deletionPolicy,omitempty"`
 }
 
 // FrappeSitePhase represents the current phase

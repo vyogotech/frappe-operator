@@ -85,6 +85,7 @@ rbac:
   create: true
 
 # MariaDB Operator dependency
+# If you are using PostgreSQL exclusively, you can set this to false.
 mariadb-operator:
   enabled: true
   crds:
@@ -95,6 +96,11 @@ mariadb-operator:
   # Override MariaDB Operator values if needed
   # webhook:
   #   enabled: false
+
+# PostgreSQL Support Note:
+# If you plan to use PostgreSQL, you must independently install the Percona PostgreSQL Operator.
+# It is not included as a Helm subchart dependency.
+# See docs/POSTGRESQL_INTEGRATION.md for details.
 
 # KEDA (Kubernetes Event Driven Autoscaler) dependency
 keda:

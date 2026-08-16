@@ -77,6 +77,7 @@ For detailed guides, visit **[vyogotech.github.io/frappe-operator](https://vyogo
 - **[OpenShift Installation](docs/INSTALL_OPENSHIFT.md)** - Step-by-step OpenShift guide
 - **[OpenShift Technical Guide](docs/openshift.md)** - Deep dive into compatibility & SCCs
 - **[MariaDB Integration Guide](docs/MARIADB_INTEGRATION.md)** - Database isolation & credentials
+- **[PostgreSQL Integration Guide](docs/POSTGRESQL_INTEGRATION.md)** - PostgreSQL support, data safety, & provisioning
 
 ## Examples
 

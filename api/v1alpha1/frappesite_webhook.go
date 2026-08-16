@@ -89,14 +89,29 @@ func (r *FrappeSite) validateSite() error {
 		}
 	}
 
-	// If dedicated mode, validate MariaDB reference
+	provider := r.Spec.DBConfig.Provider
+	if provider == "" {
+		provider = "mariadb" // Default provider
+	}
+
+	// Validate references for dedicated mode based on provider
 	if r.Spec.DBConfig.Mode == "dedicated" {
-		if r.Spec.DBConfig.MariaDBRef == nil {
-			return fmt.Errorf("dbConfig.mariaDBRef must be specified for dedicated mode")
+		if provider == "mariadb" {
+			if r.Spec.DBConfig.MariaDBRef == nil || r.Spec.DBConfig.MariaDBRef.Name == "" {
+				return fmt.Errorf("dbConfig.mariaDBRef.name must be specified for mariadb dedicated mode")
+			}
+		} else if provider == "postgres" {
+			// In dedicated mode for Postgres, we create a new PerconaPGCluster, so a PostgresRef is optional.
+			// But if one is provided, its name must not be empty.
+			if r.Spec.DBConfig.PostgresRef != nil && r.Spec.DBConfig.PostgresRef.Name == "" {
+				return fmt.Errorf("dbConfig.postgresRef.name cannot be empty if specified")
+			}
 		}
-		if r.Spec.DBConfig.MariaDBRef.Name == "" {
-			return fmt.Errorf("dbConfig.mariaDBRef.name cannot be empty")
-		}
+	}
+
+	// Validate DeletionPolicy
+	if r.Spec.DeletionPolicy != "" && r.Spec.DeletionPolicy != "Retain" && r.Spec.DeletionPolicy != "Delete" {
+		return fmt.Errorf("deletionPolicy must be either 'Retain' or 'Delete'")
 	}
 
 	return nil

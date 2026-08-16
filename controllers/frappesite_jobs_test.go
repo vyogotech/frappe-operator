@@ -100,6 +100,7 @@ var _ = Describe("FrappeSite Jobs", func() {
 		It("should create deletion job when site is marked for deletion", func() {
 			site.SetFinalizers([]string{frappeSiteFinalizer})
 			site.Spec.DBConfig = vyogotechv1alpha1.DatabaseConfig{Mode: "shared"}
+			site.Spec.DeletionPolicy = "Delete"
 			Expect(fakeClient.Create(ctx, site)).To(Succeed())
 
 			// Add MariaDB root secret for shared mode
