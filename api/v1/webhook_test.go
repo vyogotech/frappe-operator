@@ -186,6 +186,57 @@ func TestFrappeSiteValidateCreate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "postgres shared is valid without any ref",
+			site: &FrappeSite{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-site"},
+				Spec: FrappeSiteSpec{
+					SiteName: "test.local",
+					BenchRef: &NamespacedName{Name: "test-bench"},
+					DBConfig: DatabaseConfig{Provider: "postgres", Mode: "shared"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "postgres dedicated is valid without a ref (operator provisions cluster)",
+			site: &FrappeSite{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-site"},
+				Spec: FrappeSiteSpec{
+					SiteName: "test.local",
+					BenchRef: &NamespacedName{Name: "test-bench"},
+					DBConfig: DatabaseConfig{Provider: "postgres", Mode: "dedicated"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "postgres provider with a mariadbRef is rejected",
+			site: &FrappeSite{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-site"},
+				Spec: FrappeSiteSpec{
+					SiteName: "test.local",
+					BenchRef: &NamespacedName{Name: "test-bench"},
+					DBConfig: DatabaseConfig{
+						Provider:   "postgres",
+						MariaDBRef: &NamespacedName{Name: "mdb"},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid deletionPolicy is rejected",
+			site: &FrappeSite{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-site"},
+				Spec: FrappeSiteSpec{
+					SiteName:       "test.local",
+					BenchRef:       &NamespacedName{Name: "test-bench"},
+					DeletionPolicy: "Purge",
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
