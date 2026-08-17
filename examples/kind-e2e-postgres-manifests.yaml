@@ -89,9 +89,10 @@ metadata:
 spec:
   frappeVersion: "develop"
   imageConfig:
-    # Operator-compatible Frappe develop/v17 image with Postgres support.
-    repository: ghcr.io/vyogotech/frappe-postgres
-    tag: develop
+    # Operator-compatible Frappe develop/v17 image (Postgres-capable: the develop
+    # base ships psycopg2 + libpq). Published by the frappe-erpnext-images-for-operator repo.
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: v17
     pullPolicy: IfNotPresent
   redisConfig:
     type: redis

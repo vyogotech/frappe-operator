@@ -9,7 +9,7 @@ on:
       benchImage:
         description: 'Frappe develop/v17 Postgres bench image (repository:tag)'
         required: true
-        default: 'ghcr.io/vyogotech/frappe-postgres:develop'
+        default: 'ghcr.io/vyogotech/erpnext-for-operator:v17'
       perconaVersion:
         description: 'Percona PostgreSQL Operator version'
         required: true
@@ -73,8 +73,8 @@ jobs:
           # Point the example bench at the provided image.
           IMG='${{ github.event.inputs.benchImage }}'
           REPO="${IMG%:*}"; TAG="${IMG##*:}"
-          sed -e "s#repository: ghcr.io/vyogotech/frappe-postgres#repository: ${REPO}#" \
-              -e "s#tag: develop#tag: ${TAG}#" \
+          sed -e "s#repository: ghcr.io/vyogotech/erpnext-for-operator#repository: ${REPO}#" \
+              -e "s#tag: v17#tag: ${TAG}#" \
               examples/kind-e2e-postgres-manifests.yaml > /tmp/pg-manifests.yaml
           kubectl apply -f /tmp/pg-manifests.yaml
 
