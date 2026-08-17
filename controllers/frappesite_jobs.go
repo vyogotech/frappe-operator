@@ -260,6 +260,14 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1.FrappeSite) error {
 	logger := log.FromContext(ctx)
 
+	// DeletionPolicy Retain (the default) preserves the database — skip the destructive
+	// `bench drop-site` job so an accidental CR delete or a GitOps prune can't drop tenant
+	// data. The database provider's Cleanup honours the same policy for the DB/user/cluster.
+	if site.Spec.DeletionPolicy != "Delete" {
+		logger.Info("DeletionPolicy is Retain; skipping bench drop-site to preserve data", "site", site.Name)
+		return nil
+	}
+
 	// Get the referenced bench
 	bench := &vyogotechv1.FrappeBench{}
 	benchKey := types.NamespacedName{
