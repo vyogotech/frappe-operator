@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -100,6 +101,7 @@ var _ = Describe("FrappeSite Jobs", func() {
 		It("should create deletion job when site is marked for deletion", func() {
 			site.SetFinalizers([]string{frappeSiteFinalizer})
 			site.Spec.DBConfig = vyogotechv1.DatabaseConfig{Mode: "shared"}
+			site.Spec.DeletionPolicy = "Delete" // opt into the destructive drop-site path
 			Expect(fakeClient.Create(ctx, site)).To(Succeed())
 
 			// Add MariaDB root secret for shared mode
@@ -129,6 +131,20 @@ var _ = Describe("FrappeSite Jobs", func() {
 
 			job := &batchv1.Job{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name + "-delete", Namespace: site.Namespace}, job)).To(Succeed())
+		})
+
+		It("should NOT create a deletion job when DeletionPolicy is Retain (default)", func() {
+			site.SetFinalizers([]string{frappeSiteFinalizer})
+			site.Spec.DBConfig = vyogotechv1.DatabaseConfig{Mode: "shared"}
+			// DeletionPolicy left empty -> defaults to Retain semantics: preserve data.
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+
+			err := reconciler.deleteSite(ctx, site)
+			Expect(err).NotTo(HaveOccurred())
+
+			job := &batchv1.Job{}
+			getErr := fakeClient.Get(ctx, types.NamespacedName{Name: site.Name + "-delete", Namespace: site.Namespace}, job)
+			Expect(apierrors.IsNotFound(getErr)).To(BeTrue(), "Retain policy must not create a drop-site job")
 		})
 	})
 
