@@ -104,6 +104,13 @@ spec:
   deletionPolicy: Delete
 ```
 
+On PostgreSQL 15+, the `public` schema is locked to the database owner, and
+Percona seeds a per-user schema that would otherwise shadow `public`. Frappe
+requires `public`, so the operator exposes the Percona `postgres` superuser and
+runs a one-time, idempotent **configure Job** that hands the database to the app
+user (giving it `public` ownership) and sets its `search_path` to `public`. The
+site only reports `Ready` once both the cluster is `ready` and that Job succeeds.
+
 The generated cluster is `PerconaPGCluster/<site>-postgres` with:
 
 - `postgresVersion: 16`, one instance (`instance1`)
