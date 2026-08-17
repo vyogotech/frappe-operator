@@ -181,18 +181,32 @@ func TestPostgresProvider_DedicatedClusterShape(t *testing.T) {
 		t.Error("instances[0].dataVolumeClaimSpec missing")
 	}
 
-	// The Percona user name must be a DNS label (^[a-z0-9]([-a-z0-9]*[a-z0-9])?$).
+	// Users: the superuser (postgres) is exposed for the configure Job, plus the
+	// app user. Every user name must be a DNS label (^[a-z0-9]([-a-z0-9]*[a-z0-9])?$),
+	// and the app user must match generatePGUserName (for the pguser secret lookup).
 	users, _, _ := unstructured.NestedSlice(cluster.Object, "spec", "users")
-	if len(users) == 0 {
-		t.Fatal("cluster spec.users missing")
+	if len(users) < 2 {
+		t.Fatalf("cluster spec.users should include postgres + app user, got %d", len(users))
 	}
-	uname, _ := users[0].(map[string]interface{})["name"].(string)
-	if !dnsLabel.MatchString(uname) {
-		t.Errorf("Percona user name %q is not a valid DNS label", uname)
+	wantUser := p.generatePGUserName(site)
+	var sawPostgres, sawApp bool
+	for _, u := range users {
+		name, _ := u.(map[string]interface{})["name"].(string)
+		if !dnsLabel.MatchString(name) {
+			t.Errorf("Percona user name %q is not a valid DNS label", name)
+		}
+		if name == "postgres" {
+			sawPostgres = true
+		}
+		if name == wantUser {
+			sawApp = true
+		}
 	}
-	// GetCredentials must derive the same pguser secret name.
-	if got := p.generatePGUserName(site); got != uname {
-		t.Errorf("generatePGUserName=%q but cluster user=%q (must match for secret lookup)", got, uname)
+	if !sawPostgres {
+		t.Error("cluster spec.users must expose the postgres superuser for the configure job")
+	}
+	if !sawApp {
+		t.Errorf("cluster spec.users must include the app user %q", wantUser)
 	}
 }
 
