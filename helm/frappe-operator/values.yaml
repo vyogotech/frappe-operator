@@ -178,6 +178,18 @@ operatorConfig:
   #       cpu: 100m
   #       memory: 100Mi
 
+# PostgreSQL support (dbConfig.provider: postgres).
+# Dedicated mode provisions a per-site PerconaPGCluster via the Percona
+# PostgreSQL Operator (install it separately, e.g. bundle.yaml v2.3.1).
+# Leave the image overrides empty to use the operator's built-in defaults
+# (Percona PostgreSQL Operator v2.3.1 / PostgreSQL 16); set them to pin or
+# mirror images in air-gapped environments.
+postgres:
+  percona:
+    postgresImage: ""
+    pgBouncerImage: ""
+    pgBackRestImage: ""
+
 # Default MariaDB instance for Frappe sites
 mariadb:
   # Enable creation of a default shared MariaDB instance

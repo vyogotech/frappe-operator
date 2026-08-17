@@ -18,12 +18,14 @@ package database
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -141,6 +143,60 @@ func TestPostgresProvider_DeletionPolicy(t *testing.T) {
 		t.Errorf("Delete policy must create a drop-database Job: %v", err)
 	}
 }
+
+func TestPostgresProvider_DedicatedClusterShape(t *testing.T) {
+	p, _ := pgTestSetup()
+	ctx := context.Background()
+	site := pgSite()
+	site.Spec.DBConfig.Mode = "dedicated"
+
+	info, err := p.EnsureDatabase(ctx, site)
+	if err != nil {
+		t.Fatalf("EnsureDatabase(dedicated): %v", err)
+	}
+	if info.Host == "" || info.Port != "5432" {
+		t.Fatalf("unexpected DatabaseInfo: %+v", info)
+	}
+
+	cluster := &unstructured.Unstructured{}
+	cluster.SetGroupVersionKind(PerconaPGClusterGVK)
+	if err := p.client.Get(ctx, types.NamespacedName{Name: "pgsite-postgres", Namespace: "default"}, cluster); err != nil {
+		t.Fatalf("expected PerconaPGCluster: %v", err)
+	}
+
+	// The Percona CRD requires postgresVersion, instances[].dataVolumeClaimSpec and
+	// backups.pgbackrest.repos — assert the operator emits all of them.
+	if _, found, _ := unstructured.NestedInt64(cluster.Object, "spec", "postgresVersion"); !found {
+		t.Error("cluster spec.postgresVersion missing")
+	}
+	repos, found, _ := unstructured.NestedSlice(cluster.Object, "spec", "backups", "pgbackrest", "repos")
+	if !found || len(repos) == 0 {
+		t.Error("cluster spec.backups.pgbackrest.repos missing")
+	}
+	insts, found, _ := unstructured.NestedSlice(cluster.Object, "spec", "instances")
+	if !found || len(insts) == 0 {
+		t.Fatal("cluster spec.instances missing")
+	}
+	if _, ok := insts[0].(map[string]interface{})["dataVolumeClaimSpec"]; !ok {
+		t.Error("instances[0].dataVolumeClaimSpec missing")
+	}
+
+	// The Percona user name must be a DNS label (^[a-z0-9]([-a-z0-9]*[a-z0-9])?$).
+	users, _, _ := unstructured.NestedSlice(cluster.Object, "spec", "users")
+	if len(users) == 0 {
+		t.Fatal("cluster spec.users missing")
+	}
+	uname, _ := users[0].(map[string]interface{})["name"].(string)
+	if !dnsLabel.MatchString(uname) {
+		t.Errorf("Percona user name %q is not a valid DNS label", uname)
+	}
+	// GetCredentials must derive the same pguser secret name.
+	if got := p.generatePGUserName(site); got != uname {
+		t.Errorf("generatePGUserName=%q but cluster user=%q (must match for secret lookup)", got, uname)
+	}
+}
+
+var dnsLabel = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 
 func TestPostgresProvider_GenerateDBName(t *testing.T) {
 	p, _ := pgTestSetup()
