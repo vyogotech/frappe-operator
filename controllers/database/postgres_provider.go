@@ -156,11 +156,23 @@ func (p *PostgresProvider) IsReady(ctx context.Context, site *vyogotechv1.Frappe
 		if err != nil || !found {
 			return false, nil
 		}
-		if status == "ready" {
-			logger.Info("Dedicated Postgres cluster is ready")
-			return true, nil
+		if status != "ready" {
+			return false, nil
 		}
-		return false, nil
+
+		// Cluster is up, but Frappe still can't use it until the app user owns the
+		// database and defaults to the `public` schema. Run (and gate on) a one-time
+		// configure Job that fixes Percona's PG15+ schema locking.
+		configured, err := p.ensureDedicatedConfigured(ctx, site)
+		if err != nil {
+			return false, err
+		}
+		if !configured {
+			logger.Info("Dedicated Postgres cluster ready; waiting on schema configure job")
+			return false, nil
+		}
+		logger.Info("Dedicated Postgres cluster is ready and configured")
+		return true, nil
 	}
 
 	return false, fmt.Errorf("unknown mode: %s", mode)
@@ -408,6 +420,12 @@ func (p *PostgresProvider) ensureDedicatedPostgres(ctx context.Context, site *vy
 					},
 				},
 				"users": []interface{}{
+					// Expose the postgres superuser so the operator can run a one-time
+					// configure Job (Frappe requires the `public` schema and the app user
+					// to own it; Percona locks public to the DB owner on PG15+).
+					map[string]interface{}{
+						"name": "postgres",
+					},
 					map[string]interface{}{
 						"name": dbUser,
 						"databases": []interface{}{
@@ -456,10 +474,89 @@ func (p *PostgresProvider) ensureDedicatedPostgres(ctx context.Context, site *vy
 		return "", "", err
 	}
 
-	host := fmt.Sprintf("%s-pgbouncer.%s.svc.cluster.local", clusterName, site.Namespace)
+	// Connect Frappe to the PRIMARY service, not pgbouncer. Percona's pgBouncer
+	// defaults to transaction pooling, which breaks `bench new-site`/`bench migrate`
+	// (session-level DDL, SET, and prepared statements). The <cluster>-primary
+	// service is a stable, direct session connection to the current primary — which
+	// is what Frappe expects on PostgreSQL.
+	host := fmt.Sprintf("%s-primary.%s.svc.cluster.local", clusterName, site.Namespace)
 	port := "5432"
 
 	return host, port, nil
+}
+
+// ensureDedicatedConfigured runs a one-time, idempotent Job (as the Percona
+// postgres superuser) that makes the dedicated cluster usable by Frappe:
+//   - hand ownership of the app database to the app user, so it owns the `public`
+//     schema too (PostgreSQL 15+ locks public to the database owner) and can
+//     create tables there;
+//   - default the app user's search_path to `public`, so unqualified objects land
+//     in public (Percona seeds a per-user schema that would otherwise shadow it).
+//
+// It returns true only once the Job has succeeded. Requires the superuser secret
+// `<cluster>-pguser-postgres`, which exists because the cluster spec declares the
+// postgres user.
+func (p *PostgresProvider) ensureDedicatedConfigured(ctx context.Context, site *vyogotechv1.FrappeSite) (bool, error) {
+	clusterName := fmt.Sprintf("%s-postgres", site.Name)
+	dbName := p.generateDBName(site)
+	dbUser := p.generatePGUserName(site)
+	superSecretName := fmt.Sprintf("%s-pguser-postgres", clusterName)
+
+	// The superuser secret must exist before we can configure anything.
+	superSecret := &corev1.Secret{}
+	if err := p.client.Get(ctx, types.NamespacedName{Name: superSecretName, Namespace: site.Namespace}, superSecret); err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	jobName := fmt.Sprintf("%s-db-configure", site.Name)
+	job := &batchv1.Job{}
+	err := p.client.Get(ctx, types.NamespacedName{Name: jobName, Namespace: site.Namespace}, job)
+	if err == nil {
+		// Job exists — report success only when it has completed.
+		if job.Status.Succeeded > 0 {
+			return true, nil
+		}
+		if job.Status.Failed > 0 {
+			return false, fmt.Errorf("dedicated postgres configure job failed")
+		}
+		return false, nil
+	}
+	if !errors.IsNotFound(err) {
+		return false, err
+	}
+
+	// Create the configure Job. Connect to the app database as the superuser and
+	// grant ownership + set the search_path. Idempotent (safe to re-run).
+	host := fmt.Sprintf("%s-primary.%s.svc.cluster.local", clusterName, site.Namespace)
+	script := fmt.Sprintf(`set -e
+export PGPASSWORD="$(cat /tmp/super/password)"
+SUPER="$(cat /tmp/super/user)"
+psql -v ON_ERROR_STOP=1 -h "%s" -p 5432 -U "$SUPER" -d "%s" <<SQL
+ALTER DATABASE "%s" OWNER TO "%s";
+GRANT ALL ON SCHEMA public TO "%s";
+ALTER ROLE "%s" IN DATABASE "%s" SET search_path TO public;
+SQL
+`, host, dbName, dbName, dbUser, dbUser, dbUser, dbName)
+
+	container := resources.NewContainerBuilder("pg-configure", "postgres:16-alpine").
+		WithCommand("sh", "-c").
+		WithArgs(script).
+		WithVolumeMount("super", "/tmp/super").
+		Build()
+
+	configureJob := resources.NewJobBuilder(jobName, site.Namespace).
+		WithLabels(map[string]string{"app": "frappe", "site": site.Name}).
+		WithContainer(container).
+		WithSecretVolume("super", superSecretName, resources.Int32Ptr(0444)).
+		MustBuild()
+
+	if err := p.client.Create(ctx, configureJob); err != nil {
+		return false, err
+	}
+	return false, nil
 }
 
 func (p *PostgresProvider) getSharedHostPort(ctx context.Context, site *vyogotechv1.FrappeSite) (string, string, error) {
