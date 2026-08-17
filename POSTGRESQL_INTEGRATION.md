@@ -107,7 +107,10 @@ spec:
 The generated cluster is `PerconaPGCluster/<site>-postgres` with:
 
 - `postgresVersion: 16`, one instance (`instance1`)
-- a pgBouncer proxy (Frappe connects through `<site>-postgres-pgbouncer`)
+- a pgBouncer proxy (deployed for general use). **Frappe itself connects to the
+  direct `<site>-postgres-primary` service**, not pgBouncer: Percona's pgBouncer
+  defaults to transaction pooling, which breaks `bench new-site`/`bench migrate`
+  (session-level DDL and prepared statements)
 - a PVC-backed pgBackRest repo (`repo1`) so backups work out of the box
 - a role whose credentials the Percona operator writes to
   `Secret/<site>-postgres-pguser-<user>`
