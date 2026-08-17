@@ -145,10 +145,12 @@ Env vars: `FRAPPE_PERCONA_POSTGRES_IMAGE`, `FRAPPE_PERCONA_PGBOUNCER_IMAGE`,
 
 ## Building a Postgres bench image
 
-`provider: postgres` needs a Frappe build from `develop` (→ v17). Build an
-operator-compatible image the same way as the base image (so the entrypoint is
-compatible with the operator's PVC mount), from Frappe `develop`, and point the
-bench at it:
+`provider: postgres` needs a Frappe build from `develop` (→ v17). The
+`frappe-erpnext-images-for-operator` repo publishes an operator-compatible
+develop image; its `develop` base already ships psycopg2 + libpq + psql, so it is
+Postgres-capable out of the box. Build/publish it by running that repo's
+`container-build.yml` workflow with `frappe_version=develop` (tag `v17`), then
+point the bench at it:
 
 ```yaml
 apiVersion: vyogo.tech/v1
@@ -158,8 +160,8 @@ metadata:
 spec:
   frappeVersion: "develop"
   imageConfig:
-    repository: ghcr.io/vyogotech/frappe-postgres
-    tag: develop
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: v17
     pullPolicy: IfNotPresent
 ```
 
