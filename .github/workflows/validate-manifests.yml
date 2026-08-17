@@ -52,6 +52,9 @@ jobs:
           # We might need mariadb and keda CRDs to successfully dry-run test files that reference them
           # Install mariadb CRDs
           kubectl apply -f https://github.com/mariadb-operator/mariadb-operator/releases/latest/download/crds.yaml
+          # Install Percona PostgreSQL Operator CRDs (for the postgres examples that
+          # reference pgv2.percona.com/v2 PerconaPGCluster). CRDs only — no operator.
+          kubectl apply --server-side -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/v2.3.1/deploy/crd.yaml
           
       - name: Validate examples/ (Server Dry Run)
         run: |

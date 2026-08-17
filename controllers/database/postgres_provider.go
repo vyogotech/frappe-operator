@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash/fnv"
+	"os"
 	"regexp"
 	"strings"
 
@@ -47,6 +48,24 @@ var (
 	}
 )
 
+// Percona PostgreSQL Operator component images for dedicated-mode clusters.
+// Overridable via env so operators can pin/mirror images without a rebuild.
+// Defaults track Percona PostgreSQL Operator v2.3.1 (PostgreSQL 16).
+const (
+	defaultPerconaPGVersion       = 16
+	defaultPerconaPostgresImage   = "percona/percona-postgresql-operator:2.3.1-ppg16-postgres"
+	defaultPerconaPGBouncerImage  = "percona/percona-postgresql-operator:2.3.1-ppg16-pgbouncer"
+	defaultPerconaPGBackRestImage = "percona/percona-postgresql-operator:2.3.1-ppg16-pgbackrest"
+	defaultDedicatedStorageSize   = "2Gi"
+)
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
 type PostgresProvider struct {
 	client client.Client
 	scheme *runtime.Scheme
@@ -67,15 +86,16 @@ func (p *PostgresProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1
 	}
 
 	dbName := p.generateDBName(site)
-	dbUser := p.generateDBUser(site)
 
 	var host, port string
 	var err error
 
 	if mode == "shared" {
-		host, port, err = p.ensureSharedPostgres(ctx, site, dbName, dbUser)
+		// Shared mode provisions via psql, where underscore-form identifiers are valid.
+		host, port, err = p.ensureSharedPostgres(ctx, site, dbName, p.generateDBUser(site))
 	} else if mode == "dedicated" {
-		host, port, err = p.ensureDedicatedPostgres(ctx, site, dbName, dbUser)
+		// Dedicated mode goes through the Percona CRD, which requires a DNS-label user.
+		host, port, err = p.ensureDedicatedPostgres(ctx, site, dbName, p.generatePGUserName(site))
 	} else {
 		return nil, fmt.Errorf("unsupported database mode: %s", mode)
 	}
@@ -156,7 +176,7 @@ func (p *PostgresProvider) GetCredentials(ctx context.Context, site *vyogotechv1
 	if mode == "dedicated" {
 		// Percona Operator generates <cluster>-pguser-<username> secret
 		clusterName := fmt.Sprintf("%s-postgres", site.Name)
-		dbUser := p.generateDBUser(site)
+		dbUser := p.generatePGUserName(site)
 		secretName = fmt.Sprintf("%s-pguser-%s", clusterName, dbUser)
 	}
 
@@ -179,6 +199,7 @@ func (p *PostgresProvider) GetCredentials(ctx context.Context, site *vyogotechv1
 
 	dbUser := p.generateDBUser(site)
 	if mode == "dedicated" {
+		dbUser = p.generatePGUserName(site)
 		if userBytes, ok := secret.Data["user"]; ok {
 			dbUser = string(userBytes)
 		}
@@ -347,6 +368,27 @@ psql -h "%s" -p "%s" -U "$(cat /tmp/creds/user)" -d postgres -c "CREATE DATABASE
 func (p *PostgresProvider) ensureDedicatedPostgres(ctx context.Context, site *vyogotechv1.FrappeSite, dbName, dbUser string) (string, string, error) {
 	clusterName := fmt.Sprintf("%s-postgres", site.Name)
 
+	// Storage size for the data volume and the pgBackRest repo volume.
+	storageSize := defaultDedicatedStorageSize
+	if site.Spec.DBConfig.StorageSize != nil {
+		storageSize = site.Spec.DBConfig.StorageSize.String()
+	}
+
+	pvcSpec := func(size string) map[string]interface{} {
+		return map[string]interface{}{
+			"accessModes": []interface{}{"ReadWriteOnce"},
+			"resources": map[string]interface{}{
+				"requests": map[string]interface{}{
+					"storage": size,
+				},
+			},
+		}
+	}
+
+	// A complete, CRD-valid PerconaPGCluster: the schema requires postgresVersion,
+	// instances[].dataVolumeClaimSpec and backups.pgbackrest.repos. We provision a
+	// single instance with a PVC-backed pgBackRest repo (repo1) so backups work
+	// out of the box, and a pgBouncer proxy that Frappe connects through.
 	cluster := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "pgv2.percona.com/v2",
@@ -356,10 +398,13 @@ func (p *PostgresProvider) ensureDedicatedPostgres(ctx context.Context, site *vy
 				"namespace": site.Namespace,
 			},
 			"spec": map[string]interface{}{
+				"image":           envOr("FRAPPE_PERCONA_POSTGRES_IMAGE", defaultPerconaPostgresImage),
+				"postgresVersion": int64(defaultPerconaPGVersion),
 				"instances": []interface{}{
 					map[string]interface{}{
-						"name":     "instance1",
-						"replicas": 1,
+						"name":                "instance1",
+						"replicas":            int64(1),
+						"dataVolumeClaimSpec": pvcSpec(storageSize),
 					},
 				},
 				"users": []interface{}{
@@ -367,6 +412,25 @@ func (p *PostgresProvider) ensureDedicatedPostgres(ctx context.Context, site *vy
 						"name": dbUser,
 						"databases": []interface{}{
 							dbName,
+						},
+					},
+				},
+				"proxy": map[string]interface{}{
+					"pgBouncer": map[string]interface{}{
+						"image":    envOr("FRAPPE_PERCONA_PGBOUNCER_IMAGE", defaultPerconaPGBouncerImage),
+						"replicas": int64(1),
+					},
+				},
+				"backups": map[string]interface{}{
+					"pgbackrest": map[string]interface{}{
+						"image": envOr("FRAPPE_PERCONA_PGBACKREST_IMAGE", defaultPerconaPGBackRestImage),
+						"repos": []interface{}{
+							map[string]interface{}{
+								"name": "repo1",
+								"volume": map[string]interface{}{
+									"volumeClaimSpec": pvcSpec(storageSize),
+								},
+							},
 						},
 					},
 				},
@@ -426,6 +490,15 @@ func (p *PostgresProvider) generateDBName(site *vyogotechv1.FrappeSite) string {
 
 func (p *PostgresProvider) generateDBUser(site *vyogotechv1.FrappeSite) string {
 	return p.generateDBName(site)
+}
+
+// generatePGUserName returns a PostgreSQL role name for dedicated (Percona) mode.
+// The Percona CRD constrains spec.users[].name to a DNS-label
+// (^[a-z0-9]([-a-z0-9]*[a-z0-9])?$) because it derives the credential Secret name
+// (<cluster>-pguser-<name>) from it — so the underscore-prefixed generateDBName form
+// is invalid here. We use a stable, lowercase, label-safe name derived from the site.
+func (p *PostgresProvider) generatePGUserName(site *vyogotechv1.FrappeSite) string {
+	return "u" + p.hashString(site.Namespace + "/" + site.Name)[:8]
 }
 
 func (p *PostgresProvider) hashString(s string) string {

@@ -82,6 +82,17 @@ func (r *FrappeSite) validateSite() error {
 		return fmt.Errorf("benchRef.name cannot be empty")
 	}
 
+	// Validate database provider (empty defaults to mariadb)
+	provider := r.Spec.DBConfig.Provider
+	if provider == "" {
+		provider = "mariadb"
+	}
+	switch provider {
+	case "mariadb", "postgres", "sqlite", "external":
+	default:
+		return fmt.Errorf("dbConfig.provider must be one of 'mariadb', 'postgres', 'sqlite', 'external'")
+	}
+
 	// Validate database mode (empty DBConfig is valid; defaults to shared)
 	if r.Spec.DBConfig.Mode != "" {
 		if r.Spec.DBConfig.Mode != "shared" && r.Spec.DBConfig.Mode != "dedicated" {
@@ -89,14 +100,36 @@ func (r *FrappeSite) validateSite() error {
 		}
 	}
 
-	// If dedicated mode, validate MariaDB reference
+	// Provider-specific reference requirements for dedicated mode.
 	if r.Spec.DBConfig.Mode == "dedicated" {
-		if r.Spec.DBConfig.MariaDBRef == nil {
-			return fmt.Errorf("dbConfig.mariaDBRef must be specified for dedicated mode")
+		switch provider {
+		case "mariadb":
+			// MariaDB dedicated references an existing MariaDB CR.
+			if r.Spec.DBConfig.MariaDBRef == nil || r.Spec.DBConfig.MariaDBRef.Name == "" {
+				return fmt.Errorf("dbConfig.mariadbRef.name must be specified for dedicated MariaDB mode")
+			}
+		case "postgres":
+			// PostgreSQL dedicated provisions a per-site PerconaPGCluster; no ref required.
+			// If postgresRef is given, it must carry a name.
+			if r.Spec.DBConfig.PostgresRef != nil && r.Spec.DBConfig.PostgresRef.Name == "" {
+				return fmt.Errorf("dbConfig.postgresRef.name cannot be empty when postgresRef is set")
+			}
+		case "sqlite", "external":
+			return fmt.Errorf("dbConfig.mode 'dedicated' is not supported for provider '%s'", provider)
 		}
-		if r.Spec.DBConfig.MariaDBRef.Name == "" {
-			return fmt.Errorf("dbConfig.mariaDBRef.name cannot be empty")
-		}
+	}
+
+	// A postgresRef only makes sense for the postgres provider; a mariadbRef only for mariadb.
+	if provider != "postgres" && r.Spec.DBConfig.PostgresRef != nil {
+		return fmt.Errorf("dbConfig.postgresRef is only valid when dbConfig.provider is 'postgres'")
+	}
+	if provider != "mariadb" && r.Spec.DBConfig.MariaDBRef != nil {
+		return fmt.Errorf("dbConfig.mariadbRef is only valid when dbConfig.provider is 'mariadb'")
+	}
+
+	// Validate deletion policy (empty defaults to Retain).
+	if r.Spec.DeletionPolicy != "" && r.Spec.DeletionPolicy != "Retain" && r.Spec.DeletionPolicy != "Delete" {
+		return fmt.Errorf("deletionPolicy must be either 'Retain' or 'Delete'")
 	}
 
 	return nil
