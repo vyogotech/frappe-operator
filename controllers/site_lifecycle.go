@@ -435,6 +435,40 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 	return "", "", fmt.Errorf("unsupported database mode: %s", dbConfig.Mode)
 }
 
+// mariaDBRootSecretRef resolves the Secret (name/key/namespace) holding the MariaDB
+// root password for a site's database. DB-admin operations that must recreate the
+// database — notably `bench restore`, which otherwise prompts interactively for the
+// root password and hangs in a non-TTY Job — inject this via env rather than
+// embedding the secret in a command line. Mirrors getMariaDBRootCredentials.
+func mariaDBRootSecretRef(ctx context.Context, c client.Client, siteName, siteNamespace string, dbConfig vyogotechv1.DatabaseConfig) (name, key, namespace string, err error) {
+	if dbConfig.Mode == "dedicated" {
+		return fmt.Sprintf("%s-mariadb-root", siteName), "password", siteNamespace, nil
+	}
+
+	mariadbName := "frappe-mariadb"
+	mariadbNamespace := siteNamespace
+	if dbConfig.MariaDBRef != nil {
+		mariadbName = dbConfig.MariaDBRef.Name
+		if dbConfig.MariaDBRef.Namespace != "" {
+			mariadbNamespace = dbConfig.MariaDBRef.Namespace
+		}
+	}
+
+	cr := &unstructured.Unstructured{}
+	cr.SetGroupVersionKind(schema.GroupVersionKind{Group: "k8s.mariadb.com", Version: "v1alpha1", Kind: "MariaDB"})
+	if err := c.Get(ctx, types.NamespacedName{Name: mariadbName, Namespace: mariadbNamespace}, cr); err != nil {
+		return "", "", "", err
+	}
+	spec, _, _ := unstructured.NestedMap(cr.Object, "spec")
+	ref, _, _ := unstructured.NestedMap(spec, "rootPasswordSecretKeyRef")
+	name, _, _ = unstructured.NestedString(ref, "name")
+	key, found, _ := unstructured.NestedString(ref, "key")
+	if !found {
+		key = "password"
+	}
+	return name, key, mariadbNamespace, nil
+}
+
 // getRequeueAttempt returns the current requeue attempt from the site annotation
 func (r *FrappeSiteReconciler) getRequeueAttempt(site *vyogotechv1.FrappeSite) int {
 	if site.Annotations == nil {
