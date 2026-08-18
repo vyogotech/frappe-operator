@@ -43,6 +43,14 @@ type SiteAppSpec struct {
 	// +optional
 	// +kubebuilder:default=true
 	AutoMigrate bool `json:"autoMigrate,omitempty"`
+
+	// BackupBeforeInstall determines whether the operator takes a full backup of
+	// the site and waits for it to succeed before installing/upgrading the app.
+	// This creates a rollback point in case the install corrupts the site.
+	// Defaults to true; set false to skip (e.g. for throwaway sites).
+	// +optional
+	// +kubebuilder:default=true
+	BackupBeforeInstall bool `json:"backupBeforeInstall,omitempty"`
 }
 
 // SiteAppStatus defines the observed state of SiteApp
@@ -52,6 +60,11 @@ type SiteAppStatus struct {
 
 	// InstalledVersion stores the version or commit of the installed app.
 	InstalledVersion string `json:"installedVersion,omitempty"`
+
+	// PreBackupRef is the name of the SiteBackup taken before this install as a
+	// rollback point (set when backupBeforeInstall is enabled).
+	// +optional
+	PreBackupRef string `json:"preBackupRef,omitempty"`
 
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

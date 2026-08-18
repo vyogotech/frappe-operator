@@ -105,6 +105,13 @@ type SiteBackupStatus struct {
 	// Message provides additional information about the backup status
 	// +optional
 	Message string `json:"message,omitempty"`
+
+	// StorageLocation is where the backup artifacts were stored when off-cluster
+	// storage is configured — an "s3://bucket/prefix" URI for S3 storage. Empty
+	// for PVC-only backups. Consumers (e.g. the control plane generating presigned
+	// download URLs) read this to locate the objects.
+	// +optional
+	StorageLocation string `json:"storageLocation,omitempty"`
 }
 
 // BackupStorageConfig defines storage backend for backups

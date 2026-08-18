@@ -203,6 +203,13 @@ spec:
               phase:
                 description: Phase indicates the current phase of the backup
                 type: string
+              storageLocation:
+                description: |-
+                  StorageLocation is where the backup artifacts were stored when off-cluster
+                  storage is configured — an "s3://bucket/prefix" URI for S3 storage. Empty
+                  for PVC-only backups. Consumers (e.g. the control plane generating presigned
+                  download URLs) read this to locate the objects.
+                type: string
             type: object
         type: object
     served: true

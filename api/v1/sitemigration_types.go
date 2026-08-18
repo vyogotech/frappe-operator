@@ -33,6 +33,14 @@ type SiteMigrationSpec struct {
 	// Force determines whether to force migration even if schema is unchanged.
 	// +optional
 	Force bool `json:"force,omitempty"`
+
+	// BackupBeforeMigrate determines whether the operator takes a full backup of
+	// the site and waits for it to succeed before running `bench migrate`. This
+	// creates a rollback point in case the migration corrupts the site.
+	// Defaults to true; set false to skip.
+	// +optional
+	// +kubebuilder:default=true
+	BackupBeforeMigrate bool `json:"backupBeforeMigrate,omitempty"`
 }
 
 // SiteMigrationStatus defines the observed state of SiteMigration
@@ -42,6 +50,11 @@ type SiteMigrationStatus struct {
 
 	// JobName stores the name of the Kubernetes Job executing bench migrate.
 	JobName string `json:"jobName,omitempty"`
+
+	// PreBackupRef is the name of the SiteBackup taken before this migration as a
+	// rollback point (set when backupBeforeMigrate is enabled).
+	// +optional
+	PreBackupRef string `json:"preBackupRef,omitempty"`
 
 	// StartTime indicates when the migration started.
 	// +optional

@@ -31,11 +31,120 @@ import (
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// Frappe stores its own transient backups under "<site>/private/backups". On
+// every `bench backup`, Frappe's delete_temp_backups() lists that directory and
+// os.remove()s each entry — and is_file_old() returns True for anything that is
+// not a regular file, so a *subdirectory* makes the NEXT backup crash with
+// IsADirectoryError. The console/agent addresses each backup by a per-name
+// subdirectory ("private/backups/<name>/database.sql.gz"), which is exactly that
+// toxic case: the first backup succeeds, its leftover directory breaks all the
+// rest.
+//
+// To keep the console's addressing scheme while staying compatible with Frappe,
+// the operator relocates named per-backup artifacts to a sibling directory Frappe
+// never scans. Callers still express paths with the conventional
+// "private/backups/" segment; the operator rewrites that segment to
+// "private/vyogo-backups/" for BOTH the backup output and the restore input, so
+// the two always agree on the same physical location.
+const (
+	frappeBackupsSegment = "private/backups/"
+	vyogoBackupsSegment  = "private/vyogo-backups/"
+)
+
+// relocateNamedBackupPath rewrites the conventional "private/backups/" segment of
+// a backup/restore path to the operator's Frappe-safe "private/vyogo-backups/"
+// directory. Paths that don't contain that segment (Frappe's own flat layout,
+// custom absolute paths) are returned unchanged, so this is a no-op for anything
+// that isn't a console-style named backup.
+func relocateNamedBackupPath(p string) string {
+	return strings.Replace(p, frappeBackupsSegment, vyogoBackupsSegment, 1)
+}
+
+// ensurePreflightBackup guarantees a completed SiteBackup exists before a
+// mutating operation (app install/upgrade, bench migrate) proceeds, so there is
+// always a rollback point. It is idempotent: the backup is keyed by name (the
+// caller derives a per-generation name), so re-reconciles converge instead of
+// spawning duplicates.
+//
+// Returns (done, err):
+//   - done=true, err=nil  → a successful backup exists; the caller may proceed.
+//   - done=false, err=nil → the backup is still running; the caller should requeue.
+//   - err!=nil            → the backup failed (or a client error); the caller
+//     should fail the operation rather than mutate an un-backed-up site.
+//
+// The backup deliberately carries no owner reference: it is a restore point that
+// must outlive the SiteApp/SiteMigration that triggered it.
+func ensurePreflightBackup(ctx context.Context, c client.Client, namespace, siteName, backupName string) (bool, error) {
+	sb := &vyogotechv1.SiteBackup{}
+	err := c.Get(ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, sb)
+	if apierrors.IsNotFound(err) {
+		base := fmt.Sprintf("sites/%s/private/backups/%s", siteName, backupName)
+		sb = &vyogotechv1.SiteBackup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      backupName,
+				Namespace: namespace,
+				Labels: map[string]string{
+					"app":                  "frappe",
+					"site":                 siteName,
+					"vyogo.tech/preflight": "true",
+				},
+			},
+			Spec: vyogotechv1.SiteBackupSpec{
+				Site:                   siteName,
+				WithFiles:              true,
+				Compress:               true,
+				BackupPath:             base,
+				BackupPathDB:           base + "/database.sql.gz",
+				BackupPathConf:         base + "/site_config_backup.json",
+				BackupPathFiles:        base + "/files.tar",
+				BackupPathPrivateFiles: base + "/private-files.tar",
+			},
+		}
+		if err := c.Create(ctx, sb); err != nil && !apierrors.IsAlreadyExists(err) {
+			return false, err
+		}
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	switch sb.Status.Phase {
+	case "Succeeded":
+		return true, nil
+	case "Failed":
+		return false, fmt.Errorf("preflight backup %q failed: %s", backupName, sb.Status.Message)
+	default:
+		return false, nil
+	}
+}
+
+// benchJobEnv returns the env vars a `bench` job pod (backup, migrate, restore)
+// needs to run correctly against a site. The bench deployment/worker pods set
+// the same set; job pods historically didn't, which broke two things:
+//   - USER/HOME: bench's getpass.getuser() calls getpwuid(); when the pod runs
+//     as a uid that isn't in /etc/passwd (the operator pins runAsUser but images
+//     may build a different frappe uid, e.g. 1001), that raises
+//     "OSError: No username set in the environment". Setting USER avoids it.
+//   - PYTHONPATH: SiteApp installs apps into sites/apps on the shared PVC (not
+//     the image) and relies on this path + the generated sitecustomize.py to
+//     load them. Without it, `bench` crashes with "ModuleNotFoundError: No
+//     module named '<app>'" — e.g. a backup of a site with a SiteApp-installed
+//     app fails to load that app's commands.
+func benchJobEnv() []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{Name: "USER", Value: "frappe"},
+		{Name: "HOME", Value: "/home/frappe"},
+		{Name: "PYTHONPATH", Value: "/tmp/pip:/home/frappe/frappe-bench/sites/apps"},
+	}
+}
 
 // getBenchImage returns the image to use from the bench
 // Priority: 1. bench.spec.imageConfig, 2. operator ConfigMap defaults, 3. hardcoded constants

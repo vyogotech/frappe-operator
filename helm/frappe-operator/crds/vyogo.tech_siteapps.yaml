@@ -62,6 +62,14 @@ spec:
                 description: AutoMigrate determines whether to trigger database migration
                   after app installation. Defaults to true.
                 type: boolean
+              backupBeforeInstall:
+                default: true
+                description: |-
+                  BackupBeforeInstall determines whether the operator takes a full backup of
+                  the site and waits for it to succeed before installing/upgrading the app.
+                  This creates a rollback point in case the install corrupts the site.
+                  Defaults to true; set false to skip (e.g. for throwaway sites).
+                type: boolean
               gitBranch:
                 description: GitBranch specifies the Git branch or tag to clone (defaults
                   to "main" or "master").
@@ -159,6 +167,11 @@ spec:
               phase:
                 description: Phase represents the current state of the SiteApp (Pending,
                   Installing, Ready, Failed, Uninstalling).
+                type: string
+              preBackupRef:
+                description: |-
+                  PreBackupRef is the name of the SiteBackup taken before this install as a
+                  rollback point (set when backupBeforeInstall is enabled).
                 type: string
             type: object
         type: object

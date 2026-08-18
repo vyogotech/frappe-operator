@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -115,6 +116,118 @@ func TestSiteBackupReconciler_buildBackupArgs(t *testing.T) {
 			t.Error("expected --compress in args")
 		}
 	})
+	t.Run("normalizes backup paths for bench (strip sites/, relocate to vyogo-backups)", func(t *testing.T) {
+		// The console sends bench-root-relative paths ("sites/<site>/private/backups/<name>/..."),
+		// but the operator must (1) strip the leading "sites/" because `bench backup
+		// --backup-path*` resolves relative to the sites dir (otherwise paths double to
+		// "sites/sites/..."), and (2) relocate the "private/backups/" segment to the
+		// Frappe-safe "private/vyogo-backups/" dir (a per-backup subdir inside
+		// private/backups makes Frappe's delete_temp_backups crash on the next backup).
+		sb := &vyogotechv1.SiteBackup{
+			Spec: vyogotechv1.SiteBackupSpec{
+				Site:                   "site3.local",
+				BackupPath:             "sites/site3.local/private/backups/bk1",
+				BackupPathDB:           "sites/site3.local/private/backups/bk1/database.sql.gz",
+				BackupPathConf:         "sites/site3.local/private/backups/bk1/site_config_backup.json",
+				BackupPathFiles:        "sites/site3.local/private/backups/bk1/files.tar",
+				BackupPathPrivateFiles: "sites/site3.local/private/backups/bk1/private-files.tar",
+			},
+		}
+		args := r.buildBackupArgs(sb)
+		want := map[string]string{
+			"--backup-path":               "site3.local/private/vyogo-backups/bk1",
+			"--backup-path-db":            "site3.local/private/vyogo-backups/bk1/database.sql.gz",
+			"--backup-path-conf":          "site3.local/private/vyogo-backups/bk1/site_config_backup.json",
+			"--backup-path-files":         "site3.local/private/vyogo-backups/bk1/files.tar",
+			"--backup-path-private-files": "site3.local/private/vyogo-backups/bk1/private-files.tar",
+		}
+		for flag, expected := range want {
+			found := false
+			for i, a := range args {
+				if a == flag {
+					found = true
+					if i+1 >= len(args) || args[i+1] != expected {
+						t.Errorf("%s: expected %q, got %q", flag, expected, args[i+1])
+					}
+					if strings.HasPrefix(args[i+1], "sites/") {
+						t.Errorf("%s: value still has leading sites/: %q", flag, args[i+1])
+					}
+					if strings.Contains(args[i+1], "private/backups/") {
+						t.Errorf("%s: value not relocated off private/backups/: %q", flag, args[i+1])
+					}
+				}
+			}
+			if !found {
+				t.Errorf("expected flag %s in args %v", flag, args)
+			}
+		}
+	})
+}
+
+func TestSiteBackupReconciler_backupCommandAndArgs(t *testing.T) {
+	r := &SiteBackupReconciler{}
+	t.Run("no S3 runs bench directly", func(t *testing.T) {
+		sb := &vyogotechv1.SiteBackup{Spec: vyogotechv1.SiteBackupSpec{Site: "s1.local"}}
+		cmd, args := r.backupCommandAndArgs(sb)
+		if len(cmd) != 1 || cmd[0] != "bench" {
+			t.Fatalf("expected command [bench], got %v", cmd)
+		}
+		if len(args) < 3 || args[0] != "--site" {
+			t.Errorf("expected bench backup args, got %v", args)
+		}
+	})
+	t.Run("S3 wraps bench + upload script", func(t *testing.T) {
+		sb := &vyogotechv1.SiteBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "bk1"},
+			Spec: vyogotechv1.SiteBackupSpec{
+				Site:         "s1.local",
+				BackupPathDB: "sites/s1.local/private/backups/bk1/database.sql.gz",
+				Storage: &vyogotechv1.BackupStorageConfig{
+					Type: "s3",
+					S3: &vyogotechv1.S3Config{
+						Endpoint: "https://minio:9000", Bucket: "backups",
+						AccessKeySecret: corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "s3-creds"}, Key: "access"},
+						SecretKeySecret: corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "s3-creds"}, Key: "secret"},
+					},
+				},
+			},
+		}
+		cmd, args := r.backupCommandAndArgs(sb)
+		if len(cmd) != 2 || cmd[0] != "bash" || cmd[1] != "-c" {
+			t.Fatalf("expected [bash -c], got %v", cmd)
+		}
+		if len(args) != 1 {
+			t.Fatalf("expected one script arg, got %d", len(args))
+		}
+		script := args[0]
+		for _, want := range []string{
+			"bench ", "backup", "boto3", "upload_file",
+			"/home/frappe/frappe-bench/sites/s1.local/private/vyogo-backups/bk1/database.sql.gz",
+			"s1.local/bk1/database.sql.gz",
+		} {
+			if !strings.Contains(script, want) {
+				t.Errorf("script missing %q\n---\n%s", want, script)
+			}
+		}
+		// upload path must be relocated off private/backups
+		if strings.Contains(script, "private/backups/bk1/database.sql.gz") {
+			t.Errorf("upload local path not relocated to vyogo-backups:\n%s", script)
+		}
+		// S3 env should resolve keys from the secret
+		env := backupS3Env(sb.Spec.Storage.S3)
+		var gotBucket, gotAccessFrom bool
+		for _, e := range env {
+			if e.Name == "S3_BUCKET" && e.Value == "backups" {
+				gotBucket = true
+			}
+			if e.Name == "S3_ACCESS_KEY" && e.ValueFrom != nil && e.ValueFrom.SecretKeyRef != nil && e.ValueFrom.SecretKeyRef.Name == "s3-creds" {
+				gotAccessFrom = true
+			}
+		}
+		if !gotBucket || !gotAccessFrom {
+			t.Errorf("S3 env incomplete: bucket=%v accessFromSecret=%v", gotBucket, gotAccessFrom)
+		}
+	})
 }
 
 func TestSiteBackupReconciler_buildBackupJob(t *testing.T) {
@@ -131,7 +244,7 @@ func TestSiteBackupReconciler_buildBackupJob(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "bench", Namespace: "default"},
 		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
 	}
-	job := r.buildBackupJob(siteBackup, bench)
+	job := r.buildBackupJob(context.Background(), siteBackup, bench)
 	if job.Name != "my-backup-backup" || job.Namespace != "default" {
 		t.Errorf("job name/ns: got %s/%s", job.Name, job.Namespace)
 	}
