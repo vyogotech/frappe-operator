@@ -40,14 +40,16 @@ import (
 // SiteMigrationReconciler reconciles a SiteMigration object
 type SiteMigrationReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme      *runtime.Scheme
+	Recorder    record.EventRecorder
+	IsOpenShift bool
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitemigrations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitemigrations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitemigrations/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch
+//+kubebuilder:rbac:groups=vyogo.tech,resources=sitebackups,verbs=get;list;watch;create
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -128,13 +130,15 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					Labels: map[string]string{"app": "frappe", "site": site.Name},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyOnFailure,
+					RestartPolicy:   corev1.RestartPolicyOnFailure,
+					SecurityContext: PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security),
 					Containers: []corev1.Container{
 						{
 							Name:            "migrate-runner",
 							Image:           benchImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command:         []string{"bash", "-c", cmdStr},
+							Env:             benchJobEnv(),
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",
@@ -163,6 +167,31 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	var existingJob batchv1.Job
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteMigration.Namespace}, &existingJob)
 	if err != nil && errors.IsNotFound(err) {
+		// Rollback safety: take a full backup and wait for it to succeed before
+		// running `bench migrate`. The migrate job is not created until the
+		// preflight backup is done, so a corrupt migration can always be reverted.
+		if siteMigration.Spec.BackupBeforeMigrate {
+			backupName := fmt.Sprintf("%s-pre-g%d", siteMigration.Name, siteMigration.Generation)
+			done, berr := ensurePreflightBackup(ctx, r.Client, siteMigration.Namespace, site.Spec.SiteName, backupName)
+			if berr != nil {
+				return r.failReconciliation(ctx, siteMigration, fmt.Sprintf("Pre-migration backup failed: %v", berr), "PreBackupFailed")
+			}
+			if !done {
+				siteMigration.Status.Phase = "BackingUp"
+				siteMigration.Status.PreBackupRef = backupName
+				r.setCondition(siteMigration, metav1.Condition{
+					Type:    "Ready",
+					Status:  metav1.ConditionFalse,
+					Reason:  "BackingUp",
+					Message: fmt.Sprintf("Taking pre-migration backup %s before migrating %s", backupName, site.Name),
+				})
+				siteMigration.Status.ObservedGeneration = siteMigration.Generation
+				_ = r.updateStatus(ctx, siteMigration)
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
+			siteMigration.Status.PreBackupRef = backupName
+		}
+
 		if err := r.Create(ctx, job); err != nil {
 			return r.failReconciliation(ctx, siteMigration, fmt.Sprintf("Failed to create Migration Job: %v", err), "JobCreationFailed")
 		}

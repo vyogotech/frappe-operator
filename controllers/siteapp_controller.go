@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -54,7 +55,67 @@ type SiteAppReconciler struct {
 //+kubebuilder:rbac:groups=vyogo.tech,resources=siteapps/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=vyogo.tech,resources=siteapps/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch
+//+kubebuilder:rbac:groups=vyogo.tech,resources=sitebackups,verbs=get;list;watch;create
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch
+
+// benchServingComponents are the bench deployment components that run Python
+// application code and therefore load installed apps into a long-lived process.
+// nginx (reverse proxy) and socketio (Node) don't import Frappe apps, so they
+// don't need to roll when an app is added or removed.
+var benchServingComponents = map[string]bool{
+	"gunicorn":       true,
+	"scheduler":      true,
+	"worker-default": true,
+	"worker-short":   true,
+	"worker-long":    true,
+}
+
+// reloadBenchServingPods rolls the bench's Python serving deployments so a
+// newly installed app on the shared sites PVC is picked up by the running
+// processes. A long-running Python interpreter caches its sys.path finders, so
+// an app added to sites/apps *after* the process started is invisible to it
+// until a restart — the site then 500s with "ModuleNotFoundError: No module
+// named '<app>'" on every request. install-app succeeding on the PVC is not
+// enough; the gunicorn/worker/scheduler processes must be rolled.
+//
+// The roll is triggered by stamping a per-app annotation on each deployment's
+// pod template. The value is stable for a given SiteApp generation, so repeated
+// reconciles of the same app re-write the same value (a no-op that Kubernetes
+// ignores — no restart loop), while a new app uses a distinct annotation key and
+// rolls exactly once. Using a per-app key (rather than one shared key) avoids
+// two apps ping-ponging the same annotation between their own values.
+func (r *SiteAppReconciler) reloadBenchServingPods(ctx context.Context, benchName, benchNamespace, appName, reloadValue string) {
+	logger := log.FromContext(ctx)
+	var deploys appsv1.DeploymentList
+	if err := r.List(ctx, &deploys, client.InNamespace(benchNamespace), client.MatchingLabels{"bench": benchName}); err != nil {
+		logger.Error(err, "reload: failed to list bench deployments", "bench", benchName)
+		return
+	}
+	annKey := "vyogo.tech/reload-" + appName
+	for i := range deploys.Items {
+		d := &deploys.Items[i]
+		// The "component" label lives on the pod template / selector, not on the
+		// Deployment's own metadata (which only carries app + bench), so read it
+		// from the template.
+		if !benchServingComponents[d.Spec.Template.Labels["component"]] {
+			continue
+		}
+		if d.Spec.Template.Annotations[annKey] == reloadValue {
+			continue // already rolled for this app install
+		}
+		patched := d.DeepCopy()
+		if patched.Spec.Template.Annotations == nil {
+			patched.Spec.Template.Annotations = map[string]string{}
+		}
+		patched.Spec.Template.Annotations[annKey] = reloadValue
+		if err := r.Patch(ctx, patched, client.MergeFrom(d)); err != nil {
+			logger.Error(err, "reload: failed to patch deployment", "deployment", d.Name)
+			continue
+		}
+		logger.Info("reload: rolled bench serving deployment to pick up app", "deployment", d.Name, "app", appName)
+	}
+}
 
 func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -195,6 +256,30 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
 
 	if errors.IsNotFound(err) {
+		// Rollback safety: before installing/upgrading the app, take a full backup
+		// and wait for it to succeed. The install job is not created until the
+		// preflight backup is done, so a corrupt install can always be reverted.
+		if siteApp.Spec.BackupBeforeInstall {
+			backupName := fmt.Sprintf("%s-pre-g%d", siteApp.Name, siteApp.Generation)
+			done, berr := ensurePreflightBackup(ctx, r.Client, siteApp.Namespace, site.Spec.SiteName, backupName)
+			if berr != nil {
+				return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Pre-install backup failed: %v", berr), "PreBackupFailed")
+			}
+			if !done {
+				siteApp.Status.Phase = "BackingUp"
+				siteApp.Status.PreBackupRef = backupName
+				r.setCondition(siteApp, metav1.Condition{
+					Type:    "Ready",
+					Status:  metav1.ConditionFalse,
+					Reason:  "BackingUp",
+					Message: fmt.Sprintf("Taking pre-install backup %s before installing %s", backupName, siteApp.Spec.AppName),
+				})
+				_ = r.updateStatus(ctx, siteApp)
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
+			siteApp.Status.PreBackupRef = backupName
+		}
+
 		bench := &vyogotechv1.FrappeBench{}
 		benchName := site.Spec.BenchRef.Name
 		benchNamespace := site.Spec.BenchRef.Namespace
@@ -430,6 +515,19 @@ bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
 	}
 
 	if job.Status.Succeeded > 0 {
+		// The app now exists on the shared PVC, but the already-running
+		// gunicorn/worker/scheduler processes won't see it until they restart
+		// (Python caches sys.path finders). Roll them so the site doesn't 500
+		// with ModuleNotFoundError. Idempotent: the value is stable per SiteApp
+		// generation, so this only rolls once per install/upgrade.
+		benchName := site.Spec.BenchRef.Name
+		benchNamespace := site.Spec.BenchRef.Namespace
+		if benchNamespace == "" {
+			benchNamespace = site.Namespace
+		}
+		reloadValue := fmt.Sprintf("gen-%d", siteApp.Generation)
+		r.reloadBenchServingPods(ctx, benchName, benchNamespace, siteApp.Spec.AppName, reloadValue)
+
 		siteApp.Status.Phase = "Ready"
 		siteApp.Status.ObservedGeneration = siteApp.Generation
 		r.setCondition(siteApp, metav1.Condition{

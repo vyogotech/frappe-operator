@@ -52,6 +52,14 @@ spec:
           spec:
             description: SiteMigrationSpec defines the desired state of SiteMigration
             properties:
+              backupBeforeMigrate:
+                default: true
+                description: |-
+                  BackupBeforeMigrate determines whether the operator takes a full backup of
+                  the site and waits for it to succeed before running `bench migrate`. This
+                  creates a rollback point in case the migration corrupts the site.
+                  Defaults to true; set false to skip.
+                type: boolean
               force:
                 description: Force determines whether to force migration even if schema
                   is unchanged.
@@ -152,6 +160,11 @@ spec:
               phase:
                 description: Phase represents the current state (Pending, Migrating,
                   Succeeded, Failed).
+                type: string
+              preBackupRef:
+                description: |-
+                  PreBackupRef is the name of the SiteBackup taken before this migration as a
+                  rollback point (set when backupBeforeMigrate is enabled).
                 type: string
               startTime:
                 description: StartTime indicates when the migration started.

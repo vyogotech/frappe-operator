@@ -295,9 +295,10 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteMigrationReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("sitemigration-controller"),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Recorder:    mgr.GetEventRecorderFor("sitemigration-controller"),
+		IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteMigration")
 		os.Exit(1)
@@ -343,17 +344,19 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteBackupReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("sitebackup-controller"),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Recorder:    mgr.GetEventRecorderFor("sitebackup-controller"),
+		IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteBackup")
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteRestoreReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("siterestore-controller"),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Recorder:    mgr.GetEventRecorderFor("siterestore-controller"),
+		IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteRestore")
 		os.Exit(1)

@@ -37,13 +37,16 @@ import (
 // SiteRestoreReconciler reconciles a SiteRestore object
 type SiteRestoreReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme      *runtime.Scheme
+	Recorder    record.EventRecorder
+	IsOpenShift bool
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=siterestores,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=vyogo.tech,resources=siterestores/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=vyogo.tech,resources=siterestores/finalizers,verbs=update
+//+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch
+//+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs,verbs=get;list;watch
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SiteRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -73,7 +76,7 @@ func (r *SiteRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	err := r.Get(ctx, client.ObjectKey{Name: jobName, Namespace: siteRestore.Namespace}, job)
 
 	if errors.IsNotFound(err) {
-		job = r.buildRestoreJob(siteRestore, bench)
+		job = r.buildRestoreJob(ctx, siteRestore, bench)
 		if err := r.Create(ctx, job); err != nil {
 			logger.Error(err, "Failed to create restore job")
 			return ctrl.Result{}, err
@@ -96,7 +99,7 @@ func (r *SiteRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{}, nil
 }
 
-func (r *SiteRestoreReconciler) buildRestoreScript(siteRestore *vyogotechv1.SiteRestore) string {
+func (r *SiteRestoreReconciler) buildRestoreScript(siteRestore *vyogotechv1.SiteRestore, withMariaDBRoot bool) string {
 	script := `#!/bin/bash
 set -e
 
@@ -138,10 +141,16 @@ s3.download_file(bucket, key, "%s")
 PYTHON_SCRIPT
 `, target, envPrefix, envPrefix, envPrefix, envPrefix, envPrefix, envPrefix, target, target)
 		} else if source.LocalPath != "" {
+			// Named backups produced by the operator live in "private/vyogo-backups/"
+			// (not the console-addressed "private/backups/", which Frappe's backup
+			// cleanup would delete). Rewrite the segment so restore reads the same
+			// physical location the backup job wrote. cp runs from the bench root, so
+			// the "sites/" prefix is kept as-is. See relocateNamedBackupPath.
+			localPath := relocateNamedBackupPath(source.LocalPath)
 			script += fmt.Sprintf(`
 echo "Using local backup path: %s"
 cp "%s" "%s"
-`, source.LocalPath, source.LocalPath, target)
+`, localPath, localPath, target)
 		}
 	}
 
@@ -168,6 +177,13 @@ cp "%s" "%s"
 		restoreCmd += " --force"
 	}
 
+	// `bench restore` recreates the site database and so needs DB-admin creds.
+	// Without this it prompts "MySQL root password:" and hangs in the non-TTY Job.
+	// DB_ROOT_PASSWORD is injected from the MariaDB root Secret (see buildRestoreJob).
+	if withMariaDBRoot {
+		restoreCmd += ` --mariadb-root-password "$DB_ROOT_PASSWORD"`
+	}
+
 	script += fmt.Sprintf(`
 echo "Executing restore command..."
 # Handle admin password if provided via env
@@ -184,8 +200,40 @@ rm -rf /tmp/restore
 	return script
 }
 
-func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1.SiteRestore, bench *vyogotechv1.FrappeBench) *batchv1.Job {
-	env := []corev1.EnvVar{}
+func (r *SiteRestoreReconciler) buildRestoreJob(ctx context.Context, siteRestore *vyogotechv1.SiteRestore, bench *vyogotechv1.FrappeBench) *batchv1.Job {
+	env := benchJobEnv()
+
+	// Inject the MariaDB root password so `bench restore` can recreate the site
+	// database non-interactively. Resolve it from the target FrappeSite's dbConfig
+	// (matched by siteName). Only wired for MariaDB when the root Secret lives in
+	// this namespace (env secretKeyRef is namespace-local).
+	withMariaDBRoot := false
+	var siteList vyogotechv1.FrappeSiteList
+	if err := r.List(ctx, &siteList, client.InNamespace(siteRestore.Namespace)); err == nil {
+		for i := range siteList.Items {
+			s := &siteList.Items[i]
+			if s.Spec.SiteName != siteRestore.Spec.Site {
+				continue
+			}
+			if s.Spec.DBConfig.Provider != "" && s.Spec.DBConfig.Provider != "mariadb" {
+				break
+			}
+			secName, secKey, secNs, rerr := mariaDBRootSecretRef(ctx, r.Client, s.Name, s.Namespace, s.Spec.DBConfig)
+			if rerr == nil && secName != "" && secNs == siteRestore.Namespace {
+				env = append(env, corev1.EnvVar{
+					Name: "DB_ROOT_PASSWORD",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: secName},
+							Key:                  secKey,
+						},
+					},
+				})
+				withMariaDBRoot = true
+			}
+			break
+		}
+	}
 
 	// Helper for adding S3 env vars
 	addS3Env := func(source vyogotechv1.BackupSource, prefix string) {
@@ -244,14 +292,8 @@ func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1.SiteRes
 			BackoffLimit: int32Ptr(1),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
-					// Reusing logic from SiteBackup for now
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: boolPtr(true),
-						SeccompProfile: &corev1.SeccompProfile{
-							Type: corev1.SeccompProfileTypeRuntimeDefault,
-						},
-					},
+					RestartPolicy:   corev1.RestartPolicyNever,
+					SecurityContext: PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security),
 					ImagePullSecrets: func() []corev1.LocalObjectReference {
 						if bench.Spec.ImageConfig != nil && len(bench.Spec.ImageConfig.PullSecrets) > 0 {
 							secrets := make([]corev1.LocalObjectReference, len(bench.Spec.ImageConfig.PullSecrets))
@@ -273,7 +315,7 @@ func (r *SiteRestoreReconciler) buildRestoreJob(siteRestore *vyogotechv1.SiteRes
 								return corev1.PullPolicy("")
 							}(),
 							Command: []string{"bash", "-c"},
-							Args:    []string{r.buildRestoreScript(siteRestore)},
+							Args:    []string{r.buildRestoreScript(siteRestore, withMariaDBRoot)},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",
