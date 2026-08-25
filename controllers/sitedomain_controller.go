@@ -22,6 +22,7 @@ import (
 	"net"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -57,6 +58,7 @@ type SiteDomainReconciler struct {
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitedomains/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -97,6 +99,9 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if siteDomain.DeletionTimestamp != nil {
 		if controllerutil.ContainsFinalizer(siteDomain, siteDomainFinalizer) {
 			logger.Info("Cleaning up site domain", "domain", siteDomain.Spec.Domain, "site", site.Name)
+			// Best-effort: remove the sites/<domain> alias symlink on the PVC.
+			// The Ingress + Certificate are garbage-collected via owner refs.
+			r.cleanupFrappeDomainAlias(ctx, siteDomain, site)
 			latest := &vyogotechv1.SiteDomain{}
 			if err := r.Get(ctx, req.NamespacedName, latest); err == nil {
 				controllerutil.RemoveFinalizer(latest, siteDomainFinalizer)
@@ -187,7 +192,13 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 									PathType: &pathTypePrefix,
 									Backend: networkingv1.IngressBackend{
 										Service: &networkingv1.IngressServiceBackend{
-											Name: fmt.Sprintf("%s-bench-v2-nginx", site.Spec.BenchRef.Name),
+											// Must match the bench nginx Service the FrappeBench
+											// controller creates: "<bench>-nginx" (see
+											// frappebench_deployments.go ensureNginxService and the
+											// primary-site ingress in frappesite_ingress.go). The old
+											// "-bench-v2-nginx" name never existed, so the custom-domain
+											// Ingress had no valid backend (503).
+											Name: fmt.Sprintf("%s-nginx", site.Spec.BenchRef.Name),
 											Port: networkingv1.ServiceBackendPort{Number: 8080},
 										},
 									},
@@ -221,6 +232,17 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	// Step 3: Register the custom domain with Frappe itself. The bench runs with
+	// FRAPPE_SITE_NAME_HEADER=$host, so Frappe resolves the site from the Host
+	// header and looks for sites/<host>/. The site directory is named the primary
+	// domain (site.Spec.SiteName), so a request on the custom domain would 404
+	// ("site does not exist") without an alias. We create a symlink
+	// sites/<domain> -> <siteName> on the bench's shared sites PVC — the native
+	// Frappe multitenant alias mechanism — so every bench pod resolves it.
+	if err := r.ensureFrappeDomainAlias(ctx, siteDomain, site); err != nil {
+		return r.failReconciliation(ctx, siteDomain, fmt.Sprintf("Failed to register domain alias with Frappe: %v", err), "AliasJobFailed")
+	}
+
 	siteDomain.Status.Phase = "Ready"
 	siteDomain.Status.IngressName = ingressName
 	siteDomain.Status.TLSCertificateIssued = true
@@ -234,6 +256,109 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	_ = r.updateStatus(ctx, siteDomain)
 
 	return ctrl.Result{}, nil
+}
+
+// ensureFrappeDomainAlias creates an idempotent Job that symlinks
+// sites/<domain> -> <siteName> on the bench's shared sites PVC, so Frappe's
+// $host-based multitenant routing resolves the custom domain to the site.
+// The symlink lives on the shared PVC, so a single run serves every bench pod.
+func (r *SiteDomainReconciler) ensureFrappeDomainAlias(ctx context.Context, siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite) error {
+	jobName := fmt.Sprintf("%s-domain-alias", siteDomain.Name)
+
+	// Idempotent: leave an existing Job alone unless it failed, in which case
+	// recreate it so the alias eventually lands. `ln -sfn` is itself idempotent.
+	existing := &batchv1.Job{}
+	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteDomain.Namespace}, existing)
+	if err == nil {
+		if existing.Status.Failed > 0 && existing.Status.Succeeded == 0 {
+			bg := metav1.DeletePropagationBackground
+			_ = r.Delete(ctx, existing, &client.DeleteOptions{PropagationPolicy: &bg})
+		}
+		return nil
+	}
+	if !errors.IsNotFound(err) {
+		return err
+	}
+
+	job := r.domainAliasJob(siteDomain, site, jobName, false)
+	_ = controllerutil.SetControllerReference(siteDomain, job, r.Scheme)
+	if err := r.Create(ctx, job); err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+// cleanupFrappeDomainAlias fires a best-effort Job that removes the sites/<domain>
+// symlink when the SiteDomain is deleted. It carries no owner reference (so it
+// outlives the SiteDomain it is cleaning up after) and self-deletes via TTL.
+func (r *SiteDomainReconciler) cleanupFrappeDomainAlias(ctx context.Context, siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite) {
+	jobName := fmt.Sprintf("%s-domain-unalias", siteDomain.Name)
+	existing := &batchv1.Job{}
+	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteDomain.Namespace}, existing); err == nil {
+		return
+	}
+	job := r.domainAliasJob(siteDomain, site, jobName, true)
+	_ = r.Create(ctx, job)
+}
+
+// domainAliasJob builds the create-or-remove alias Job. It passes the site name
+// and domain as env vars (never interpolated into the shell) and rejects a domain
+// containing a path separator, so a hostile domain value cannot escape sites/.
+func (r *SiteDomainReconciler) domainAliasJob(siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite, jobName string, cleanup bool) *batchv1.Job {
+	pvcName := fmt.Sprintf("%s-sites", site.Spec.BenchRef.Name)
+	backoff := int32(4)
+	ttl := int32(600)
+	runAsUser := int64(1000)
+
+	script := `set -e
+case "$DOMAIN" in */*|..|"") echo "invalid domain: $DOMAIN"; exit 1;; esac
+cd /sites
+if [ ! -d "$SITE_NAME" ]; then echo "site dir $SITE_NAME not found"; exit 1; fi
+if [ "$DOMAIN" = "$SITE_NAME" ]; then echo "domain equals site; nothing to do"; exit 0; fi
+ln -sfn "$SITE_NAME" "$DOMAIN"
+echo "aliased $DOMAIN -> $SITE_NAME"; ls -ld "$DOMAIN"`
+	if cleanup {
+		script = `set -e
+case "$DOMAIN" in */*|..|"") echo "invalid domain: $DOMAIN"; exit 0;; esac
+cd /sites
+if [ -L "$DOMAIN" ]; then rm -f "$DOMAIN"; echo "removed alias $DOMAIN"; else echo "no alias $DOMAIN"; fi`
+	}
+
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: siteDomain.Namespace,
+			Labels:    map[string]string{"app": "frappe", "site": site.Name, "sitedomain": siteDomain.Name},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit:            &backoff,
+			TTLSecondsAfterFinished: &ttl,
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy:   corev1.RestartPolicyOnFailure,
+					SecurityContext: &corev1.PodSecurityContext{FSGroup: &runAsUser},
+					Containers: []corev1.Container{{
+						Name:    "alias",
+						Image:   "busybox:latest",
+						Command: []string{"sh", "-c", script},
+						Env: []corev1.EnvVar{
+							{Name: "SITE_NAME", Value: site.Spec.SiteName},
+							{Name: "DOMAIN", Value: siteDomain.Spec.Domain},
+						},
+						VolumeMounts: []corev1.VolumeMount{{
+							Name: "sites", MountPath: "/sites", SubPath: "frappe-sites",
+						}},
+					}},
+					Volumes: []corev1.Volume{{
+						Name: "sites",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
+						},
+					}},
+				},
+			},
+		},
+	}
 }
 
 func (r *SiteDomainReconciler) failReconciliation(ctx context.Context, siteDomain *vyogotechv1.SiteDomain, msg, reason string) (ctrl.Result, error) {
