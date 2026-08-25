@@ -155,8 +155,20 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	pathTypePrefix := networkingv1.PathTypePrefix
+	// Mirror the primary-site ingress (frappesite_ingress.go): a sane default,
+	// then whatever the site's ingress config specifies. Do NOT hardcode
+	// ssl-redirect here — that belongs to the cluster/site. Forcing it "true"
+	// 308-loops on proxy-fronted clusters (e.g. Cloudflare Flexible SSL, where
+	// the edge speaks HTTP to the origin), which is why the platform ingresses
+	// set ssl-redirect "false". Inheriting the site annotations lets that flow
+	// through to custom domains too.
 	annotations := map[string]string{
-		"nginx.ingress.kubernetes.io/ssl-redirect": "true",
+		"nginx.ingress.kubernetes.io/proxy-body-size": "100m",
+	}
+	if site.Spec.Ingress != nil && site.Spec.Ingress.Annotations != nil {
+		for k, v := range site.Spec.Ingress.Annotations {
+			annotations[k] = v
+		}
 	}
 
 	if siteDomain.Spec.TLS != nil && siteDomain.Spec.TLS.IssuerRef != nil && siteDomain.Spec.TLS.IssuerRef.Name != "" {
