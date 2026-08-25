@@ -118,8 +118,6 @@ func (r *SiteAppReconciler) reloadBenchServingPods(ctx context.Context, benchNam
 }
 
 func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-
 	siteApp := &vyogotechv1.SiteApp{}
 	if err := r.Get(ctx, req.NamespacedName, siteApp); err != nil {
 		if errors.IsNotFound(err) {
@@ -159,12 +157,18 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Handle Deletion & Finalizer
 	if siteApp.DeletionTimestamp != nil {
 		if controllerutil.ContainsFinalizer(siteApp, siteAppFinalizer) {
-			logger.Info("Uninstalling site app", "app", siteApp.Spec.AppName, "site", site.Name)
-			siteApp.Status.Phase = "Uninstalling"
-			_ = r.updateStatus(ctx, siteApp)
-
-			if r.FrappeClient != nil {
-				_ = r.FrappeClient.UninstallApp(ctx, siteApp.Spec.AppName)
+			// Actually uninstall the app from the site before dropping the CR.
+			// Just removing the finalizer would delete the console card but leave
+			// the app installed on the shared PVC — a bad app then keeps 500ing the
+			// desk. Run a bench uninstall-app Job and wait for it to complete.
+			res, removable, err := r.reconcileAppUninstallJob(ctx, siteApp, site)
+			if err != nil {
+				return res, err
+			}
+			if !removable {
+				// Job still running (or just created) — requeue without removing
+				// the finalizer so the CR sticks around until uninstall finishes.
+				return res, nil
 			}
 
 			latest := &vyogotechv1.SiteApp{}
@@ -290,17 +294,8 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 			return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Failed to fetch referenced bench %s: %v", benchName, err), "BenchNotFound")
 		}
 
-		image := "ghcr.io/vyogotech/erpnext-for-operator:version-15"
-		if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
-			tag := bench.Spec.ImageConfig.Tag
-			if tag == "" {
-				tag = "latest"
-			}
-			image = fmt.Sprintf("%s:%s", bench.Spec.ImageConfig.Repository, tag)
-		}
-
+		image := resolveBenchImage(bench)
 		pvcName := fmt.Sprintf("%s-sites", bench.Name)
-		backoffLimit := int32(1)
 
 		script := `#!/bin/bash
 set -e
@@ -424,81 +419,30 @@ bench build --app "$APP_NAME" 2>/dev/null || true
 
 echo "Clearing site cache..."
 bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
+
+# Post-install health probe: a bad app (e.g. one incompatible with the bench's
+# Frappe version) can leave the site unbootable so every desk request 500s. Do a
+# cheap boot of the site and enumerate installed apps; if this errors the site is
+# broken, so exit non-zero to fail the Job. The controller then marks the SiteApp
+# Failed instead of Ready, surfacing the breakage instead of hiding it. No
+# '|| true' here on purpose — its failure must fail the Job.
+echo "Verifying site health after install..."
+bench --site "$SITE_NAME" execute frappe.get_installed_apps
 `
 
-		newJob := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      jobName,
-				Namespace: siteApp.Namespace,
-				Labels: map[string]string{
-					"app.kubernetes.io/managed-by": "frappe-operator",
-					"vyogo.tech/siteapp":           siteApp.Name,
-				},
-			},
-			Spec: batchv1.JobSpec{
-				BackoffLimit: &backoffLimit,
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{
-							"app.kubernetes.io/managed-by": "frappe-operator",
-							"vyogo.tech/siteapp":           siteApp.Name,
-						},
-					},
-					Spec: corev1.PodSpec{
-						RestartPolicy: corev1.RestartPolicyNever,
-						SecurityContext: &corev1.PodSecurityContext{
-							RunAsUser:  ptr.To(int64(1000)),
-							RunAsGroup: ptr.To(int64(1000)),
-							FSGroup:    ptr.To(int64(1000)),
-						},
-						Containers: []corev1.Container{
-							{
-								Name:            "app-installer",
-								Image:           image,
-								ImagePullPolicy: corev1.PullIfNotPresent,
-								Command:         []string{"bash", "-c", script},
-								Env: []corev1.EnvVar{
-									{Name: "APP_NAME", Value: siteApp.Spec.AppName},
-									{Name: "SITE_NAME", Value: site.Spec.SiteName},
-									{Name: "GIT_REPO", Value: siteApp.Spec.GitRepo},
-									{Name: "GIT_BRANCH", Value: siteApp.Spec.GitBranch},
-									{Name: "FRAPPE_VERSION", Value: bench.Spec.FrappeVersion},
-									{Name: "USER", Value: "frappe"},
-								},
-								VolumeMounts: []corev1.VolumeMount{
-									{
-										Name:      "sites",
-										MountPath: "/home/frappe/frappe-bench/sites",
-										SubPath:   "frappe-sites",
-									},
-									{
-										Name:      "bench-logs",
-										MountPath: "/home/frappe/frappe-bench/logs",
-									},
-								},
-							},
-						},
-						Volumes: []corev1.Volume{
-							{
-								Name: "sites",
-								VolumeSource: corev1.VolumeSource{
-									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-										ClaimName: pvcName,
-									},
-								},
-							},
-							{
-								Name: "bench-logs",
-								VolumeSource: corev1.VolumeSource{
-									EmptyDir: &corev1.EmptyDirVolumeSource{},
-								},
-							},
-						},
-					},
-				},
-			},
+		env := []corev1.EnvVar{
+			{Name: "APP_NAME", Value: siteApp.Spec.AppName},
+			{Name: "SITE_NAME", Value: site.Spec.SiteName},
+			{Name: "GIT_REPO", Value: siteApp.Spec.GitRepo},
+			{Name: "GIT_BRANCH", Value: siteApp.Spec.GitBranch},
+			{Name: "FRAPPE_VERSION", Value: bench.Spec.FrappeVersion},
+			{Name: "USER", Value: "frappe"},
 		}
 
+		newJob := r.buildAppJob(siteApp, jobName, "app-installer", image, pvcName, script, env, int32(1), nil)
+
+		// The install job is owned by the SiteApp so it is garbage-collected with
+		// it. (The uninstall job cannot be — see reconcileAppUninstallJob.)
 		if err := controllerutil.SetControllerReference(siteApp, newJob, r.Scheme); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -547,6 +491,227 @@ bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
 	siteApp.Status.Phase = "Installing"
 	_ = r.updateStatus(ctx, siteApp)
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
+// resolveBenchImage derives the bench container image used for app install /
+// uninstall Jobs from the bench's ImageConfig, falling back to the default
+// operator image.
+func resolveBenchImage(bench *vyogotechv1.FrappeBench) string {
+	image := "ghcr.io/vyogotech/erpnext-for-operator:version-15"
+	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
+		tag := bench.Spec.ImageConfig.Tag
+		if tag == "" {
+			tag = "latest"
+		}
+		image = fmt.Sprintf("%s:%s", bench.Spec.ImageConfig.Repository, tag)
+	}
+	return image
+}
+
+// buildAppJob assembles the Job that runs a bench command against the site on
+// the bench's shared sites PVC. It is the single source of truth for the pod
+// shape (image, sites PVC mount at frappe-sites subPath, security context,
+// RestartPolicy Never) shared by the install and uninstall paths. The caller
+// sets the owner reference (or deliberately does not — see the uninstall path).
+func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, containerName, image, pvcName, script string, env []corev1.EnvVar, backoffLimit int32, ttlSecondsAfterFinished *int32) *batchv1.Job {
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: siteApp.Namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "frappe-operator",
+				"vyogo.tech/siteapp":           siteApp.Name,
+			},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit:            &backoffLimit,
+			TTLSecondsAfterFinished: ttlSecondsAfterFinished,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "frappe-operator",
+						"vyogo.tech/siteapp":           siteApp.Name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsUser:  ptr.To(int64(1000)),
+						RunAsGroup: ptr.To(int64(1000)),
+						FSGroup:    ptr.To(int64(1000)),
+					},
+					Containers: []corev1.Container{
+						{
+							Name:            containerName,
+							Image:           image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Command:         []string{"bash", "-c", script},
+							Env:             env,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "sites",
+									MountPath: "/home/frappe/frappe-bench/sites",
+									SubPath:   "frappe-sites",
+								},
+								{
+									Name:      "bench-logs",
+									MountPath: "/home/frappe/frappe-bench/logs",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "sites",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: pvcName,
+								},
+							},
+						},
+						{
+							Name: "bench-logs",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// reconcileAppUninstallJob drives a bench uninstall-app Job to completion during
+// SiteApp deletion. It returns (result, removable, err):
+//   - removable=false: the uninstall is still in flight (or was just created);
+//     the caller must requeue with result and keep the finalizer.
+//   - removable=true: the uninstall finished (success) or was definitively given
+//     up on (Job failed / bench gone); the caller may remove the finalizer.
+//
+// On a successful uninstall the bench's Python serving deployments are rolled so
+// the desk drops the now-removed app from memory (gunicorn/scheduler/workers
+// cache the installed-apps list — see reloadBenchServingPods). That roll is
+// best-effort and never blocks finalizer removal.
+func (r *SiteAppReconciler) reconcileAppUninstallJob(ctx context.Context, siteApp *vyogotechv1.SiteApp, site *vyogotechv1.FrappeSite) (ctrl.Result, bool, error) {
+	logger := log.FromContext(ctx)
+	jobName := fmt.Sprintf("%s-app-uninstall", siteApp.Name)
+
+	job := &batchv1.Job{}
+	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
+
+	if errors.IsNotFound(err) {
+		bench := &vyogotechv1.FrappeBench{}
+		benchName := ""
+		benchNamespace := site.Namespace
+		if site.Spec.BenchRef != nil {
+			benchName = site.Spec.BenchRef.Name
+			if site.Spec.BenchRef.Namespace != "" {
+				benchNamespace = site.Spec.BenchRef.Namespace
+			}
+		}
+		if benchName == "" {
+			// No bench to uninstall from — nothing on the PVC to clean up. Let the
+			// deletion proceed rather than wedging the resource forever.
+			logger.Info("Uninstall: site has no benchRef, skipping uninstall job", "app", siteApp.Spec.AppName)
+			r.Recorder.Event(siteApp, corev1.EventTypeWarning, "UninstallSkipped", "Site has no benchRef; app was not actively uninstalled")
+			return ctrl.Result{}, true, nil
+		}
+		if err := r.Get(ctx, types.NamespacedName{Name: benchName, Namespace: benchNamespace}, bench); err != nil {
+			// Bench gone means its DB/pods/PVC are gone too, so the app is already
+			// effectively uninstalled. Allow deletion to complete.
+			logger.Info("Uninstall: referenced bench not found, treating app as already removed", "bench", benchName, "app", siteApp.Spec.AppName)
+			r.Recorder.Eventf(siteApp, corev1.EventTypeWarning, "UninstallSkipped", "Referenced bench %s not found; app was not actively uninstalled", benchName)
+			return ctrl.Result{}, true, nil
+		}
+
+		image := resolveBenchImage(bench)
+		pvcName := fmt.Sprintf("%s-sites", bench.Name)
+
+		script := `#!/bin/bash
+set -e
+
+export HOME=/tmp
+export PYTHONPATH="/tmp/pip:/home/frappe/frappe-bench/sites/apps:$PYTHONPATH"
+
+cd /home/frappe/frappe-bench
+
+echo "Uninstalling app $APP_NAME from site $SITE_NAME..."
+# --yes bypasses the interactive confirmation prompt; --force removes the app
+# even if other installed apps declare it as a dependency (dependents are the
+# caller's problem, not a reason to leave a broken app wedged on the site).
+bench --site "$SITE_NAME" uninstall-app "$APP_NAME" --yes --force
+
+echo "Clearing site cache..."
+bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
+`
+
+		env := []corev1.EnvVar{
+			{Name: "APP_NAME", Value: siteApp.Spec.AppName},
+			{Name: "SITE_NAME", Value: site.Spec.SiteName},
+			{Name: "USER", Value: "frappe"},
+		}
+
+		// NOTE: no owner reference. The SiteApp is mid-deletion (DeletionTimestamp
+		// set), and the API server rejects creating a child with a
+		// blockOwnerDeletion owner reference to an object being deleted. Instead the
+		// Job self-cleans via TTLSecondsAfterFinished once it finishes.
+		newJob := r.buildAppJob(siteApp, jobName, "app-uninstaller", image, pvcName, script, env, int32(2), ptr.To(int32(300)))
+
+		if err := r.Create(ctx, newJob); err != nil {
+			return ctrl.Result{}, false, fmt.Errorf("failed to create uninstall job: %w", err)
+		}
+
+		logger.Info("Created uninstall job", "job", jobName, "app", siteApp.Spec.AppName, "site", site.Name)
+		siteApp.Status.Phase = "Uninstalling"
+		_ = r.updateStatus(ctx, siteApp)
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, false, nil
+	} else if err != nil {
+		return ctrl.Result{}, false, err
+	}
+
+	if job.Status.Succeeded > 0 {
+		// App is gone from the PVC, but the running gunicorn/worker/scheduler
+		// processes still hold it in memory. Roll them so the desk recovers.
+		// Best-effort: a failed patch must not wedge the finalizer.
+		benchName := ""
+		benchNamespace := site.Namespace
+		if site.Spec.BenchRef != nil {
+			benchName = site.Spec.BenchRef.Name
+			if site.Spec.BenchRef.Namespace != "" {
+				benchNamespace = site.Spec.BenchRef.Namespace
+			}
+		}
+		if benchName != "" {
+			reloadValue := fmt.Sprintf("uninstall-gen-%d", siteApp.Generation)
+			r.reloadBenchServingPods(ctx, benchName, benchNamespace, siteApp.Spec.AppName, reloadValue)
+		}
+		logger.Info("Uninstall job succeeded", "job", jobName, "app", siteApp.Spec.AppName)
+		return ctrl.Result{}, true, nil
+	}
+
+	if job.Status.Failed > 0 {
+		// Bounded give-up: the Job exhausted its backoffLimit. Surface the failure
+		// loudly (status + event) but still let the CR be deleted so the user isn't
+		// left with an un-removable card.
+		msg := fmt.Sprintf("Uninstall job %s failed; app %s may still be installed on the site", jobName, siteApp.Spec.AppName)
+		logger.Error(fmt.Errorf("uninstall job failed"), msg)
+		siteApp.Status.Phase = "Failed"
+		r.setCondition(siteApp, metav1.Condition{
+			Type:    "Ready",
+			Status:  metav1.ConditionFalse,
+			Reason:  "UninstallFailed",
+			Message: msg,
+		})
+		_ = r.updateStatus(ctx, siteApp)
+		r.Recorder.Event(siteApp, corev1.EventTypeWarning, "UninstallFailed", msg)
+		return ctrl.Result{}, true, nil
+	}
+
+	// Job still running.
+	siteApp.Status.Phase = "Uninstalling"
+	_ = r.updateStatus(ctx, siteApp)
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, false, nil
 }
 
 func (r *SiteAppReconciler) updateStatus(ctx context.Context, siteApp *vyogotechv1.SiteApp) error {
