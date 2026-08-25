@@ -22,6 +22,7 @@ import (
 	"time"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -141,4 +142,68 @@ func TestSiteDomainReconciler_Reconcile_ValidationAndNotReady(t *testing.T) {
 			t.Errorf("expected RequeueAfter 15s, got %v", res.RequeueAfter)
 		}
 	})
+}
+
+func TestSiteDomainReconciler_BackendNameAndFrappeAlias(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	siteDomain := &vyogotechv1.SiteDomain{
+		ObjectMeta: metav1.ObjectMeta{Name: "sd1", Namespace: "tenant"},
+		Spec: vyogotechv1.SiteDomainSpec{
+			SiteRef: &vyogotechv1.NamespacedName{Name: "site1"},
+			Domain:  "shop.customer.com",
+		},
+	}
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "tenant"},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			SiteName: "primary.myplatform.com",
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"},
+		},
+		Status: vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+	}
+
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteDomain, site).WithStatusSubresource(siteDomain).Build()
+	r := &SiteDomainReconciler{
+		Client:        cl,
+		Scheme:        scheme,
+		Recorder:      record.NewFakeRecorder(10),
+		DNSLookupFunc: func(host string) ([]string, error) { return []string{"203.0.113.9"}, nil },
+	}
+	ctx := context.Background()
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "sd1", Namespace: "tenant"}}); err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+
+	// Ingress backend must be the real bench nginx Service name.
+	ingress := &networkingv1.Ingress{}
+	if err := cl.Get(ctx, types.NamespacedName{Name: "site1-domain-sd1", Namespace: "tenant"}, ingress); err != nil {
+		t.Fatalf("ingress not found: %v", err)
+	}
+	got := ingress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name
+	if got != "bench1-nginx" {
+		t.Errorf("ingress backend = %q, want bench1-nginx", got)
+	}
+
+	// A Frappe alias Job must exist that symlinks the domain to the site on the PVC.
+	job := &batchv1.Job{}
+	if err := cl.Get(ctx, types.NamespacedName{Name: "sd1-domain-alias", Namespace: "tenant"}, job); err != nil {
+		t.Fatalf("alias Job not created: %v", err)
+	}
+	env := map[string]string{}
+	for _, e := range job.Spec.Template.Spec.Containers[0].Env {
+		env[e.Name] = e.Value
+	}
+	if env["SITE_NAME"] != "primary.myplatform.com" || env["DOMAIN"] != "shop.customer.com" {
+		t.Errorf("alias Job env = %v, want SITE_NAME=primary.myplatform.com DOMAIN=shop.customer.com", env)
+	}
+	vol := job.Spec.Template.Spec.Volumes[0].PersistentVolumeClaim
+	if vol == nil || vol.ClaimName != "bench1-sites" {
+		t.Errorf("alias Job PVC = %v, want bench1-sites", vol)
+	}
+	if sp := job.Spec.Template.Spec.Containers[0].VolumeMounts[0].SubPath; sp != "frappe-sites" {
+		t.Errorf("alias Job mount subPath = %q, want frappe-sites", sp)
+	}
 }
