@@ -20,11 +20,13 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func TestSiteAppReconciler_Reconcile_SuccessAndUninstall(t *testing.T) {
@@ -42,7 +45,6 @@ func TestSiteAppReconciler_Reconcile_SuccessAndUninstall(t *testing.T) {
 	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 
 	appInstalled := false
-	appUninstalled := false
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/method/login" {
@@ -56,12 +58,6 @@ func TestSiteAppReconciler_Reconcile_SuccessAndUninstall(t *testing.T) {
 			_, _ = w.Write([]byte(`{"message": "Installed"}`))
 			return
 		}
-		if r.URL.Path == "/api/method/frappe.installer.uninstall_app" {
-			appUninstalled = true
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"message": "Uninstalled"}`))
-			return
-		}
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer ts.Close()
@@ -73,16 +69,26 @@ func TestSiteAppReconciler_Reconcile_SuccessAndUninstall(t *testing.T) {
 			AppName: "erpnext_australian_localisation",
 		},
 	}
+	// The site references a bench: the uninstall path builds a Job that mounts the
+	// bench's <bench>-sites PVC, so the bench must exist for the delete path.
 	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
-		Status:     vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"},
+			SiteName: "site1.example.com",
+		},
+		Status: vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "15.0.0"},
 	}
 	adminSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "site1-admin", Namespace: "default"},
 		Data:       map[string][]byte{"password": []byte("adminpass")},
 	}
 
-	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteApp, site, adminSecret).WithStatusSubresource(siteApp).Build()
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteApp, site, bench, adminSecret).WithStatusSubresource(siteApp).Build()
 	r := &SiteAppReconciler{
 		Client:       client,
 		Scheme:       scheme,
@@ -112,7 +118,9 @@ func TestSiteAppReconciler_Reconcile_SuccessAndUninstall(t *testing.T) {
 		t.Errorf("expected phase Ready, got %s", updatedApp.Status.Phase)
 	}
 
-	// 2. Test Deletion Finalizer
+	// 2. Test Deletion Finalizer: deleting the SiteApp must run a bench
+	// uninstall-app Job (not merely drop the card), and the finalizer must be
+	// held until that Job completes.
 	err = client.Delete(ctx, updatedApp)
 	if err != nil {
 		t.Fatalf("failed to delete site app: %v", err)
@@ -123,8 +131,55 @@ func TestSiteAppReconciler_Reconcile_SuccessAndUninstall(t *testing.T) {
 		t.Fatalf("Reconcile deletion failed: %v", err)
 	}
 
-	if !appUninstalled {
-		t.Error("expected app to be uninstalled via REST API upon deletion")
+	uninstallJob := &batchv1.Job{}
+	err = client.Get(ctx, types.NamespacedName{Name: "app1-app-uninstall", Namespace: "default"}, uninstallJob)
+	if err != nil {
+		t.Fatalf("expected uninstall Job to be created on deletion: %v", err)
+	}
+
+	cmd := uninstallJob.Spec.Template.Spec.Containers[0].Command
+	joined := strings.Join(cmd, "\n")
+	if !strings.Contains(joined, "uninstall-app") {
+		t.Errorf("expected uninstall Job command to contain 'uninstall-app', got: %s", joined)
+	}
+
+	// The uninstall Job must mount the bench's <bench>-sites PVC (bench1-sites).
+	foundPVC := false
+	for _, v := range uninstallJob.Spec.Template.Spec.Volumes {
+		if v.PersistentVolumeClaim != nil && v.PersistentVolumeClaim.ClaimName == "bench1-sites" {
+			foundPVC = true
+		}
+	}
+	if !foundPVC {
+		t.Error("expected uninstall Job to mount PVC 'bench1-sites'")
+	}
+
+	// The finalizer must still be present (uninstall Job has not completed yet), so
+	// the CR is not prematurely removed while the app is still on the site.
+	pendingApp := &vyogotechv1.SiteApp{}
+	if err := client.Get(ctx, types.NamespacedName{Name: "app1", Namespace: "default"}, pendingApp); err != nil {
+		t.Fatalf("failed to re-fetch site app during deletion: %v", err)
+	}
+	if !controllerutil.ContainsFinalizer(pendingApp, siteAppFinalizer) {
+		t.Error("expected finalizer to be retained while uninstall Job is running")
+	}
+
+	// 3. Simulate the uninstall Job succeeding; the next reconcile must drop the
+	// finalizer so the CR is finally removed.
+	uninstallJob.Status.Succeeded = 1
+	if err := client.Status().Update(ctx, uninstallJob); err != nil {
+		t.Fatalf("failed to mark uninstall job succeeded: %v", err)
+	}
+
+	_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "app1", Namespace: "default"}})
+	if err != nil {
+		t.Fatalf("Reconcile after uninstall success failed: %v", err)
+	}
+
+	goneApp := &vyogotechv1.SiteApp{}
+	err = client.Get(ctx, types.NamespacedName{Name: "app1", Namespace: "default"}, goneApp)
+	if err == nil && controllerutil.ContainsFinalizer(goneApp, siteAppFinalizer) {
+		t.Error("expected finalizer to be removed after uninstall Job succeeded")
 	}
 }
 
@@ -206,7 +261,7 @@ func TestSiteAppReconciler_reloadBenchServingPods(t *testing.T) {
 	guni := mkDeploy("b1-gunicorn", "gunicorn")
 	worker := mkDeploy("b1-worker-default", "worker-default")
 	scheduler := mkDeploy("b1-scheduler", "scheduler")
-	nginx := mkDeploy("b1-nginx", "nginx")     // must NOT be rolled
+	nginx := mkDeploy("b1-nginx", "nginx")          // must NOT be rolled
 	socketio := mkDeploy("b1-socketio", "socketio") // must NOT be rolled
 	otherBench := mkDeploy("b2-gunicorn", "gunicorn")
 	otherBench.Labels["bench"] = "b2"
