@@ -10,7 +10,8 @@ operator:
   image:
     repository: ghcr.io/vyogotech/frappe-operator
     pullPolicy: IfNotPresent
-    tag: "v4.2.2"
+    # v4.2.2 + KEDA redis address/listName backport (cherry-pick of b76f1ef).
+    tag: "sha-f541929"
   
   imagePullSecrets: []
   nameOverride: ""
