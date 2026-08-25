@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -17,6 +18,12 @@ import (
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
+
+// benchRQID is the RQ queue-key prefix Frappe derives from the bench working
+// directory (/home/frappe/frappe-bench → "home-frappe-frappe-bench"), used to
+// build the default listName ("rq:queue:<benchRQID>:<queue>"). The operator
+// always mounts the bench there, so this is deterministic.
+const benchRQID = "home-frappe-frappe-bench"
 
 type KEDAProvider struct {
 	client client.Client
@@ -91,6 +98,21 @@ func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1.FrappeBenc
 		}
 		for k, v := range config.KEDA.Metadata {
 			metadata[k] = v
+		}
+		// Auto-derive the connection details for the bench's own RQ broker when the
+		// caller didn't pin them. KEDA runs in its own namespace, so the address
+		// MUST be namespace-qualified (a bare service name fails to resolve), and
+		// Frappe prefixes queue keys with the bench id — both are deterministic for
+		// this bench, so default them here rather than making every caller supply
+		// the exact FQDN and rq:queue:<benchID>:<queue> string.
+		if _, ok := metadata["address"]; !ok {
+			if _, hasHost := metadata["host"]; !hasHost {
+				metadata["address"] = fmt.Sprintf("%s-redis-queue.%s.svc.cluster.local:6379", bench.Name, bench.Namespace)
+			}
+		}
+		if _, ok := metadata["listName"]; !ok {
+			queue := strings.TrimPrefix(componentName, "worker-")
+			metadata["listName"] = fmt.Sprintf("rq:queue:%s:%s", benchRQID, queue)
 		}
 		trigger = map[string]interface{}{
 			"type":     "redis",
