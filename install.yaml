@@ -3890,6 +3890,14 @@ spec:
                 default: true
                 description: AutoMigrate determines whether to trigger database migration after app installation. Defaults to true.
                 type: boolean
+              backupBeforeInstall:
+                default: true
+                description: |-
+                  BackupBeforeInstall determines whether the operator takes a full backup of
+                  the site and waits for it to succeed before installing/upgrading the app.
+                  This creates a rollback point in case the install corrupts the site.
+                  Defaults to true; set false to skip (e.g. for throwaway sites).
+                type: boolean
               gitBranch:
                 description: GitBranch specifies the Git branch or tag to clone (defaults to "main" or "master").
                 type: string
@@ -3980,6 +3988,11 @@ spec:
                 type: integer
               phase:
                 description: Phase represents the current state of the SiteApp (Pending, Installing, Ready, Failed, Uninstalling).
+                type: string
+              preBackupRef:
+                description: |-
+                  PreBackupRef is the name of the SiteBackup taken before this install as a
+                  rollback point (set when backupBeforeInstall is enabled).
                 type: string
             type: object
         type: object
@@ -4177,6 +4190,13 @@ spec:
                 type: string
               phase:
                 description: Phase indicates the current phase of the backup
+                type: string
+              storageLocation:
+                description: |-
+                  StorageLocation is where the backup artifacts were stored when off-cluster
+                  storage is configured — an "s3://bucket/prefix" URI for S3 storage. Empty
+                  for PVC-only backups. Consumers (e.g. the control plane generating presigned
+                  download URLs) read this to locate the objects.
                 type: string
             type: object
         type: object
@@ -5319,6 +5339,14 @@ spec:
           spec:
             description: SiteMigrationSpec defines the desired state of SiteMigration
             properties:
+              backupBeforeMigrate:
+                default: true
+                description: |-
+                  BackupBeforeMigrate determines whether the operator takes a full backup of
+                  the site and waits for it to succeed before running `bench migrate`. This
+                  creates a rollback point in case the migration corrupts the site.
+                  Defaults to true; set false to skip.
+                type: boolean
               force:
                 description: Force determines whether to force migration even if schema is unchanged.
                 type: boolean
@@ -5412,6 +5440,11 @@ spec:
                 type: integer
               phase:
                 description: Phase represents the current state (Pending, Migrating, Succeeded, Failed).
+                type: string
+              preBackupRef:
+                description: |-
+                  PreBackupRef is the name of the SiteBackup taken before this migration as a
+                  rollback point (set when backupBeforeMigrate is enabled).
                 type: string
               startTime:
                 description: StartTime indicates when the migration started.
