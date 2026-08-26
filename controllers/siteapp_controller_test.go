@@ -233,6 +233,114 @@ func TestSiteAppReconciler_Reconcile_ValidationAndNotReady(t *testing.T) {
 	})
 }
 
+// The "already installed" decision must never be read off the site's Spec.Apps:
+// site-init can skip an app it cannot find yet still leave the name in the spec,
+// so trusting Spec.Apps skips a real install and blocks repairing such a site.
+func TestSiteAppReconciler_Reconcile_IgnoresPoisonedSpecApps(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+	ctx := context.Background()
+
+	installed := false
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/method/login":
+			http.SetCookie(w, &http.Cookie{Name: "sid", Value: "test-sid"})
+			w.WriteHeader(http.StatusOK)
+		case "/api/method/frappe.installer.install_app":
+			installed = true
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"message": "Installed"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+
+	siteApp := &vyogotechv1.SiteApp{
+		ObjectMeta: metav1.ObjectMeta{Name: "app1", Namespace: "default"},
+		Spec:       vyogotechv1.SiteAppSpec{SiteRef: &vyogotechv1.NamespacedName{Name: "site1"}, AppName: "wiki"},
+	}
+	// The site's spec CLAIMS wiki, but it is not actually installed. The old code
+	// short-circuited on this and never installed; the fix must install anyway.
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"},
+			SiteName: "site1.example.com",
+			Apps:     []string{"wiki"},
+		},
+		Status: vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "16.0.0"},
+	}
+	adminSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1-admin", Namespace: "default"},
+		Data:       map[string][]byte{"password": []byte("adminpass")},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithRuntimeObjects(siteApp, site, bench, adminSecret).WithStatusSubresource(siteApp).Build()
+	r := &SiteAppReconciler{
+		Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		FrappeClient: NewFrappeClient(ts.URL, "Administrator", "adminpass"),
+	}
+
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "app1", Namespace: "default"}}); err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+	if !installed {
+		t.Error("app must be installed even though site.Spec.Apps already lists it (Spec.Apps is desired state, not proof of install)")
+	}
+}
+
+// Once a SiteApp has finished installing for its current generation, a later
+// reconcile must not redo the work.
+func TestSiteAppReconciler_Reconcile_SkipsWhenAlreadyReconciled(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+	ctx := context.Background()
+
+	installed := false
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/method/frappe.installer.install_app" {
+			installed = true
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	siteApp := &vyogotechv1.SiteApp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "app1", Namespace: "default",
+			Finalizers: []string{siteAppFinalizer},
+		},
+		Spec:   vyogotechv1.SiteAppSpec{SiteRef: &vyogotechv1.NamespacedName{Name: "site1"}, AppName: "wiki"},
+		Status: vyogotechv1.SiteAppStatus{Phase: "Ready", ObservedGeneration: 0},
+	}
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeSiteSpec{BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"}, SiteName: "site1.example.com"},
+		Status:     vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithRuntimeObjects(siteApp, site).WithStatusSubresource(siteApp).Build()
+	r := &SiteAppReconciler{
+		Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		FrappeClient: NewFrappeClient(ts.URL, "Administrator", "adminpass"),
+	}
+
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "app1", Namespace: "default"}}); err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+	if installed {
+		t.Error("a SiteApp already Ready for its current generation must not reinstall")
+	}
+}
+
 func TestSiteAppReconciler_reloadBenchServingPods(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
