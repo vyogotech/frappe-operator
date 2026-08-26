@@ -209,25 +209,16 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Message: "Referenced FrappeSite is ready",
 	})
 
-	// Check if app is already installed on site
-	alreadyInstalled := false
-	for _, app := range site.Spec.Apps {
-		if app == siteApp.Spec.AppName {
-			alreadyInstalled = true
-			break
-		}
-	}
-
-	if alreadyInstalled {
-		siteApp.Status.Phase = "Ready"
-		siteApp.Status.ObservedGeneration = siteApp.Generation
-		r.setCondition(siteApp, metav1.Condition{
-			Type:    "Ready",
-			Status:  metav1.ConditionTrue,
-			Reason:  "AppInstalled",
-			Message: fmt.Sprintf("App %s is already installed on site", siteApp.Spec.AppName),
-		})
-		_ = r.updateStatus(ctx, siteApp)
+	// Idempotency without trusting desired state. A site's Spec.Apps is a DECLARED
+	// wish-list, not proof of installation: site-init silently skips an app it
+	// cannot find in the bench yet still records it (Spec.Apps and Status
+	// alike), so keying "already installed" off Spec.Apps skips a real, needed
+	// install — and blocks repairing exactly those sites (their spec already
+	// names the app). Instead, skip only when THIS SiteApp has already finished
+	// its own work for the current spec. Whether the app is *actually* on the
+	// site is decided from real state (bench list-apps) inside the install job,
+	// where the database is reachable — never from Spec.Apps here.
+	if siteApp.Status.Phase == "Ready" && siteApp.Status.ObservedGeneration == siteApp.Generation {
 		return ctrl.Result{}, nil
 	}
 
@@ -382,6 +373,18 @@ if m:
     print(' '.join(re.findall(r'["\']([\w_]+)["\']', m.group(1))))
 PY
 }
+
+# 0) Real-state idempotency (authoritative). Decide from what is ACTUALLY
+# installed on the site — tabInstalled Application, read via list-apps — never
+# from the site's desired Spec.Apps. If the app is genuinely present there is
+# nothing to do; if the spec merely claims it (a site-init that skipped the app),
+# we fall through and install it for real. This is the check the controller used
+# to do against Spec.Apps, moved to where the database is reachable and the truth
+# actually lives.
+if bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}' | grep -qx "$APP_NAME"; then
+  echo "App $APP_NAME already installed on $SITE_NAME (verified via list-apps); nothing to do."
+  exit 0
+fi
 
 # 1) Clone the target app (needed to read its dependency list).
 clone_app "$APP_NAME" "$GIT_REPO" "$GIT_BRANCH"
