@@ -41,6 +41,10 @@ import (
 
 const (
 	siteAppFinalizer = "vyogo.tech/siteapp-finalizer"
+	// fpmCLIVersion is the fpm release the install Job fetches when the bench
+	// image does not already ship the CLI. v3.0.0+ resolves the transitive app
+	// dependency tree (cascade install) and rolls back atomically on failure.
+	fpmCLIVersion = "v3.0.0"
 )
 
 // SiteAppReconciler reconciles a SiteApp object
@@ -386,6 +390,51 @@ if bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}' | grep -qx
   exit 0
 fi
 
+# FPM install path (preferred when the app is a published package). Installs a
+# prebuilt package — compiled assets + vendored wheels, installed offline — with
+# no yarn/pip build on the bench, and lets fpm resolve the transitive app
+# dependency tree. The git clone path below is the fallback for apps that have no
+# published package (FPM_PACKAGE empty).
+if [ -n "$FPM_PACKAGE" ]; then
+  echo "Installing $FPM_PACKAGE via FPM (repo: ${FPM_REPO:-none})..."
+  # Bench images may not ship the fpm CLI yet; fetch the pinned release if absent.
+  if ! command -v fpm >/dev/null 2>&1; then
+    echo "fpm CLI not found in image; fetching ${FPM_VERSION:-v3.0.0}..."
+    curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v3.0.0}/fpm-linux-amd64" && chmod +x /tmp/fpm
+    export PATH="/tmp:$PATH"
+  fi
+  if [ -n "$FPM_REPO" ]; then
+    # FPM_REPO_TYPE is "oci" (e.g. ghcr.io/vyogotech/fpm - the built packages) or
+    # "http". OCI registries are typically private, so FPM_USERNAME + the token in
+    # FPM_REPO_FPMREPO_PASSWORD authenticate the pull. The install resolver
+    # handles OCI natively (unlike get-app).
+    fpm repo add fpmrepo "$FPM_REPO" --type "${FPM_REPO_TYPE:-http}" ${FPM_USERNAME:+--username "$FPM_USERNAME"} 2>/dev/null || true
+    export FPM_REPO_FPMREPO_PASSWORD="${FPM_TOKEN:-}"
+  fi
+  cd /home/frappe/frappe-bench
+  # fpm install extracts to the FPM store, symlinks apps/<app>, and installs on the site.
+  fpm install "$FPM_PACKAGE" --bench-path /home/frappe/frappe-bench --site "$SITE_NAME"
+  # Durability: the FPM store (HOME/.fpm) is ephemeral, so relocate the app onto
+  # the sites PVC — the same durable location the git path uses — so it survives
+  # pod restarts and the serving pods (PYTHONPATH=sites/apps + sitecustomize)
+  # load it. Without this the app vanishes on the next roll.
+  SRC=$(readlink -f "/home/frappe/frappe-bench/apps/$APP_NAME" 2>/dev/null || true)
+  DEST="/home/frappe/frappe-bench/sites/apps/$APP_NAME"
+  if [ -n "$SRC" ] && [ -d "$SRC" ] && [ "$SRC" != "$DEST" ]; then
+    echo "Relocating $APP_NAME onto the sites PVC for durability..."
+    rm -rf "$DEST"; cp -a "$SRC" "$DEST"
+    ln -sfn "$DEST" "/home/frappe/frappe-bench/apps/$APP_NAME"
+    [ -d "$DEST/$APP_NAME/public" ] && ln -sfn "$DEST/$APP_NAME/public" "/home/frappe/frappe-bench/sites/assets/$APP_NAME"
+    grep -q "^$DEST$" /home/frappe/frappe-bench/sites/apps.pth 2>/dev/null || echo "$DEST" >> /home/frappe/frappe-bench/sites/apps.pth
+    grep -q "^$APP_NAME$" /home/frappe/frappe-bench/sites/apps.txt 2>/dev/null || echo "$APP_NAME" >> /home/frappe/frappe-bench/sites/apps.txt
+  fi
+  bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
+  echo "Verifying site health after FPM install..."
+  bench --site "$SITE_NAME" execute frappe.get_installed_apps
+  echo "FPM install complete for $APP_NAME."
+  exit 0
+fi
+
 # 1) Clone the target app (needed to read its dependency list).
 clone_app "$APP_NAME" "$GIT_REPO" "$GIT_BRANCH"
 
@@ -438,8 +487,24 @@ bench --site "$SITE_NAME" execute frappe.get_installed_apps
 			{Name: "SITE_NAME", Value: site.Spec.SiteName},
 			{Name: "GIT_REPO", Value: siteApp.Spec.GitRepo},
 			{Name: "GIT_BRANCH", Value: siteApp.Spec.GitBranch},
+			{Name: "FPM_PACKAGE", Value: siteApp.Spec.FPMPackage},
+			{Name: "FPM_REPO", Value: siteApp.Spec.FPMRepo},
+			{Name: "FPM_REPO_TYPE", Value: siteApp.Spec.FPMRepoType},
+			{Name: "FPM_VERSION", Value: fpmCLIVersion},
 			{Name: "FRAPPE_VERSION", Value: bench.Spec.FrappeVersion},
 			{Name: "USER", Value: "frappe"},
+		}
+		// Credentials for a private OCI registry come from the optional
+		// "fpm-registry-auth" Secret in the site's namespace; the env is a no-op
+		// (empty) until that Secret is provisioned, so the HTTP path is unaffected.
+		if siteApp.Spec.FPMRepoType == "oci" {
+			optional := true
+			env = append(env,
+				corev1.EnvVar{Name: "FPM_USERNAME", ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "fpm-registry-auth"}, Key: "username", Optional: &optional}}},
+				corev1.EnvVar{Name: "FPM_TOKEN", ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "fpm-registry-auth"}, Key: "token", Optional: &optional}}},
+			)
 		}
 
 		newJob := r.buildAppJob(siteApp, jobName, "app-installer", image, pvcName, script, env, int32(1), nil)

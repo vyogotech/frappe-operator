@@ -39,6 +39,29 @@ type SiteAppSpec struct {
 	// +optional
 	GitBranch string `json:"gitBranch,omitempty"`
 
+	// FPMPackage, when set, installs the app from a prebuilt FPM package
+	// ("<org>/<app>==<version>", e.g. "frappe/wiki==3.0.0") instead of a runtime
+	// git clone. The package ships compiled assets + vendored wheels, so no
+	// yarn/pip build runs on the bench. This is the preferred path; GitRepo is the
+	// fallback for apps that have no published package.
+	// +optional
+	FPMPackage string `json:"fpmPackage,omitempty"`
+
+	// FPMRepo is the FPM registry the package is resolved from — either an HTTP
+	// registry ("https://fpm.vyogo.tech") or an OCI registry
+	// ("ghcr.io/vyogotech/fpm", where the built packages live). Required
+	// alongside FPMPackage.
+	// +optional
+	FPMRepo string `json:"fpmRepo,omitempty"`
+
+	// FPMRepoType is the registry backend: "oci" or "http" (default "http").
+	// OCI registries (ghcr) hold the prod-built packages and are usually private,
+	// so credentials come from the "fpm-registry-auth" Secret (keys: username,
+	// token) in the site's namespace.
+	// +optional
+	// +kubebuilder:validation:Enum=http;oci
+	FPMRepoType string `json:"fpmRepoType,omitempty"`
+
 	// AutoMigrate determines whether to trigger database migration after app installation. Defaults to true.
 	// +optional
 	// +kubebuilder:default=true
