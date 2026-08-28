@@ -312,6 +312,15 @@ cat << "EOF" > /home/frappe/frappe-bench/sites/apps/sitecustomize.py
 import sys, os
 apps_dir = "/home/frappe/frappe-bench/sites/apps"
 ignored = {"frappe", "erpnext", "custom_demo_app", "__pycache__"}
+# FPM apps vendor their Python dependencies as wheels; the install job unpacks
+# them into this durable PVC dir (pip --target) so the serving pods — which do
+# not share the install job's ephemeral env/ — can import them. It is APPENDED,
+# not prepended: the bench env's own pins (frappe's requests/pytz) must win for
+# shared packages, and .pydeps only supplies deps the base image lacks. Named
+# with a leading dot so the app-dir scan below skips it.
+deps_dir = os.path.join(apps_dir, ".pydeps")
+if os.path.isdir(deps_dir) and deps_dir not in sys.path:
+    sys.path.append(deps_dir)
 if os.path.exists(apps_dir):
     for entry in os.listdir(apps_dir):
         if entry.startswith(".") or entry in ignored:
@@ -427,6 +436,18 @@ if [ -n "$FPM_PACKAGE" ]; then
     [ -d "$DEST/$APP_NAME/public" ] && ln -sfn "$DEST/$APP_NAME/public" "/home/frappe/frappe-bench/sites/assets/$APP_NAME"
     grep -q "^$DEST$" /home/frappe/frappe-bench/sites/apps.pth 2>/dev/null || echo "$DEST" >> /home/frappe/frappe-bench/sites/apps.pth
     grep -q "^$APP_NAME$" /home/frappe/frappe-bench/sites/apps.txt 2>/dev/null || echo "$APP_NAME" >> /home/frappe/frappe-bench/sites/apps.txt
+    # Stage the app's vendored wheels into a durable PVC dir so the serving pods
+    # (which do not share this job's env/) can import the app's Python deps. The
+    # wheels came with the .fpm and are installed offline. sitecustomize appends
+    # .pydeps to sys.path, so the bench env's own pins still win for shared deps.
+    if ls "$DEST"/wheels/*.whl >/dev/null 2>&1; then
+      PYDEPS="/home/frappe/frappe-bench/sites/apps/.pydeps"
+      mkdir -p "$PYDEPS"
+      echo "Staging vendored wheels for $APP_NAME into $PYDEPS..."
+      /home/frappe/frappe-bench/env/bin/pip install --no-index --find-links "$DEST/wheels" \
+        --target "$PYDEPS" --upgrade "$DEST"/wheels/*.whl 2>/dev/null || \
+        echo "warning: could not stage vendored wheels; app deps must be in the base image"
+    fi
   fi
   bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
   echo "Verifying site health after FPM install..."
@@ -604,8 +625,13 @@ func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, c
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser:  ptr.To(int64(1000)),
-						RunAsGroup: ptr.To(int64(1000)),
+						RunAsUser: ptr.To(int64(1000)),
+						// Group 0 (not 1000) to match the serving pods: the bench
+						// image's apps/ and env/ dirs are root-group-writable
+						// (mode 775), so a job running as gid 1000 cannot write the
+						// apps/<name> symlink that `fpm install` requires — the git
+						// path only survived because its symlink is `|| true`.
+						RunAsGroup: ptr.To(int64(0)),
 						FSGroup:    ptr.To(int64(1000)),
 					},
 					Containers: []corev1.Container{
