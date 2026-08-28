@@ -341,6 +341,73 @@ func TestSiteAppReconciler_Reconcile_SkipsWhenAlreadyReconciled(t *testing.T) {
 	}
 }
 
+// A SiteApp carrying an FPMPackage must install via `fpm install` (prebuilt
+// package) rather than a git clone; git stays the fallback for apps without one.
+func TestSiteAppReconciler_Reconcile_FPMInstallPath(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+	ctx := context.Background()
+
+	skipBackup := false
+	siteApp := &vyogotechv1.SiteApp{
+		ObjectMeta: metav1.ObjectMeta{Name: "app1", Namespace: "default", Finalizers: []string{siteAppFinalizer}},
+		Spec: vyogotechv1.SiteAppSpec{
+			SiteRef:             &vyogotechv1.NamespacedName{Name: "site1"},
+			AppName:             "wiki",
+			FPMPackage:          "frappe/wiki==3.0.0",
+			FPMRepo:             "ghcr.io/vyogotech/fpm",
+			FPMRepoType:         "oci",
+			BackupBeforeInstall: skipBackup, // skip preflight backup so the install Job is built now
+		},
+	}
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeSiteSpec{BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"}, SiteName: "site1.example.com"},
+		Status:     vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "16.0.0"},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithRuntimeObjects(siteApp, site, bench).WithStatusSubresource(siteApp).Build()
+	r := &SiteAppReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "app1", Namespace: "default"}}); err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+
+	job := &batchv1.Job{}
+	if err := client.Get(ctx, types.NamespacedName{Name: "app1-app-install", Namespace: "default"}, job); err != nil {
+		t.Fatalf("expected install Job to be created: %v", err)
+	}
+	script := strings.Join(job.Spec.Template.Spec.Containers[0].Command, "\n") +
+		strings.Join(job.Spec.Template.Spec.Containers[0].Args, "\n")
+	if !strings.Contains(script, `fpm install "$FPM_PACKAGE"`) {
+		t.Error("install Job script must use `fpm install` when FPMPackage is set")
+	}
+	if !strings.Contains(script, `--type "${FPM_REPO_TYPE:-http}"`) {
+		t.Error("install Job script must configure the repo backend type (OCI vs HTTP)")
+	}
+	// The package + repo must reach the Job as env.
+	env := map[string]string{}
+	authFrom := map[string]bool{}
+	for _, e := range job.Spec.Template.Spec.Containers[0].Env {
+		env[e.Name] = e.Value
+		if e.ValueFrom != nil && e.ValueFrom.SecretKeyRef != nil {
+			authFrom[e.Name] = e.ValueFrom.SecretKeyRef.Name == "fpm-registry-auth"
+		}
+	}
+	if env["FPM_PACKAGE"] != "frappe/wiki==3.0.0" || env["FPM_REPO"] != "ghcr.io/vyogotech/fpm" || env["FPM_REPO_TYPE"] != "oci" {
+		t.Errorf("FPM env not passed to Job: %v", env)
+	}
+	// A private OCI registry needs credentials from the fpm-registry-auth Secret.
+	if !authFrom["FPM_USERNAME"] || !authFrom["FPM_TOKEN"] {
+		t.Error("OCI install must source FPM_USERNAME/FPM_TOKEN from the fpm-registry-auth Secret")
+	}
+}
+
 func TestSiteAppReconciler_reloadBenchServingPods(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
