@@ -449,6 +449,12 @@ if [ -n "$FPM_PACKAGE" ]; then
         echo "warning: could not stage vendored wheels; app deps must be in the base image"
     fi
   fi
+  # Always (re)create the /assets/<app> symlink, not just during the one-time
+  # relocate above. The relocate block is skipped whenever the app is already on
+  # the PVC (a re-reconcile, or a retried install), and a bench step can drop
+  # sites/assets — either way the symlink goes missing and the app's frontend
+  # 404s (only the framework's /assets/frappe/* load). ln -sfn is idempotent.
+  [ -d "$DEST/$APP_NAME/public" ] && ln -sfn "$DEST/$APP_NAME/public" "/home/frappe/frappe-bench/sites/assets/$APP_NAME"
   bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
   echo "Verifying site health after FPM install..."
   bench --site "$SITE_NAME" execute frappe.get_installed_apps
