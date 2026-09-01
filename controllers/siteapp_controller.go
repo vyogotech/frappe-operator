@@ -653,6 +653,19 @@ func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, c
 									MountPath: "/home/frappe/frappe-bench/sites",
 									SubPath:   "frappe-sites",
 								},
+								// sites/assets is a SEPARATE subPath overlay in the
+								// serving pods (frappebench_deployments.go) and every
+								// other job (frappesite_jobs, sitebackup, siterestore).
+								// Without the same overlay here, this job's writes to
+								// sites/assets go to the parent mount's assets subdir,
+								// which is a different bind mount than the serving pods
+								// read — so the /assets/<app> symlink never reaches them
+								// and the app's frontend 404s. Mount it identically.
+								{
+									Name:      "sites",
+									MountPath: "/home/frappe/frappe-bench/sites/assets",
+									SubPath:   "frappe-sites/assets",
+								},
 								{
 									Name:      "bench-logs",
 									MountPath: "/home/frappe/frappe-bench/logs",
