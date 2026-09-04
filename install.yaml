@@ -3898,6 +3898,31 @@ spec:
                   This creates a rollback point in case the install corrupts the site.
                   Defaults to true; set false to skip (e.g. for throwaway sites).
                 type: boolean
+              fpmPackage:
+                description: |-
+                  FPMPackage, when set, installs the app from a prebuilt FPM package
+                  ("<org>/<app>==<version>", e.g. "frappe/wiki==3.0.0") instead of a runtime
+                  git clone. The package ships compiled assets + vendored wheels, so no
+                  yarn/pip build runs on the bench. This is the preferred path; GitRepo is the
+                  fallback for apps that have no published package.
+                type: string
+              fpmRepo:
+                description: |-
+                  FPMRepo is the FPM registry the package is resolved from — either an HTTP
+                  registry ("https://fpm.vyogo.tech") or an OCI registry
+                  ("ghcr.io/vyogotech/fpm", where the built packages live). Required
+                  alongside FPMPackage.
+                type: string
+              fpmRepoType:
+                description: |-
+                  FPMRepoType is the registry backend: "oci" or "http" (default "http").
+                  OCI registries (ghcr) hold the prod-built packages and are usually private,
+                  so credentials come from the "fpm-registry-auth" Secret (keys: username,
+                  token) in the site's namespace.
+                enum:
+                - http
+                - oci
+                type: string
               gitBranch:
                 description: GitBranch specifies the Git branch or tag to clone (defaults to "main" or "master").
                 type: string
