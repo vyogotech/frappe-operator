@@ -429,6 +429,13 @@ if [ -n "$FPM_PACKAGE" ]; then
     export FPM_REPO_FPMREPO_PASSWORD="${FPM_TOKEN:-}"
   fi
   cd /home/frappe/frappe-bench
+  # Snapshot the bench env BEFORE fpm resolves anything. A package that ships no
+  # vendored wheels (the mirror publishes one as "published-nodeps" when a dep
+  # has no wheel for the target) makes fpm pip-install the app's deps from the
+  # network into THIS job's ephemeral env/. Whatever that adds beyond the base
+  # image is exactly what the serving pods will lack, so it is staged into
+  # .pydeps below by diffing against this snapshot.
+  /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-before.txt || true
   # fpm install extracts to the FPM store, symlinks apps/<app>, and installs on the site.
   fpm install "$FPM_PACKAGE" --bench-path /home/frappe/frappe-bench --site "$SITE_NAME"
   # Durability: the FPM store (HOME/.fpm) is ephemeral, so relocate the app onto
@@ -448,13 +455,34 @@ if [ -n "$FPM_PACKAGE" ]; then
     # (which do not share this job's env/) can import the app's Python deps. The
     # wheels came with the .fpm and are installed offline. sitecustomize appends
     # .pydeps to sys.path, so the bench env's own pins still win for shared deps.
+    PYDEPS="/home/frappe/frappe-bench/sites/apps/.pydeps"
     if ls "$DEST"/wheels/*.whl >/dev/null 2>&1; then
-      PYDEPS="/home/frappe/frappe-bench/sites/apps/.pydeps"
       mkdir -p "$PYDEPS"
       echo "Staging vendored wheels for $APP_NAME into $PYDEPS..."
       /home/frappe/frappe-bench/env/bin/pip install --no-index --find-links "$DEST/wheels" \
         --target "$PYDEPS" --upgrade "$DEST"/wheels/*.whl 2>/dev/null || \
         echo "warning: could not stage vendored wheels; app deps must be in the base image"
+    else
+      # No vendored wheels: fpm resolved the app's Python deps online into this
+      # job's env/ (see the snapshot above). Stage the dists that install ADDED
+      # beyond the base image into .pydeps, one by one with --no-deps, so nothing
+      # is re-resolved or rebuilt: every one of them was already fetched (or
+      # built) into pip's cache by the online install. Without this the app
+      # installs cleanly here and then 500s on every serving pod with
+      # "No module named <dep>" (insights/ibis was the case that found it).
+      /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-after.txt || true
+      NEWDEPS=$(comm -13 /tmp/pip-before.txt /tmp/pip-after.txt 2>/dev/null | grep -E '^[A-Za-z0-9][A-Za-z0-9._-]*==' || true)
+      if [ -n "$NEWDEPS" ]; then
+        mkdir -p "$PYDEPS"
+        echo "No vendored wheels for $APP_NAME; staging the $(printf '%s\n' "$NEWDEPS" | wc -l | tr -d ' ') Python deps its online install added into $PYDEPS:"
+        printf '%s\n' "$NEWDEPS" | sed 's/^/  /'
+        printf '%s\n' "$NEWDEPS" > /tmp/pydeps-requirements.txt
+        /home/frappe/frappe-bench/env/bin/pip install --no-deps --target "$PYDEPS" --upgrade \
+          -r /tmp/pydeps-requirements.txt 2>&1 | tail -5 || \
+          echo "warning: could not stage $APP_NAME's Python deps into $PYDEPS; the serving pods may fail to import it"
+      else
+        echo "No vendored wheels for $APP_NAME and its online install added nothing beyond the base image; nothing to stage."
+      fi
     fi
   fi
   # Always (re)create the /assets/<app> symlink, not just during the one-time
