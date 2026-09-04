@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -146,6 +147,27 @@ func benchJobEnv() []corev1.EnvVar {
 	}
 }
 
+// benchImageTag maps a bench's FrappeVersion onto the tag scheme the published
+// bench images actually use. A bare numeric major ("16") becomes "version-16"
+// (the vyogotech *-for-operator images and upstream frappe/erpnext both publish
+// version-N tags); a full semver ("16.0.0") keeps a leading "v" ("v16.0.0"),
+// which is what upstream tags point releases with. Anything else ("develop",
+// "latest", already-prefixed values) is passed through unchanged. Rewriting a
+// bare major to "v16" produced a tag that does not exist on any of these
+// registries, so every bench without an explicit imageConfig ImagePullBackOff'd.
+func benchImageTag(version string) string {
+	if version == "" || version == "latest" {
+		return version
+	}
+	if ok, _ := regexp.MatchString(`^\d+$`, version); ok {
+		return "version-" + version
+	}
+	if ok, _ := regexp.MatchString(`^\d+\.[\d.]+$`, version); ok {
+		return "v" + version
+	}
+	return version
+}
+
 // getBenchImage returns the image to use from the bench
 // Priority: 1. bench.spec.imageConfig, 2. operator ConfigMap defaults, 3. hardcoded constants
 func (r *FrappeSiteReconciler) getBenchImage(ctx context.Context, bench *vyogotechv1.FrappeBench) string {
@@ -156,7 +178,7 @@ func (r *FrappeSiteReconciler) getBenchImage(ctx context.Context, bench *vyogote
 			image = fmt.Sprintf("%s:%s", image, bench.Spec.ImageConfig.Tag)
 		} else if bench.Spec.FrappeVersion != "" {
 			// If tag not specified but version is, use version as tag
-			image = fmt.Sprintf("%s:%s", image, bench.Spec.FrappeVersion)
+			image = fmt.Sprintf("%s:%s", image, benchImageTag(bench.Spec.FrappeVersion))
 		}
 		return image
 	}
@@ -170,7 +192,7 @@ func (r *FrappeSiteReconciler) getBenchImage(ctx context.Context, bench *vyogote
 				// Extract repository from default image and append version tag
 				parts := strings.Split(defaultImage, ":")
 				if len(parts) == 2 {
-					return fmt.Sprintf("%s:%s", parts[0], bench.Spec.FrappeVersion)
+					return fmt.Sprintf("%s:%s", parts[0], benchImageTag(bench.Spec.FrappeVersion))
 				}
 			}
 			return defaultImage
@@ -179,7 +201,7 @@ func (r *FrappeSiteReconciler) getBenchImage(ctx context.Context, bench *vyogote
 
 	// Priority 3: Fall back to constants with version
 	if bench.Spec.FrappeVersion != "" && bench.Spec.FrappeVersion != "latest" {
-		return fmt.Sprintf("docker.io/frappe/erpnext:%s", bench.Spec.FrappeVersion)
+		return fmt.Sprintf("docker.io/frappe/erpnext:%s", benchImageTag(bench.Spec.FrappeVersion))
 	}
 	return constants.DefaultFrappeImage
 }
