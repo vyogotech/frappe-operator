@@ -29,10 +29,10 @@ func TestGetBenchImage_VersionPrefix(t *testing.T) {
 		expectedContains string
 	}{
 		{
-			name:             "version without v prefix gets v added",
+			name:             "bare major maps to the published version-N tag",
 			frappeVersion:    "15",
 			imageConfig:      nil,
-			expectedContains: ":v15",
+			expectedContains: ":version-15",
 		},
 		{
 			name:             "version with v prefix stays unchanged",
@@ -41,10 +41,10 @@ func TestGetBenchImage_VersionPrefix(t *testing.T) {
 			expectedContains: ":v15",
 		},
 		{
-			name:             "version 14 without v prefix gets v added",
+			name:             "bare major 14 maps to version-14",
 			frappeVersion:    "14",
 			imageConfig:      nil,
-			expectedContains: ":v14",
+			expectedContains: ":version-14",
 		},
 		{
 			name:          "custom repository ignored if no tag",
@@ -52,7 +52,7 @@ func TestGetBenchImage_VersionPrefix(t *testing.T) {
 			imageConfig: &vyogotechv1.ImageConfig{
 				Repository: "custom/repo",
 			},
-			expectedContains: ":v15",
+			expectedContains: ":version-15",
 		},
 		{
 			name:          "custom image with full tag used directly",
