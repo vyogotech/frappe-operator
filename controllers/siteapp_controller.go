@@ -311,7 +311,15 @@ mkdir -p /home/frappe/frappe-bench/sites/apps 2>/dev/null || true
 cat << "EOF" > /home/frappe/frappe-bench/sites/apps/sitecustomize.py
 import sys, os
 apps_dir = "/home/frappe/frappe-bench/sites/apps"
-ignored = {"frappe", "erpnext", "custom_demo_app", "__pycache__"}
+# Only skip what the bench IMAGE already provides on sys.path. frappe is baked
+# into every bench image (apps/frappe); everything else -- erpnext INCLUDED -- is
+# installed per-site via FPM into sites/apps and MUST be added here, or a bare
+# import of erpnext resolves the outer repo dir as a namespace package and
+# erpnext.startup (and every submodule) is missing -> 500. The standard/pooled
+# bench runs the frappe-only image (frappe-for-operator), so erpnext is NOT baked.
+# (A bench image that DID bake erpnext keeps apps/erpnext earlier on sys.path, so
+# adding sites/apps/erpnext is harmless there.)
+ignored = {"frappe", "__pycache__"}
 # FPM apps vendor their Python dependencies as wheels; the install job unpacks
 # them into this durable PVC dir (pip --target) so the serving pods — which do
 # not share the install job's ephemeral env/ — can import them. It is APPENDED,
