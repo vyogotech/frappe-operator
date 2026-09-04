@@ -1,32 +1,33 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: external-bench
 spec:
   frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+    pullPolicy: Always
   redisConfig:
     type: redis
     external: true
-    host: redis-external.default.svc.cluster.local
+    host: redis-external
     port: 6379
     connectionSecretRef:
       name: external-redis-creds
   storageSize: 2Gi
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
-  name: external-site
+  name: external-sites
 spec:
   benchRef:
     name: external-bench
   siteName: external.test.local
   dbConfig:
-    provider: mariadb
-    external: true
-    host: mariadb-external.default.svc.cluster.local
-    port: 3306
-    user: root
-    rootPasswordSecretRef:
+    provider: external
+    host: mariadb-external
+    port: "3306"
+    connectionSecretRef:
       name: external-mariadb-creds
-      key: root-password

@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 2.6.3
+VERSION ?= 5.0.0
 CONTAINER_TOOL ?= podman
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -140,6 +140,13 @@ e2e-test: manifests generate docker-build ## Run end-to-end tests.
 	# Run e2e tests
 	E2E_TEST=true go test ./test/e2e/... -v -ginkgo.v
 
+##@ Release
+
+.PHONY: bump-version
+bump-version: ## Automatically bump the operator version across the repo (e.g. make bump-version VERSION=3.2.0)
+	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is not set. Use make bump-version VERSION=X.Y.Z"; exit 1; fi
+	./scripts/bump-version.sh "$(VERSION)"
+
 ##@ Build
 
 .PHONY: build
@@ -218,6 +225,15 @@ KUSTOMIZE_VERSION ?= v3.8.7
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
+# Fetch the pinned kustomize straight from its release asset. The upstream
+# install_kustomize.sh discovers the download URL through api.github.com, which
+# is unauthenticated on CI runners and fails with "Github rate-limiter failed
+# the request" whenever the shared runner IP is over quota (it broke the Release
+# and Validate Example Manifests workflows). The script stays as a fallback for
+# a platform without a prebuilt asset at this version (darwin/arm64 for v3.8.7).
+KUSTOMIZE_OS ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
+KUSTOMIZE_ARCH ?= $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
+KUSTOMIZE_URL ?= https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F$(KUSTOMIZE_VERSION)/kustomize_$(KUSTOMIZE_VERSION)_$(KUSTOMIZE_OS)_$(KUSTOMIZE_ARCH).tar.gz
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
 $(KUSTOMIZE): $(LOCALBIN)
@@ -225,7 +241,11 @@ $(KUSTOMIZE): $(LOCALBIN)
 		echo "$(LOCALBIN)/kustomize version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/kustomize; \
 	fi
-	test -s $(LOCALBIN)/kustomize || { curl -Ss $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }
+	test -s $(LOCALBIN)/kustomize || curl -fsSL "$(KUSTOMIZE_URL)" | tar -xz -C $(LOCALBIN) kustomize || { \
+		echo "no prebuilt kustomize at $(KUSTOMIZE_URL); falling back to the upstream install script"; \
+		rm -f $(LOCALBIN)/kustomize; \
+		curl -Ss $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }
+	chmod +x $(LOCALBIN)/kustomize
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
@@ -243,6 +263,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 	operator-sdk generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
+	sed -i.bak -e '/namespace: frappe-operator-system/d' bundle/manifests/frappe-operator-config_v1_configmap.yaml && rm bundle/manifests/*.bak || true
 	operator-sdk bundle validate ./bundle
 
 .PHONY: bundle-build

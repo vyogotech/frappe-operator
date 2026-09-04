@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: autoscaling-keda-bench
@@ -6,8 +6,8 @@ metadata:
 spec:
   frappeVersion: "15.0.0"
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-7bc7484
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: v3.1.0
     pullPolicy: Always
   
   # External Redis configuration

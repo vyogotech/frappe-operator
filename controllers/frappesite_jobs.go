@@ -19,9 +19,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 	"github.com/vyogotech/frappe-operator/pkg/scripts"
@@ -30,13 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ensureSiteInitialized creates a Job to run bench new-site
-func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials) (bool, error) {
+func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	jobName := fmt.Sprintf("%s-init", site.Name)
@@ -45,52 +47,37 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	// Check for site version annotation
 	versionAnnotation := "frappe.io/site-version"
 	siteVersionVal := site.Annotations[versionAnnotation]
+	if siteVersionVal == "" {
+		siteVersionVal = "default"
+	}
 	logger.Info("Checking site version annotation", "siteVersion", siteVersionVal)
+
+	// If already initialized with this exact version, return success immediately
+	if site.Status.ObservedSiteVersion == siteVersionVal && site.Status.Phase == vyogotechv1.FrappeSitePhaseReady {
+		return true, nil
+	}
 
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: site.Namespace}, job)
 	if err == nil {
 		// Job exists
 		jobVersionVal := job.Annotations[versionAnnotation]
-		logger.Info("Job exists, checking version annotations", "jobName", jobName, "jobVersion", jobVersionVal, "siteVersion", siteVersionVal)
-
-		// Check if a specific version or update is requested
-		if siteVersionVal != "" {
-			if siteVersionVal != jobVersionVal {
-				logger.Info("Version change detected, deleting init job for update", "old", jobVersionVal, "new", siteVersionVal)
-				if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
-					return false, fmt.Errorf("failed to delete init job for update: %w", err)
-				}
-				// Requeue to create new job
-				return false, nil
-			}
-			logger.Info("Version values match, no action needed")
-		} else {
-			logger.Info("No version annotation requested")
+		if jobVersionVal == "" {
+			jobVersionVal = "default"
+		}
+		if siteVersionVal == "" {
+			siteVersionVal = "default"
 		}
 
-		// Check if apps in Spec are different from the apps the Job was created with
-		jobApps, hasAnnotation := job.Annotations["vyogo.tech/apps"]
-		appsChanged := false
-		if hasAnnotation {
-			appsChanged = jobApps != strings.Join(site.Spec.Apps, ",")
-		} else if site.Status.Phase == vyogotechv1alpha1.FrappeSitePhaseReady {
-			// Fallback for legacy jobs when site is already Ready
-			if len(site.Spec.Apps) != len(site.Status.InstalledApps) {
-				appsChanged = true
-			} else {
-				for i, app := range site.Spec.Apps {
-					if app != site.Status.InstalledApps[i] {
-						appsChanged = true
-						break
-					}
-				}
-			}
-		}
+		currentAppsList := strings.Join(site.Spec.Apps, ",")
+		jobAppsList := job.Annotations["frappe.io/apps-list"]
 
-		if appsChanged {
-			logger.Info("App installation spec changed, deleting init job for update", "old", jobApps, "new", strings.Join(site.Spec.Apps, ","))
+		logger.Info("Job exists, checking annotations", "jobName", jobName, "jobVersion", jobVersionVal, "siteVersion", siteVersionVal, "jobApps", jobAppsList, "siteApps", currentAppsList)
+
+		// If the existing job has an older version or different apps, delete it to restart
+		if siteVersionVal != jobVersionVal || currentAppsList != jobAppsList {
+			logger.Info("Init job outdated (version or apps changed), deleting to restart", "oldVersion", jobVersionVal, "newVersion", siteVersionVal, "oldApps", jobAppsList, "newApps", currentAppsList)
 			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
-				return false, fmt.Errorf("failed to delete init job for app update: %w", err)
+				return false, fmt.Errorf("failed to delete init job for update: %w", err)
 			}
 			// Requeue to create new job
 			return false, nil
@@ -115,28 +102,37 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 			return true, nil
 		}
 
-		if job.Status.Active > 0 {
-			// Job is still running
-			logger.Info("Site initialization job in progress", "job", jobName)
-			if len(site.Spec.Apps) > 0 {
-				site.Status.AppInstallationStatus = fmt.Sprintf("Installing %d app(s)... (attempts: %d)", len(site.Spec.Apps), job.Status.Failed+1)
-			}
-			return false, nil
-		}
-
 		if job.Status.Failed > 0 {
-			logger.Error(nil, "Site initialization job failed", "job", jobName, "failedCount", job.Status.Failed)
-			r.Recorder.Event(site, corev1.EventTypeWarning, "SiteInitializationFailed",
-				fmt.Sprintf("Site initialization job failed after %d attempt(s)", job.Status.Failed))
+			// Check whether the job has permanently failed (backoff limit exhausted)
+			// or is still retrying pods. A permanently failed job has a "Failed"
+			// condition with status True set by the Job controller.
+			jobPermanentlyFailed := false
+			for _, cond := range job.Status.Conditions {
+				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+					jobPermanentlyFailed = true
+					break
+				}
+			}
 
-			// Try to get pod logs for error details
+			if !jobPermanentlyFailed {
+				// Transient failure — job is still within backoffLimit, let it retry.
+				logger.Info("Site initialization job has pod failures but is still retrying",
+					"job", jobName, "failedCount", job.Status.Failed)
+				return false, nil
+			}
+
+			// Permanent failure — backoff limit exhausted.
+			logger.Error(nil, "Site initialization job permanently failed", "job", jobName, "failedCount", job.Status.Failed)
+			r.Recorder.Event(site, corev1.EventTypeWarning, "SiteInitializationFailed",
+				fmt.Sprintf("Site initialization job permanently failed after %d attempt(s)", job.Status.Failed))
+
+			// Collect pod logs for debugging
 			podList := &corev1.PodList{}
 			listOpts := []client.ListOption{
 				client.InNamespace(site.Namespace),
 				client.MatchingLabels{"job-name": jobName},
 			}
 			if err := r.List(ctx, podList, listOpts...); err == nil && len(podList.Items) > 0 {
-				// Check the most recent pod for error messages
 				pod := podList.Items[len(podList.Items)-1]
 				if pod.Status.Phase == corev1.PodFailed {
 					logger.Error(nil, "Site initialization pod failed",
@@ -145,7 +141,10 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 						"reason", pod.Status.Reason,
 						"message", pod.Status.Message)
 
-					// Update status with failure information
+					if logs, err := r.GetPodLogs(ctx, pod.Namespace, pod.Name); err == nil {
+						fmt.Printf("--- Logs for failed pod %s ---\n%s\n---------------------------\n", pod.Name, logs)
+					}
+
 					if len(site.Spec.Apps) > 0 {
 						site.Status.AppInstallationStatus = fmt.Sprintf("Failed to install apps: %s", pod.Status.Message)
 						r.Recorder.Event(site, corev1.EventTypeWarning, "AppInstallationFailed",
@@ -154,10 +153,14 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 				}
 			}
 
-			return false, fmt.Errorf("site initialization job failed")
+			return false, fmt.Errorf("site initialization job permanently failed after %d attempt(s): backoff limit exhausted", job.Status.Failed)
 		}
-
-		return false, fmt.Errorf("site initialization job is in an unknown state")
+		// Job is still running
+		logger.Info("Site initialization job in progress", "job", jobName)
+		if len(site.Spec.Apps) > 0 {
+			site.Status.AppInstallationStatus = fmt.Sprintf("Installing %d app(s)...", len(site.Spec.Apps))
+		}
+		return false, nil
 	}
 
 	if !errors.IsNotFound(err) {
@@ -188,7 +191,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	}
 
 	// Ensure initialization secret exists with all credentials
-	if err := r.ensureInitSecrets(ctx, site, bench, domain, dbInfo, dbCreds, adminPassword, r.resolveRedisURL(ctx, bench)); err != nil {
+	if err := r.ensureInitSecrets(ctx, site, bench, domain, dbInfo, dbCreds, adminPassword, r.resolveRedisCacheURL(ctx, bench), r.resolveRedisQueueURL(ctx, bench)); err != nil {
 		logger.Error(err, "Failed to create initialization secret")
 		return false, fmt.Errorf("failed to create init secret: %w", err)
 	}
@@ -210,6 +213,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 
 	// Build the container
 	container := resources.NewContainerBuilder("site-init", r.getBenchImage(ctx, bench)).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithCommand("bash", "-c").
 		WithArgs(initScript).
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
@@ -220,18 +224,18 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		Build()
 
 	// Prepare job annotations
-	jobAnnotations := map[string]string{
-		"vyogo.tech/apps": strings.Join(site.Spec.Apps, ","),
-	}
+	jobAnnotations := map[string]string{}
 	if siteVersionVal != "" {
 		jobAnnotations[versionAnnotation] = siteVersionVal
 	}
+	jobAnnotations["frappe.io/apps-list"] = strings.Join(site.Spec.Apps, ",")
 
 	// Build the job
 	job = resources.NewJobBuilder(jobName, site.Namespace).
 		WithLabels(extraLabels).
 		WithExtraPodLabels(extraLabels).
 		WithAnnotations(jobAnnotations).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).
 		WithTolerations(tolerations).
@@ -242,6 +246,8 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		WithOwner(site, r.Scheme).
 		MustBuild()
 
+	job.Spec.BackoffLimit = int32Ptr(0)
+
 	if err := r.Create(ctx, job); err != nil {
 		return false, err
 	}
@@ -251,11 +257,19 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 }
 
 // deleteSite implements the site deletion logic
-func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
+func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1.FrappeSite) error {
 	logger := log.FromContext(ctx)
 
+	// DeletionPolicy Retain (the default) preserves the database — skip the destructive
+	// `bench drop-site` job so an accidental CR delete or a GitOps prune can't drop tenant
+	// data. The database provider's Cleanup honours the same policy for the DB/user/cluster.
+	if site.Spec.DeletionPolicy != "Delete" {
+		logger.Info("DeletionPolicy is Retain; skipping bench drop-site to preserve data", "site", site.Name)
+		return nil
+	}
+
 	// Get the referenced bench
-	bench := &vyogotechv1alpha1.FrappeBench{}
+	bench := &vyogotechv1.FrappeBench{}
 	benchKey := types.NamespacedName{
 		Name:      site.Spec.BenchRef.Name,
 		Namespace: site.Spec.BenchRef.Namespace,
@@ -285,8 +299,11 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 		// Job doesn't exist, create it
 		logger.Info("Creating site deletion job", "job", jobName)
 
+		// Resolve DB Config
+		dbConfig := r.resolveDBConfig(site, bench)
+
 		// Get MariaDB root credentials for deletion
-		rootUser, rootPassword, err := r.getMariaDBRootCredentials(ctx, site)
+		rootUser, rootPassword, err := r.getMariaDBRootCredentials(ctx, site, dbConfig)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				logger.Info("MariaDB instance not found, skipping site deletion job")
@@ -346,6 +363,7 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 
 		// Build the container
 		container := resources.NewContainerBuilder("site-delete", r.getBenchImage(ctx, bench)).
+			WithImagePullPolicy(r.getImagePullPolicy(bench)).
 			WithCommand("bash", "-c").
 			WithArgs(deleteScript).
 			WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
@@ -359,6 +377,7 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 		job = resources.NewJobBuilder(jobName, site.Namespace).
 			WithLabels(extraLabels).
 			WithExtraPodLabels(extraLabels).
+			WithImagePullSecrets(r.getImagePullSecrets(bench)).
 			WithNodeSelector(nodeSelector).
 			WithAffinity(affinity).
 			WithTolerations(tolerations).
@@ -368,6 +387,8 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 			WithSecretVolume("deletion-secret", deletionSecretName, resources.Int32Ptr(0444)).
 			WithOwner(site, r.Scheme).
 			MustBuild()
+
+		job.Spec.BackoffLimit = int32Ptr(1)
 
 		if err := r.Create(ctx, job); err != nil {
 			return fmt.Errorf("failed to create site deletion job: %w", err)
@@ -385,19 +406,15 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 		return nil
 	}
 
-	if job.Status.Active > 0 {
-		return fmt.Errorf("site deletion job is still running")
-	}
-
 	if job.Status.Failed > 0 {
-		return fmt.Errorf("site deletion job failed after all attempts")
+		return fmt.Errorf("site deletion job failed")
 	}
 
-	return fmt.Errorf("site deletion job is in an unknown state")
+	return fmt.Errorf("site deletion job is still running")
 }
 
-// resolveRedisURL returns the Redis connection URL for the bench
-func (r *FrappeSiteReconciler) resolveRedisURL(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
+// resolveRedisCacheURL returns the Redis cache connection URL for the bench
+func (r *FrappeSiteReconciler) resolveRedisCacheURL(ctx context.Context, bench *vyogotechv1.FrappeBench) string {
 	// Default internal Redis URL
 	host := fmt.Sprintf("%s-redis-cache", bench.Name)
 	port := int32(6379)
@@ -431,4 +448,66 @@ func (r *FrappeSiteReconciler) resolveRedisURL(ctx context.Context, bench *vyogo
 		return fmt.Sprintf(":%s@%s:%d", password, host, port)
 	}
 	return fmt.Sprintf("%s:%d", host, port)
+}
+
+// resolveRedisQueueURL returns the Redis queue connection URL for the bench
+func (r *FrappeSiteReconciler) resolveRedisQueueURL(ctx context.Context, bench *vyogotechv1.FrappeBench) string {
+	// Default internal Redis URL
+	host := fmt.Sprintf("%s-redis-queue", bench.Name)
+	port := int32(6379)
+	password := ""
+
+	// If external Redis is configured, resolve host, port, and password
+	// (usually external configurations share the same endpoint for cache and queue)
+	if bench.Spec.RedisConfig != nil && bench.Spec.RedisConfig.External {
+		if bench.Spec.RedisConfig.Host != "" {
+			host = bench.Spec.RedisConfig.Host
+		}
+		if bench.Spec.RedisConfig.Port > 0 {
+			port = bench.Spec.RedisConfig.Port
+		}
+
+		// Resolve password from secret if provided
+		if bench.Spec.RedisConfig.ConnectionSecretRef != nil {
+			secret := &corev1.Secret{}
+			err := r.Get(ctx, types.NamespacedName{
+				Name:      bench.Spec.RedisConfig.ConnectionSecretRef.Name,
+				Namespace: bench.Namespace,
+			}, secret)
+			if err == nil {
+				if p, ok := secret.Data["password"]; ok {
+					password = string(p)
+				}
+			}
+		}
+	}
+
+	if password != "" {
+		return fmt.Sprintf(":%s@%s:%d", password, host, port)
+	}
+	return fmt.Sprintf("%s:%d", host, port)
+}
+
+// GetPodLogs retrieves logs from a pod
+func (r *FrappeSiteReconciler) GetPodLogs(ctx context.Context, namespace, podName string) (string, error) {
+	clientset, err := kubernetes.NewForConfig(r.Config)
+	if err != nil {
+		return "", err
+	}
+
+	podLogOpts := &corev1.PodLogOptions{}
+	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, podLogOpts)
+	podLogs, err := req.Stream(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer podLogs.Close()
+
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }

@@ -14,7 +14,23 @@ spec:
     singular: frappesite
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.benchRef.name
+      name: Bench
+      type: string
+    - jsonPath: .status.siteURL
+      name: URL
+      type: string
+    - jsonPath: .status.installedApps
+      name: Apps
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: FrappeSite is the Schema for the frappesites API
@@ -115,6 +131,14 @@ spec:
                     required:
                     - name
                     type: object
+                  maxStatementTimeSeconds:
+                    description: |-
+                      MaxStatementTimeSeconds bounds how long a single SQL statement may run, protecting
+                      the database from runaway queries (noisy-neighbor). It is applied via my.cnf on
+                      operator-provisioned (dedicated-mode) MariaDB only; for shared/external databases
+                      set max_statement_time on your own instance. 0 or unset leaves it unbounded.
+                    format: int64
+                    type: integer
                   mode:
                     default: shared
                     description: 'Mode: shared (one DB instance, multiple site databases)
@@ -180,11 +204,48 @@ spec:
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                 type: object
+              deletionPolicy:
+                default: Retain
+                description: |-
+                  DeletionPolicy controls what happens to the site's database resources when the
+                  FrappeSite is deleted. Applies to both MariaDB and PostgreSQL.
+                    - Retain (default): keep the database, user, and credential Secret (GitOps-safe;
+                      an accidental CR delete or ArgoCD prune won't drop tenant data).
+                    - Delete: hard-delete the database and user (and, for dedicated Postgres, the cluster).
+                enum:
+                - Retain
+                - Delete
+                type: string
               domain:
                 description: |-
                   Domain is the external domain for ingress
                   MUST match siteName (defaults to siteName if not specified)
                 type: string
+              encryptionKeySecretRef:
+                description: |-
+                  EncryptionKeySecretRef references a Secret containing an external encryption_key
+                  Key must be "encryption_key" in the referenced secret
+                properties:
+                  key:
+                    description: The key of the secret to select from.  Must be a
+                      valid secret key.
+                    type: string
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  optional:
+                    description: Specify whether the Secret or its key must be defined
+                    type: boolean
+                required:
+                - key
+                type: object
+                x-kubernetes-map-type: atomic
               ingress:
                 description: Ingress configuration
                 properties:

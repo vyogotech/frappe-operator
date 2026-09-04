@@ -14,6 +14,7 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --platform) PLATFORM="$2"; shift 2 ;;
     --scenario) SCENARIO="$2"; shift 2 ;;
+    --skip-operator-install) SKIP_OPERATOR_INSTALL="true"; shift 1 ;;
     *) echo "Unknown option $1"; exit 1 ;;
   esac
 done
@@ -37,72 +38,114 @@ if [ "$PLATFORM" == "openshift" ]; then
     sleep 5
 fi
 
-# 2. Install MariaDB Operator (Dependency)
-log "Installing MariaDB Operator..."
-helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
-helm repo update
-helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
-  --namespace $OPERATOR_NAMESPACE \
-  --create-namespace \
-  --set crds.enabled=true
-
-log "Waiting for MariaDB Operator to be ready..."
-kubectl rollout status deployment/mariadb-operator -n $OPERATOR_NAMESPACE --timeout=2m
-
-# 3. Install KEDA (for scaling scenarios)
-if [ "$SCENARIO" == "scaling" ]; then
-    log "Installing KEDA..."
-    helm repo add keda https://kedacore.github.io/charts
-    helm repo update
-    helm upgrade --install keda keda/keda \
-      --namespace $OPERATOR_NAMESPACE \
-      --set crds.install=true
+# 1b. Install Metrics Server (required for HPA/Scaling)
+log "Checking if Metrics API is available..."
+if ! kubectl get apiservice v1beta1.metrics.k8s.io &>/dev/null; then
+    log "Metrics API not found. Installing Metrics Server..."
+    kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
     
-    log "Waiting for KEDA to be ready..."
-    kubectl rollout status deployment/keda-operator -n $OPERATOR_NAMESPACE --timeout=2m
+    # Patch metrics-server to allow insecure TLS and set address types (required for KIND)
+    kubectl patch deployment metrics-server -n kube-system --type='json' \
+      -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}, {"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-preferred-address-types=InternalIP"}]'
+    
+    log "Waiting for metrics-server deployment to be ready..."
+    kubectl rollout status deployment/metrics-server -n kube-system --timeout=2m || true
+    
+    log "Waiting for Metrics API availability (kubectl get --raw /apis/metrics.k8s.io/v1beta1)..."
+    for i in {1..15}; do
+        if kubectl get --raw /apis/metrics.k8s.io/v1beta1 &>/dev/null; then
+            log "Metrics API is now available."
+            break
+        fi
+        echo -n "."
+        sleep 10
+    done
+else
+    log "Metrics API already available."
 fi
+
+# 2. (Removed independent MariaDB/KEDA installation - now handled by Frappe Operator chart)
+
+# 3. Setup Scenario Namespace
+log "Creating scenario namespace: $NAMESPACE"
+kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace mariadb --dry-run=client -o yaml | kubectl apply -f -
 
 # 4. Setup External Mocks (for external scenario)
 if [ "$SCENARIO" == "external" ]; then
     log "Deploying mock external MariaDB and Redis..."
     
     # Deploy a simple Redis
-    kubectl create deployment redis-external --image=redis:alpine
-    kubectl expose deployment redis-external --port=6379
-    kubectl create secret generic external-redis-creds --from-literal=redis-password="" --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create deployment redis-external --image=redis:alpine -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    kubectl expose deployment redis-external --port=6379 -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create secret generic external-redis-creds --from-literal=password="" --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
 
     # Deploy a simple MariaDB
-    kubectl create deployment mariadb-external --image=mariadb:10.6 --port=3306
-    kubectl set env deployment/mariadb-external MARIADB_ROOT_PASSWORD=frappe
-    kubectl expose deployment mariadb-external --port=3306
-    kubectl create secret generic external-mariadb-creds --from-literal=root-password=frappe --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create deployment mariadb-external --image=mariadb:10.6 --port=3306 -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    kubectl set env deployment/mariadb-external MARIADB_ROOT_PASSWORD=frappe MARIADB_DATABASE=external_test_local MARIADB_USER=external_test_local MARIADB_PASSWORD=frappe -n $NAMESPACE
+    kubectl expose deployment mariadb-external --port=3306 -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create secret generic external-mariadb-creds --from-literal=username=external_test_local --from-literal=password=frappe --from-literal=database=external_test_local --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
     
     log "Waiting for external mocks to be ready..."
-    kubectl rollout status deployment/redis-external --timeout=2m
-    kubectl rollout status deployment/mariadb-external --timeout=2m
+    kubectl rollout status deployment/redis-external -n $NAMESPACE --timeout=2m
+    kubectl rollout status deployment/mariadb-external -n $NAMESPACE --timeout=2m
 fi
 
-# 5. Install Frappe Operator
-log "Building Helm dependencies..."
-helm dependency update ./helm/frappe-operator
+if [ "$SKIP_OPERATOR_INSTALL" != "true" ]; then
+    log "Building Helm dependencies..."
+    helm dependency update ./helm/frappe-operator
 
-log "Installing Frappe Operator..."
-# We disable the mariadb-operator and keda sub-charts because we installed them independently
-# in steps 2 and 3 to ensure CRDs and standalone releases are properly managed.
-helm upgrade --install frappe-operator ./helm/frappe-operator \
-  --namespace $OPERATOR_NAMESPACE \
-  --set mariadb.enabled=true \
-  --set mariadb-operator.enabled=false \
-  --set keda.enabled=false 
+    log "Installing Frappe Operator (with MariaDB and KEDA dependencies)..."
+    # If OPERATOR_IMAGE is provided (e.g. from CI), split it into repo and tag for Helm
+    HELM_OPTS=("--set" "mariadb-operator.enabled=true" "--set" "keda.enabled=true" "--set" "operator.image.pullPolicy=IfNotPresent")
+    if [ -n "$OPERATOR_IMAGE" ]; then
+        IFS=':' read -ra ADDR <<< "$OPERATOR_IMAGE"
+        HELM_OPTS+=("--set" "operator.image.repository=${ADDR[0]}")
+        if [ -n "${ADDR[1]}" ]; then
+            HELM_OPTS+=("--set" "operator.image.tag=${ADDR[1]}")
+        fi
+    fi
 
-# 6. Apply Scenario Manifest
+    helm upgrade --install frappe-operator ./helm/frappe-operator \
+      --namespace $OPERATOR_NAMESPACE \
+      --create-namespace \
+      "${HELM_OPTS[@]}"
+
+    log "Waiting for all operator components to be ready..."
+    for deploy in $(kubectl get deployment -n $OPERATOR_NAMESPACE -o name); do
+        kubectl rollout status "$deploy" -n "$OPERATOR_NAMESPACE" --timeout=2m
+    done
+else
+    log "Skipping operator Helm installation (--skip-operator-install specified). Verifying existing deployments..."
+    for deploy in $(kubectl get deployment -n $OPERATOR_NAMESPACE -o name); do
+        kubectl rollout status "$deploy" -n "$OPERATOR_NAMESPACE" --timeout=2m
+    done
+fi
+
+log "Giving webhooks a moment to start listening..."
+sleep 15
+
+# 6. Apply scenario-independent MariaDB Instance
+log "Applying MariaDB instance from deploy/mariadb.yaml..."
+kubectl apply -f deploy/mariadb.yaml
+
+# 7. Apply Scenario Manifest
 log "Applying scenario: $SCENARIO..."
 MANIFEST="test/scenarios/${SCENARIO}.yaml"
 if [ ! -f "$MANIFEST" ]; then error "Scenario manifest $MANIFEST not found"; fi
 
-kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
-# Substitute placeholder image if present (standard CI practice)
-sed -e "s|ghcr.io/rmallam/frappe_docker|${OPERATOR_IMAGE:-ghcr.io/rmallam/frappe_docker}|g" "$MANIFEST" | kubectl apply -n $NAMESPACE -f -
+# If BENCH_IMAGE is provided, inject it into the manifest placeholder
+if [ -n "$BENCH_IMAGE" ]; then
+    IFS=':' read -ra ADDR <<< "$BENCH_IMAGE"
+    REPO="${ADDR[0]}"
+    TAG="${ADDR[1]:-latest}"
+    log "Injecting bench image: $REPO:$TAG"
+    sed -e "s|repository: ghcr.io/vyogotech/frappe_base|repository: $REPO|g" \
+        -e "s|tag: latest|tag: $TAG|g" \
+        "$MANIFEST" | kubectl apply -n $NAMESPACE -f -
+else
+    kubectl apply -n $NAMESPACE -f "$MANIFEST"
+fi
 
 # 7. Verification Loop
 log "Waiting for resources to reach Ready phase..."
@@ -115,8 +158,20 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     echo "Current Status: Bench=$BENCH_PHASE, Site=$SITE_PHASE ($ELAPSED/$TIMEOUT)"
     
     if [ "$BENCH_PHASE" == "Ready" ] && [ "$SITE_PHASE" == "Ready" ]; then
-        log "✅ SUCCESS: All resources are Ready!"
-        break
+        if [ "$SCENARIO" == "backup-restore" ]; then
+            BACKUP_PHASE=$(kubectl get sitebackup -n $NAMESPACE -o jsonpath='{.items[0].status.phase}' 2>/dev/null)
+            BACKUP_PHASE=${BACKUP_PHASE:-Pending}
+            echo "Backup Status: $BACKUP_PHASE"
+            if [ "$BACKUP_PHASE" == "Succeeded" ]; then
+                log "✅ SUCCESS: All resources are Ready and Backup is Succeeded!"
+                break
+            elif [ "$BACKUP_PHASE" == "Failed" ]; then
+                error "FAILED: SiteBackup reached Failed phase."
+            fi
+        else
+            log "✅ SUCCESS: All resources are Ready!"
+            break
+        fi
     fi
     
     if [ "$BENCH_PHASE" == "Failed" ] || [ "$SITE_PHASE" == "Failed" ]; then
@@ -149,6 +204,9 @@ else
     fi
 fi
 
+log "========================================="
+log "Final Resource State:"
+kubectl get frappesite,frappebench -n $NAMESPACE
 log "========================================="
 log "Scenario $SCENARIO on $PLATFORM PASSED!"
 log "========================================="

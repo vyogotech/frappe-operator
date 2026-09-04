@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 // SiteDashboardChartReconciler reconciles a SiteDashboardChart object
@@ -59,6 +59,6 @@ func (r *SiteDashboardChartReconciler) Reconcile(ctx context.Context, req ctrl.R
 // SetupWithManager sets up the controller with the Manager.
 func (r *SiteDashboardChartReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&vyogotechv1alpha1.SiteDashboardChart{}).
+		For(&vyogotechv1.SiteDashboardChart{}).
 		Complete(r)
 }

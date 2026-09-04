@@ -10,7 +10,7 @@ crds:
   enabled: false
 
 image:
-  repository: docker-registry3.mariadb.com/mariadb-operator/mariadb-operator
+  repository: ghcr.io/mariadb-operator/mariadb-operator
   pullPolicy: IfNotPresent
   # -- Image tag to use. By default the chart appVersion is used
   tag: ""
@@ -132,7 +132,7 @@ webhook:
   # -- Specifies whether the webhook should be created.
   enabled: true
   image:
-    repository: docker-registry3.mariadb.com/mariadb-operator/mariadb-operator
+    repository: ghcr.io/mariadb-operator/mariadb-operator
     pullPolicy: IfNotPresent
     # -- Image tag to use. By default the chart appVersion is used
     tag: ""
@@ -220,8 +220,10 @@ webhook:
 certController:
   # -- Specifies whether the cert-controller should be created.
   enabled: true
+  serviceAccount:
+    name: mariadb-cert-controller
   image:
-    repository: docker-registry3.mariadb.com/mariadb-operator/mariadb-operator
+    repository: ghcr.io/mariadb-operator/mariadb-operator
     pullPolicy: IfNotPresent
     # -- Image tag to use. By default the chart appVersion is used
     tag: ""

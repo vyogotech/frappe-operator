@@ -1,7 +1,7 @@
 # Example: FrappeBench with KEDA-based Worker Autoscaling
 # Demonstrates queue-based scaling with scale-to-zero support
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: worker-autoscale-bench
@@ -51,9 +51,9 @@ spec:
 
   # Resource limits
   componentResources:
-    worker-short:
-      requests: {cpu: "100m", memory: "256Mi"}
-      limits: {cpu: "500m", memory: "512Mi"}
-    worker-long:
+    workerShort:
+      requests: {cpu: "250m", memory: "512Mi"}
+      limits: {cpu: "1", memory: "1Gi"}
+    workerLong:
       requests: {cpu: "500m", memory: "1Gi"}
-      limits: {cpu: "1000m", memory: "2Gi"}
+      limits: {cpu: "2", memory: "2Gi"}

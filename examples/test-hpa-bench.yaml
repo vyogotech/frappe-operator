@@ -1,6 +1,6 @@
 # Simple FrappeBench with HPA autoscaling for E2E testing
 # Generated from configuration: /home/varun/projects/frappe-operator/test-config.conf
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: test-bench-hpa
@@ -10,8 +10,8 @@ spec:
   
   # Use custom Frappe image
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-ae82c47
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-15
   
   apps:
     - name: erpnext

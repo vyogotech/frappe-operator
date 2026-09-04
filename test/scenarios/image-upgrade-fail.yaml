@@ -1,0 +1,29 @@
+apiVersion: vyogo.tech/v1
+kind: FrappeBench
+metadata:
+  name: upgrade-bench
+spec:
+  frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_custom_apps
+    tag: latest
+    pullPolicy: IfNotPresent
+  storageSize: 2Gi
+---
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: upgrade-site
+spec:
+  benchRef:
+    name: upgrade-bench
+  siteName: upgrade.test.local
+  apps:
+    - erpnext
+    - hrms
+    - nonexistentapp
+  dbConfig:
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: mariadb

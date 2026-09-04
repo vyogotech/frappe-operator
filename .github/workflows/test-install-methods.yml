@@ -1,0 +1,162 @@
+name: Test Install Methods
+
+on:
+  pull_request:
+    branches: [release]
+  workflow_dispatch:
+
+jobs:
+  test-install-yaml:
+    name: Test manual install.yaml deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: install-yaml-test
+
+      - name: Install dependencies (MariaDB and KEDA)
+        run: |
+          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+          helm repo add keda https://kedacore.github.io/charts
+          helm repo update
+          
+          echo "Installing MariaDB Operator..."
+          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+            --namespace frappe-operator-system --create-namespace --set crds.enabled=true --wait
+            
+          echo "Installing KEDA..."
+          helm upgrade --install keda keda/keda \
+            --namespace frappe-operator-system --create-namespace --set crds.install=true --wait
+
+      - name: Build Operator Image
+        run: |
+          make build
+          docker build -t ghcr.io/vyogotech/frappe-operator:local-install-test -f Dockerfile .
+
+      - name: Load image into Kind
+        run: |
+          kind load docker-image ghcr.io/vyogotech/frappe-operator:local-install-test --name install-yaml-test
+
+      - name: Deploy Operator via committed install.yaml
+        run: |
+          # Replace the release image tag in the committed install.yaml with our local test image
+          sed "s|image: ghcr.io/vyogotech/frappe-operator:.*|image: ghcr.io/vyogotech/frappe-operator:local-install-test|g" install.yaml > test-install.yaml
+          kubectl apply -f test-install.yaml
+
+      - name: Verify Controller Status
+        run: |
+          kubectl get deployments -n frappe-operator-system
+          kubectl wait deployment/frappe-operator-controller-manager -n frappe-operator-system --for=condition=Available --timeout=120s
+          kubectl get pods -n frappe-operator-system
+          echo "✅ Operator successfully deployed via committed install.yaml and running!"
+
+  test-helm-install:
+    name: Test Helm deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: helm-install-test
+
+      - name: Install dependencies (MariaDB and KEDA)
+        run: |
+          helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+          helm repo add keda https://kedacore.github.io/charts
+          helm repo update
+          
+          helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+            --namespace frappe-operator-system --create-namespace --set crds.enabled=true --wait
+            
+          helm upgrade --install keda keda/keda \
+            --namespace frappe-operator-system --create-namespace --set crds.install=true --wait
+
+      - name: Deploy Operator via Live Helm Repo
+        run: |
+          # Add the live GitHub Pages repository
+          helm repo add frappe-operator https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/helm-repo
+          helm repo update
+          
+          # Deploy from the published repository
+          helm upgrade --install frappe-operator frappe-operator/frappe-operator \
+            --namespace frappe-operator-system \
+            --create-namespace \
+            --set operator.image.repository=ghcr.io/vyogotech/frappe-operator \
+            --set operator.image.tag=latest \
+            --set keda.enabled=false \
+            --set mariadb-operator.enabled=false
+            
+          echo "✅ Published Helm chart successfully pulled and deployed!"
+
+  test-olm-install:
+    name: Test OLM bundle deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: olm-install-test
+
+      - name: Install Operator SDK
+        run: |
+          export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
+          export OS=$(uname | awk '{print tolower($0)}')
+          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.34.1
+          curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
+          chmod +x operator-sdk_${OS}_${ARCH}
+          sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
+
+      - name: Build Operator Image
+        run: |
+          make build
+          docker build -t ghcr.io/vyogotech/frappe-operator:local-e2e -f Dockerfile .
+
+      - name: Run Operator Bundle
+        run: |
+          # Fix CSV to point to our loaded e2e operator image
+          sed -i "s|controller:latest|ghcr.io/vyogotech/frappe-operator:local-e2e|g" bundle/manifests/frappe-operator.clusterserviceversion.yaml || true
+          
+          # We use an ephemeral anonymous CI registry (ttl.sh) so operator-sdk and OLM 
+          # can pull the catalogs without internal loopback TLS connection timeouts.
+          export BUNDLE_IMAGE="ttl.sh/vyogotech-frappe-operator-bundle-${{ github.sha }}:15m"
+          
+          make bundle-build BUNDLE_IMG=$BUNDLE_IMAGE
+          docker push $BUNDLE_IMAGE
+
+          # Load into exact nodes so the local kind pulls cache instead of hitting the internet
+          kind load docker-image $BUNDLE_IMAGE --name olm-install-test
+          kind load docker-image ghcr.io/vyogotech/frappe-operator:local-e2e --name olm-install-test
+
+          echo "Running customized bundle install on cluster..."
+          operator-sdk olm install
+          kubectl create namespace frappe-operator-system || true
+          operator-sdk run bundle $BUNDLE_IMAGE \
+            --namespace frappe-operator-system \
+            --timeout 5m
+
+      - name: Verify Controller Status
+        run: |
+          kubectl get deployments -n frappe-operator-system
+          kubectl wait deployment -n frappe-operator-system --all --for=condition=Available --timeout=60s
+          kubectl get pods -n frappe-operator-system
+          echo "✅ OLM bundle deployment API objects successfully applied!"

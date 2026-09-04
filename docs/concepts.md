@@ -17,7 +17,7 @@ This architecture enables efficient multi-tenancy while maintaining isolation wh
 A **FrappeBench** represents a Frappe bench environment with shared infrastructure components:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: production-bench
@@ -48,7 +48,7 @@ spec:
 A **FrappeSite** represents an individual Frappe site with its own:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: customer1-site

@@ -136,7 +136,7 @@ kubectl delete validatingwebhookconfiguration frappe-operator-validating-webhook
 kubectl delete mutatingwebhookconfiguration frappe-operator-mutating-webhook-configuration
 
 # Reinstall operator
-kubectl apply -f config/install.yaml
+kubectl apply -f install.yaml
 ```
 
 ---

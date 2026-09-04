@@ -4,6 +4,51 @@
 set -e
 umask 0002
 
+# Post-hook to ensure site remains functional (CSS loads) even if upgrade/migration fails
+cleanup() {
+    # Only clear cache if the site directory exists (prevents failing during initial new-site creation)
+    if [ -n "$SITE_NAME" ] && [ -d "/home/frappe/frappe-bench/sites/$SITE_NAME" ] && [ -f "/home/frappe/frappe-bench/sites/$SITE_NAME/site_config.json" ]; then
+        echo "Running post-execution hook: clearing cache to ensure static assets load from new image..."
+        
+        # 1. Try standard bench clear-cache first
+        if ! bench --site "$SITE_NAME" clear-cache; then
+            echo "⚠ Warning: 'bench clear-cache' failed (likely due to broken app code)."
+            echo "Attempting to flush Redis cache directly as a fallback..."
+            
+            # 2. Fallback to direct Redis flush if bench context is broken
+            if [ -n "$REDIS_CACHE_ADDRESS" ]; then
+                # REDIS_CACHE_ADDRESS is typically host:port
+                REDIS_HOST=$(echo "$REDIS_CACHE_ADDRESS" | cut -d':' -f1)
+                REDIS_PORT=$(echo "$REDIS_CACHE_ADDRESS" | cut -d':' -f2)
+                
+                # Use frappe's venv which guarantees the redis package is installed
+                env/bin/python -c "
+import redis, sys
+try:
+    r = redis.Redis(host='$REDIS_HOST', port=int('$REDIS_PORT'))
+    keys_deleted = 0
+    for key in r.scan_iter('*'):
+        # Preserve user sessions so we don't log everyone out during a failed upgrade
+        if b'session' not in key:
+            r.delete(key)
+            keys_deleted += 1
+    print(f'✓ Safely flushed {keys_deleted} non-session keys from Redis cache directly.')
+except Exception as e:
+    print(f'Failed to flush redis safely: {e}')
+    sys.exit(1)
+" || echo "✗ Warning: Direct Redis flush also failed."
+            else
+                echo "✗ No REDIS_CACHE_ADDRESS found, skipping direct flush."
+            fi
+        else
+            echo "✓ Cache cleared successfully."
+        fi
+    fi
+}
+trap cleanup EXIT
+
+echo "DEBUG: Running site_init.sh version $(date)"
+
 # Setup user for OpenShift compatibility (fixes getpwuid() error)
 if ! whoami &>/dev/null; then
   export USER=frappe
@@ -23,17 +68,214 @@ ADMIN_PASSWORD=$(cat /tmp/site-secrets/admin_password)
 BENCH_NAME=$(cat /tmp/site-secrets/bench_name)
 DB_PROVIDER=$(cat /tmp/site-secrets/db_provider)
 APPS_TO_INSTALL=$(cat /tmp/site-secrets/apps_to_install 2>/dev/null || echo "")
-REDIS_ADDRESS=$(cat /tmp/site-secrets/redis_address)
+REDIS_CACHE_ADDRESS=$(cat /tmp/site-secrets/redis_cache_address 2>/dev/null || echo "")
+REDIS_QUEUE_ADDRESS=$(cat /tmp/site-secrets/redis_queue_address 2>/dev/null || echo "")
+SKIP_INIT=$(cat /tmp/site-secrets/skip_init 2>/dev/null || echo "false")
+ENCRYPTION_KEY=$(cat /tmp/site-secrets/encryption_key 2>/dev/null || echo "")
+
+# Sync assets from the image cache to the Persistent Volume BEFORE migration/initialization
+# This guarantees that even if database migration fails, assets are present for the web service
+if [ -d "/home/frappe/assets_cache" ]; then
+    echo "Syncing pre-built assets from image to PVC (preserving dynamic app hashes)..."
+    mkdir -p sites/assets
+    # Copy asset subdirectories with -rn (no-clobber) so new assets copy without overwriting existing files
+    cp -rn /home/frappe/assets_cache/* sites/assets/ 2>/dev/null || true
+
+    # Intelligently MERGE assets.json to update core hashes while preserving dynamic app hashes
+    python3 -c "
+import json, os
+
+cache_json = '/home/frappe/assets_cache/assets.json'
+site_json = 'sites/assets/assets.json'
+
+if os.path.exists(cache_json):
+    try:
+        with open(cache_json, 'r') as f:
+            new_assets = json.load(f)
+
+        current_assets = {}
+        if os.path.exists(site_json):
+            try:
+                with open(site_json, 'r') as f:
+                    current_assets = json.load(f)
+            except Exception:
+                pass
+
+        current_assets.update(new_assets)
+
+        with open(site_json, 'w') as f:
+            json.dump(current_assets, f, indent=2)
+        print('✓ Intelligently merged assets.json without losing dynamic app hashes')
+    except Exception as e:
+        print(f'Warning: assets.json merge failed: {e}')
+" || echo "Warning: Failed to merge assets.json"
+fi
+
+# Create or update common_site_config.json BEFORE migration/initialization
+echo "Creating common_site_config.json..."
+cat > sites/common_site_config.json <<EOF
+{
+  "redis_cache": "redis://${REDIS_CACHE_ADDRESS}",
+  "redis_queue": "redis://${REDIS_QUEUE_ADDRESS}",
+  "socketio_port": 9000
+}
+EOF
+
+# Centralized function to intelligently merge site_config.json without destroying existing keys
+update_site_config_json() {
+    echo "Intelligently updating site_config.json..."
+    python3 << 'PYTHON_SCRIPT'
+import json, os
+
+# Read from secret files mounted at /tmp/site-secrets
+with open('/tmp/site-secrets/site_name', 'r') as f:
+    site_name = f.read().strip()
+with open('/tmp/site-secrets/domain', 'r') as f:
+    domain = f.read().strip()
+try:
+    with open('/tmp/site-secrets/redis_cache_address', 'r') as f:
+        redis_cache_address = f.read().strip()
+except FileNotFoundError:
+    redis_cache_address = ""
+try:
+    with open('/tmp/site-secrets/redis_queue_address', 'r') as f:
+        redis_queue_address = f.read().strip()
+except FileNotFoundError:
+    redis_queue_address = ""
+with open('/tmp/site-secrets/db_host', 'r') as f:
+    db_host = f.read().strip()
+with open('/tmp/site-secrets/db_port', 'r') as f:
+    db_port = f.read().strip()
+with open('/tmp/site-secrets/db_name', 'r') as f:
+    db_name = f.read().strip()
+with open('/tmp/site-secrets/db_user', 'r') as f:
+    db_user = f.read().strip()
+with open('/tmp/site-secrets/db_password', 'r') as f:
+    db_password = f.read().strip()
+with open('/tmp/site-secrets/db_provider', 'r') as f:
+    db_provider = f.read().strip()
+
+try:
+    with open('/tmp/site-secrets/encryption_key', 'r') as f:
+        encryption_key = f.read().strip()
+except FileNotFoundError:
+    encryption_key = ""
+
+site_path = f"/home/frappe/frappe-bench/sites/{site_name}"
+config_file = os.path.join(site_path, "site_config.json")
+
+# Ensure directories exist
+os.makedirs(site_path, exist_ok=True)
+os.makedirs(os.path.join(site_path, "logs"), exist_ok=True)
+
+# Read or initialize config
+try:
+    with open(config_file, 'r') as f:
+        config = json.load(f)
+except FileNotFoundError:
+    config = {}
+
+# Update with resolved domain and redis configuration
+if domain:
+    config['host_name'] = domain
+if redis_cache_address:
+    config['redis_cache'] = f"redis://{redis_cache_address}"
+if redis_queue_address:
+    config['redis_queue'] = f"redis://{redis_queue_address}"
+
+# Explicitly add database credentials for self-healing
+config['db_name'] = db_name
+config['db_user'] = db_user
+config['db_password'] = db_password
+config['db_host'] = db_host
+config['db_port'] = int(db_port) if db_port.isdigit() else db_port
+config['db_type'] = db_provider
+
+# If an external encryption_key was securely provided, inject it
+if encryption_key:
+    config['encryption_key'] = encryption_key
+
+# Write back reliably
+with open(config_file, 'w') as f:
+    json.dump(config, f, indent=2)
+
+print(f"✓ Updated site_config.json successfully for {site_name}")
+PYTHON_SCRIPT
+}
+
+# --- Initialization Flow --- 
+
+IS_UPGRADE=$(cat /tmp/site-secrets/is_upgrade 2>/dev/null || echo "false")
 SKIP_INIT=$(cat /tmp/site-secrets/skip_init 2>/dev/null || echo "false")
 
 echo "Creating Frappe site: $SITE_NAME"
 echo "Domain: $DOMAIN"
 
-# If the site directory already exists, skip creation but update config
-if [[ -d "/home/frappe/frappe-bench/sites/$SITE_NAME" ]]; then
-    echo "Site $SITE_NAME already exists; skipping new-site and updating config."
+# Check directly against the database whether Frappe is already installed.
+# Emits exactly one of:
+#   "true"    - connected, the frappe app is installed (site exists)
+#   "false"   - connected, and the install table is genuinely absent (empty DB)
+#   "unknown" - could NOT determine (connection/query error, or non-SQL provider)
+# The "unknown" state is critical: a transient DB error (e.g. "Packet sequence number
+# wrong") must never be conflated with "empty", or we would destroy and recreate a
+# live, working site during a failed/racy upgrade.
+DB_HAS_FRAPPE=$(python3 << 'PYTHON_CHECK'
+import sys
+
+try:
+    with open('/tmp/site-secrets/db_host', 'r') as f: db_host = f.read().strip()
+    with open('/tmp/site-secrets/db_port', 'r') as f: db_port = f.read().strip()
+    with open('/tmp/site-secrets/db_name', 'r') as f: db_name = f.read().strip()
+    with open('/tmp/site-secrets/db_user', 'r') as f: db_user = f.read().strip()
+    with open('/tmp/site-secrets/db_password', 'r') as f: db_password = f.read().strip()
+    with open('/tmp/site-secrets/db_provider', 'r') as f: db_provider = f.read().strip()
+
+    if db_provider not in ('mariadb', 'external'):
+        print("unknown"); sys.exit(0)
+
+    import MySQLdb
+    db = MySQLdb.connect(host=db_host, port=int(db_port), user=db_user, passwd=db_password, db=db_name)
+    cur = db.cursor()
+    cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s AND table_name = 'tabInstalled Application'", (db_name,))
+    if cur.fetchone()[0] == 0:
+        print("false"); sys.exit(0)          # connected, table absent -> genuinely empty
+    cur.execute("SELECT COUNT(*) FROM `tabInstalled Application` WHERE app_name = 'frappe'")
+    print("true" if cur.fetchone()[0] > 0 else "false")
+except Exception as e:
+    sys.stderr.write("DB init-check could not determine site state: %s\n" % e)
+    print("unknown")                          # do NOT assume empty on error
+PYTHON_CHECK
+)
+
+# Durable local evidence that this site was already initialized. These live on the
+# sites PVC, so they survive bench image changes (unlike the racy is_upgrade flag,
+# which is derived from site.Status.Phase==Ready and can flip to false mid-rollout).
+SITE_DIR="/home/frappe/frappe-bench/sites/$SITE_NAME"
+SITE_ALREADY_INITIALIZED="false"
+if [[ -f "$SITE_DIR/.init_complete" ]] || [[ -f "$SITE_DIR/site_config.json" ]]; then
+    SITE_ALREADY_INITIALIZED="true"
+fi
+
+# Decision — skip the destructive new-site whenever ANYTHING indicates the site already
+# exists: DB confirms frappe, an explicit upgrade/skip flag, durable local evidence, OR
+# the DB state is merely unknown while a site directory is present. We create fresh ONLY
+# when we are confident the site is new: the DB is definitively empty AND there is no
+# local evidence of a prior init. This prevents a transient DB error or a racy is_upgrade
+# from wiping a working site during a failed upgrade (the fallback-trap guarantee).
+if [[ "$DB_HAS_FRAPPE" == "true" ]] || [[ "$IS_UPGRADE" == "true" ]] || [[ "$SKIP_INIT" == "true" ]] \
+   || [[ "$SITE_ALREADY_INITIALIZED" == "true" ]] \
+   || { [[ "$DB_HAS_FRAPPE" == "unknown" ]] && [[ -d "$SITE_DIR" ]]; }; then
+    echo "✓ Site $SITE_NAME already initialized (db=$DB_HAS_FRAPPE upgrade=$IS_UPGRADE skip=$SKIP_INIT local=$SITE_ALREADY_INITIALIZED); skipping new-site and updating config."
     goto_update_config=1
+    mkdir -p "$SITE_DIR"
+    touch "$SITE_DIR/.init_complete"
 else
+    if [[ -d "$SITE_DIR" ]]; then
+        # Reached only when the DB is CONFIRMED empty AND there is no durable local
+        # evidence of a prior init — i.e. a genuinely stale/half-created directory.
+        echo "Warning: Site directory exists but DB is confirmed uninitialized and no init marker present; cleaning up for a fresh new-site..."
+        rm -rf "$SITE_DIR"
+    fi
     goto_update_config=0
 fi
 
@@ -123,8 +365,13 @@ else
 	echo "=========================================="
 fi
 
-# Run bench new-site with provider-specific database configuration
-if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
+# run bench new-site with provider-specific database configuration
+if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]] || [[ "$DB_PROVIDER" == "external" ]]; then
+    # Map 'external' to 'mariadb' (engine) for script logic if it leaked through
+    if [[ "$DB_PROVIDER" == "external" ]]; then
+        DB_PROVIDER="mariadb"
+    fi
+
 	# For MariaDB and PostgreSQL: use pre-provisioned database with dedicated credentials
 	# These are mounted from secret volumes, not environment variables
 	DB_HOST=$(cat /tmp/site-secrets/db_host)
@@ -138,31 +385,42 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
 		exit 1
 	fi
 
+    # Strategy: If DB_USER != DB_NAME and bench doesn't support --db-user,
+    # or if we explicitly want to skip standard init (e.g. for external managed DBs),
+    # we use the manual config + migrate path which is much more reliable.
+    
+    USE_MANUAL_CONFIG=0
     if [[ "$SKIP_INIT" == "true" ]]; then
+        USE_MANUAL_CONFIG=1
+    fi
+
+    # Check bench capabilities
+    SUPPORTS_DB_USER=0
+    if bench new-site --help | grep -qE "db-user|mariadb-user"; then
+        SUPPORTS_DB_USER=1
+    fi
+
+    if [[ "$DB_USER" != "$DB_NAME" && "$SUPPORTS_DB_USER" -eq 0 ]]; then
+        echo "⚠ User '$DB_USER' differs from DB '$DB_NAME' but bench lacks --db-user support."
+        echo "  Switching to manual configuration path for reliable connection."
+        USE_MANUAL_CONFIG=1
+    fi
+
+    if [[ "$USE_MANUAL_CONFIG" -eq 1 ]]; then
         echo "=========================================="
-        echo "SKIP_INIT is true - Registering Existing Site"
+        echo "Manual Site Configuration (Migration Path)"
         echo "=========================================="
         echo "Site Name: $SITE_NAME"
         echo "Database Provider: $DB_PROVIDER"
         echo "Database Name: $DB_NAME"
+        echo "Database User: $DB_USER"
         echo "Database Host: $DB_HOST:$DB_PORT"
-        echo "Apps to Install: ${APPS_TO_INSTALL:-none}"
         echo "=========================================="
 
         mkdir -p "sites/$SITE_NAME/logs"
         
-        # Create site_config.json manually so bench migrate can run
-        cat > "sites/$SITE_NAME/site_config.json" <<EOF
-{
- "db_name": "$DB_NAME",
- "db_password": "$DB_PASSWORD",
- "db_type": "$DB_PROVIDER",
- "db_host": "$DB_HOST",
- "db_port": $DB_PORT,
- "db_user": "$DB_USER"
-}
-EOF
-        echo "✓ Created/Updated manual site_config.json"
+        # Merge credentials into site_config.json safely before migrating
+        update_site_config_json
         
         echo "Running bench migrate..."
         bench --site "$SITE_NAME" migrate
@@ -193,15 +451,16 @@ EOF
         echo "Apps to install: ${APPS_TO_INSTALL:-none}"
         echo "=========================================="
         
-        # Check if bench version supports --db-user flag
+        # Check if bench version supports --db-user flag AND if it's needed
         DB_USER_FLAG=""
-        if bench new-site --help | grep -q " --db-user"; then
-            echo "✓ Detected support for --db-user flag"
-            DB_USER_FLAG="--db-user=$DB_USER"
-        elif [[ "$DB_USER" != "$DB_NAME" ]]; then
-            echo "⚠ WARNING: Your bench version does not support --db-user. Using DB_NAME as username."
-        else
-            echo "✓ Bench version does not support --db-user, but DB_USER matches DB_NAME. Proceeding."
+        if [[ "$DB_USER" != "$DB_NAME" ]]; then
+            if [[ "$SUPPORTS_DB_USER" -eq 1 ]]; then
+                echo "✓ Detected support for --db-user flag (User differs from DB Name)"
+                DB_USER_FLAG="--db-user=$DB_USER"
+            else
+                echo "⚠ User '$DB_USER' differs from DB '$DB_NAME' but bench lacks --db-user support."
+                echo "  Process may fail if database user is not the same as database name."
+            fi
         fi
 
         echo ""
@@ -223,6 +482,7 @@ EOF
           --no-setup-db \
           --admin-password="$ADMIN_PASSWORD" \
           $INSTALL_APP_ARG \
+          --force \
           --verbose \
           "$SITE_NAME" 2>&1)
         SITE_CREATION_EXIT_CODE=$?
@@ -272,6 +532,12 @@ EOF
         echo "Site already exists - Running Maintenance"
         echo "=========================================="
         
+        # Ensure site_config.json has the correct DB credentials before migrating
+        # using bench set-config or our python helper to ensure proper formatting and handling
+        if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]]; then
+             update_site_config_json
+        fi
+
         echo "1. Running bench migrate..."
         bench --site "$SITE_NAME" migrate
         echo "✓ Migration completed."
@@ -286,98 +552,29 @@ EOF
                 fi
             done
         fi
+        
+        echo "3. Syncing Admin Password..."
+        if [[ -n "$ADMIN_PASSWORD" ]]; then
+            bench --site "$SITE_NAME" set-admin-password "$ADMIN_PASSWORD"
+            echo "✓ Admin password synchronized with Kubernetes Secret."
+        fi
+
+        echo "4. Cache will be cleared automatically by the post-execution hook."
     fi
 else
     echo "ERROR: Unsupported DB provider: $DB_PROVIDER"
     exit 1
 fi
 
-# Create or update common_site_config.json
-echo "Creating common_site_config.json..."
-cat > sites/common_site_config.json <<EOF
-{
-  "redis_cache": "redis://${REDIS_ADDRESS}",
-  "redis_queue": "redis://${REDIS_ADDRESS}",
-  "socketio_port": 9000
-}
-EOF
-
-# Sync assets from the image cache to the Persistent Volume
-if [ -d "/home/frappe/assets_cache" ]; then
-    echo "Syncing pre-built assets from image to PVC..."
-    mkdir -p sites/assets
-    # Use -R to copy recursively. We want to overwrite old assets with new ones from the image.
-    # But we don't want to delete files (unless we use rsync --delete which might be risky or unavailable)
-    cp -R /home/frappe/assets_cache/* sites/assets/ || echo "Warning: Failed to sync assets"
-fi
 
 echo "Site $SITE_NAME created successfully!"
 
-# Update site_config.json with domain and Redis configuration using Python
-echo "Updating site_config.json with domain and Redis"
-python3 << 'PYTHON_SCRIPT'
-import json, os
+# Final pass: Ensure site_config.json is up-to-date with domain and Redis configuration
+echo "Finalizing site configuration for domain: $DOMAIN and Redis Cache: $REDIS_CACHE_ADDRESS / Queue: $REDIS_QUEUE_ADDRESS"
+update_site_config_json
 
-# Read from secret files mounted at /tmp/site-secrets
-with open('/tmp/site-secrets/site_name', 'r') as f:
-    site_name = f.read().strip()
-with open('/tmp/site-secrets/domain', 'r') as f:
-    domain = f.read().strip()
-with open('/tmp/site-secrets/bench_name', 'r') as f:
-    bench_name = f.read().strip()
-with open('/tmp/site-secrets/redis_address', 'r') as f:
-    redis_address = f.read().strip()
-with open('/tmp/site-secrets/db_host', 'r') as f:
-    db_host = f.read().strip()
-with open('/tmp/site-secrets/db_port', 'r') as f:
-    db_port = f.read().strip()
-with open('/tmp/site-secrets/db_name', 'r') as f:
-    db_name = f.read().strip()
-with open('/tmp/site-secrets/db_user', 'r') as f:
-    db_user = f.read().strip()
-with open('/tmp/site-secrets/db_password', 'r') as f:
-    db_password = f.read().strip()
-with open('/tmp/site-secrets/db_provider', 'r') as f:
-    db_provider = f.read().strip()
 
-site_path = f"/home/frappe/frappe-bench/sites/{site_name}"
-config_file = os.path.join(site_path, "site_config.json")
-
-# Read or initialize config
-try:
-    with open(config_file, 'r') as f:
-        config = json.load(f)
-except FileNotFoundError:
-    config = {}
-
-# Update with resolved domain
-config['host_name'] = domain
-
-# Add Redis configuration for this site
-config['redis_cache'] = f"redis://{redis_address}"
-config['redis_queue'] = f"redis://{redis_address}"
-
-# Explicitly add database credentials for self-healing
-config['db_name'] = db_name
-config['db_user'] = db_user
-config['db_password'] = db_password
-config['db_host'] = db_host
-config['db_type'] = db_provider
-
-# Ensure directory exists
-os.makedirs(site_path, exist_ok=True)
-
-# Ensure logs directory exists
-os.makedirs(os.path.join(site_path, "logs"), exist_ok=True)
-
-# Write back
-with open(config_file, 'w') as f:
-    json.dump(config, f, indent=2)
-
-print(f"Updated site_config.json for domain: {domain}")
-print(f"Redis address: {redis_address}")
-PYTHON_SCRIPT
-
+touch "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete"
 echo "Site initialization complete!"
 
 # Exit success regardless of whether new-site ran

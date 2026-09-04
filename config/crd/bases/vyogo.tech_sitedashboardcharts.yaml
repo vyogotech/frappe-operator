@@ -14,7 +14,7 @@ spec:
     singular: sitedashboardchart
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: SiteDashboardChart is the Schema for the sitedashboardcharts
@@ -40,9 +40,9 @@ spec:
           spec:
             description: SiteDashboardChartSpec defines the desired state of SiteDashboardChart
             properties:
-              foo:
-                description: Foo is an example field of SiteDashboardChart. Edit sitedashboardchart_types.go
-                  to remove/update
+              description:
+                description: Description provides a human-readable explanation of
+                  the SiteDashboardChart.
                 type: string
             type: object
           status:

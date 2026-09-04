@@ -1,0 +1,154 @@
+# PostgreSQL end-to-end example for the Frappe operator.
+#
+# PostgreSQL support requires a Frappe build from the `develop` branch (→ v17);
+# the stable v15 image does NOT support Postgres. Build an operator-compatible
+# Postgres bench image first (see docs/POSTGRESQL_INTEGRATION.md) and set it as
+# the FrappeBench image below.
+#
+# This file shows BOTH modes:
+#   1. shared     — provision a database + role on an existing PostgreSQL server
+#                   (here: a Percona shared cluster reachable via pgbouncer)
+#   2. dedicated  — the operator spins up a per-site PerconaPGCluster
+#
+# Prerequisites on the cluster:
+#   - Percona PostgreSQL Operator v2 installed (for dedicated mode and/or the
+#     shared cluster below):
+#       kubectl apply --server-side -f \
+#         https://raw.githubusercontent.com/percona/percona-postgresql-operator/v2.3.1/deploy/bundle.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frappe-pg
+---
+# Admin password for the site
+apiVersion: v1
+kind: Secret
+metadata:
+  name: e2e-admin-password
+  namespace: frappe-pg
+type: Opaque
+stringData:
+  password: admin
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# SHARED MODE
+# ─────────────────────────────────────────────────────────────────────────────
+# A shared PostgreSQL cluster all "shared"-mode sites provision databases on.
+apiVersion: pgv2.percona.com/v2
+kind: PerconaPGCluster
+metadata:
+  name: frappe-postgres
+  namespace: frappe-pg
+spec:
+  image: percona/percona-postgresql-operator:2.3.1-ppg16-postgres
+  postgresVersion: 16
+  instances:
+    - name: instance1
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+  proxy:
+    pgBouncer:
+      image: percona/percona-postgresql-operator:2.3.1-ppg16-pgbouncer
+      replicas: 1
+  backups:
+    pgbackrest:
+      image: percona/percona-postgresql-operator:2.3.1-ppg16-pgbackrest
+      repos:
+        - name: repo1
+          volume:
+            volumeClaimSpec:
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 2Gi
+---
+# Superuser credentials the operator's pg-provision Job uses to CREATE ROLE /
+# CREATE DATABASE on the shared cluster. Keys MUST be `user` and `password`.
+# (For a Percona shared cluster, point this at the postgres superuser secret,
+#  or create a dedicated provisioning role.)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: frappe-postgres-provisioner
+  namespace: frappe-pg
+type: Opaque
+stringData:
+  user: postgres
+  password: provisioner-password-change-me
+---
+apiVersion: vyogo.tech/v1
+kind: FrappeBench
+metadata:
+  name: pg-bench
+  namespace: frappe-pg
+spec:
+  frappeVersion: "develop"
+  imageConfig:
+    # Operator-compatible Frappe develop/v17 image (Postgres-capable: the develop
+    # base ships psycopg2 + libpq). Published by the frappe-erpnext-images-for-operator repo.
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: v17
+    pullPolicy: IfNotPresent
+  redisConfig:
+    type: redis
+  componentAutoscaling:
+    worker-default:
+      enabled: false
+      staticReplicas: 1
+    worker-short:
+      enabled: false
+      staticReplicas: 0
+    worker-long:
+      enabled: false
+      staticReplicas: 0
+---
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: pg-shared-site
+  namespace: frappe-pg
+spec:
+  benchRef:
+    name: pg-bench
+  siteName: pg-shared.local
+  adminPasswordSecretRef:
+    name: e2e-admin-password
+  dbConfig:
+    provider: postgres
+    mode: shared
+    # Optional: reference a specific shared cluster. Defaults to
+    # `frappe-postgres-pgbouncer` in the site namespace when omitted.
+    postgresRef:
+      name: frappe-postgres
+      namespace: frappe-pg
+  # Retain (default) keeps the database on CR deletion. Use Delete to hard-drop.
+  deletionPolicy: Retain
+  ingress:
+    enabled: true
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# DEDICATED MODE — the operator provisions a per-site PerconaPGCluster.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: pg-dedicated-site
+  namespace: frappe-pg
+spec:
+  benchRef:
+    name: pg-bench
+  siteName: pg-dedicated.local
+  adminPasswordSecretRef:
+    name: e2e-admin-password
+  dbConfig:
+    provider: postgres
+    mode: dedicated
+    storageSize: 2Gi
+  deletionPolicy: Delete
+  ingress:
+    enabled: true

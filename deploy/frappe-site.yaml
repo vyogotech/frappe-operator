@@ -1,6 +1,6 @@
 # Basic Frappe Site
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: my-site-v6
@@ -11,6 +11,8 @@ spec:
   
   # Site domain - for local testing use .localhost
   siteName: my-site-v6.localhost
+  adminPasswordSecretRef:
+    name: my-site-v6-admin-password
   
   # Database configuration
   dbConfig:

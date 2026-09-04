@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	routev1 "github.com/openshift/api/route/v1"
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
 )
 
@@ -43,8 +44,8 @@ var _ = Describe("FrappeSite Jobs", func() {
 		reconciler   *FrappeSiteReconciler
 		fakeClient   client.Client
 		fakeRecorder *record.FakeRecorder
-		site         *vyogotechv1alpha1.FrappeSite
-		bench        *vyogotechv1alpha1.FrappeBench
+		site         *vyogotechv1.FrappeSite
+		bench        *vyogotechv1.FrappeBench
 		namespace    string
 		scheme       *runtime.Scheme
 	)
@@ -54,27 +55,27 @@ var _ = Describe("FrappeSite Jobs", func() {
 		namespace = "test-namespace"
 		fakeRecorder = record.NewFakeRecorder(10)
 
-		bench = &vyogotechv1alpha1.FrappeBench{
+		bench = &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-bench",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+			Spec: vyogotechv1.FrappeBenchSpec{
 				FrappeVersion: "15",
 			},
-			Status: vyogotechv1alpha1.FrappeBenchStatus{
+			Status: vyogotechv1.FrappeBenchStatus{
 				Phase: "Ready",
 			},
 		}
 
-		site = &vyogotechv1alpha1.FrappeSite{
+		site = &vyogotechv1.FrappeSite{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-site",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			Spec: vyogotechv1.FrappeSiteSpec{
 				SiteName: "test-site.local",
-				BenchRef: &vyogotechv1alpha1.NamespacedName{
+				BenchRef: &vyogotechv1.NamespacedName{
 					Name:      bench.Name,
 					Namespace: bench.Namespace,
 				},
@@ -82,12 +83,12 @@ var _ = Describe("FrappeSite Jobs", func() {
 		}
 
 		scheme = runtime.NewScheme()
-		_ = vyogotechv1alpha1.AddToScheme(scheme)
+		_ = vyogotechv1.AddToScheme(scheme)
 		_ = corev1.AddToScheme(scheme)
 		_ = batchv1.AddToScheme(scheme)
 		_ = routev1.AddToScheme(scheme)
 
-		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(bench).WithStatusSubresource(&vyogotechv1alpha1.FrappeSite{}).Build()
+		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(bench).WithStatusSubresource(&vyogotechv1.FrappeSite{}).Build()
 
 		reconciler = &FrappeSiteReconciler{
 			Client:   fakeClient,
@@ -99,7 +100,8 @@ var _ = Describe("FrappeSite Jobs", func() {
 	Describe("Asynchronous Site Deletion", func() {
 		It("should create deletion job when site is marked for deletion", func() {
 			site.SetFinalizers([]string{frappeSiteFinalizer})
-			site.Spec.DBConfig = vyogotechv1alpha1.DatabaseConfig{Mode: "shared"}
+			site.Spec.DBConfig = vyogotechv1.DatabaseConfig{Mode: "shared"}
+			site.Spec.DeletionPolicy = "Delete" // opt into the destructive drop-site path
 			Expect(fakeClient.Create(ctx, site)).To(Succeed())
 
 			// Add MariaDB root secret for shared mode
@@ -130,6 +132,20 @@ var _ = Describe("FrappeSite Jobs", func() {
 			job := &batchv1.Job{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name + "-delete", Namespace: site.Namespace}, job)).To(Succeed())
 		})
+
+		It("should NOT create a deletion job when DeletionPolicy is Retain (default)", func() {
+			site.SetFinalizers([]string{frappeSiteFinalizer})
+			site.Spec.DBConfig = vyogotechv1.DatabaseConfig{Mode: "shared"}
+			// DeletionPolicy left empty -> defaults to Retain semantics: preserve data.
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+
+			err := reconciler.deleteSite(ctx, site)
+			Expect(err).NotTo(HaveOccurred())
+
+			job := &batchv1.Job{}
+			getErr := fakeClient.Get(ctx, types.NamespacedName{Name: site.Name + "-delete", Namespace: site.Namespace}, job)
+			Expect(apierrors.IsNotFound(getErr)).To(BeTrue(), "Retain policy must not create a drop-site job")
+		})
 	})
 
 	Describe("Site Initialization Job", func() {
@@ -145,6 +161,114 @@ var _ = Describe("FrappeSite Jobs", func() {
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name + "-init", Namespace: site.Namespace}, job)).To(Succeed())
 			Expect(job.Labels["site"]).To(Equal(site.Name))
 			Expect(job.Spec.Template.Spec.Volumes).To(HaveLen(2)) // sites PVC + secrets secret
+		})
+	})
+
+	Describe("Init Job Failure Detection", func() {
+		var (
+			dbInfo  *database.DatabaseInfo
+			dbCreds *database.DatabaseCredentials
+		)
+
+		BeforeEach(func() {
+			dbInfo = &database.DatabaseInfo{Provider: "mariadb", Name: "test"}
+			dbCreds = &database.DatabaseCredentials{Username: "test", Password: "test"}
+		})
+
+		It("should return (false, nil) for transient failure — job still retrying, no JobFailed condition", func() {
+			// Job has pod failures but backoffLimit not yet exhausted:
+			// no batchv1.JobFailed condition is present.
+			transientJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      site.Name + "-init",
+					Namespace: namespace,
+					Labels:    map[string]string{"site": site.Name},
+				},
+				Status: batchv1.JobStatus{
+					Failed: 2,
+					// Deliberately no JobFailed condition — still within backoffLimit.
+				},
+			}
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Create(ctx, transientJob)).To(Succeed())
+
+			done, err := reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Expect(err).NotTo(HaveOccurred(), "transient failure should not surface as an error")
+			Expect(done).To(BeFalse())
+		})
+
+		It("should return (false, error) for permanent failure — JobFailed condition True", func() {
+			// Job has exceeded backoffLimit: Job controller sets JobFailed condition.
+			failedJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      site.Name + "-init",
+					Namespace: namespace,
+					Labels:    map[string]string{"site": site.Name},
+				},
+				Status: batchv1.JobStatus{
+					Failed: 4,
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:    batchv1.JobFailed,
+							Status:  corev1.ConditionTrue,
+							Reason:  "BackoffLimitExceeded",
+							Message: "Job has reached the specified backoff limit",
+						},
+					},
+				},
+			}
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Create(ctx, failedJob)).To(Succeed())
+
+			done, err := reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Expect(err).To(HaveOccurred(), "permanent failure must be returned as an error")
+			Expect(err.Error()).To(ContainSubstring("permanently failed"))
+			Expect(done).To(BeFalse())
+		})
+
+		It("should return (true, nil) when job succeeded", func() {
+			succeededJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      site.Name + "-init",
+					Namespace: namespace,
+					Labels:    map[string]string{"site": site.Name},
+				},
+				Status: batchv1.JobStatus{
+					Succeeded: 1,
+				},
+			}
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Create(ctx, succeededJob)).To(Succeed())
+
+			done, err := reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(done).To(BeTrue())
+		})
+
+		It("should return (false, nil) and emit a Warning event on permanent failure", func() {
+			// Permanent failure event should be recorded via the Recorder.
+			failedJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      site.Name + "-init",
+					Namespace: namespace,
+					Labels:    map[string]string{"site": site.Name},
+				},
+				Status: batchv1.JobStatus{
+					Failed: 3,
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobFailed,
+							Status: corev1.ConditionTrue,
+							Reason: "BackoffLimitExceeded",
+						},
+					},
+				},
+			}
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Create(ctx, failedJob)).To(Succeed())
+
+			_, _ = reconciler.ensureSiteInitialized(ctx, site, bench, "test-site.local", dbInfo, dbCreds)
+			Eventually(fakeRecorder.Events).Should(Receive(ContainSubstring("SiteInitializationFailed")))
 		})
 	})
 })

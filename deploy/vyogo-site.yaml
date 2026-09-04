@@ -1,12 +1,14 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: vyogodemo
   namespace: frappe
 spec:
   siteName: vyogo1.apps.crc.testing
+  adminPasswordSecretRef:
+    name: vyogodemo-admin-password
   benchRef:
-    name: vyogobench
+    name: vyogo-bench
   dbConfig:
     provider: external
     host: 64.227.178.150

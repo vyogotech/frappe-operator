@@ -1,0 +1,13 @@
+apiVersion: vyogo.tech/v1
+kind: SiteConfig
+metadata:
+  name: central-site-config
+  namespace: default
+spec:
+  siteRef:
+    name: central-site-25mar2026
+  maintenanceMode: false
+  maxFileSize: 52428800
+  customConfig:
+    allow_consecutive_logins: "1"
+    rate_limit_decryption: "60"

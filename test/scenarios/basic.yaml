@@ -1,13 +1,17 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: basic-bench
 spec:
   frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+    pullPolicy: Always
   # Image is substituted by the test script/workflow
   storageSize: 2Gi
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: basic-site
@@ -15,6 +19,8 @@ spec:
   benchRef:
     name: basic-bench
   siteName: basic.test.local
-  adminPasswordSecretRef:
-    name: basic-admin-password
-    key: password
+  dbConfig:
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: mariadb

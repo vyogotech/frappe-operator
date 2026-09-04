@@ -1,12 +1,14 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
-  name: brainwise
+  name: central-site
   namespace: frappe
 spec:
-  siteName: brainwise.apps-crc.testing
+  siteName: central-site.atxinvox.com.au
+  adminPasswordSecretRef:
+    name: central-site-admin-password
   benchRef:
-    name: bench-test
+    name: central-bench
     namespace: frappe
 
   # Database configuration
@@ -20,7 +22,7 @@ spec:
   # Ingress configuration for OpenShift
   ingress:
     enabled: true
-    className: openshift-default
+    className: nginx
   apps:
     - erpnext
   

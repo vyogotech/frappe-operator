@@ -3,7 +3,7 @@
 # 1. Create shared MariaDB instance (see mariadb-shared-instance.yaml)
 # 2. Create FrappeBench (see basic-bench.yaml)
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: dev-site
@@ -14,13 +14,13 @@ spec:
   
   # Site domain - for local testing use .localhost
   siteName: dev.localhost
-  ingressClassName: traefik
+  adminPasswordSecretRef:
+    name: dev-site-admin-password
   
   # Apps to install (optional)
   # Uncomment to install apps - they must be available in the bench
-  apps:
-    - erpnext
-    - hrms
+  # apps:
+  #   - erpnext
   
   # Database configuration
   dbConfig:
@@ -33,7 +33,7 @@ spec:
   # Ingress (optional for local development)
   ingress:
     enabled: true
-    className: traefik
+    className: nginx
 
 # The operator will automatically:
 # 1. Create database and user via MariaDB Operator

@@ -1,0 +1,97 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version to release (e.g. 4.1.1)'
+        required: true
+        type: string
+
+jobs:
+  bump-and-tag:
+    name: Bump Version and Tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run Version Bump
+        run: |
+          chmod +x ./scripts/bump-version.sh
+          ./scripts/bump-version.sh ${{ inputs.version }}
+
+      - name: Install Operator SDK
+        run: |
+          export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
+          export OS=$(uname | awk '{print tolower($0)}')
+          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.34.1
+          curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
+          chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
+
+      - name: Fetch all tags
+        run: git fetch --tags --force
+
+      - name: Regenerate OLM Bundle and Manifests
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          PREVIOUS_VERSION=$(git tag -l "v*" --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^v${{ inputs.version }}$" | head -n 1 | sed 's/^v//')
+          export PREVIOUS_VERSION
+          
+          make manifests
+          make bundle VERSION=${{ inputs.version }} IMG=ghcr.io/${{ github.repository }}:v${{ inputs.version }}
+          
+          # Inject containerImage annotation and replaces upgrade path required by OperatorHub
+          python3 -c "
+          import os
+          path = 'bundle/manifests/frappe-operator.clusterserviceversion.yaml'
+          with open(path, 'r') as f:
+              content = f.read()
+          
+          # Inject containerImage annotation
+          target_ann = '  annotations:\n'
+          replacement_ann = f'  annotations:\n    containerImage: ghcr.io/vyogotech/frappe-operator:v{os.environ[\"VERSION\"]}\n'
+          content = content.replace(target_ann, replacement_ann, 1)
+          
+          # Inject replaces field if previous version exists
+          prev = os.environ.get('PREVIOUS_VERSION')
+          if prev:
+              target_spec = 'spec:\n'
+              replacement_spec = f'spec:\n  replaces: frappe-operator.v{prev}\n'
+              content = content.replace(target_spec, replacement_spec, 1)
+              
+          with open(path, 'w') as f:
+              f.write(content)
+          "
+
+      - name: Commit and Push Changes to Branch
+        run: |
+          git checkout -b release-bump-v${{ inputs.version }}
+          git add -A
+          git commit -m "chore: bump version to v${{ inputs.version }}" || exit 0
+          git push https://x-access-token:${{ secrets.COMMUNITY_OP_PAT }}@github.com/${{ github.repository }}.git release-bump-v${{ inputs.version }} --force
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.COMMUNITY_OP_PAT }}
+        run: |
+          gh pr create \
+            --title "chore: bump version to v${{ inputs.version }}" \
+            --body "Automated version bump and manifest regeneration for v${{ inputs.version }}." \
+            --head "release-bump-v${{ inputs.version }}" \
+            --base release

@@ -31,7 +31,7 @@ Install the operator and its CRDs:
 
 ```bash
 # Install CRDs and operator
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/config/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.yaml
 
 # Verify installation
 kubectl get deployment -n frappe-operator-system
@@ -132,7 +132,7 @@ Create a file named `my-first-site.yaml`:
 ```yaml
 ---
 # FrappeBench: Shared infrastructure
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: dev-bench
@@ -143,7 +143,7 @@ spec:
 
 ---
 # FrappeSite: Your site
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: mysite
@@ -261,7 +261,7 @@ echo "127.0.0.1 mysite.local" | sudo tee -a /etc/hosts
 If you have an ingress controller and proper DNS:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: mysite
@@ -486,7 +486,7 @@ Out of the box, the operator uses OpenShift-compatible defaults:
 Configure security context for a specific bench:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: custom-bench
@@ -552,6 +552,6 @@ kubectl delete statefulset mariadb
 kubectl delete service mariadb
 
 # Uninstall operator (optional)
-kubectl delete -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/config/install.yaml
+kubectl delete -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.yaml
 ```
 

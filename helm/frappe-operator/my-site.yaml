@@ -1,5 +1,5 @@
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: my-bench
@@ -13,7 +13,7 @@ spec:
     - name: erpnext
       source: image
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: my-site

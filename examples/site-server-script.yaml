@@ -1,0 +1,15 @@
+apiVersion: vyogo.tech/v1
+kind: SiteServerScript
+metadata:
+  name: e2e-validate-po-number
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  scriptType: "DocType Event"
+  referenceDocType: "Sales Order"
+  eventType: "Before Submit"
+  script: |
+    if doc.grand_total > 50000 and not doc.po_no:
+        frappe.throw("PO Number is required for orders above $50,000")
+  disabled: false

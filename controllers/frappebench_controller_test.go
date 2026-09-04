@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 )
 
@@ -44,7 +45,7 @@ var _ = Describe("FrappeBench Controller", func() {
 		reconciler   *FrappeBenchReconciler
 		fakeClient   client.Client
 		fakeRecorder *record.FakeRecorder
-		bench        *vyogotechv1alpha1.FrappeBench
+		bench        *vyogotechv1.FrappeBench
 		namespace    string
 	)
 
@@ -53,26 +54,26 @@ var _ = Describe("FrappeBench Controller", func() {
 		namespace = "test-namespace"
 		fakeRecorder = record.NewFakeRecorder(10)
 
-		bench = &vyogotechv1alpha1.FrappeBench{
+		bench = &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-bench",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+			Spec: vyogotechv1.FrappeBenchSpec{
 				FrappeVersion: "15",
-				Apps: []vyogotechv1alpha1.AppSource{
+				Apps: []vyogotechv1.AppSource{
 					{Name: "erpnext", Source: "image"},
 				},
 			},
 		}
 
 		scheme := runtime.NewScheme()
-		_ = vyogotechv1alpha1.AddToScheme(scheme)
+		_ = vyogotechv1.AddToScheme(scheme)
 		_ = corev1.AddToScheme(scheme)
 		_ = appsv1.AddToScheme(scheme)
 		_ = batchv1.AddToScheme(scheme)
 
-		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&vyogotechv1alpha1.FrappeBench{}).Build()
+		fakeClient = fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&vyogotechv1.FrappeBench{}).Build()
 
 		// Seed a default StorageClass to satisfy storage provisioning lookups in tests
 		sc := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "standard", Annotations: map[string]string{"storageclass.kubernetes.io/is-default-class": "true"}}, Provisioner: "kubernetes.io/no-provisioner"}
@@ -91,9 +92,9 @@ var _ = Describe("FrappeBench Controller", func() {
 
 			result, err := reconciler.handleFinalizer(ctx, bench)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(Equal(time.Duration(0)))
 
-			updatedBench := &vyogotechv1alpha1.FrappeBench{}
+			updatedBench := &vyogotechv1.FrappeBench{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, updatedBench)).To(Succeed())
 			Expect(updatedBench.GetFinalizers()).To(ContainElement(frappeBenchFinalizer))
 		})
@@ -104,14 +105,14 @@ var _ = Describe("FrappeBench Controller", func() {
 			Expect(fakeClient.Create(ctx, bench)).To(Succeed())
 
 			// Create dependent site
-			site := &vyogotechv1alpha1.FrappeSite{
+			site := &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-site",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "test-site.local",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name:      bench.Name,
 						Namespace: bench.Namespace,
 					},
@@ -128,7 +129,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 
 			// Verify finalizer still exists
-			updatedBench := &vyogotechv1alpha1.FrappeBench{}
+			updatedBench := &vyogotechv1.FrappeBench{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, updatedBench)).To(Succeed())
 			Expect(updatedBench.GetFinalizers()).To(ContainElement(frappeBenchFinalizer))
 
@@ -197,7 +198,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			Expect(result.IsZero()).To(BeTrue())
 
 			// Verify bench is deleted (which implies finalizer removal)
-			updatedBench := &vyogotechv1alpha1.FrappeBench{}
+			updatedBench := &vyogotechv1.FrappeBench{}
 			err = fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, updatedBench)
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
@@ -221,7 +222,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			reconciler.setCondition(bench, condition)
 			Expect(fakeClient.Status().Update(ctx, bench)).To(Succeed())
 
-			updatedBench := &vyogotechv1alpha1.FrappeBench{}
+			updatedBench := &vyogotechv1.FrappeBench{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, updatedBench)).To(Succeed())
 
 			foundCondition := meta.FindStatusCondition(updatedBench.Status.Conditions, "Progressing")
@@ -254,7 +255,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			reconciler.setCondition(bench, condition)
 			Expect(fakeClient.Status().Update(ctx, bench)).To(Succeed())
 
-			updatedBench := &vyogotechv1alpha1.FrappeBench{}
+			updatedBench := &vyogotechv1.FrappeBench{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, updatedBench)).To(Succeed())
 
 			foundCondition := meta.FindStatusCondition(updatedBench.Status.Conditions, "Ready")
@@ -286,7 +287,7 @@ var _ = Describe("FrappeBench Controller", func() {
 
 	Describe("Flexible App Installation", func() {
 		It("should track apps from spec in status", func() {
-			bench.Spec.Apps = []vyogotechv1alpha1.AppSource{
+			bench.Spec.Apps = []vyogotechv1.AppSource{
 				{Name: "erpnext", Source: "image"},
 				{Name: "hrms", Source: "fpm", Org: "frappe", Version: "1.0.0"},
 				{Name: "custom-app", Source: "git", GitURL: "https://github.com/company/custom-app"},
@@ -297,7 +298,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 
 			// Update status with apps
-			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1.FPMRepository{})
 			// Status update may fail due to fake client limitations, but we can verify the logic
 			// by checking the bench object directly after the call
 			_ = err // Ignore status update errors for now
@@ -310,13 +311,13 @@ var _ = Describe("FrappeBench Controller", func() {
 		})
 
 		It("should handle empty apps list", func() {
-			bench.Spec.Apps = []vyogotechv1alpha1.AppSource{}
+			bench.Spec.Apps = []vyogotechv1.AppSource{}
 			Expect(fakeClient.Create(ctx, bench)).To(Succeed())
 
 			// Refresh bench from client before updating status
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 
-			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1.FPMRepository{})
 			_ = err // Ignore status update errors for now
 
 			// Verify empty apps list is handled
@@ -324,7 +325,7 @@ var _ = Describe("FrappeBench Controller", func() {
 		})
 
 		It("should track multiple app sources", func() {
-			bench.Spec.Apps = []vyogotechv1alpha1.AppSource{
+			bench.Spec.Apps = []vyogotechv1.AppSource{
 				{Name: "frappe", Source: "image"},
 				{Name: "erpnext", Source: "image"},
 				{Name: "hrms", Source: "fpm", Org: "frappe", Version: "1.0.0"},
@@ -334,7 +335,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			// Refresh bench from client before updating status
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 
-			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1.FPMRepository{})
 			_ = err // Ignore status update errors for now
 
 			// Verify multiple apps are tracked
@@ -354,7 +355,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 
 			// Update status
-			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1.FPMRepository{})
 			_ = err // Ignore status update errors for fake client
 
 			// Verify Initializing phase is preserved (not reset to Provisioning)
@@ -381,7 +382,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 
 			// Update status
-			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1.FPMRepository{})
 			_ = err // Ignore status update errors
 
 			// Ready phase should be maintained
@@ -408,7 +409,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 
 			// Update status
-			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1.FPMRepository{})
 			_ = err // Ignore status update errors
 
 			// Phase should transition to Ready
@@ -435,7 +436,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 
 			// Update status
-			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1.FPMRepository{})
 			_ = err // Ignore status update errors
 
 			// Phase should be Failed
@@ -450,7 +451,7 @@ var _ = Describe("FrappeBench Controller", func() {
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, bench)).To(Succeed())
 
 			// Update status
-			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1alpha1.FPMRepository{})
+			err := reconciler.updateBenchStatus(ctx, bench, false, []vyogotechv1.FPMRepository{})
 			_ = err // Ignore status update errors
 
 			// Phase should be set to Provisioning

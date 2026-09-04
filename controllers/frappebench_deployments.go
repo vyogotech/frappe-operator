@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +38,7 @@ const (
 )
 
 // ensureSocketIO ensures the Socket.IO Deployment and Service exist
-func (r *FrappeBenchReconciler) ensureSocketIO(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureSocketIO(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	if err := r.ensureSocketIOService(ctx, bench); err != nil {
 		return err
 	}
@@ -46,14 +46,14 @@ func (r *FrappeBenchReconciler) ensureSocketIO(ctx context.Context, bench *vyogo
 }
 
 // ensureGunicorn ensures the Gunicorn Deployment and Service exist
-func (r *FrappeBenchReconciler) ensureGunicorn(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureGunicorn(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	if err := r.ensureGunicornService(ctx, bench); err != nil {
 		return err
 	}
 	return r.ensureGunicornDeployment(ctx, bench)
 }
 
-func (r *FrappeBenchReconciler) ensureGunicornService(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureGunicornService(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
 	svcName := fmt.Sprintf("%s-gunicorn", bench.Name)
@@ -85,7 +85,7 @@ func (r *FrappeBenchReconciler) ensureGunicornService(ctx context.Context, bench
 	return r.Create(ctx, svc)
 }
 
-func (r *FrappeBenchReconciler) ensureNginxService(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureNginxService(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
 	svcName := fmt.Sprintf("%s-nginx", bench.Name)
@@ -117,7 +117,7 @@ func (r *FrappeBenchReconciler) ensureNginxService(ctx context.Context, bench *v
 	return r.Create(ctx, svc)
 }
 
-func (r *FrappeBenchReconciler) ensureSocketIOService(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureSocketIOService(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
 	svcName := fmt.Sprintf("%s-socketio", bench.Name)
@@ -149,7 +149,7 @@ func (r *FrappeBenchReconciler) ensureSocketIOService(ctx context.Context, bench
 	return r.Create(ctx, svc)
 }
 
-func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 	componentName := "gunicorn"
 	deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)
@@ -196,6 +196,21 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 			changed = true
 		}
 
+		hasPythonPath := false
+		for _, e := range deploy.Spec.Template.Spec.Containers[0].Env {
+			if e.Name == "PYTHONPATH" {
+				hasPythonPath = true
+				break
+			}
+		}
+		if !hasPythonPath {
+			deploy.Spec.Template.Spec.Containers[0].Env = append(deploy.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+				Name:  "PYTHONPATH",
+				Value: "/tmp/pip:/home/frappe/frappe-bench/sites/apps",
+			})
+			changed = true
+		}
+
 		if changed {
 			return r.Update(ctx, deploy)
 		}
@@ -225,12 +240,14 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 	}
 
 	container := resources.NewContainerBuilder("gunicorn", image).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithPort("http", 8000).
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
 		WithResources(gunicornResources).
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		WithEnv("USER", "frappe").
+		WithEnv("PYTHONPATH", "/tmp/pip:/home/frappe/frappe-bench/sites/apps").
 		Build()
 
 	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
@@ -240,6 +257,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, componentName)).
 		WithAnnotations(annotations).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).
@@ -265,7 +283,7 @@ func (r *FrappeBenchReconciler) ensureGunicornDeployment(ctx context.Context, be
 }
 
 // ensureNginx ensures the NGINX Deployment and Service exist
-func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	if err := r.ensureNginxService(ctx, bench); err != nil {
 		return err
 	}
@@ -345,6 +363,7 @@ func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotec
 	}
 
 	container := resources.NewContainerBuilder("nginx", image).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithArgs("nginx-entrypoint.sh").
 		WithPort("http", 8080).
 		WithEnv("BACKEND", fmt.Sprintf("%s:8000", gunicornSvc)).
@@ -366,6 +385,7 @@ func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotec
 		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, componentName)).
 		WithAnnotations(annotations).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).
@@ -390,7 +410,7 @@ func (r *FrappeBenchReconciler) ensureNginx(ctx context.Context, bench *vyogotec
 	return nil
 }
 
-func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 	componentName := "socketio"
 	deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)
@@ -465,6 +485,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 	}
 
 	container := resources.NewContainerBuilder("socketio", image).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithArgs("node", "/home/frappe/frappe-bench/apps/frappe/socketio.js").
 		WithPort("socketio", 9000).
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
@@ -472,6 +493,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 		WithResources(socketIOResources).
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		WithEnv("USER", "frappe").
+		WithEnv("PYTHONPATH", "/tmp/pip:/home/frappe/frappe-bench/sites/apps").
 		Build()
 
 	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
@@ -481,6 +503,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, componentName)).
 		WithAnnotations(annotations).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).
@@ -506,7 +529,7 @@ func (r *FrappeBenchReconciler) ensureSocketIODeployment(ctx context.Context, be
 }
 
 // ensureScheduler ensures the Scheduler Deployment exists
-func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 	componentName := "scheduler"
 	deployName := fmt.Sprintf("%s-%s", bench.Name, componentName)
@@ -538,6 +561,21 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 			changed = true
 		}
 
+		hasPythonPath := false
+		for _, e := range deploy.Spec.Template.Spec.Containers[0].Env {
+			if e.Name == "PYTHONPATH" {
+				hasPythonPath = true
+				break
+			}
+		}
+		if !hasPythonPath {
+			deploy.Spec.Template.Spec.Containers[0].Env = append(deploy.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+				Name:  "PYTHONPATH",
+				Value: "/tmp/pip:/home/frappe/frappe-bench/sites/apps",
+			})
+			changed = true
+		}
+
 		if changed {
 			return r.Update(ctx, deploy)
 		}
@@ -554,12 +592,14 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 
 	container := resources.NewContainerBuilder("scheduler", image).
+		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithArgs("bench", "schedule").
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
 		WithResources(schedulerResources).
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		WithEnv("USER", "frappe").
+		WithEnv("PYTHONPATH", "/tmp/pip:/home/frappe/frappe-bench/sites/apps").
 		Build()
 
 	nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(bench.Spec.PodConfig, r.benchLabels(bench))
@@ -568,6 +608,7 @@ func (r *FrappeBenchReconciler) ensureScheduler(ctx context.Context, bench *vyog
 		WithLabels(extraLabels).
 		WithExtraPodLabels(extraLabels).
 		WithSelector(r.componentLabels(bench, componentName)).
+		WithImagePullSecrets(r.getImagePullSecrets(bench)).
 		WithReplicas(replicas).
 		WithNodeSelector(nodeSelector).
 		WithAffinity(affinity).

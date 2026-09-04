@@ -1,0 +1,12 @@
+apiVersion: vyogo.tech/v1
+kind: SiteCron
+metadata:
+  name: nightly-sales-sync
+  namespace: default
+spec:
+  siteRef:
+    name: central-site-25mar2026
+  schedule: "0 2 * * *"
+  method: "saas_platform.api.sync_nightly_sales"
+  timeoutSeconds: 3600
+  suspended: false

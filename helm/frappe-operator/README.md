@@ -24,7 +24,9 @@ A Helm chart for deploying the Frappe Operator with all required dependencies on
 The Helm chart automatically installs MariaDB Operator CRDs via a pre-install hook:
 
 ```bash
-helm install frappe-operator oci://ghcr.io/vyogotech/charts/frappe-operator \
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
+helm repo update
+helm install frappe-operator frappe-operator/frappe-operator \
   --namespace frappe-operator-system \
   --create-namespace
 ```
@@ -59,6 +61,14 @@ cd frappe-operator/helm/frappe-operator
 helm install frappe-operator . \
   --namespace frappe-operator-system \
   --create-namespace
+```
+
+### Alternative: Operator Lifecycle Manager (OLM)
+
+If you prefer installing via OLM (OperatorHub) instead of Helm:
+
+```bash
+kubectl create -f https://operatorhub.io/install/frappe-operator.yaml
 ```
 
 ### Custom Installation
@@ -110,6 +120,9 @@ helm install frappe-operator . \
 |-----------|-------------|---------|
 | `operator.replicaCount` | Number of operator replicas | `1` |
 | `operatorConfig.maxConcurrentSiteReconciles` | Max concurrent FrappeSite reconciles (tune for 100+ sites) | `"10"` |
+| `operatorConfig.maxConcurrentReconciles` | Max concurrent reconciles for the FrappeBench + all site-child controllers (SiteApp, SiteConfig, ...); raise for 500+ sites | `"5"` |
+| `operatorConfig.clientQps` | Optional kube API client QPS for the operator (empty = controller-runtime default) | `""` |
+| `operatorConfig.clientBurst` | Optional kube API client Burst for the operator (empty = controller-runtime default) | `""` |
 | `operator.image.repository` | Operator image repository | `ghcr.io/vyogotech/frappe-operator` |
 | `operator.image.tag` | Operator image tag | `v1.0.0` |
 | `operator.resources.limits.cpu` | CPU limit | `500m` |
@@ -235,7 +248,7 @@ After the operator is installed:
 ```yaml
 # my-site.yaml
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: production-bench
@@ -246,7 +259,7 @@ spec:
     - name: erpnext
       source: image
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: my-company-site
@@ -332,7 +345,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main
 
 **3. Disable Ingress creation (if not needed):**
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: my-site

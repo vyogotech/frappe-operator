@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	routev1 "github.com/openshift/api/route/v1"
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,7 +33,7 @@ import (
 )
 
 // ensureIngress creates an Ingress for the site
-func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string) error {
+func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench, domain string) error {
 	logger := log.FromContext(ctx)
 
 	// Check if Ingress is disabled
@@ -117,7 +117,7 @@ func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotec
 }
 
 // ensureRoute creates an OpenShift Route for the site
-func (r *FrappeSiteReconciler) ensureRoute(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string) error {
+func (r *FrappeSiteReconciler) ensureRoute(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench, domain string) error {
 	logger := log.FromContext(ctx)
 
 	routeName := fmt.Sprintf("%s-route", site.Name)

@@ -18,11 +18,13 @@ package controllers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +39,7 @@ import (
 )
 
 // ensureAdminPassword gets or generates the admin password for the site
-func (r *FrappeSiteReconciler) ensureAdminPassword(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, error) {
+func (r *FrappeSiteReconciler) ensureAdminPassword(ctx context.Context, site *vyogotechv1.FrappeSite) (string, error) {
 	logger := log.FromContext(ctx)
 	var adminPassword string
 	var adminPasswordSecret *corev1.Secret
@@ -109,8 +111,17 @@ func (r *FrappeSiteReconciler) ensureAdminPassword(ctx context.Context, site *vy
 	return adminPassword, nil
 }
 
+// generateFernetKey generates a secure 32-byte URL-safe base64 encoded Fernet key
+func (r *FrappeSiteReconciler) generateFernetKey() (string, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes for fernet key: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(key), nil
+}
+
 // ensureInitSecrets creates a Secret containing all initialization credentials
-func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string, redisAddress string) error {
+func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials, adminPassword string, redisCacheAddress string, redisQueueAddress string) error {
 	logger := log.FromContext(ctx)
 
 	secretName := fmt.Sprintf("%s-init-secrets", site.Name)
@@ -152,16 +163,23 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		}
 	}
 
+	isUpgrade := "false"
+	if site.Status.Phase == vyogotechv1.FrappeSitePhaseReady {
+		isUpgrade = "true"
+	}
+
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
-		"site_name":       []byte(site.Spec.SiteName),
-		"domain":          []byte(domain),
-		"admin_password":  []byte(adminPassword),
-		"bench_name":      []byte(bench.Name),
-		"db_provider":     []byte(dbProvider),
-		"apps_to_install": []byte(appsToInstall),
-		"redis_address":   []byte(redisAddress),
-		"skip_init":       []byte(strconv.FormatBool(site.Spec.SkipInit)),
+		"site_name":           []byte(site.Spec.SiteName),
+		"domain":              []byte(domain),
+		"admin_password":      []byte(adminPassword),
+		"bench_name":          []byte(bench.Name),
+		"db_provider":         []byte(dbProvider),
+		"apps_to_install":     []byte(appsToInstall),
+		"redis_cache_address": []byte(redisCacheAddress),
+		"redis_queue_address": []byte(redisQueueAddress),
+		"skip_init":           []byte(strconv.FormatBool(site.Spec.SkipInit)),
+		"is_upgrade":          []byte(isUpgrade),
 	}
 
 	// Add database credentials
@@ -173,6 +191,79 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 	if dbCreds != nil {
 		secretData["db_user"] = []byte(dbCreds.Username)
 		secretData["db_password"] = []byte(dbCreds.Password)
+	}
+
+	// Auto-generate encryption key secret if one wasn't provided
+	if site.Spec.EncryptionKeySecretRef == nil {
+		generatedKeyName := fmt.Sprintf("%s-encryption-key", site.Name)
+		var existingEncSecret corev1.Secret
+		err := r.Get(ctx, types.NamespacedName{Name: generatedKeyName, Namespace: site.Namespace}, &existingEncSecret)
+
+		if err != nil && errors.IsNotFound(err) {
+			// Generate new Fernet key
+			fernetKey, err := r.generateFernetKey()
+			if err != nil {
+				logger.Error(err, "Failed to generate fernet encryption key")
+				return err
+			}
+
+			newEncSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      generatedKeyName,
+					Namespace: site.Namespace,
+					Labels: map[string]string{
+						"app":  "frappe",
+						"site": site.Name,
+					},
+				},
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{
+					"encryption_key": []byte(fernetKey),
+				},
+			}
+
+			if err := controllerutil.SetControllerReference(site, newEncSecret, r.Scheme); err != nil {
+				return err
+			}
+
+			if err := r.Create(ctx, newEncSecret); err != nil {
+				return fmt.Errorf("failed to create auto-generated encryption key secret: %w", err)
+			}
+			logger.Info("Created auto-generated encryption key secret", "secret", generatedKeyName)
+		} else if err != nil {
+			return err
+		}
+
+		// Self-populate the Spec ref temporarily just for this reconciliation cycle so we fetch and mount it below
+		site.Spec.EncryptionKeySecretRef = &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{Name: generatedKeyName},
+			Key:                  "encryption_key",
+		}
+	}
+
+	// Fetch custom encryption key if provided
+	if site.Spec.EncryptionKeySecretRef != nil {
+		var encSecret corev1.Secret
+		encSecretName := types.NamespacedName{
+			Name:      site.Spec.EncryptionKeySecretRef.Name,
+			Namespace: site.Namespace,
+		}
+		if err := r.Get(ctx, encSecretName, &encSecret); err != nil {
+			logger.Error(err, "Failed to get encryption key secret", "secretName", encSecretName)
+			return err
+		}
+		key := site.Spec.EncryptionKeySecretRef.Key
+		if key == "" {
+			key = "encryption_key"
+		}
+		if val, ok := encSecret.Data[key]; ok {
+			secretData["encryption_key"] = val
+			logger.Info("Using external encryption key from secret", "secret", encSecretName.Name)
+		} else {
+			err := fmt.Errorf("key %s not found in encryption key secret %s", key, encSecretName.Name)
+			logger.Error(err, "Invalid encryption key secret configuration")
+			return err
+		}
 	}
 
 	// Create or update the secret
@@ -214,7 +305,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 }
 
 // resolveDBConfig merges site-specific database configuration with bench-level defaults
-func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench) vyogotechv1alpha1.DatabaseConfig {
+func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench) vyogotechv1.DatabaseConfig {
 	config := site.Spec.DBConfig
 
 	if bench.Spec.DBConfig == nil {
@@ -256,7 +347,7 @@ func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1alpha1.FrappeSit
 }
 
 // resolveDomain determines the final domain for the site with priority-based resolution
-func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, bench *vyogotechv1alpha1.FrappeBench) (string, string) {
+func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench) (string, string) {
 	if site.Spec.Domain != "" {
 		return site.Spec.Domain, "explicit"
 	}
@@ -284,8 +375,8 @@ func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotec
 }
 
 // getMariaDBRootCredentials retrieves root credentials for database operations
-func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) (string, string, error) {
-	if site.Spec.DBConfig.Mode == "dedicated" {
+func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, site *vyogotechv1.FrappeSite, dbConfig vyogotechv1.DatabaseConfig) (string, string, error) {
+	if dbConfig.Mode == "dedicated" {
 		secretName := fmt.Sprintf("%s-mariadb-root", site.Name)
 		secret := &corev1.Secret{}
 		err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: site.Namespace}, secret)
@@ -299,13 +390,13 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 		return "root", string(password), nil
 	}
 
-	if site.Spec.DBConfig.Mode == "shared" {
+	if dbConfig.Mode == "shared" {
 		mariadbName := "frappe-mariadb"
 		mariadbNamespace := site.Namespace
-		if site.Spec.DBConfig.MariaDBRef != nil {
-			mariadbName = site.Spec.DBConfig.MariaDBRef.Name
-			if site.Spec.DBConfig.MariaDBRef.Namespace != "" {
-				mariadbNamespace = site.Spec.DBConfig.MariaDBRef.Namespace
+		if dbConfig.MariaDBRef != nil {
+			mariadbName = dbConfig.MariaDBRef.Name
+			if dbConfig.MariaDBRef.Namespace != "" {
+				mariadbNamespace = dbConfig.MariaDBRef.Namespace
 			}
 		}
 
@@ -341,11 +432,45 @@ func (r *FrappeSiteReconciler) getMariaDBRootCredentials(ctx context.Context, si
 		return "root", string(password), nil
 	}
 
-	return "", "", fmt.Errorf("unsupported database mode: %s", site.Spec.DBConfig.Mode)
+	return "", "", fmt.Errorf("unsupported database mode: %s", dbConfig.Mode)
+}
+
+// mariaDBRootSecretRef resolves the Secret (name/key/namespace) holding the MariaDB
+// root password for a site's database. DB-admin operations that must recreate the
+// database — notably `bench restore`, which otherwise prompts interactively for the
+// root password and hangs in a non-TTY Job — inject this via env rather than
+// embedding the secret in a command line. Mirrors getMariaDBRootCredentials.
+func mariaDBRootSecretRef(ctx context.Context, c client.Client, siteName, siteNamespace string, dbConfig vyogotechv1.DatabaseConfig) (name, key, namespace string, err error) {
+	if dbConfig.Mode == "dedicated" {
+		return fmt.Sprintf("%s-mariadb-root", siteName), "password", siteNamespace, nil
+	}
+
+	mariadbName := "frappe-mariadb"
+	mariadbNamespace := siteNamespace
+	if dbConfig.MariaDBRef != nil {
+		mariadbName = dbConfig.MariaDBRef.Name
+		if dbConfig.MariaDBRef.Namespace != "" {
+			mariadbNamespace = dbConfig.MariaDBRef.Namespace
+		}
+	}
+
+	cr := &unstructured.Unstructured{}
+	cr.SetGroupVersionKind(schema.GroupVersionKind{Group: "k8s.mariadb.com", Version: "v1alpha1", Kind: "MariaDB"})
+	if err := c.Get(ctx, types.NamespacedName{Name: mariadbName, Namespace: mariadbNamespace}, cr); err != nil {
+		return "", "", "", err
+	}
+	spec, _, _ := unstructured.NestedMap(cr.Object, "spec")
+	ref, _, _ := unstructured.NestedMap(spec, "rootPasswordSecretKeyRef")
+	name, _, _ = unstructured.NestedString(ref, "name")
+	key, found, _ := unstructured.NestedString(ref, "key")
+	if !found {
+		key = "password"
+	}
+	return name, key, mariadbNamespace, nil
 }
 
 // getRequeueAttempt returns the current requeue attempt from the site annotation
-func (r *FrappeSiteReconciler) getRequeueAttempt(site *vyogotechv1alpha1.FrappeSite) int {
+func (r *FrappeSiteReconciler) getRequeueAttempt(site *vyogotechv1.FrappeSite) int {
 	if site.Annotations == nil {
 		return 0
 	}
@@ -364,7 +489,7 @@ func (r *FrappeSiteReconciler) getRequeueAttempt(site *vyogotechv1alpha1.FrappeS
 }
 
 // patchRequeueAttempt sets the requeue-attempt annotation on the site
-func (r *FrappeSiteReconciler) patchRequeueAttempt(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, nextAttempt int) error {
+func (r *FrappeSiteReconciler) patchRequeueAttempt(ctx context.Context, site *vyogotechv1.FrappeSite, nextAttempt int) error {
 	siteCopy := site.DeepCopy()
 	if siteCopy.Annotations == nil {
 		siteCopy.Annotations = make(map[string]string)
@@ -374,39 +499,39 @@ func (r *FrappeSiteReconciler) patchRequeueAttempt(ctx context.Context, site *vy
 }
 
 // getPodSecurityContext returns the pod-level security context (shared logic in security_context.go)
-func (r *FrappeSiteReconciler) getPodSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+func (r *FrappeSiteReconciler) getPodSecurityContext(ctx context.Context, bench *vyogotechv1.FrappeBench) *corev1.PodSecurityContext {
 	return PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security)
 }
 
 // getContainerSecurityContext returns the container-level security context (shared logic in security_context.go)
-func (r *FrappeSiteReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+func (r *FrappeSiteReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1.FrappeBench) *corev1.SecurityContext {
 	return ContainerSecurityContextForBench(r.IsOpenShift, bench.Spec.Security)
 }
 
 // getSiteInitResources returns resource requirements for site initialization jobs
-func (r *FrappeSiteReconciler) getSiteInitResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeSiteReconciler) getSiteInitResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("128Mi"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("500m"),
-			corev1.ResourceMemory: resource.MustParse("256Mi"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 	}
 }
 
 // getSiteDeleteResources returns resource requirements for site deletion jobs
-func (r *FrappeSiteReconciler) getSiteDeleteResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeSiteReconciler) getSiteDeleteResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("128Mi"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("500m"),
-			corev1.ResourceMemory: resource.MustParse("256Mi"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 	}
 }

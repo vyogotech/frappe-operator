@@ -1,7 +1,7 @@
 # Example: Frappe site with dedicated MariaDB instance
 # Use this for enterprise/isolated deployments
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: enterprise-site
@@ -11,6 +11,8 @@ spec:
     name: shared-bench  # Can still share the bench
   
   siteName: enterprise.example.com
+  adminPasswordSecretRef:
+    name: enterprise-site-admin-password
   
   # Database configuration - dedicated mode
   dbConfig:

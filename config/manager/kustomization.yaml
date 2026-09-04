@@ -1,10 +1,11 @@
 resources:
 - manager.yaml
+- operator-config.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Production image configuration
 # For local development, override with: kustomize edit set image controller=<your-image>
 images:
 - name: controller
-  newName: frappe-operator
-  newTag: local-test
+  newName: ghcr.io/vyogotech/frappe-operator
+  newTag: v5.0.0

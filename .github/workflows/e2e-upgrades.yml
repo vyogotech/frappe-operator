@@ -1,0 +1,126 @@
+name: E2E Upgrade Testing
+
+on:
+  push:
+    branches: [main, master, release, develop, 'feat/**']
+    paths:
+      - 'helm/**'
+      - 'controllers/**'
+      - 'api/**'
+      - 'pkg/**'
+      - 'scripts/**'
+      - 'test/**'
+      - 'tests/**'
+      - '.github/workflows/e2e-upgrades.yml'
+  pull_request:
+    branches: [main, master, release]
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  test-css-upgrade:
+    name: Standard Upgrade (CSS Validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+          # Install Kind
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.22.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4.2.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright
+        run: |
+          npm --prefix tests/e2e install
+          npx --prefix tests/e2e playwright install chromium --with-deps
+
+      - name: Run Test
+        run: |
+          chmod +x scripts/test-css-upgrade.sh
+          ./scripts/test-css-upgrade.sh
+
+      - name: Upload Playwright Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-css-upgrade
+          path: |
+            tests/e2e/playwright-report/
+            tests/e2e/test-results/
+          retention-days: 7
+
+  test-failed-upgrade:
+    name: Failed Upgrade (Fallback Trap Validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.22.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4.2.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright
+        run: |
+          npm --prefix tests/e2e install
+          npx --prefix tests/e2e playwright install chromium --with-deps
+
+      - name: Run Test
+        run: |
+          chmod +x scripts/test-failed-upgrade.sh
+          ./scripts/test-failed-upgrade.sh
+
+      - name: Upload Playwright Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-failed-upgrade
+          path: |
+            tests/e2e/playwright-report/
+            tests/e2e/test-results/
+          retention-days: 7
+
+  test-apps-upgrade:
+    name: Dynamic Apps Upgrade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.22.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4.2.0
+
+      - name: Run Test
+        run: |
+          chmod +x scripts/test-apps-upgrade.sh
+          ./scripts/test-apps-upgrade.sh

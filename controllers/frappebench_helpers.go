@@ -19,13 +19,13 @@ package controllers
 import (
 	"context"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // benchLabels returns standard labels for bench resources
-func (r *FrappeBenchReconciler) benchLabels(bench *vyogotechv1alpha1.FrappeBench) map[string]string {
+func (r *FrappeBenchReconciler) benchLabels(bench *vyogotechv1.FrappeBench) map[string]string {
 	return map[string]string{
 		"app":   "frappe",
 		"bench": bench.Name,
@@ -33,7 +33,7 @@ func (r *FrappeBenchReconciler) benchLabels(bench *vyogotechv1alpha1.FrappeBench
 }
 
 // componentLabels returns labels for a specific component
-func (r *FrappeBenchReconciler) componentLabels(bench *vyogotechv1alpha1.FrappeBench, component string) map[string]string {
+func (r *FrappeBenchReconciler) componentLabels(bench *vyogotechv1.FrappeBench, component string) map[string]string {
 	labels := r.benchLabels(bench)
 	labels["component"] = component
 	return labels
@@ -41,7 +41,25 @@ func (r *FrappeBenchReconciler) componentLabels(bench *vyogotechv1alpha1.FrappeB
 
 // Image getters
 
-func (r *FrappeBenchReconciler) getRedisImage(bench *vyogotechv1alpha1.FrappeBench) string {
+func (r *FrappeBenchReconciler) getImagePullSecrets(bench *vyogotechv1.FrappeBench) []corev1.LocalObjectReference {
+	if bench.Spec.ImageConfig != nil && len(bench.Spec.ImageConfig.PullSecrets) > 0 {
+		secrets := make([]corev1.LocalObjectReference, len(bench.Spec.ImageConfig.PullSecrets))
+		for i, s := range bench.Spec.ImageConfig.PullSecrets {
+			secrets[i] = corev1.LocalObjectReference{Name: s.Name}
+		}
+		return secrets
+	}
+	return nil
+}
+
+func (r *FrappeBenchReconciler) getImagePullPolicy(bench *vyogotechv1.FrappeBench) corev1.PullPolicy {
+	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.PullPolicy != "" {
+		return bench.Spec.ImageConfig.PullPolicy
+	}
+	return corev1.PullPolicy("") // Leave empty so Kubernetes defaults apply
+}
+
+func (r *FrappeBenchReconciler) getRedisImage(bench *vyogotechv1.FrappeBench) string {
 	if bench.Spec.RedisConfig != nil && bench.Spec.RedisConfig.Image != "" {
 		return bench.Spec.RedisConfig.Image
 	}
@@ -52,7 +70,7 @@ func (r *FrappeBenchReconciler) getRedisImage(bench *vyogotechv1alpha1.FrappeBen
 
 // Resource getters
 
-func (r *FrappeBenchReconciler) getRedisResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeBenchReconciler) getRedisResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	if bench.Spec.RedisConfig != nil && bench.Spec.RedisConfig.Resources != nil {
 		return corev1.ResourceRequirements{
 			Requests: bench.Spec.RedisConfig.Resources.Requests,
@@ -71,7 +89,7 @@ func (r *FrappeBenchReconciler) getRedisResources(bench *vyogotechv1alpha1.Frapp
 	}
 }
 
-func (r *FrappeBenchReconciler) getGunicornResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeBenchReconciler) getGunicornResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	if bench.Spec.ComponentResources != nil && bench.Spec.ComponentResources.Gunicorn != nil {
 		return corev1.ResourceRequirements{
 			Requests: bench.Spec.ComponentResources.Gunicorn.Requests,
@@ -90,7 +108,7 @@ func (r *FrappeBenchReconciler) getGunicornResources(bench *vyogotechv1alpha1.Fr
 	}
 }
 
-func (r *FrappeBenchReconciler) getNginxResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeBenchReconciler) getNginxResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	if bench.Spec.ComponentResources != nil && bench.Spec.ComponentResources.Nginx != nil {
 		return corev1.ResourceRequirements{
 			Requests: bench.Spec.ComponentResources.Nginx.Requests,
@@ -109,7 +127,7 @@ func (r *FrappeBenchReconciler) getNginxResources(bench *vyogotechv1alpha1.Frapp
 	}
 }
 
-func (r *FrappeBenchReconciler) getSocketIOResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeBenchReconciler) getSocketIOResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	if bench.Spec.ComponentResources != nil && bench.Spec.ComponentResources.Socketio != nil {
 		return corev1.ResourceRequirements{
 			Requests: bench.Spec.ComponentResources.Socketio.Requests,
@@ -128,7 +146,7 @@ func (r *FrappeBenchReconciler) getSocketIOResources(bench *vyogotechv1alpha1.Fr
 	}
 }
 
-func (r *FrappeBenchReconciler) getSchedulerResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeBenchReconciler) getSchedulerResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	if bench.Spec.ComponentResources != nil && bench.Spec.ComponentResources.Scheduler != nil {
 		return corev1.ResourceRequirements{
 			Requests: bench.Spec.ComponentResources.Scheduler.Requests,
@@ -147,7 +165,7 @@ func (r *FrappeBenchReconciler) getSchedulerResources(bench *vyogotechv1alpha1.F
 	}
 }
 
-func (r *FrappeBenchReconciler) getWorkerDefaultResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeBenchReconciler) getWorkerDefaultResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	if bench.Spec.ComponentResources != nil && bench.Spec.ComponentResources.WorkerDefault != nil {
 		return corev1.ResourceRequirements{
 			Requests: bench.Spec.ComponentResources.WorkerDefault.Requests,
@@ -166,7 +184,7 @@ func (r *FrappeBenchReconciler) getWorkerDefaultResources(bench *vyogotechv1alph
 	}
 }
 
-func (r *FrappeBenchReconciler) getWorkerLongResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeBenchReconciler) getWorkerLongResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	if bench.Spec.ComponentResources != nil && bench.Spec.ComponentResources.WorkerLong != nil {
 		return corev1.ResourceRequirements{
 			Requests: bench.Spec.ComponentResources.WorkerLong.Requests,
@@ -185,7 +203,7 @@ func (r *FrappeBenchReconciler) getWorkerLongResources(bench *vyogotechv1alpha1.
 	}
 }
 
-func (r *FrappeBenchReconciler) getWorkerShortResources(bench *vyogotechv1alpha1.FrappeBench) corev1.ResourceRequirements {
+func (r *FrappeBenchReconciler) getWorkerShortResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
 	if bench.Spec.ComponentResources != nil && bench.Spec.ComponentResources.WorkerShort != nil {
 		return corev1.ResourceRequirements{
 			Requests: bench.Spec.ComponentResources.WorkerShort.Requests,
@@ -209,7 +227,7 @@ func (r *FrappeBenchReconciler) getWorkerShortResources(bench *vyogotechv1alpha1
 // Autoscaling configuration helpers
 
 // getComponentAutoscaling gets the autoscaling config for a component
-func (r *FrappeBenchReconciler) getComponentAutoscaling(bench *vyogotechv1alpha1.FrappeBench, componentName string) *vyogotechv1alpha1.ComponentAutoscaling {
+func (r *FrappeBenchReconciler) getComponentAutoscaling(bench *vyogotechv1.FrappeBench, componentName string) *vyogotechv1.ComponentAutoscaling {
 	if bench.Spec.ComponentAutoscaling != nil {
 		if config, exists := bench.Spec.ComponentAutoscaling[componentName]; exists && config != nil {
 			return config
@@ -219,12 +237,12 @@ func (r *FrappeBenchReconciler) getComponentAutoscaling(bench *vyogotechv1alpha1
 }
 
 // fillComponentDefaults fills in default values for a component's autoscaling config
-func (r *FrappeBenchReconciler) fillComponentDefaults(config *vyogotechv1alpha1.ComponentAutoscaling, componentName string) *vyogotechv1alpha1.ComponentAutoscaling {
+func (r *FrappeBenchReconciler) fillComponentDefaults(config *vyogotechv1.ComponentAutoscaling, componentName string) *vyogotechv1.ComponentAutoscaling {
 	if config == nil {
 		return r.getComponentDefaults(componentName)
 	}
 
-	result := &vyogotechv1alpha1.ComponentAutoscaling{}
+	result := &vyogotechv1.ComponentAutoscaling{}
 	*result = *config
 
 	defaults := r.getComponentDefaults(componentName)
@@ -262,7 +280,7 @@ func (r *FrappeBenchReconciler) fillComponentDefaults(config *vyogotechv1alpha1.
 }
 
 // cleanupOtherProviders removes scaling resources from providers other than the current one
-func (r *FrappeBenchReconciler) cleanupOtherProviders(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, componentName string, currentProvider string) {
+func (r *FrappeBenchReconciler) cleanupOtherProviders(ctx context.Context, bench *vyogotechv1.FrappeBench, componentName string, currentProvider string) {
 	providers := []string{"keda", "hpa"}
 	for _, p := range providers {
 		if p != currentProvider {
@@ -272,8 +290,8 @@ func (r *FrappeBenchReconciler) cleanupOtherProviders(ctx context.Context, bench
 }
 
 // getComponentDefaults returns opinionated defaults per component
-func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyogotechv1alpha1.ComponentAutoscaling {
-	defaults := map[string]*vyogotechv1alpha1.ComponentAutoscaling{
+func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyogotechv1.ComponentAutoscaling {
+	defaults := map[string]*vyogotechv1.ComponentAutoscaling{
 		"nginx": {
 			Enabled:         boolPtr(false),
 			StaticReplicas:  int32Ptr(1),
@@ -282,7 +300,7 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
 			Provider:        "hpa",
-			HPA: &vyogotechv1alpha1.HPAScalingConfig{
+			HPA: &vyogotechv1.HPAScalingConfig{
 				Metric:                 "cpu",
 				TargetUtilization:      int32Ptr(70),
 				ScaleUpStabilization:   int32Ptr(0),
@@ -297,7 +315,7 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
 			Provider:        "hpa",
-			HPA: &vyogotechv1alpha1.HPAScalingConfig{
+			HPA: &vyogotechv1.HPAScalingConfig{
 				Metric:                 "cpu",
 				TargetUtilization:      int32Ptr(70),
 				ScaleUpStabilization:   int32Ptr(0),
@@ -312,7 +330,7 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
 			Provider:        "hpa",
-			HPA: &vyogotechv1alpha1.HPAScalingConfig{
+			HPA: &vyogotechv1.HPAScalingConfig{
 				Metric:                 "cpu",
 				TargetUtilization:      int32Ptr(70),
 				ScaleUpStabilization:   int32Ptr(0),
@@ -336,7 +354,7 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
 			Provider:        "keda",
-			KEDA: &vyogotechv1alpha1.KEDAScalingConfig{
+			KEDA: &vyogotechv1.KEDAScalingConfig{
 				Trigger:     "redis",
 				TargetValue: "5",
 			},
@@ -349,7 +367,7 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
 			Provider:        "keda",
-			KEDA: &vyogotechv1alpha1.KEDAScalingConfig{
+			KEDA: &vyogotechv1.KEDAScalingConfig{
 				Trigger:     "redis",
 				TargetValue: "2",
 			},
@@ -362,7 +380,7 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 			CooldownPeriod:  int32Ptr(60),
 			PollingInterval: int32Ptr(30),
 			Provider:        "keda",
-			KEDA: &vyogotechv1alpha1.KEDAScalingConfig{
+			KEDA: &vyogotechv1.KEDAScalingConfig{
 				Trigger:     "redis",
 				TargetValue: "5",
 			},
@@ -374,7 +392,7 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 	}
 
 	// Safe fallback for unknown components
-	return &vyogotechv1alpha1.ComponentAutoscaling{
+	return &vyogotechv1.ComponentAutoscaling{
 		Enabled:         boolPtr(false),
 		StaticReplicas:  int32Ptr(1),
 		MinReplicas:     int32Ptr(1),
@@ -385,7 +403,7 @@ func (r *FrappeBenchReconciler) getComponentDefaults(componentName string) *vyog
 }
 
 // getComponentReplicaCount determines the replica count based on scaling mode
-func (r *FrappeBenchReconciler) getComponentReplicaCount(config *vyogotechv1alpha1.ComponentAutoscaling, providerManaged bool) int32 {
+func (r *FrappeBenchReconciler) getComponentReplicaCount(config *vyogotechv1.ComponentAutoscaling, providerManaged bool) int32 {
 	if config == nil {
 		return 1
 	}
@@ -407,15 +425,15 @@ func (r *FrappeBenchReconciler) getComponentReplicaCount(config *vyogotechv1alph
 
 // Security context helpers (shared logic in security_context.go; Redis uses fixed UID 999)
 
-func (r *FrappeBenchReconciler) getPodSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+func (r *FrappeBenchReconciler) getPodSecurityContext(ctx context.Context, bench *vyogotechv1.FrappeBench) *corev1.PodSecurityContext {
 	return PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security)
 }
 
-func (r *FrappeBenchReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+func (r *FrappeBenchReconciler) getContainerSecurityContext(ctx context.Context, bench *vyogotechv1.FrappeBench) *corev1.SecurityContext {
 	return ContainerSecurityContextForBench(r.IsOpenShift, bench.Spec.Security)
 }
 
-func (r *FrappeBenchReconciler) getRedisPodSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.PodSecurityContext {
+func (r *FrappeBenchReconciler) getRedisPodSecurityContext(bench *vyogotechv1.FrappeBench) *corev1.PodSecurityContext {
 	// If user provided custom security context, use it
 	if bench.Spec.Security != nil && bench.Spec.Security.PodSecurityContext != nil {
 		return bench.Spec.Security.PodSecurityContext
@@ -435,12 +453,17 @@ func (r *FrappeBenchReconciler) getRedisPodSecurityContext(bench *vyogotechv1alp
 		secCtx.RunAsUser = &redisUID
 		secCtx.RunAsGroup = &redisUID
 		secCtx.FSGroup = &redisUID
+	} else {
+		// On OpenShift, if we don't provide a numeric UID, we must omit RunAsNonRoot
+		// to avoid "image will run as root" validation error for named users.
+		// OpenShift's SCC will still enforce non-root execution.
+		secCtx.RunAsNonRoot = nil
 	}
 
 	return secCtx
 }
 
-func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotechv1alpha1.FrappeBench) *corev1.SecurityContext {
+func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotechv1.FrappeBench) *corev1.SecurityContext {
 	// If user provided custom security context, use it
 	if bench.Spec.Security != nil && bench.Spec.Security.SecurityContext != nil {
 		return bench.Spec.Security.SecurityContext
@@ -461,6 +484,11 @@ func (r *FrappeBenchReconciler) getRedisContainerSecurityContext(bench *vyogotec
 		redisUID := int64(999)
 		secCtx.RunAsUser = &redisUID
 		secCtx.RunAsGroup = &redisUID
+	} else {
+		// On OpenShift, if we don't provide a numeric UID, we must omit RunAsNonRoot
+		// to avoid "image will run as root" validation error for named users.
+		// OpenShift's SCC will still enforce non-root execution.
+		secCtx.RunAsNonRoot = nil
 	}
 
 	return secCtx

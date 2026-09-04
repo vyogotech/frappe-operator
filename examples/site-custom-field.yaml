@@ -1,0 +1,14 @@
+apiVersion: vyogo.tech/v1
+kind: SiteCustomField
+metadata:
+  name: e2e-customer-tax-id
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  dt: "Customer"
+  fieldname: "custom_tax_id"
+  label: "Tax Registration ID"
+  fieldtype: "Data"
+  insertAfter: "customer_name"
+  reqd: 1

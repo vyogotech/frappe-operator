@@ -29,15 +29,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	crcfg "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	routev1 "github.com/openshift/api/route/v1"
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -53,7 +55,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	utilruntime.Must(routev1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -62,7 +64,7 @@ const defaultMaxConcurrentSiteReconciles = 10
 
 // effectiveMaxFromBenches returns the effective max concurrent site reconciles from env value and bench list.
 // Used by getMaxConcurrentSiteReconciles; exported for testing.
-func effectiveMaxFromBenches(fromEnv int, items []vyogotechv1alpha1.FrappeBench) int {
+func effectiveMaxFromBenches(fromEnv int, items []vyogotechv1.FrappeBench) int {
 	benchMax := 0
 	for i := range items {
 		if items[i].Spec.SiteReconcileConcurrency != nil && *items[i].Spec.SiteReconcileConcurrency > 0 {
@@ -90,16 +92,53 @@ func getMaxConcurrentSiteReconciles(mgr ctrl.Manager) int {
 			fromEnv = n
 		}
 	}
-	var items []vyogotechv1alpha1.FrappeBench
+	var items []vyogotechv1.FrappeBench
 	cl, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
 	if err == nil {
-		var list vyogotechv1alpha1.FrappeBenchList
+		var list vyogotechv1.FrappeBenchList
 		// Omit InNamespace to list FrappeBenches across all namespaces (bench-level override).
 		if err := cl.List(context.Background(), &list); err == nil {
 			items = list.Items
 		}
 	}
 	return effectiveMaxFromBenches(fromEnv, items)
+}
+
+// defaultMaxConcurrentReconciles is the worker concurrency applied to the FrappeBench
+// controller and every site-child resource controller (SiteApp, SiteConfig, SiteUser,
+// SiteBackup, ...) via the manager's global controller config. controller-runtime
+// otherwise defaults these to 1, serializing batch operations across many sites.
+const defaultMaxConcurrentReconciles = 5
+
+// getMaxConcurrentReconciles returns the global (non-FrappeSite) controller worker
+// concurrency. FrappeSite keeps its own per-bench tuning via getMaxConcurrentSiteReconciles
+// and is unaffected. Tunable via FRAPPE_MAX_CONCURRENT_RECONCILES (operator ConfigMap).
+func getMaxConcurrentReconciles() int {
+	n := defaultMaxConcurrentReconciles
+	if s := os.Getenv("FRAPPE_MAX_CONCURRENT_RECONCILES"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			n = v
+		}
+	}
+	return n
+}
+
+// applyClientThrottle raises the API client's QPS/Burst from the rest config when
+// FRAPPE_CLIENT_QPS / FRAPPE_CLIENT_BURST are set. Higher reconcile concurrency is only
+// useful if the shared client rate limiter can keep up during mass provisioning; leaving
+// the env unset preserves controller-runtime's conservative defaults.
+func applyClientThrottle(cfg *rest.Config) (float32, int) {
+	if s := os.Getenv("FRAPPE_CLIENT_QPS"); s != "" {
+		if v, err := strconv.ParseFloat(s, 32); err == nil && v > 0 {
+			cfg.QPS = float32(v)
+		}
+	}
+	if s := os.Getenv("FRAPPE_CLIENT_BURST"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			cfg.Burst = v
+		}
+	}
+	return cfg.QPS, cfg.Burst
 }
 
 func main() {
@@ -119,13 +158,25 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	restCfg := ctrl.GetConfigOrDie()
+	qps, burst := applyClientThrottle(restCfg)
+	maxReconciles := getMaxConcurrentReconciles()
+
+	mgr, err := ctrl.NewManager(restCfg, ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsserver.Options{BindAddress: metricsAddr},
 		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "bd4753fa.vyogo.tech",
+		// Global worker concurrency for the FrappeBench controller and every site-child
+		// resource controller (SiteApp, SiteConfig, SiteUser, ...). Without this they run
+		// at controller-runtime's default of 1 and serialize batch operations across many
+		// sites. FrappeSite overrides this with its own per-bench value in SetupWithManager,
+		// so its tuning is preserved.
+		Controller: crcfg.Controller{
+			MaxConcurrentReconciles: maxReconciles,
+		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -142,9 +193,15 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+	setupLog.Info("controller concurrency configured",
+		"maxConcurrentReconciles", maxReconciles, "clientQPS", qps, "clientBurst", burst)
 
 	// Detect OpenShift
 	isOpenShift := controllers.IsRouteAPIAvailable(mgr.GetConfig())
+	if os.Getenv("FRAPPE_IS_OPENSHIFT") != "" {
+		isOpenShift = os.Getenv("FRAPPE_IS_OPENSHIFT") == "true"
+	}
+
 	if isOpenShift {
 		setupLog.Info("OpenShift platform detected")
 	} else {
@@ -165,6 +222,7 @@ func main() {
 	if err = (&controllers.FrappeSiteReconciler{
 		Client:                  mgr.GetClient(),
 		Scheme:                  mgr.GetScheme(),
+		Config:                  mgr.GetConfig(),
 		Recorder:                mgr.GetEventRecorderFor("frappesite-controller"),
 		IsOpenShift:             isOpenShift,
 		MaxConcurrentReconciles: maxSiteReconciles,
@@ -178,6 +236,71 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("siteuser-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteUser")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteRoleReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siterole-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteRole")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteAppReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteapp-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteApp")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteConfigReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteconfig-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteConfig")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteDomainReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitedomain-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteDomain")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteCronReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitecron-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteCron")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteAPIKeyReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteapikey-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteAPIKey")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteQuotaReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitequota-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteQuota")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteMigrationReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Recorder:    mgr.GetEventRecorderFor("sitemigration-controller"),
+		IsOpenShift: isOpenShift,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteMigration")
 		os.Exit(1)
 	}
 	if err = (&controllers.FrappeWorkpaceReconciler{
@@ -221,19 +344,69 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteBackupReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("sitebackup-controller"),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Recorder:    mgr.GetEventRecorderFor("sitebackup-controller"),
+		IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteBackup")
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteRestoreReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("siterestore-controller"),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Recorder:    mgr.GetEventRecorderFor("siterestore-controller"),
+		IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteRestore")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteCustomFieldReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitecustomfield-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteCustomField")
+		os.Exit(1)
+	}
+	if err = (&controllers.SitePropertySetterReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitepropertysetter-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SitePropertySetter")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteServerScriptReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteserverscript-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteServerScript")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteClientScriptReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteclientscript-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteClientScript")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteWebhookReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("sitewebhook-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteWebhook")
+		os.Exit(1)
+	}
+	if err = (&controllers.SiteUserPermissionReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("siteuserpermission-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SiteUserPermission")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

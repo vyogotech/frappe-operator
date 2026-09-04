@@ -21,9 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
-	"github.com/vyogotech/frappe-operator/pkg/backoff"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -32,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -52,6 +52,7 @@ const (
 type FrappeSiteReconciler struct {
 	client.Client
 	Scheme                  *runtime.Scheme
+	Config                  *rest.Config
 	Recorder                record.EventRecorder
 	IsOpenShift             bool
 	MaxConcurrentReconciles int
@@ -65,6 +66,7 @@ type FrappeSiteReconciler struct {
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets;services;configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs;databases;users;grants,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=route.openshift.io,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
@@ -73,7 +75,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger := log.FromContext(ctx)
 	startTime := time.Now()
 
-	site := &vyogotechv1alpha1.FrappeSite{}
+	site := &vyogotechv1.FrappeSite{}
 	if err := r.Get(ctx, req.NamespacedName, site); err != nil {
 		if !errors.IsNotFound(err) {
 			ReconciliationErrors.WithLabelValues("frappesite", "fetch_error").Inc()
@@ -102,7 +104,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if site.DeletionTimestamp == nil &&
-		site.Status.Phase == vyogotechv1alpha1.FrappeSitePhaseReady &&
+		site.Status.Phase == vyogotechv1.FrappeSitePhaseReady &&
 		site.Generation == site.Status.ObservedGeneration &&
 		siteVersion == site.Status.ObservedSiteVersion {
 		logger.V(1).Info("Site is Ready and spec/version unchanged, skipping reconciliation")
@@ -135,9 +137,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				})
 				_ = r.updateStatus(ctx, site)
 
-				attempt := r.getRequeueAttempt(site)
-				_ = r.patchRequeueAttempt(ctx, site, attempt+1)
-				return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(15*time.Second, attempt, requeueBackoffMax)}, nil
+				return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 			}
 
 			// Cleanup remaining resources if any
@@ -168,14 +168,14 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return r.failReconciliation(ctx, site, "benchRef is required", "ValidationFailed")
 	}
 
-	bench := &vyogotechv1alpha1.FrappeBench{}
+	bench := &vyogotechv1.FrappeBench{}
 	benchKey := types.NamespacedName{Name: site.Spec.BenchRef.Name, Namespace: site.Spec.BenchRef.Namespace}
 	if benchKey.Namespace == "" {
 		benchKey.Namespace = site.Namespace
 	}
 
 	if err := r.Get(ctx, benchKey, bench); err != nil {
-		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhasePending
+		site.Status.Phase = vyogotechv1.FrappeSitePhasePending
 		r.setCondition(site, metav1.Condition{
 			Type:    "BenchReady",
 			Status:  metav1.ConditionFalse,
@@ -183,13 +183,11 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Message: fmt.Sprintf("Failed to get referenced bench: %v", err),
 		})
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
-		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(30*time.Second, attempt, requeueBackoffMax)}, nil
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if bench.Status.Phase != "Ready" {
-		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhasePending
+		site.Status.Phase = vyogotechv1.FrappeSitePhasePending
 		r.setCondition(site, metav1.Condition{
 			Type:    "BenchReady",
 			Status:  metav1.ConditionFalse,
@@ -197,9 +195,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Message: fmt.Sprintf("Bench %s is not ready", bench.Name),
 		})
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
-		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(requeueBackoffBase, attempt, requeueBackoffMax)}, nil
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 
 	r.setCondition(site, metav1.Condition{
@@ -229,7 +225,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if err != nil {
 			return r.failReconciliation(ctx, site, fmt.Sprintf("Database provisioning failed: %v", err), "DatabaseFailed")
 		}
-		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseProvisioning
+		site.Status.Phase = vyogotechv1.FrappeSitePhaseProvisioning
 		r.setCondition(site, metav1.Condition{
 			Type:    "DatabaseReady",
 			Status:  metav1.ConditionFalse,
@@ -237,9 +233,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Message: "Database is being provisioned",
 		})
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
-		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(requeueBackoffBase, attempt, requeueBackoffMax)}, nil
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 
 	r.setCondition(site, metav1.Condition{
@@ -257,15 +251,16 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Initialize Site
 	siteReady, err := r.ensureSiteInitialized(ctx, site, bench, domain, dbInfo, dbCreds)
 	if err != nil {
-		return r.failReconciliation(ctx, site, fmt.Sprintf("Site initialization failed: %v", err), "SiteInitializationFailed")
+		// Permanent init job failure: mark Failed and stop requeueing.
+		// Returning a non-nil error here would cause controller-runtime to
+		// immediately requeue forever. Use failTerminal instead.
+		return r.failTerminal(ctx, site, fmt.Sprintf("Site initialization failed: %v", err), "SiteInitializationFailed")
 	}
 
 	if !siteReady {
-		site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseProvisioning
+		site.Status.Phase = vyogotechv1.FrappeSitePhaseProvisioning
 		_ = r.updateStatus(ctx, site)
-		attempt := r.getRequeueAttempt(site)
-		_ = r.patchRequeueAttempt(ctx, site, attempt+1)
-		return ctrl.Result{RequeueAfter: backoff.ExponentialBackoff(requeueBackoffBase, attempt, requeueBackoffMax)}, nil
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 
 	// External Access (Ingress/Route)
@@ -282,7 +277,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Finalize status
-	site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseReady
+	site.Status.Phase = vyogotechv1.FrappeSitePhaseReady
 	site.Status.ObservedGeneration = site.Generation
 	site.Status.ObservedSiteVersion = site.Annotations["frappe.io/site-version"]
 	site.Status.SiteURL = fmt.Sprintf("http://%s", domain)
@@ -311,8 +306,8 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *FrappeSiteReconciler) failReconciliation(ctx context.Context, site *vyogotechv1alpha1.FrappeSite, msg, reason string) (ctrl.Result, error) {
-	site.Status.Phase = vyogotechv1alpha1.FrappeSitePhaseFailed
+func (r *FrappeSiteReconciler) failReconciliation(ctx context.Context, site *vyogotechv1.FrappeSite, msg, reason string) (ctrl.Result, error) {
+	site.Status.Phase = vyogotechv1.FrappeSitePhaseFailed
 	r.setCondition(site, metav1.Condition{
 		Type:    "Ready",
 		Status:  metav1.ConditionFalse,
@@ -324,14 +319,32 @@ func (r *FrappeSiteReconciler) failReconciliation(ctx context.Context, site *vyo
 	return ctrl.Result{}, fmt.Errorf("%s", msg)
 }
 
-func (r *FrappeSiteReconciler) setCondition(site *vyogotechv1alpha1.FrappeSite, condition metav1.Condition) {
+// failTerminal marks the site Failed and returns without requeueing.
+// Use this for permanent, unrecoverable failures (e.g. init job backoff exhausted)
+// where returning a non-nil error would cause controller-runtime to loop forever.
+func (r *FrappeSiteReconciler) failTerminal(ctx context.Context, site *vyogotechv1.FrappeSite, msg, reason string) (ctrl.Result, error) {
+	site.Status.Phase = vyogotechv1.FrappeSitePhaseFailed
+	r.setCondition(site, metav1.Condition{
+		Type:    "Ready",
+		Status:  metav1.ConditionFalse,
+		Reason:  reason,
+		Message: msg,
+	})
+	r.Recorder.Event(site, corev1.EventTypeWarning, reason, msg)
+	_ = r.updateStatus(ctx, site)
+	// Return nil error — the site is Failed and no further action is possible
+	// until the user intervenes (e.g. deletes the failed job to trigger a retry).
+	return ctrl.Result{}, nil
+}
+
+func (r *FrappeSiteReconciler) setCondition(site *vyogotechv1.FrappeSite, condition metav1.Condition) {
 	condition.ObservedGeneration = site.Generation
 	meta.SetStatusCondition(&site.Status.Conditions, condition)
 }
 
-func (r *FrappeSiteReconciler) updateStatus(ctx context.Context, site *vyogotechv1alpha1.FrappeSite) error {
+func (r *FrappeSiteReconciler) updateStatus(ctx context.Context, site *vyogotechv1.FrappeSite) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		latest := &vyogotechv1alpha1.FrappeSite{}
+		latest := &vyogotechv1.FrappeSite{}
 		if err := r.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, latest); err != nil {
 			return err
 		}
@@ -354,7 +367,7 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(opts).
-		For(&vyogotechv1alpha1.FrappeSite{}).
+		For(&vyogotechv1.FrappeSite{}).
 		Owns(&batchv1.Job{}).
 		Owns(&networkingv1.Ingress{}).
 		Complete(r)

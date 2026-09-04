@@ -2,8 +2,8 @@ apiVersion: v2
 name: frappe-operator
 description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
 type: application
-version: 3.0.0
-appVersion: "v3.0.0"
+version: 5.0.7
+appVersion: "v5.0.7"
 keywords:
   - frappe
   - erpnext
@@ -37,7 +37,7 @@ dependencies:
 annotations:
   # Artifact Hub annotations
   artifacthub.io/category: database
-  artifacthub.io/license: Apache-2.0
+  artifacthub.io/license: Elastic-2.0
   artifacthub.io/prerelease: "false"
   artifacthub.io/operator: "true"
   artifacthub.io/operatorCapabilities: Full Lifecycle

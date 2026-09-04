@@ -1,0 +1,10 @@
+apiVersion: vyogo.tech/v1
+kind: SiteApp
+metadata:
+  name: e2e-site-app-lms
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  appName: lms
+  gitRepo: "https://github.com/frappe/lms"

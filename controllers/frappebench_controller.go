@@ -20,11 +20,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/constants"
 	"github.com/vyogotech/frappe-operator/pkg/scripts"
 	appsv1 "k8s.io/api/apps/v1"
@@ -72,6 +71,7 @@ const frappeBenchFinalizer = "vyogo.tech/bench-finalizer"
 //+kubebuilder:rbac:groups=keda.sh,resources=scaledobjects/finalizers,verbs=update
 //+kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+//+kubebuilder:rbac:groups="",resources=resourcequotas;limitranges,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -79,7 +79,7 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	startTime := time.Now()
 
 	// Fetch the FrappeBench instance
-	bench := &vyogotechv1alpha1.FrappeBench{}
+	bench := &vyogotechv1.FrappeBench{}
 	if err := r.Get(ctx, req.NamespacedName, bench); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -134,6 +134,13 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		logger.Error(err, "Failed to merge FPM repositories")
 	}
 	logger.Info("FPM repositories configured", "count", len(fpmRepos))
+
+	// Ensure namespace guardrails (ResourceQuota / LimitRange) before workloads are
+	// created, so default limits apply and tenant caps are in force. Non-fatal.
+	if err := r.ensureNamespacePolicy(ctx, bench); err != nil {
+		logger.Error(err, "Failed to ensure namespace policy")
+		r.Recorder.Event(bench, corev1.EventTypeWarning, "NamespacePolicyFailed", fmt.Sprintf("Failed to apply namespace policy: %v", err))
+	}
 
 	// Ensure storage
 	if err := r.ensureBenchStorage(ctx, bench); err != nil {
@@ -248,7 +255,7 @@ func (r *FrappeBenchReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 // handleFinalizer manages the finalizer for FrappeBench deletion
-func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) (ctrl.Result, error) {
+func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyogotechv1.FrappeBench) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	if bench.GetDeletionTimestamp() != nil {
@@ -268,7 +275,7 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 			}
 
 			// 1. Check for dependent sites
-			siteList := &vyogotechv1alpha1.FrappeSiteList{}
+			siteList := &vyogotechv1.FrappeSiteList{}
 			if err := r.List(ctx, siteList, client.InNamespace(bench.Namespace)); err != nil {
 				logger.Error(err, "Failed to list dependent sites")
 				r.Recorder.Event(bench, corev1.EventTypeWarning, "DeletionFailed", fmt.Sprintf("Failed to check dependent sites: %v", err))
@@ -401,15 +408,15 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 }
 
 // setCondition sets a condition on the FrappeBench using meta.SetStatusCondition
-func (r *FrappeBenchReconciler) setCondition(bench *vyogotechv1alpha1.FrappeBench, condition metav1.Condition) {
+func (r *FrappeBenchReconciler) setCondition(bench *vyogotechv1.FrappeBench, condition metav1.Condition) {
 	condition.ObservedGeneration = bench.Generation
 	meta.SetStatusCondition(&bench.Status.Conditions, condition)
 }
 
 // updateStatus updates the FrappeBench status with proper error handling and conflict retry
-func (r *FrappeBenchReconciler) updateStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) updateStatus(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		latest := &vyogotechv1alpha1.FrappeBench{}
+		latest := &vyogotechv1.FrappeBench{}
 		if err := r.Get(ctx, types.NamespacedName{Name: bench.Name, Namespace: bench.Namespace}, latest); err != nil {
 			return err
 		}
@@ -437,7 +444,7 @@ func (r *FrappeBenchReconciler) getOperatorConfig(ctx context.Context, namespace
 }
 
 // isGitEnabled determines if Git is enabled based on operator and bench config
-func (r *FrappeBenchReconciler) isGitEnabled(operatorConfig *corev1.ConfigMap, bench *vyogotechv1alpha1.FrappeBench) bool {
+func (r *FrappeBenchReconciler) isGitEnabled(operatorConfig *corev1.ConfigMap, bench *vyogotechv1.FrappeBench) bool {
 	// Priority 1: Bench-level override
 	if bench.Spec.GitConfig != nil && bench.Spec.GitConfig.Enabled != nil {
 		return *bench.Spec.GitConfig.Enabled
@@ -455,13 +462,13 @@ func (r *FrappeBenchReconciler) isGitEnabled(operatorConfig *corev1.ConfigMap, b
 }
 
 // mergeFPMRepositories merges operator-level and bench-level FPM repositories
-func (r *FrappeBenchReconciler) mergeFPMRepositories(operatorConfig *corev1.ConfigMap, bench *vyogotechv1alpha1.FrappeBench) ([]vyogotechv1alpha1.FPMRepository, error) {
-	var repos []vyogotechv1alpha1.FPMRepository
+func (r *FrappeBenchReconciler) mergeFPMRepositories(operatorConfig *corev1.ConfigMap, bench *vyogotechv1.FrappeBench) ([]vyogotechv1.FPMRepository, error) {
+	var repos []vyogotechv1.FPMRepository
 
 	// Add operator-level repositories
 	if operatorConfig != nil {
 		if fpmReposJSON, ok := operatorConfig.Data["fpmRepositories"]; ok {
-			var operatorRepos []vyogotechv1alpha1.FPMRepository
+			var operatorRepos []vyogotechv1.FPMRepository
 			if err := json.Unmarshal([]byte(fpmReposJSON), &operatorRepos); err == nil {
 				repos = append(repos, operatorRepos...)
 			}
@@ -477,16 +484,40 @@ func (r *FrappeBenchReconciler) mergeFPMRepositories(operatorConfig *corev1.Conf
 }
 
 // ensureBenchInitialized creates a job to initialize the Frappe bench
-func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, gitEnabled bool, fpmRepos []vyogotechv1alpha1.FPMRepository) (bool, error) {
+func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, bench *vyogotechv1.FrappeBench, gitEnabled bool, fpmRepos []vyogotechv1.FPMRepository) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	jobName := fmt.Sprintf("%s-init", bench.Name)
 	job := &batchv1.Job{}
+	expectedImage := r.getBenchImage(ctx, bench)
+
+	// Check if already initialized with the correct image
+	if bench.Status.InitializedImage == expectedImage {
+		return true, nil
+	}
 
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: bench.Namespace}, job)
 	if err == nil {
-		// Job exists, check status
+		// Job exists, check if the FrappeBench image tag has been updated
+		if len(job.Spec.Template.Spec.Containers) > 0 {
+			currentImage := job.Spec.Template.Spec.Containers[0].Image
+			if currentImage != expectedImage {
+				logger.Info("Bench image updated, deleting old init job to re-sync assets", "oldImage", currentImage, "newImage", expectedImage)
+				if deleteErr := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); deleteErr != nil {
+					return false, deleteErr
+				}
+				// Return false so controller requeues and recreates the job on the next loop
+				return false, nil
+			}
+		}
+
+		// Job exists and is up to date, check status
 		if job.Status.Succeeded > 0 {
+			// Job completed successfully, update the state
+			bench.Status.InitializedImage = expectedImage
+			if err := r.updateBenchStatus(ctx, bench, gitEnabled, fpmRepos); err != nil {
+				return false, fmt.Errorf("failed to update bench status with InitializedImage: %w", err)
+			}
 			return true, nil
 		}
 		// If job failed, report it early
@@ -503,8 +534,9 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 	logger.Info("Creating bench init job", "job", jobName)
 
 	initScript, err := scripts.RenderScript(scripts.BenchInit, scripts.BenchInitData{
-		BenchName:    bench.Name,
-		RedisAddress: r.resolveRedisURL(ctx, bench),
+		BenchName:         bench.Name,
+		RedisCacheAddress: r.resolveRedisCacheURL(ctx, bench),
+		RedisQueueAddress: r.resolveRedisQueueURL(ctx, bench),
 	})
 	if err != nil {
 		return false, fmt.Errorf("failed to render bench init script: %w", err)
@@ -524,16 +556,28 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 			Namespace: bench.Namespace,
 		},
 		Spec: batchv1.JobSpec{
+			BackoffLimit: int32Ptr(1),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyNever,
 					SecurityContext: r.getPodSecurityContext(ctx, bench),
+					ImagePullSecrets: func() []corev1.LocalObjectReference {
+						if bench.Spec.ImageConfig != nil && len(bench.Spec.ImageConfig.PullSecrets) > 0 {
+							secrets := make([]corev1.LocalObjectReference, len(bench.Spec.ImageConfig.PullSecrets))
+							for i, s := range bench.Spec.ImageConfig.PullSecrets {
+								secrets[i] = corev1.LocalObjectReference{Name: s.Name}
+							}
+							return secrets
+						}
+						return nil
+					}(),
 					Containers: []corev1.Container{
 						{
-							Name:    "bench-init",
-							Image:   r.getBenchImage(ctx, bench),
-							Command: []string{"bash", "-c"},
-							Args:    []string{initScript},
+							Name:            "bench-init",
+							Image:           r.getBenchImage(ctx, bench),
+							ImagePullPolicy: r.getImagePullPolicy(bench),
+							Command:         []string{"bash", "-c"},
+							Args:            []string{initScript},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -595,16 +639,10 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 
 // getBenchImage returns the image to use for the bench
 // Priority: 1. bench.spec.imageConfig, 2. operator ConfigMap defaults, 3. hardcoded constants
-func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) string {
-	version := bench.Spec.FrappeVersion
-	// Only add 'v' prefix to numeric versions (e.g., "15" -> "v15", but "develop" stays "develop")
-	if version != "" && version != "latest" && !strings.HasPrefix(version, "v") {
-		// Check if version is numeric (e.g., "15", "14", "16.0.0")
-		isNumeric, _ := regexp.MatchString(`^[\d.]+$`, version)
-		if isNumeric {
-			version = "v" + version
-		}
-	}
+func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogotechv1.FrappeBench) string {
+	// Normalise the version onto the published tag scheme ("16" -> "version-16").
+	// See benchImageTag: the old "v"+major rewrite produced a nonexistent tag.
+	version := benchImageTag(bench.Spec.FrappeVersion)
 
 	// Priority 1: Check bench-level ImageConfig override
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
@@ -636,22 +674,24 @@ func (r *FrappeBenchReconciler) getBenchImage(ctx context.Context, bench *vyogot
 
 	// Priority 3: Fall back to constants with version
 	if version != "" && version != "latest" {
-		return fmt.Sprintf("ghcr.io/vyogotech/erpnext-for-operator:%s", version)
+		return fmt.Sprintf("docker.io/frappe/erpnext:%s", version)
 	}
 	return constants.DefaultFrappeImage
 }
 
 // parseAppsJSON converts legacy appsJSON to AppSource array
-func (r *FrappeBenchReconciler) parseAppsJSON(appsJSON string) []vyogotechv1alpha1.AppSource {
+//
+//nolint:unused
+func (r *FrappeBenchReconciler) parseAppsJSON(appsJSON string) []vyogotechv1.AppSource {
 	var appNames []string
 	if err := json.Unmarshal([]byte(appsJSON), &appNames); err != nil {
 		return nil
 	}
 
-	apps := make([]vyogotechv1alpha1.AppSource, 0, len(appNames))
+	apps := make([]vyogotechv1.AppSource, 0, len(appNames))
 	for _, name := range appNames {
 		// Assume image source for legacy format
-		apps = append(apps, vyogotechv1alpha1.AppSource{
+		apps = append(apps, vyogotechv1.AppSource{
 			Name:   name,
 			Source: "image",
 		})
@@ -660,11 +700,11 @@ func (r *FrappeBenchReconciler) parseAppsJSON(appsJSON string) []vyogotechv1alph
 }
 
 // updateComponentScalingStatus updates the status with current component scaling information
-func (r *FrappeBenchReconciler) updateComponentScalingStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) updateComponentScalingStatus(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
 	if bench.Status.ComponentScaling == nil {
-		bench.Status.ComponentScaling = make(map[string]*vyogotechv1alpha1.ComponentScalingStatus)
+		bench.Status.ComponentScaling = make(map[string]*vyogotechv1.ComponentScalingStatus)
 	}
 
 	components := []string{"gunicorn", "nginx", "socketio", "worker-default", "worker-long", "worker-short"}
@@ -714,7 +754,7 @@ func (r *FrappeBenchReconciler) updateComponentScalingStatus(ctx context.Context
 		}
 
 		// Update status
-		bench.Status.ComponentScaling[componentName] = &vyogotechv1alpha1.ComponentScalingStatus{
+		bench.Status.ComponentScaling[componentName] = &vyogotechv1.ComponentScalingStatus{
 			Mode:            mode,
 			CurrentReplicas: currentReplicas,
 			DesiredReplicas: desiredReplicas,
@@ -725,7 +765,7 @@ func (r *FrappeBenchReconciler) updateComponentScalingStatus(ctx context.Context
 	return nil
 }
 
-func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, gitEnabled bool, fpmRepos []vyogotechv1alpha1.FPMRepository) error {
+func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vyogotechv1.FrappeBench, gitEnabled bool, fpmRepos []vyogotechv1.FPMRepository) error {
 	logger := log.FromContext(ctx)
 
 	// Collect installed app names
@@ -741,7 +781,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 	}
 
 	// Determine phase and conditions
-	isReady := false
 	if bench.Status.Phase == "" || (bench.Status.Phase != "Provisioning" && bench.Status.Phase != "Ready" && bench.Status.Phase != "Initializing") {
 		bench.Status.Phase = "Provisioning"
 		r.setCondition(bench, metav1.Condition{
@@ -758,7 +797,6 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: bench.Namespace}, job); err == nil {
 		if job.Status.Succeeded > 0 {
 			bench.Status.Phase = "Ready"
-			isReady = true
 			r.setCondition(bench, metav1.Condition{
 				Type:    "Ready",
 				Status:  metav1.ConditionTrue,
@@ -800,16 +838,13 @@ func (r *FrappeBenchReconciler) updateBenchStatus(ctx context.Context, bench *vy
 		return err
 	}
 
-	if isReady {
-	}
-
 	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager
 func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder := ctrl.NewControllerManagedBy(mgr).
-		For(&vyogotechv1alpha1.FrappeBench{}).
+		For(&vyogotechv1.FrappeBench{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
