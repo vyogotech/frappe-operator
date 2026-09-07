@@ -2,16 +2,19 @@ name: Comprehensive E2E Tests
 
 on:
   push:
-    branches: [main, master]
+    # release is included deliberately: releases are cut from it, so leaving it
+    # off meant the branch that ships had no e2e gate at all.
+    branches: [main, master, release]
     paths:
       - 'helm/**'
       - 'controllers/**'
       - 'api/**'
+      - 'pkg/**'
       - 'scripts/**'
       - 'test/**'
       - '.github/workflows/comprehensive-e2e.yml'
   pull_request:
-    branches: [main, master]
+    branches: [main, master, release]
   workflow_dispatch:
 
 jobs:
@@ -23,9 +26,9 @@ jobs:
       - name: Build operator binary
         run: make build
       - name: Build container image
-        run: docker build -t ghcr.io/rmallam/frappe-operator:local-e2e -f Dockerfile .
+        run: docker build -t ghcr.io/vyogotech/frappe-operator:local-e2e -f Dockerfile .
       - name: Save image
-        run: docker save ghcr.io/rmallam/frappe-operator:local-e2e | gzip > operator-image.tar.gz
+        run: docker save ghcr.io/vyogotech/frappe-operator:local-e2e | gzip > operator-image.tar.gz
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
@@ -40,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [kind, openshift]
+        platform: [kind, openshift-sim]
         scenario: [basic, external, scaling, custom-apps, advanced-config, backup-restore]
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +61,7 @@ jobs:
       - name: Load image into Kind
         run: |
           docker load < operator-image.tar.gz
-          kind load docker-image ghcr.io/rmallam/frappe-operator:local-e2e --name e2e-${{ matrix.platform }}-${{ matrix.scenario }}
+          kind load docker-image ghcr.io/vyogotech/frappe-operator:local-e2e --name e2e-${{ matrix.platform }}-${{ matrix.scenario }}
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -75,7 +78,7 @@ jobs:
           chmod +x scripts/e2e-suite.sh
           ./scripts/e2e-suite.sh --platform ${{ matrix.platform }} --scenario ${{ matrix.scenario }}
         env:
-          OPERATOR_IMAGE: ghcr.io/rmallam/frappe-operator:local-e2e
+          OPERATOR_IMAGE: ghcr.io/vyogotech/frappe-operator:local-e2e
 
       - name: Capture logs on failure
         if: failure()

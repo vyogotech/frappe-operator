@@ -137,6 +137,11 @@ func (r *FrappeSiteReconciler) ensureRoute(ctx context.Context, site *vyogotechv
 
 	nginxSvcName := fmt.Sprintf("%s-nginx", bench.Name)
 
+	routeHost := domain
+	if site.Spec.RouteConfig != nil && site.Spec.RouteConfig.Host != "" {
+		routeHost = site.Spec.RouteConfig.Host
+	}
+
 	// Determine TLS termination
 	tlsTermination := routev1.TLSTerminationEdge
 	if site.Spec.RouteConfig != nil && site.Spec.RouteConfig.TLSTermination != "" {
@@ -158,7 +163,7 @@ func (r *FrappeSiteReconciler) ensureRoute(ctx context.Context, site *vyogotechv
 			},
 		},
 		Spec: routev1.RouteSpec{
-			Host: domain,
+			Host: routeHost,
 			To: routev1.RouteTargetReference{
 				Kind: "Service",
 				Name: nginxSvcName,

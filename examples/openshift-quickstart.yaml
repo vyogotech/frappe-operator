@@ -1,0 +1,112 @@
+# Frappe/ERPNext on OpenShift - validated end to end on OpenShift 4.x with ODF.
+#
+# Deploys a bench and a site reachable over the cluster's own wildcard DNS. Unlike
+# the other ocp-* examples here, this one needs no security: block and no prebuilt
+# image in an internal registry - the operator derives an SCC-compatible fsGroup
+# from the namespace itself.
+#
+# Prerequisites:
+#   - MariaDB Operator (see docs/INSTALL_OPENSHIFT.md)
+#   - A shared MariaDB named "frappe-mariadb" in this namespace
+#     (examples/mariadb-shared-instance.yaml)
+#
+#   oc apply -f examples/openshift-quickstart.yaml
+---
+apiVersion: vyogo.tech/v1
+kind: FrappeBench
+metadata:
+  name: erp-bench
+spec:
+  frappeVersion: "16"
+
+  imageConfig:
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-16
+    pullPolicy: IfNotPresent
+
+  apps:
+    - name: erpnext
+      source: image
+
+  # REQUIRED on most OpenShift clusters. The bench's sites volume is mounted by
+  # every component (gunicorn, nginx, scheduler, workers), so it must be
+  # ReadWriteMany. Many clusters default to a block StorageClass - on ODF that is
+  # ocs-external-storagecluster-ceph-rbd - which is RWO only, and provisioning
+  # fails with:
+  #
+  #   multi node access modes are only supported on rbd `block` type volumes
+  #
+  # Set a filesystem StorageClass that supports RWX. Check yours with:
+  #   oc get storageclass
+  storageClassName: "ocs-external-storagecluster-cephfs"
+  storageSize: "10Gi"
+
+  # No security: block needed. On OpenShift the operator reads the namespace's
+  # openshift.io/sa.scc.supplemental-groups range and sets a matching fsGroup, so
+  # the mounted volume is group-writable under restricted-v2. Do not hardcode
+  # fsGroup: 0 - that requires the anyuid SCC.
+
+  componentAutoscaling:
+    gunicorn:
+      enabled: false
+      staticReplicas: 1
+    scheduler:
+      enabled: false
+      staticReplicas: 1
+    worker-default:
+      enabled: false
+      staticReplicas: 1
+    worker-short:
+      enabled: false
+      staticReplicas: 1
+    worker-long:
+      enabled: false
+      staticReplicas: 1
+---
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: erp-site
+spec:
+  benchRef:
+    name: erp-bench
+
+  # A bare label is enough. The operator appends the cluster's ingress domain
+  # (from ingresses.config.openshift.io/cluster), giving a site that resolves on
+  # the cluster's wildcard DNS - here erp.apps.<cluster-domain>.
+  #
+  # A name that cannot resolve publicly (a bare label, or a reserved TLD such as
+  # .localhost/.local/.test) is corrected the same way, and the operator records
+  # what it did in status.domainSource plus a DomainAutoCorrected event. A real
+  # external domain you point at the cluster yourself is left untouched.
+  #
+  # Frappe serves a request by matching the Host header against a directory under
+  # sites/, so the resolved name is what the site is created as - not just what
+  # the Route advertises. Check the result with:
+  #   oc get frappesite erp-site -o jsonpath='{.status.resolvedDomain}'
+  siteName: erp
+
+  # Apps must be listed here to be installed into the site. Shipping them in the
+  # bench image only makes them available; it does not install them.
+  # This is immutable after the site is created.
+  apps:
+    - erpnext
+
+  dbConfig:
+    provider: mariadb
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+
+  # The operator creates an OpenShift Route automatically. Set routeConfig only to
+  # override the defaults - for example host: to serve a custom domain you manage
+  # in external DNS, which must also match siteName for Frappe to answer on it.
+  routeConfig:
+    enabled: true
+    tlsTermination: edge
+
+# The admin password is generated and stored in the <site-name>-admin secret:
+#   oc get secret erp-site-admin -o jsonpath='{.data.password}' | base64 -d
+#
+# The URL is reported once the site is Ready:
+#   oc get frappesite erp-site -o jsonpath='{.status.siteURL}'

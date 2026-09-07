@@ -328,6 +328,9 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 				"db_root_user":     []byte(rootUser),
 				"db_root_password": []byte(rootPassword),
 				"site_name":        []byte(site.Spec.SiteName),
+				// So the deletion script can remove the sites/<domain> alias that
+				// site_init created; drop-site only removes the real directory.
+				"domain": []byte(site.Status.ResolvedDomain),
 			},
 		}
 

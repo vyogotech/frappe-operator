@@ -573,6 +573,30 @@ echo "Site $SITE_NAME created successfully!"
 echo "Finalizing site configuration for domain: $DOMAIN and Redis Cache: $REDIS_CACHE_ADDRESS / Queue: $REDIS_QUEUE_ADDRESS"
 update_site_config_json
 
+# The bench runs with FRAPPE_SITE_NAME_HEADER=$host, so Frappe resolves a request
+# by looking for sites/<Host>/. When the resolved domain differs from the site
+# name - the operator having put the site on the cluster's own domain - a request
+# arriving on the Route would 404 without an alias. Symlink it, the same native
+# multitenant mechanism SiteDomain uses for custom domains. The site keeps its
+# own name, so bench --site, backups, restores and migrations are unaffected.
+if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "$SITE_NAME" ]; then
+    case "$DOMAIN" in
+        */*|.|..)
+            echo "Warning: refusing to alias a domain containing a path separator: $DOMAIN"
+            ;;
+        *)
+            # Fatal, not a warning: SiteCron and SiteConfig jobs address the site
+            # by the resolved domain, so without this alias they fail later with
+            # a far less obvious "site does not exist".
+            if ln -sfn "$SITE_NAME" "/home/frappe/frappe-bench/sites/$DOMAIN"; then
+                echo "✓ Aliased sites/$DOMAIN -> $SITE_NAME so Frappe answers on the Route host"
+            else
+                echo "ERROR: failed to create sites/$DOMAIN alias; requests on $DOMAIN would 404"
+                exit 1
+            fi
+            ;;
+    esac
+fi
 
 touch "/home/frappe/frappe-bench/sites/$SITE_NAME/.init_complete"
 echo "Site initialization complete!"
