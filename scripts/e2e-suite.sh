@@ -295,8 +295,18 @@ if [ "$PLATFORM" == "openshift-sim" ]; then
                     *) error "FAILED: site '$site' resolved to '$RESOLVED' via '$SOURCE' but did not use the cluster domain from config.openshift.io/v1 Ingress (apps.e2e.example.com)." ;;
                 esac
                 ;;
+            explicit)
+                log "site '$site': domainSource=explicit, host kept verbatim ($RESOLVED)"
+                ;;
+            sitename-default)
+                # A cluster ingress object is seeded above, so detection had
+                # something to find. Falling back to the raw siteName means it
+                # could not read it - which is what a missing
+                # config.openshift.io RBAC rule looks like from the outside.
+                error "FAILED: site '$site' fell back to sitename-default ('$RESOLVED') even though a config.openshift.io/v1 Ingress is present; cluster domain detection is not working."
+                ;;
             *)
-                log "site '$site': domainSource=$SOURCE, host kept verbatim ($RESOLVED)"
+                error "FAILED: site '$site' has unexpected domainSource '$SOURCE'."
                 ;;
         esac
     done
