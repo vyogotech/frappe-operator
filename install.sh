@@ -9,8 +9,12 @@ NC='\033[0m' # No Color
 
 # Default values
 NAMESPACE="${NAMESPACE:-frappe-operator-system}"
-IMAGE_REPO="${IMAGE_REPO:-ghcr.io/vyogotech/frappe-operator}"
-IMAGE_TAG="${IMAGE_TAG:-v1.0.0}"
+# Unset by default: the chart's own values.yaml carries the version that matches
+# this checkout, and scripts/bump-version.sh keeps it current. Hardcoding a
+# default here meant the script pinned a stale tag (v1.0.0, long gone from the
+# registry) over the correct one on every install. Export these only to override.
+IMAGE_REPO="${IMAGE_REPO:-}"
+IMAGE_TAG="${IMAGE_TAG:-}"
 INSTALL_MARIADB_CRDS="${INSTALL_MARIADB_CRDS:-true}"
 INSTALL_INGRESS="${INSTALL_INGRESS:-false}"
 INSTALL_KEDA="${INSTALL_KEDA:-true}"
@@ -145,26 +149,35 @@ fi
 # Install or upgrade the chart (upgrade --install handles both cases)
 # Use --create-namespace to let Helm manage the namespace
 echo "Installing Helm chart..."
-if helm upgrade --install frappe-operator "$CHART_PATH" \
-    --namespace "$NAMESPACE" \
-    --create-namespace \
-    --set mariadb-operator.enabled=true \
-    --set mariadb.enabled=false \
-    --set keda.enabled=false \
-    --set operator.image.repository="$IMAGE_REPO" \
-    --set operator.image.tag="$IMAGE_TAG" \
-    --timeout=10m >/dev/null 2>&1; then
-    
+
+HELM_ARGS=(
+    --namespace "$NAMESPACE"
+    --create-namespace
+    --set mariadb-operator.enabled=true
+    --set mariadb.enabled=false
+    --set keda.enabled=false
+    --timeout=10m
+)
+
+# Step 1 installed the MariaDB CRDs with kubectl, so they carry no Helm
+# ownership metadata. The mariadb-operator subchart defaults to installing them
+# too, and Helm refuses to adopt resources it does not own - which failed every
+# clean install with "invalid ownership metadata". Leave them to Step 1.
+if [ "$INSTALL_MARIADB_CRDS" = "true" ]; then
+    HELM_ARGS+=(--set mariadb-operator.crds.enabled=false)
+fi
+
+# Only override the chart's image when asked; see IMAGE_REPO/IMAGE_TAG above.
+[ -n "$IMAGE_REPO" ] && HELM_ARGS+=(--set operator.image.repository="$IMAGE_REPO")
+[ -n "$IMAGE_TAG" ] && HELM_ARGS+=(--set operator.image.tag="$IMAGE_TAG")
+
+# Keep stderr: hiding it turned every failure into "may have warnings" and left
+# the real reason - usually one line from Helm - entirely undiscoverable.
+if helm upgrade --install frappe-operator "$CHART_PATH" "${HELM_ARGS[@]}"; then
     echo -e "${GREEN}✓ Frappe Operator chart installed/upgraded${NC}"
 else
-    echo -e "${YELLOW}⚠ Helm install may have warnings, checking status...${NC}"
-    helm status frappe-operator -n "$NAMESPACE" >/dev/null 2>&1 || {
-        echo -e "${RED}✗ Helm installation failed${NC}"
-        echo "If you see namespace ownership errors, try:"
-        echo "  kubectl delete namespace $NAMESPACE"
-        echo "  Then run this script again"
-        exit 1
-    }
+    echo -e "${RED}✗ Helm installation failed (see the error above)${NC}"
+    exit 1
 fi
 echo ""
 
