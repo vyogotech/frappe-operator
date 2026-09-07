@@ -372,6 +372,40 @@ componentResources:
     requests: {cpu: "500m", memory: "1Gi"}
 ```
 
+### Job Resources
+
+`componentResources` sizes the long-running pods. The one-off Jobs the
+operator runs against the bench volume (bench/site init, app install and
+uninstall, backup, restore, migration, cron runs, and the small maintenance
+helpers such as domain aliases, config apply, site delete and database
+provisioning) are sized by `jobResources`. Every Job always gets requests and
+limits: an entry you set wins, then `default`, then the operator's built-in
+sizing. That keeps Jobs out of the BestEffort QoS class, where they would be
+the first thing evicted under node pressure and invisible to the scheduler.
+
+```yaml
+jobResources:
+  default:                      # any kind not listed below
+    requests: {cpu: "100m", memory: "256Mi"}
+    limits:   {cpu: "1",    memory: "1Gi"}
+  appInstall:                   # bench install-app + migrate on large apps
+    requests: {cpu: "500m", memory: "1Gi"}
+    limits:   {cpu: "2",    memory: "4Gi"}
+```
+
+Kinds: `benchInit`, `siteInit`, `appInstall`, `backup`, `restore`,
+`migration`, `cron`, `maintenance`. Built-in sizing when nothing is set:
+
+| Kind | Requests | Limits |
+|---|---|---|
+| `siteInit`, `appInstall`, `migration`, `restore` | 250m / 512Mi | 2 CPU / 3Gi |
+| `benchInit` | 100m / 512Mi | 1 CPU / 2Gi |
+| `backup`, `cron` | 100m / 256Mi | 1 CPU / 1Gi |
+| `maintenance` | 50m / 128Mi | 500m / 512Mi |
+
+A block you supply is used verbatim (not merged with the built-in), so set
+both requests and limits.
+
 ### Autoscaling
 
 Enable Horizontal Pod Autoscaling:

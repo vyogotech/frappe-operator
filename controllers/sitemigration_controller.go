@@ -139,6 +139,7 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command:         []string{"bash", "-c", cmdStr},
 							Env:             benchJobEnv(),
+							Resources:       vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindMigration),
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",

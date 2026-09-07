@@ -28,7 +28,6 @@ import (
 	"github.com/vyogotech/frappe-operator/controllers/database"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -570,28 +569,10 @@ func (r *FrappeSiteReconciler) getContainerSecurityContext(ctx context.Context, 
 
 // getSiteInitResources returns resource requirements for site initialization jobs
 func (r *FrappeSiteReconciler) getSiteInitResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
-	return corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("1Gi"),
-		},
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("500m"),
-			corev1.ResourceMemory: resource.MustParse("1Gi"),
-		},
-	}
+	return vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindSiteInit)
 }
 
 // getSiteDeleteResources returns resource requirements for site deletion jobs
 func (r *FrappeSiteReconciler) getSiteDeleteResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
-	return corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("1Gi"),
-		},
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("500m"),
-			corev1.ResourceMemory: resource.MustParse("1Gi"),
-		},
-	}
+	return vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindMaintenance)
 }

@@ -31,7 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -578,16 +577,7 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 							ImagePullPolicy: r.getImagePullPolicy(bench),
 							Command:         []string{"bash", "-c"},
 							Args:            []string{initScript},
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("100m"),
-									corev1.ResourceMemory: resource.MustParse("512Mi"),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("1000m"),
-									corev1.ResourceMemory: resource.MustParse("2Gi"),
-								},
-							},
+							Resources:       vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindBenchInit),
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",

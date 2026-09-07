@@ -521,9 +521,10 @@ func (r *SiteBackupReconciler) buildBackupJob(ctx context.Context, siteBackup *v
 								}
 								return corev1.PullPolicy("")
 							}(),
-							Command: command,
-							Args:    args,
-							Env:     env,
+							Command:   command,
+							Args:      args,
+							Env:       env,
+							Resources: vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindBackup),
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",
@@ -608,9 +609,10 @@ func (r *SiteBackupReconciler) buildBackupCronJob(ctx context.Context, siteBacku
 										}
 										return corev1.PullPolicy("")
 									}(),
-									Command: command,
-									Args:    args,
-									Env:     env,
+									Command:   command,
+									Args:      args,
+									Env:       env,
+									Resources: vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindBackup),
 									VolumeMounts: []corev1.VolumeMount{
 										{
 											Name:      "sites",

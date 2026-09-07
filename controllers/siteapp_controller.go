@@ -584,7 +584,7 @@ bench --site "$SITE_NAME" execute frappe.get_installed_apps
 			)
 		}
 
-		newJob := r.buildAppJob(siteApp, jobName, "app-installer", image, pvcName, script, env, int32(1), nil)
+		newJob := r.buildAppJob(siteApp, jobName, "app-installer", image, pvcName, script, env, vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindAppInstall), int32(1), nil)
 
 		// The install job is owned by the SiteApp so it is garbage-collected with
 		// it. (The uninstall job cannot be — see reconcileAppUninstallJob.)
@@ -658,7 +658,7 @@ func resolveBenchImage(bench *vyogotechv1.FrappeBench) string {
 // shape (image, sites PVC mount at frappe-sites subPath, security context,
 // RestartPolicy Never) shared by the install and uninstall paths. The caller
 // sets the owner reference (or deliberately does not — see the uninstall path).
-func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, containerName, image, pvcName, script string, env []corev1.EnvVar, backoffLimit int32, ttlSecondsAfterFinished *int32) *batchv1.Job {
+func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, containerName, image, pvcName, script string, env []corev1.EnvVar, resources corev1.ResourceRequirements, backoffLimit int32, ttlSecondsAfterFinished *int32) *batchv1.Job {
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -697,6 +697,7 @@ func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, c
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command:         []string{"bash", "-c", script},
 							Env:             env,
+							Resources:       resources,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",
@@ -819,7 +820,7 @@ bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
 		// set), and the API server rejects creating a child with a
 		// blockOwnerDeletion owner reference to an object being deleted. Instead the
 		// Job self-cleans via TTLSecondsAfterFinished once it finishes.
-		newJob := r.buildAppJob(siteApp, jobName, "app-uninstaller", image, pvcName, script, env, int32(2), ptr.To(int32(300)))
+		newJob := r.buildAppJob(siteApp, jobName, "app-uninstaller", image, pvcName, script, env, vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindAppInstall), int32(2), ptr.To(int32(300)))
 
 		if err := r.Create(ctx, newJob); err != nil {
 			return ctrl.Result{}, false, fmt.Errorf("failed to create uninstall job: %w", err)

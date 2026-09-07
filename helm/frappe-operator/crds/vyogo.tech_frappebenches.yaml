@@ -634,6 +634,236 @@ spec:
                     description: Tag is the image tag
                     type: string
                 type: object
+              jobResources:
+                description: |-
+                  JobResources sizes the one-off Jobs the operator runs for this bench and
+                  its sites (init, app install, backup, restore, migration, cron,
+                  maintenance). Unset entries fall back to the operator's built-in sizing;
+                  no Job ever runs without requests and limits.
+                properties:
+                  appInstall:
+                    description: AppInstall sizes SiteApp install and uninstall Jobs
+                      (pip/fpm install + migrate).
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  backup:
+                    description: Backup sizes one-time and scheduled backup Jobs.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  benchInit:
+                    description: BenchInit sizes the bench initialisation Job (assets/apps
+                      bootstrap).
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  cron:
+                    description: Cron sizes SiteCron Jobs.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  default:
+                    description: Default applies to every Job for which no more specific
+                      entry is set.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  maintenance:
+                    description: |-
+                      Maintenance sizes the small helpers: site delete, domain alias, config
+                      apply and database provisioning/cleanup Jobs.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  migration:
+                    description: Migration sizes SiteMigration Jobs (bench migrate).
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  restore:
+                    description: Restore sizes restore Jobs.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                  siteInit:
+                    description: SiteInit sizes site creation (bench new-site, optional
+                      app installs, migrate).
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute
+                          resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute
+                          resources required
+                        type: object
+                    type: object
+                type: object
               namespacePolicy:
                 description: |-
                   NamespacePolicy, when set, makes the operator maintain a ResourceQuota and/or a
