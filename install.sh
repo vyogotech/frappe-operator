@@ -18,6 +18,12 @@ IMAGE_TAG="${IMAGE_TAG:-}"
 INSTALL_MARIADB_CRDS="${INSTALL_MARIADB_CRDS:-true}"
 INSTALL_INGRESS="${INSTALL_INGRESS:-false}"
 INSTALL_KEDA="${INSTALL_KEDA:-true}"
+# Percona's PostgreSQL runs as uid/gid 26 and never sets an fsGroup - its
+# "openshift: true" mode only sets fsGroupChangePolicy, assuming SCC admission
+# will supply one. Where it does not, /pgdata stays root-owned and postgres
+# cannot start. Only needed if you provision Postgres-backed sites.
+INSTALL_POSTGRES_SCC="${INSTALL_POSTGRES_SCC:-false}"
+POSTGRES_NAMESPACE="${POSTGRES_NAMESPACE:-frappe-pg}"
 
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Frappe Operator Installation Script${NC}"
@@ -94,6 +100,60 @@ if [ "$INSTALL_INGRESS" = "true" ]; then
             --timeout=300s || echo -e "${YELLOW}⚠ Ingress controller may still be starting...${NC}"
         
         echo -e "${GREEN}✓ NGINX Ingress Controller installed${NC}"
+    fi
+    echo ""
+fi
+
+# Step 2b: SecurityContextConstraints for Percona PostgreSQL (OpenShift only)
+if [ "$INSTALL_POSTGRES_SCC" = "true" ]; then
+    echo -e "${YELLOW}Step 2b: Installing the PostgreSQL SecurityContextConstraints...${NC}"
+    if ! kubectl api-resources --api-group=security.openshift.io 2>/dev/null | grep -q securitycontextconstraints; then
+        echo -e "${YELLOW}⚠ Not an OpenShift cluster (no SCC API), skipping${NC}"
+    else
+        kubectl create namespace "$POSTGRES_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+        # Percona's postgres runs as uid/gid 26 and sets no fsGroup, so the data
+        # volume stays root-owned and its startup container fails with
+        # "cannot change permissions of /pgdata/pg16". Force the fsGroup here.
+        # priority 20 so this outranks the default SCCs for these accounts.
+        cat <<'SCC' | kubectl apply -f - >/dev/null
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: percona-pg-fsgroup
+priority: 20
+allowPrivilegeEscalation: false
+allowPrivilegedContainer: false
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: MustRunAs
+fsGroup:
+  type: MustRunAs
+  ranges:
+    - min: 26
+      max: 26
+supplementalGroups:
+  type: RunAsAny
+volumes: ["configMap","downwardAPI","emptyDir","persistentVolumeClaim","projected","secret"]
+SCC
+
+        for sa in frappe-postgres-instance frappe-postgres-pgbouncer \
+                  frappe-postgres-repo-host frappe-postgres-upgrade default; do
+            kubectl create clusterrolebinding "percona-pg-fsgroup-${sa}-${POSTGRES_NAMESPACE}" \
+                --clusterrole=system:openshift:scc:percona-pg-fsgroup \
+                --serviceaccount="${POSTGRES_NAMESPACE}:${sa}" \
+                --dry-run=client -o yaml 2>/dev/null | kubectl apply -f - >/dev/null || true
+        done
+
+        echo -e "${GREEN}✓ PostgreSQL SCC installed and bound in $POSTGRES_NAMESPACE${NC}"
+        # Pods in OpenShift's own system namespaces (default, kube-*, openshift-*)
+        # are not annotated by SCC admission, so a Percona cluster placed there
+        # never picks this up. Keep it in a namespace of your own.
+        if [ "$POSTGRES_NAMESPACE" = "default" ]; then
+            echo -e "${YELLOW}⚠ 'default' is a system namespace - SCCs are not applied to pods there.${NC}"
+            echo -e "${YELLOW}  Put the PostgreSQL cluster in its own namespace instead.${NC}"
+        fi
     fi
     echo ""
 fi
