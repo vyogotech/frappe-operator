@@ -84,6 +84,19 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	site := &vyogotechv1.FrappeSite{}
 	siteKey := types.NamespacedName{Name: siteDomain.Spec.SiteRef.Name, Namespace: siteNamespace}
 	if err := r.Get(ctx, siteKey, site); err != nil {
+		if siteDomain.DeletionTimestamp != nil && errors.IsNotFound(err) {
+			// The site is gone: its Ingress/Certificate went with it via owner
+			// references and the alias symlink lived in its site directory, so
+			// there is nothing left to clean. Holding the finalizer here left the
+			// SiteDomain in Terminating forever when a site was deleted first.
+			if controllerutil.ContainsFinalizer(siteDomain, siteDomainFinalizer) {
+				controllerutil.RemoveFinalizer(siteDomain, siteDomainFinalizer)
+				if err := r.Update(ctx, siteDomain); err != nil && !errors.IsNotFound(err) {
+					return ctrl.Result{}, err
+				}
+			}
+			return ctrl.Result{}, nil
+		}
 		siteDomain.Status.Phase = "Pending"
 		r.setCondition(siteDomain, metav1.Condition{
 			Type:    "SiteReady",
