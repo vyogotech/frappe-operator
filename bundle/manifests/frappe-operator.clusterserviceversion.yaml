@@ -247,7 +247,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime,Database
-    createdAt: "2026-09-07T22:34:50Z"
+    createdAt: "2026-09-07T22:37:33Z"
     features.operators.openshift.io/disconnected-compliant: "true"
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
