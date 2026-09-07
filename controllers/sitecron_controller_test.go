@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -145,4 +146,78 @@ func TestSiteCronReconciler_Reconcile_ValidationAndNotReady(t *testing.T) {
 			t.Errorf("expected RequeueAfter 15s, got %v", res.RequeueAfter)
 		}
 	})
+}
+
+// Same two bugs as the migrate Job: the cron-runner container mounted the sites
+// PVC at subPath "sites" instead of "frappe-sites" (an empty, unrelated slice of
+// the volume), and ran `bench` without recreating the bench-root apps.txt that
+// only ever exists as a symlink in the site-init Job's own (non-persistent)
+// container. This locks in the fix for both.
+func TestSiteCronReconciler_Reconcile_CronJobMountAndCommand(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	siteCron := &vyogotechv1.SiteCron{
+		ObjectMeta: metav1.ObjectMeta{Name: "sc1", Namespace: "tenant"},
+		Spec: vyogotechv1.SiteCronSpec{
+			SiteRef:  &vyogotechv1.NamespacedName{Name: "site1"},
+			Schedule: "0 2 * * *",
+			Method:   "app.api.nightly_sync",
+		},
+	}
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "tenant"},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			SiteName: "primary",
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"},
+		},
+		Status: vyogotechv1.FrappeSiteStatus{
+			Phase:          vyogotechv1.FrappeSitePhaseReady,
+			ResolvedDomain: "primary.example.com",
+		},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "tenant"},
+	}
+
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(siteCron, site, bench).
+		WithStatusSubresource(siteCron).
+		Build()
+	r := &SiteCronReconciler{
+		Client:   cl,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	ctx := context.Background()
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "sc1", Namespace: "tenant"}}); err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+
+	cronJob := &batchv1.CronJob{}
+	if err := cl.Get(ctx, types.NamespacedName{Name: "site1-cron-sc1", Namespace: "tenant"}, cronJob); err != nil {
+		t.Fatalf("CronJob not created: %v", err)
+	}
+
+	mounts := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts
+	if len(mounts) == 0 || mounts[0].SubPath != "frappe-sites" {
+		t.Errorf("cron-runner mount subPath = %v, want frappe-sites", mounts)
+	}
+
+	cmd := cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command
+	if len(cmd) < 3 {
+		t.Fatalf("cron-runner command = %v, want a bash -c <script> triple", cmd)
+	}
+	script := cmd[2]
+	if !strings.Contains(script, "cd /home/frappe/frappe-bench") {
+		t.Errorf("cron-runner script does not cd into the bench root: %q", script)
+	}
+	if !strings.Contains(script, "ls -1 apps > sites/apps.txt") || !strings.Contains(script, "ln -sf sites/apps.txt apps.txt") {
+		t.Errorf("cron-runner script does not recreate apps.txt at the bench root: %q", script)
+	}
+	if !strings.Contains(script, "bench --site primary.example.com execute app.api.nightly_sync") {
+		t.Errorf("cron-runner script does not run bench execute against the resolved domain: %q", script)
+	}
 }
