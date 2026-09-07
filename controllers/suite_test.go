@@ -97,6 +97,14 @@ func init() {
 
 func TestAPIs(t *testing.T) {
 	if skipControllerTests {
+		// Skipping is a convenience for a workstation without envtest assets. In
+		// CI it silently drops every spec in this package - which is how three
+		// OpenShift defects reached a release behind a green build - so there it
+		// is a failure instead.
+		if os.Getenv("CI") != "" {
+			t.Fatal("envtest control plane not available: install it with `make envtest` and set KUBEBUILDER_ASSETS. " +
+				"Refusing to skip the controller suite in CI.")
+		}
 		t.Skip("Skipping controller tests: envtest control plane not available")
 	}
 	RegisterFailHandler(Fail)

@@ -2,7 +2,11 @@
 set -eo pipefail
 
 # Unified E2E Test Suite for Frappe Operator
-# Usage: ./scripts/e2e-suite.sh --platform [kind|openshift] --scenario [basic|external|scaling|apps|advanced-config]
+# Usage: ./scripts/e2e-suite.sh --platform [kind|openshift-sim] --scenario [basic|external|scaling|apps|advanced-config]
+#
+# openshift-sim is a Kind cluster with OpenShift's API surface layered on top -
+# it exercises the OpenShift code paths but enforces nothing. Only a real
+# cluster covers SCC admission and fsGroup-honouring storage.
 
 PLATFORM="kind"
 SCENARIO="basic"
@@ -32,9 +36,64 @@ log() { echo -e "${GREEN}[INFO]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 # 1. Setup Platform Mocks
-if [ "$PLATFORM" == "openshift" ]; then
-    log "Mocking OpenShift environment (installing Route CRD)..."
+#
+# This is a Kind cluster wearing enough of OpenShift's API surface to exercise
+# the operator's OpenShift code paths - it is NOT OpenShift. There is no SCC
+# admission and no CSI driver honouring fsGroup here, so anything that depends
+# on enforcement rather than on what the operator emits still needs a real
+# cluster. What we can reproduce faithfully are the objects the operator reads:
+# the Route CRD, the cluster-scoped ingress config carrying the router's
+# wildcard domain, and the SCC allocation annotations OpenShift stamps on every
+# namespace. Omitting the latter two is why domain detection and the missing
+# fsGroup both shipped green.
+if [ "$PLATFORM" == "openshift-sim" ]; then
+    log "Simulating OpenShift API surface (Route CRD + cluster ingress config + SCC annotations)..."
     kubectl apply -f https://raw.githubusercontent.com/openshift/router/main/deploy/route_crd.yaml
+
+    # config.openshift.io/v1 Ingress - the operator reads .spec.domain from the
+    # object named "cluster" to derive site hostnames.
+    kubectl apply -f - <<'EOF'
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: ingresses.config.openshift.io
+spec:
+  group: config.openshift.io
+  scope: Cluster
+  names:
+    plural: ingresses
+    singular: ingress
+    kind: Ingress
+    listKind: IngressList
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                domain:
+                  type: string
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+      subresources:
+        status: {}
+EOF
+    kubectl wait --for condition=established --timeout=60s crd/ingresses.config.openshift.io
+
+    kubectl apply -f - <<'EOF'
+apiVersion: config.openshift.io/v1
+kind: Ingress
+metadata:
+  name: cluster
+spec:
+  domain: apps.e2e.example.com
+EOF
     sleep 5
 fi
 
@@ -70,6 +129,16 @@ fi
 log "Creating scenario namespace: $NAMESPACE"
 kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace mariadb --dry-run=client -o yaml | kubectl apply -f -
+
+# OpenShift derives a pod's fsGroup from these annotations. Without them the
+# operator has no range to draw from and emits no fsGroup at all.
+if [ "$PLATFORM" == "openshift-sim" ]; then
+    log "Annotating $NAMESPACE with OpenShift SCC allocation ranges"
+    kubectl annotate namespace $NAMESPACE --overwrite \
+        openshift.io/sa.scc.supplemental-groups=1000670000/10000 \
+        openshift.io/sa.scc.uid-range=1000670000/10000 \
+        openshift.io/sa.scc.mcs=s0:c26,c15
+fi
 
 # 4. Setup External Mocks (for external scenario)
 if [ "$SCENARIO" == "external" ]; then
@@ -187,12 +256,30 @@ if [ $ELAPSED -ge $TIMEOUT ]; then
 fi
 
 # 8. Platform Specific Assertions
-if [ "$PLATFORM" == "openshift" ]; then
+if [ "$PLATFORM" == "openshift-sim" ]; then
     log "Verifying OpenShift Route creation..."
     if ! kubectl get route -n $NAMESPACE &>/dev/null; then
         error "FAILED: Route not created on OpenShift platform."
     fi
     log "✅ SUCCESS: Route created."
+
+    # A Route on a host that resolves nowhere is indistinguishable from a
+    # working one unless the host is actually checked. The operator should have
+    # taken the domain from the cluster ingress config seeded above; falling
+    # back to a bare or reserved siteName is the defect this guards.
+    log "Verifying Route host uses the detected cluster domain..."
+    ROUTE_HOSTS=$(kubectl get route -n $NAMESPACE -o jsonpath='{.items[*].spec.host}')
+    log "Route hosts: ${ROUTE_HOSTS:-<none>}"
+    if [ -z "$ROUTE_HOSTS" ]; then
+        error "FAILED: Route has no host set."
+    fi
+    for h in $ROUTE_HOSTS; do
+        case "$h" in
+            *.apps.e2e.example.com) ;;
+            *) error "FAILED: Route host '$h' does not use the cluster domain from config.openshift.io/v1 Ingress (apps.e2e.example.com)." ;;
+        esac
+    done
+    log "✅ SUCCESS: Route host uses the detected cluster domain."
 else
     log "Verifying Ingress creation..."
     # Many scenarios don't enable Ingress explicitly in the manifest, 
