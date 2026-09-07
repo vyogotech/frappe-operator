@@ -48,9 +48,9 @@ jobs:
         run: |
           echo "=== Linting Codebase ==="
           $(go env GOPATH)/bin/golangci-lint cache clean
-          $(go env GOPATH)/bin/golangci-lint run --out-format json > lint-report.json || true
+          $(go env GOPATH)/bin/golangci-lint run --timeout=5m --out-format json > lint-report.json || true
           # Print standard output for humans too
-          $(go env GOPATH)/bin/golangci-lint run
+          $(go env GOPATH)/bin/golangci-lint run --timeout=5m
 
       # Without these assets controllers/suite_test.go sets skipControllerTests
       # and every Ginkgo spec in the controllers package is skipped - including

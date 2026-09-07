@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine as builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -24,17 +24,17 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 # Use Red Hat Universal Base Image (UBI) micro as minimal certified base image
 FROM registry.access.redhat.com/ubi9/ubi-micro:latest
+ARG VERSION="v5.2.0"
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY LICENSE /licenses/LICENSE
-COPY LICENSING.md /licenses/LICENSING.md
 
 LABEL name="frappe-operator" \
       vendor="Vyogo Technologies" \
-      version="v5.2.0" \
+      version="${VERSION}" \
       release="1" \
       summary="Kubernetes Operator for Frappe and ERPNext" \
-      description="The Frappe Operator brings Frappe and ERPNext frameworks natively into Kubernetes and OpenShift."
+      description="The Frappe Operator brings FrappeApps like ERPNext natively into Kubernetes and OpenShift."
 
 USER 65532:65532
 
