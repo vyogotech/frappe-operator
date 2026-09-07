@@ -7,6 +7,8 @@ on:
       - 'bundle/**'
       - 'api/**'
       - 'controllers/**'
+      - 'Dockerfile'
+      - 'bundle.Dockerfile'
       - '.github/workflows/bundle-e2e.yml'
   pull_request:
     branches: [main, master, release]
@@ -52,7 +54,7 @@ jobs:
           # can pull the catalogs without internal loopback TLS connection timeouts.
           export BUNDLE_IMAGE="ttl.sh/vyogotech-frappe-operator-bundle-${{ github.sha }}:15m"
           
-          make bundle-build BUNDLE_IMG=$BUNDLE_IMAGE
+          make bundle-build BUNDLE_IMG=$BUNDLE_IMAGE CONTAINER_TOOL=docker
           docker push $BUNDLE_IMAGE
 
           # Load into exact nodes so the local kind pulls cache instead of hitting the internet
