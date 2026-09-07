@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -136,4 +137,79 @@ func TestSiteMigrationReconciler_Reconcile_ValidationAndNotReady(t *testing.T) {
 			t.Errorf("expected RequeueAfter 15s, got %v", res.RequeueAfter)
 		}
 	})
+}
+
+// The migrate Job used to mount the sites PVC at subPath "sites" - an empty,
+// unrelated slice of the volume - instead of "frappe-sites", where every other
+// component in the operator actually stores site data. It also invoked `bench`
+// without first recreating apps.txt at the bench root, which only ever exists as
+// a symlink the site-init Job leaves in its own (non-persistent) container
+// layer. Both bugs made `bench migrate` fail against a site that was, in
+// reality, present and healthy. This locks in the fix for both.
+func TestSiteMigrationReconciler_Reconcile_JobMountAndCommand(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	siteMigration := &vyogotechv1.SiteMigration{
+		ObjectMeta: metav1.ObjectMeta{Name: "sm1", Namespace: "tenant"},
+		Spec: vyogotechv1.SiteMigrationSpec{
+			SiteRef:             &vyogotechv1.NamespacedName{Name: "site1"},
+			BackupBeforeMigrate: false,
+		},
+	}
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "tenant"},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			SiteName: "primary",
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"},
+		},
+		Status: vyogotechv1.FrappeSiteStatus{
+			Phase:          vyogotechv1.FrappeSitePhaseReady,
+			ResolvedDomain: "primary.example.com",
+		},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "tenant"},
+	}
+
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(siteMigration, site, bench).
+		WithStatusSubresource(siteMigration).
+		Build()
+	r := &SiteMigrationReconciler{
+		Client:   cl,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	ctx := context.Background()
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "sm1", Namespace: "tenant"}}); err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+
+	job := &batchv1.Job{}
+	if err := cl.Get(ctx, types.NamespacedName{Name: "site1-migrate-sm1", Namespace: "tenant"}, job); err != nil {
+		t.Fatalf("migrate Job not created: %v", err)
+	}
+
+	mounts := job.Spec.Template.Spec.Containers[0].VolumeMounts
+	if len(mounts) == 0 || mounts[0].SubPath != "frappe-sites" {
+		t.Errorf("migrate Job mount subPath = %v, want frappe-sites", mounts)
+	}
+
+	cmd := job.Spec.Template.Spec.Containers[0].Command
+	if len(cmd) < 3 {
+		t.Fatalf("migrate Job command = %v, want a bash -c <script> triple", cmd)
+	}
+	script := cmd[2]
+	if !strings.Contains(script, "cd /home/frappe/frappe-bench") {
+		t.Errorf("migrate Job script does not cd into the bench root: %q", script)
+	}
+	if !strings.Contains(script, "ls -1 apps > sites/apps.txt") || !strings.Contains(script, "ln -sf sites/apps.txt apps.txt") {
+		t.Errorf("migrate Job script does not recreate apps.txt at the bench root: %q", script)
+	}
+	if !strings.Contains(script, "bench --site primary.example.com migrate") {
+		t.Errorf("migrate Job script does not run bench migrate against the resolved domain: %q", script)
+	}
 }
