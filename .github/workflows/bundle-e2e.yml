@@ -21,6 +21,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free disk space
+        run: |
+          echo "=== Disk space before cleanup ==="
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "=== Disk space after cleanup ==="
+          df -h
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -42,8 +53,7 @@ jobs:
 
       - name: Build Operator Image
         run: |
-          make build
-          docker build -t ghcr.io/vyogotech/frappe-operator:local-e2e -f Dockerfile .
+          make docker-build IMG=ghcr.io/vyogotech/frappe-operator:local-e2e CONTAINER_TOOL=docker
 
       - name: Run Operator Bundle
         run: |
@@ -60,6 +70,8 @@ jobs:
           # Load into exact nodes so the local kind pulls cache instead of hitting the internet
           kind load docker-image $BUNDLE_IMAGE --name bundle-e2e
           kind load docker-image ghcr.io/vyogotech/frappe-operator:local-e2e --name bundle-e2e
+          docker pull ghcr.io/vyogotech/frappe_base:latest || true
+          kind load docker-image ghcr.io/vyogotech/frappe_base:latest --name bundle-e2e || true
 
           echo "Running customized bundle install on cluster..."
           operator-sdk olm install
@@ -104,5 +116,9 @@ jobs:
           kubectl get pods -A || true
           echo "=== CSV / Subscription info ==="
           kubectl get csv,subscriptions,installplan,catalogsource -n frappe-operator-system || true
-          echo "=== Events ==="
-          kubectl get events -n frappe-operator-system --sort-by='.lastTimestamp' | tail -n 50 || true
+          echo "=== Events in e2e-test ==="
+          kubectl get events -n e2e-test --sort-by='.metadata.creationTimestamp' || true
+          echo "=== Describe Pods in e2e-test ==="
+          kubectl describe pods -n e2e-test || true
+          echo "=== Node Resource Allocation ==="
+          kubectl describe nodes || true

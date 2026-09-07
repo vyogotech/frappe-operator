@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 # Use Red Hat Universal Base Image (UBI) micro as minimal certified base image
 FROM registry.access.redhat.com/ubi9/ubi-micro:latest
-ARG VERSION="v5.2.0"
+ARG VERSION
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY LICENSE /licenses/LICENSE

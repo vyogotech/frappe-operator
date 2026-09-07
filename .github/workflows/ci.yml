@@ -102,6 +102,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract Operator Version
+        id: op_version
+        run: |
+          VERSION=$(grep '^VERSION ?=' Makefile | awk '{print $3}' || echo "5.2.0")
+          echo "VERSION=v${VERSION#v}" >> $GITHUB_OUTPUT
+
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -120,6 +126,7 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+            VERSION=${{ steps.op_version.outputs.VERSION }}
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@v0.36.0
@@ -143,3 +150,4 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+            VERSION=${{ steps.op_version.outputs.VERSION }}
