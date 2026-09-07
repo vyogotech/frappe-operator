@@ -239,7 +239,14 @@ echo "Domain: $DOMAIN"
 # The "unknown" state is critical: a transient DB error (e.g. "Packet sequence number
 # wrong") must never be conflated with "empty", or we would destroy and recreate a
 # live, working site during a failed/racy upgrade.
-DB_HAS_FRAPPE=$(python3 << 'PYTHON_CHECK'
+# Run the check with the bench's own interpreter: psycopg2 (Postgres) lives only in
+# the bench virtualenv, and the system python3 has no such module - which made every
+# Postgres site read "unknown" and skip the stale-directory recovery below.
+DB_CHECK_PY="python3"
+if [ -x /home/frappe/frappe-bench/env/bin/python ]; then
+    DB_CHECK_PY="/home/frappe/frappe-bench/env/bin/python"
+fi
+DB_HAS_FRAPPE=$("$DB_CHECK_PY" << 'PYTHON_CHECK'
 import sys
 
 try:
