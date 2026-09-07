@@ -267,7 +267,7 @@ spec:
 Create a SiteBackup resource:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteBackup
 metadata:
   name: daily-backup
@@ -312,7 +312,7 @@ You can also modify other parameters, such as the retention policy or backup des
 ```bash
 # Create manual backup
 kubectl create -f - <<EOF
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteJob
 metadata:
   name: manual-backup-$(date +%Y%m%d-%H%M%S)
@@ -493,7 +493,7 @@ kubectl patch frappebench prod-bench --type=merge -p '{
 Run migrations after updates:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteJob
 metadata:
   name: migrate-prod-site
@@ -508,7 +508,7 @@ spec:
 
 ```bash
 # Upgrade operator
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/v1.1.0/config/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/v1.1.0/install.yaml
 
 # Verify upgrade
 kubectl get deployment -n frappe-operator-system
@@ -546,7 +546,7 @@ spec:
     spec:
       containers:
       - name: manager
-        image: vyogo.tech/frappe-operator:latest
+        image: vyogo.tech/frappe-operator:3.1.0
         env:
         - name: FRAPPE_DEFAULT_UID
           value: "2000"        # All benches default to UID 2000
@@ -561,7 +561,7 @@ spec:
 Override security context for specific benches:
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: compliance-bench
@@ -752,7 +752,7 @@ kubectl exec -it mariadb-0 -n databases -- \
 kubectl apply -f mariadb-restore.yaml
 
 # 2. Recreate operator
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/config/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.yaml
 
 # 3. Recreate bench
 kubectl apply -f bench.yaml
@@ -769,7 +769,7 @@ kubectl exec -it <pod> -- bench --site <site> restore <backup>
 ```bash
 # Create new site from backup
 kubectl apply -f - <<EOF
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: recovered-site

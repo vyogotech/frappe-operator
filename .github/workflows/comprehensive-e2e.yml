@@ -41,7 +41,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: [kind, openshift]
-        scenario: [basic, external, scaling, custom-apps, advanced-config]
+        scenario: [basic, external, scaling, custom-apps, advanced-config, backup-restore]
     steps:
       - uses: actions/checkout@v4
 
@@ -63,7 +63,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Set up Helm
         uses: azure/setup-helm@v3

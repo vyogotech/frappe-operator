@@ -14,7 +14,7 @@ spec:
     singular: sitedashboard
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1
     schema:
       openAPIV3Schema:
         description: SiteDashboard is the Schema for the sitedashboards API
@@ -39,9 +39,9 @@ spec:
           spec:
             description: SiteDashboardSpec defines the desired state of SiteDashboard
             properties:
-              foo:
-                description: Foo is an example field of SiteDashboard. Edit sitedashboard_types.go
-                  to remove/update
+              description:
+                description: Description provides a human-readable explanation of
+                  the SiteDashboard.
                 type: string
             type: object
           status:

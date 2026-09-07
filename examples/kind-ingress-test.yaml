@@ -1,5 +1,5 @@
 # Kind Cluster Test with Ingress
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: test-bench
@@ -8,9 +8,9 @@ spec:
   frappeVersion: "v15"
   
   imageConfig:
-    repository: "localhost/erpnext-fixed"
-    tag: "v15-uid1001"
-    pullPolicy: Never
+    repository: "ghcr.io/vyogotech/frappe_base"
+    tag: "latest"
+    pullPolicy: IfNotPresent
   
   security:
     podSecurityContext:
@@ -51,7 +51,7 @@ spec:
   storageClassName: "standard"
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: test-site-v2
@@ -61,6 +61,8 @@ spec:
     name: test-bench
   
   siteName: test-v2.local
+  adminPasswordSecretRef:
+    name: test-site-v2-admin-password
   
   # External database mode for simpler testing
   dbConfig:

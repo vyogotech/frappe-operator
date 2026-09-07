@@ -1,0 +1,11 @@
+apiVersion: vyogo.tech/v1
+kind: SiteApp
+metadata:
+  name: e2e-site-app-custom
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  appName: payments
+  gitRepo: "https://github.com/frappe/payments"
+  gitBranch: "version-15"

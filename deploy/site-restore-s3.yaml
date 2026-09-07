@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: SiteRestore
 metadata:
   name: restore-from-s3
@@ -10,9 +10,13 @@ spec:
     namespace: default
   databaseBackupSource:
     s3:
+      endpoint: "https://s3.amazonaws.com"
       bucket: my-frappe-backups
       key: "e2e.example.com/db.sql.gz"
-      credentialSecretRef:
+      accessKeySecret:
         name: s3-credentials
-        namespace: frappe-operator-system
+        key: accessKey
+      secretKeySecret:
+        name: s3-credentials
+        key: secretKey
   force: true

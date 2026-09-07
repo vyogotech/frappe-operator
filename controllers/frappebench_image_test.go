@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -12,7 +12,7 @@ import (
 
 func TestGetBenchImage_VersionPrefix(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
+	_ = vyogotechv1.AddToScheme(scheme)
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 	reconciler := &FrappeBenchReconciler{
@@ -24,15 +24,15 @@ func TestGetBenchImage_VersionPrefix(t *testing.T) {
 	tests := []struct {
 		name             string
 		frappeVersion    string
-		imageConfig      *vyogotechv1alpha1.ImageConfig
+		imageConfig      *vyogotechv1.ImageConfig
 		expectedImage    string
 		expectedContains string
 	}{
 		{
-			name:             "version without v prefix gets v added",
+			name:             "bare major maps to the published version-N tag",
 			frappeVersion:    "15",
 			imageConfig:      nil,
-			expectedContains: ":v15",
+			expectedContains: ":version-15",
 		},
 		{
 			name:             "version with v prefix stays unchanged",
@@ -41,23 +41,23 @@ func TestGetBenchImage_VersionPrefix(t *testing.T) {
 			expectedContains: ":v15",
 		},
 		{
-			name:             "version 14 without v prefix gets v added",
+			name:             "bare major 14 maps to version-14",
 			frappeVersion:    "14",
 			imageConfig:      nil,
-			expectedContains: ":v14",
+			expectedContains: ":version-14",
 		},
 		{
 			name:          "custom repository ignored if no tag",
 			frappeVersion: "15",
-			imageConfig: &vyogotechv1alpha1.ImageConfig{
+			imageConfig: &vyogotechv1.ImageConfig{
 				Repository: "custom/repo",
 			},
-			expectedContains: ":v15",
+			expectedContains: ":version-15",
 		},
 		{
 			name:          "custom image with full tag used directly",
 			frappeVersion: "15",
-			imageConfig: &vyogotechv1alpha1.ImageConfig{
+			imageConfig: &vyogotechv1.ImageConfig{
 				Repository: "custom/repo",
 				Tag:        "sha-abc123",
 			},
@@ -73,18 +73,18 @@ func TestGetBenchImage_VersionPrefix(t *testing.T) {
 			name:             "custom tag like latest stays unchanged",
 			frappeVersion:    "latest",
 			imageConfig:      nil,
-			expectedContains: ":version-16",
+			expectedContains: ":latest",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bench := &vyogotechv1alpha1.FrappeBench{
+			bench := &vyogotechv1.FrappeBench{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-bench",
 					Namespace: "default",
 				},
-				Spec: vyogotechv1alpha1.FrappeBenchSpec{
+				Spec: vyogotechv1.FrappeBenchSpec{
 					FrappeVersion: tt.frappeVersion,
 					ImageConfig:   tt.imageConfig,
 				},

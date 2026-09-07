@@ -1,10 +1,12 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: external-mock-site
   namespace: frappe
 spec:
   siteName: brainwise.vyogo.tech
+  adminPasswordSecretRef:
+    name: external-mock-site-admin-password
   benchRef:
     name: autoscaling-hpa-bench
   dbConfig:

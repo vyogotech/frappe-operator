@@ -7,7 +7,7 @@ type: Opaque
 stringData:
   password: "admin123"
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: test-site-v3
@@ -26,4 +26,4 @@ spec:
     storageSize: 1Gi
   ingress:
     enabled: true
-    ingressClassName: nginx
+    className: nginx

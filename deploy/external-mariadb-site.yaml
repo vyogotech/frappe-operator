@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: external-mock-site
@@ -7,6 +7,8 @@ spec:
   benchRef:
     name: autoscaling-hpa-bench
   siteName: external-mock.apps.crc.testing
+  adminPasswordSecretRef:
+    name: external-mock-site-admin-password
   dbConfig:
     provider: external
     host: 64.227.178.150

@@ -13,7 +13,7 @@ stringData:
   username: site1_db
   password: secretpassword
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: external-db-site
@@ -22,6 +22,8 @@ spec:
   benchRef:
     name: dev-bench
   siteName: external.example.com
+  adminPasswordSecretRef:
+    name: external-db-site-admin-password
   dbConfig:
     provider: external
     connectionSecretRef:

@@ -1,17 +1,16 @@
 # Basic Frappe Bench for development/testing
 
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: dev-bench
   namespace: default
 spec:
-  frappeVersion: "version-15"
-  
+  frappeVersion: "15"
   imageConfig:
-    repository: ghcr.io/vyogotech/erpnext-for-operator
-    tag: version-15
-
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+    pullPolicy: Always
   # Apps to install
   apps:
     - name: erpnext

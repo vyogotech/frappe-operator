@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -15,8 +16,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
+
+// benchRQID is the RQ queue-key prefix Frappe derives from the bench working
+// directory (/home/frappe/frappe-bench → "home-frappe-frappe-bench"), used to
+// build the default listName ("rq:queue:<benchRQID>:<queue>"). The operator
+// always mounts the bench there, so this is deterministic.
+const benchRQID = "home-frappe-frappe-bench"
 
 type KEDAProvider struct {
 	client client.Client
@@ -36,15 +43,10 @@ func (p *KEDAProvider) IsAvailable(ctx context.Context) bool {
 
 	// Attempt to list - if this succeeds, KEDA is available
 	err := p.client.List(ctx, list, client.Limit(1))
-
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
-func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, componentName string, deploymentName string, config *vyogotechv1alpha1.ComponentAutoscaling) error {
+func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1.FrappeBench, componentName string, deploymentName string, config *vyogotechv1.ComponentAutoscaling) error {
 	logger := log.FromContext(ctx)
 
 	scaledObjectName := fmt.Sprintf("%s-%s", bench.Name, componentName)
@@ -97,6 +99,21 @@ func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1alpha1.Frap
 		for k, v := range config.KEDA.Metadata {
 			metadata[k] = v
 		}
+		// Auto-derive the connection details for the bench's own RQ broker when the
+		// caller didn't pin them. KEDA runs in its own namespace, so the address
+		// MUST be namespace-qualified (a bare service name fails to resolve), and
+		// Frappe prefixes queue keys with the bench id — both are deterministic for
+		// this bench, so default them here rather than making every caller supply
+		// the exact FQDN and rq:queue:<benchID>:<queue> string.
+		if _, ok := metadata["address"]; !ok {
+			if _, hasHost := metadata["host"]; !hasHost {
+				metadata["address"] = fmt.Sprintf("%s-redis-queue.%s.svc.cluster.local:6379", bench.Name, bench.Namespace)
+			}
+		}
+		if _, ok := metadata["listName"]; !ok {
+			queue := strings.TrimPrefix(componentName, "worker-")
+			metadata["listName"] = fmt.Sprintf("rq:queue:%s:%s", benchRQID, queue)
+		}
 		trigger = map[string]interface{}{
 			"type":     "redis",
 			"metadata": metadata,
@@ -144,7 +161,7 @@ func (p *KEDAProvider) Ensure(ctx context.Context, bench *vyogotechv1alpha1.Frap
 	return p.client.Update(ctx, scaledObject)
 }
 
-func (p *KEDAProvider) Delete(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, componentName string) error {
+func (p *KEDAProvider) Delete(ctx context.Context, bench *vyogotechv1.FrappeBench, componentName string) error {
 	logger := log.FromContext(ctx)
 	scaledObjectName := fmt.Sprintf("%s-%s", bench.Name, componentName)
 

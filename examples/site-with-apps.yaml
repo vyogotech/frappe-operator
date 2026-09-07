@@ -5,7 +5,7 @@
 # 2. Create shared MariaDB instance (see mariadb-shared-instance.yaml)
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: erp-site
@@ -19,6 +19,8 @@ spec:
   
   # Site domain
   siteName: erp.example.com
+  adminPasswordSecretRef:
+    name: erp-site-admin-password
   
   # Apps to install on this site
   # These apps must be available in the referenced bench

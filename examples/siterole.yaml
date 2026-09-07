@@ -1,0 +1,11 @@
+apiVersion: vyogo.tech/v1
+kind: SiteRole
+metadata:
+  name: auditor-role
+  namespace: default
+spec:
+  siteRef:
+    name: central-site-25mar2026
+  roleName: "External Auditor"
+  deskAccess: true
+  disabled: false

@@ -1,0 +1,12 @@
+apiVersion: vyogo.tech/v1
+kind: SiteUserPermission
+metadata:
+  name: e2e-john-company-perm
+  namespace: frappe
+spec:
+  siteRef:
+    name: e2e-test-site
+  user: "john.doe@example.com"
+  allow: "Company"
+  forValue: "Acme Corp"
+  applyToAllDoctypes: true

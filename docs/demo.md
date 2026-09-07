@@ -103,7 +103,7 @@ kind: Project
 metadata:
   name: frappe
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: bench-test
@@ -111,8 +111,8 @@ metadata:
 spec:
   frappeVersion: "15.0.0"
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-7bc7484
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-15
     pullPolicy: Always
   storageClassName: crc-csi-hostpath-provisioner
   storageSize: 2Gi
@@ -149,7 +149,7 @@ oc get pods -n frappe
 Deploy the actual Frappe Site and connect it to the MariaDB database.
 
 ```yaml
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: vyogotechdemo

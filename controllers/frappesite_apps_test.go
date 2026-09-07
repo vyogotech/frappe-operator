@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
 )
 
@@ -98,26 +98,26 @@ var _ = Describe("FrappeSite App Installation", func() {
 
 	Describe("ensureInitSecrets with Apps", func() {
 		var (
-			site    *vyogotechv1alpha1.FrappeSite
-			bench   *vyogotechv1alpha1.FrappeBench
+			site    *vyogotechv1.FrappeSite
+			bench   *vyogotechv1.FrappeBench
 			dbInfo  *database.DatabaseInfo
 			dbCreds *database.DatabaseCredentials
 		)
 
 		BeforeEach(func() {
-			bench = &vyogotechv1alpha1.FrappeBench{
+			bench = &vyogotechv1.FrappeBench{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-bench",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeBenchSpec{
+				Spec: vyogotechv1.FrappeBenchSpec{
 					FrappeVersion: "15",
-					Apps: []vyogotechv1alpha1.AppSource{
+					Apps: []vyogotechv1.AppSource{
 						{Name: "erpnext", Source: "fpm"},
 						{Name: "hrms", Source: "fpm"},
 					},
 				},
-				Status: vyogotechv1alpha1.FrappeBenchStatus{
+				Status: vyogotechv1.FrappeBenchStatus{
 					Phase:         "Ready",
 					InstalledApps: []string{"frappe", "erpnext", "hrms"},
 				},
@@ -137,14 +137,14 @@ var _ = Describe("FrappeSite App Installation", func() {
 		})
 
 		It("should create secret with apps_to_install when apps are specified", func() {
-			site = &vyogotechv1alpha1.FrappeSite{
+			site = &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-site",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "test-site.local",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name:      bench.Name,
 						Namespace: bench.Namespace,
 					},
@@ -153,7 +153,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
@@ -164,7 +164,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 				Recorder: fakeRecorder,
 			}
 
-			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost-cache:6379", "localhost-queue:6379")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify secret was created
@@ -182,14 +182,14 @@ var _ = Describe("FrappeSite App Installation", func() {
 		})
 
 		It("should create secret with empty apps_to_install when no apps specified", func() {
-			site = &vyogotechv1alpha1.FrappeSite{
+			site = &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-site",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "test-site.local",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name:      bench.Name,
 						Namespace: bench.Namespace,
 					},
@@ -198,7 +198,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
@@ -209,7 +209,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 				Recorder: fakeRecorder,
 			}
 
-			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost-cache:6379", "localhost-queue:6379")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify secret was created
@@ -226,14 +226,14 @@ var _ = Describe("FrappeSite App Installation", func() {
 		})
 
 		It("should skip apps with invalid characters", func() {
-			site = &vyogotechv1alpha1.FrappeSite{
+			site = &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-site",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "test-site.local",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name:      bench.Name,
 						Namespace: bench.Namespace,
 					},
@@ -242,7 +242,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
@@ -253,7 +253,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 				Recorder: fakeRecorder,
 			}
 
-			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost-cache:6379", "localhost-queue:6379")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify secret was created with only valid apps
@@ -274,14 +274,14 @@ var _ = Describe("FrappeSite App Installation", func() {
 		})
 
 		It("should emit event when apps are requested", func() {
-			site = &vyogotechv1alpha1.FrappeSite{
+			site = &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-site",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "test-site.local",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name:      bench.Name,
 						Namespace: bench.Namespace,
 					},
@@ -290,7 +290,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
@@ -301,7 +301,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 				Recorder: fakeRecorder,
 			}
 
-			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost-cache:6379", "localhost-queue:6379")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify event was emitted
@@ -311,24 +311,24 @@ var _ = Describe("FrappeSite App Installation", func() {
 
 	Describe("Job Script Generation with Apps", func() {
 		var (
-			site   *vyogotechv1alpha1.FrappeSite
-			bench  *vyogotechv1alpha1.FrappeBench
+			site   *vyogotechv1.FrappeSite
+			bench  *vyogotechv1.FrappeBench
 			dbInfo *database.DatabaseInfo
 		)
 
 		BeforeEach(func() {
-			bench = &vyogotechv1alpha1.FrappeBench{
+			bench = &vyogotechv1.FrappeBench{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-bench",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeBenchSpec{
+				Spec: vyogotechv1.FrappeBenchSpec{
 					FrappeVersion: "15",
-					Apps: []vyogotechv1alpha1.AppSource{
+					Apps: []vyogotechv1.AppSource{
 						{Name: "erpnext", Source: "fpm"},
 					},
 				},
-				Status: vyogotechv1alpha1.FrappeBenchStatus{
+				Status: vyogotechv1.FrappeBenchStatus{
 					Phase: "Ready",
 				},
 			}
@@ -342,14 +342,14 @@ var _ = Describe("FrappeSite App Installation", func() {
 		})
 
 		It("should include app installation script when apps specified", func() {
-			site = &vyogotechv1alpha1.FrappeSite{
+			site = &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-site",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "test-site.local",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name:      bench.Name,
 						Namespace: bench.Namespace,
 					},
@@ -358,7 +358,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
@@ -389,14 +389,14 @@ var _ = Describe("FrappeSite App Installation", func() {
 		})
 
 		It("should include graceful skipping logic in script", func() {
-			site = &vyogotechv1alpha1.FrappeSite{
+			site = &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-site",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "test-site.local",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name:      bench.Name,
 						Namespace: bench.Namespace,
 					},
@@ -405,7 +405,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
@@ -436,14 +436,14 @@ var _ = Describe("FrappeSite App Installation", func() {
 		})
 
 		It("should check apps directory in script", func() {
-			site = &vyogotechv1alpha1.FrappeSite{
+			site = &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-site",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "test-site.local",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name:      bench.Name,
 						Namespace: bench.Namespace,
 					},
@@ -452,7 +452,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
@@ -484,34 +484,34 @@ var _ = Describe("FrappeSite App Installation", func() {
 
 	Describe("Status Updates for App Installation", func() {
 		var (
-			site   *vyogotechv1alpha1.FrappeSite
-			bench  *vyogotechv1alpha1.FrappeBench
+			site   *vyogotechv1.FrappeSite
+			bench  *vyogotechv1.FrappeBench
 			job    *batchv1.Job
 			dbInfo *database.DatabaseInfo
 		)
 
 		BeforeEach(func() {
-			bench = &vyogotechv1alpha1.FrappeBench{
+			bench = &vyogotechv1.FrappeBench{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-bench",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeBenchSpec{
+				Spec: vyogotechv1.FrappeBenchSpec{
 					FrappeVersion: "15",
 				},
-				Status: vyogotechv1alpha1.FrappeBenchStatus{
+				Status: vyogotechv1.FrappeBenchStatus{
 					Phase: "Ready",
 				},
 			}
 
-			site = &vyogotechv1alpha1.FrappeSite{
+			site = &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-site",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "test-site.local",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name:      bench.Name,
 						Namespace: bench.Namespace,
 					},
@@ -532,6 +532,9 @@ var _ = Describe("FrappeSite App Installation", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      site.Name + "-init",
 					Namespace: site.Namespace,
+					Annotations: map[string]string{
+						"frappe.io/apps-list": strings.Join(site.Spec.Apps, ","),
+					},
 				},
 				Status: batchv1.JobStatus{
 					Succeeded: 1,
@@ -539,14 +542,14 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(bench, site, job).
-				WithStatusSubresource(&vyogotechv1alpha1.FrappeSite{}).
+				WithStatusSubresource(&vyogotechv1.FrappeSite{}).
 				Build()
 
 			reconciler = &FrappeSiteReconciler{
@@ -579,14 +582,14 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(bench, site, job).
-				WithStatusSubresource(&vyogotechv1alpha1.FrappeSite{}).
+				WithStatusSubresource(&vyogotechv1.FrappeSite{}).
 				Build()
 
 			reconciler = &FrappeSiteReconciler{
@@ -609,6 +612,9 @@ var _ = Describe("FrappeSite App Installation", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      site.Name + "-init",
 					Namespace: site.Namespace,
+					Annotations: map[string]string{
+						"frappe.io/apps-list": strings.Join(site.Spec.Apps, ","),
+					},
 				},
 				Status: batchv1.JobStatus{
 					Active: 1,
@@ -616,14 +622,14 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme).
 				WithObjects(bench, site, job).
-				WithStatusSubresource(&vyogotechv1alpha1.FrappeSite{}).
+				WithStatusSubresource(&vyogotechv1.FrappeSite{}).
 				Build()
 
 			reconciler = &FrappeSiteReconciler{
@@ -644,27 +650,27 @@ var _ = Describe("FrappeSite App Installation", func() {
 
 	Describe("Event Recording for Apps", func() {
 		It("should emit AppsRequested event with app list", func() {
-			bench := &vyogotechv1alpha1.FrappeBench{
+			bench := &vyogotechv1.FrappeBench{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-bench",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeBenchSpec{
+				Spec: vyogotechv1.FrappeBenchSpec{
 					FrappeVersion: "15",
 				},
-				Status: vyogotechv1alpha1.FrappeBenchStatus{
+				Status: vyogotechv1.FrappeBenchStatus{
 					Phase: "Ready",
 				},
 			}
 
-			site := &vyogotechv1alpha1.FrappeSite{
+			site := &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-site",
 					Namespace: namespace,
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "test-site.local",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name:      bench.Name,
 						Namespace: bench.Namespace,
 					},
@@ -673,7 +679,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 			}
 
 			scheme := runtime.NewScheme()
-			_ = vyogotechv1alpha1.AddToScheme(scheme)
+			_ = vyogotechv1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			_ = batchv1.AddToScheme(scheme)
 
@@ -687,7 +693,7 @@ var _ = Describe("FrappeSite App Installation", func() {
 			dbInfo := &database.DatabaseInfo{Provider: "mariadb", Host: "host", Port: "3306", Name: "db"}
 			dbCreds := &database.DatabaseCredentials{Username: "user", Password: "pass"}
 
-			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost:6379")
+			err := reconciler.ensureInitSecrets(ctx, site, bench, "test-site.local", dbInfo, dbCreds, "adminpass", "localhost-cache:6379", "localhost-queue:6379")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify event contains app information

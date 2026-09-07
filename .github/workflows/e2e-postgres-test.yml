@@ -1,0 +1,110 @@
+name: E2E PostgreSQL
+
+# Manual-only until an operator-compatible Frappe develop/v17 Postgres bench
+# image is published (see docs/POSTGRESQL_INTEGRATION.md). Frappe's Postgres
+# support is on the develop branch; the stable v15 image cannot run these sites.
+on:
+  workflow_dispatch:
+    inputs:
+      benchImage:
+        description: 'Frappe develop/v17 Postgres bench image (repository:tag)'
+        required: true
+        default: 'ghcr.io/vyogotech/erpnext-for-operator:v17'
+      perconaVersion:
+        description: 'Percona PostgreSQL Operator version'
+        required: true
+        default: 'v2.3.1'
+      mode:
+        description: 'Which mode(s) to exercise'
+        required: true
+        default: 'both'
+        type: choice
+        options: [shared, dedicated, both]
+
+jobs:
+  e2e-postgres:
+    name: PostgreSQL end-to-end (${{ github.event.inputs.mode }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+
+      - name: Build operator image
+        run: |
+          make build
+          docker build -t ghcr.io/vyogotech/frappe-operator:local-e2e -f Dockerfile .
+
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: e2e-postgres
+
+      - name: Load operator image into Kind
+        run: kind load docker-image ghcr.io/vyogotech/frappe-operator:local-e2e --name e2e-postgres
+
+      - name: Install Percona PostgreSQL Operator
+        run: |
+          V='${{ github.event.inputs.perconaVersion }}'
+          kubectl apply --server-side \
+            -f "https://raw.githubusercontent.com/percona/percona-postgresql-operator/${V}/deploy/bundle.yaml"
+          kubectl -n default rollout status deploy/percona-postgresql-operator --timeout=180s || \
+            kubectl rollout status deploy/percona-postgresql-operator --timeout=180s -A || true
+
+      - name: Install operator CRDs + deploy operator
+        run: |
+          make install
+          # Deploy the operator with the locally built image.
+          make deploy IMG=ghcr.io/vyogotech/frappe-operator:local-e2e
+          kubectl -n frappe-operator-system rollout status deploy/frappe-operator-controller-manager --timeout=180s
+
+      - name: Prepare namespace + bench image
+        run: |
+          kubectl create namespace frappe-pg --dry-run=client -o yaml | kubectl apply -f -
+          # Pull + side-load the Postgres bench image so site pods start without a registry pull.
+          docker pull '${{ github.event.inputs.benchImage }}'
+          kind load docker-image '${{ github.event.inputs.benchImage }}' --name e2e-postgres
+
+      - name: Apply PostgreSQL manifests
+        run: |
+          # Point the example bench at the provided image.
+          IMG='${{ github.event.inputs.benchImage }}'
+          REPO="${IMG%:*}"; TAG="${IMG##*:}"
+          sed -e "s#repository: ghcr.io/vyogotech/erpnext-for-operator#repository: ${REPO}#" \
+              -e "s#tag: v17#tag: ${TAG}#" \
+              examples/kind-e2e-postgres-manifests.yaml > /tmp/pg-manifests.yaml
+          kubectl apply -f /tmp/pg-manifests.yaml
+
+      - name: Wait for shared-mode site
+        if: github.event.inputs.mode == 'shared' || github.event.inputs.mode == 'both'
+        run: |
+          kubectl -n frappe-pg wait --for=jsonpath='{.status.phase}'=Ready \
+            frappesite/pg-shared-site --timeout=600s
+
+      - name: Wait for dedicated-mode site
+        if: github.event.inputs.mode == 'dedicated' || github.event.inputs.mode == 'both'
+        run: |
+          # Percona cluster comes up first, then the site provisions against it.
+          kubectl -n frappe-pg wait --for=jsonpath='{.status.state}'=ready \
+            perconapgcluster/pg-dedicated-site-postgres --timeout=600s || true
+          kubectl -n frappe-pg wait --for=jsonpath='{.status.phase}'=Ready \
+            frappesite/pg-dedicated-site --timeout=600s
+
+      - name: Capture diagnostics on failure
+        if: failure()
+        run: |
+          echo "=== Operator logs ==="
+          kubectl logs -n frappe-operator-system -l control-plane=controller-manager --tail=200 || true
+          echo "=== FrappeSites ==="
+          kubectl get frappesite,frappebench -n frappe-pg -o wide || true
+          echo "=== PerconaPGClusters ==="
+          kubectl get perconapgcluster -n frappe-pg -o wide || true
+          echo "=== Pods ==="
+          kubectl get pods -n frappe-pg || true
+          echo "=== Provision/Delete Jobs ==="
+          kubectl get jobs -n frappe-pg || true
+          echo "=== Events ==="
+          kubectl get events -n frappe-pg --sort-by='.lastTimestamp' | tail -n 60 || true

@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: demo-site
@@ -10,6 +10,8 @@ spec:
   
   # Site domain
   siteName: demo-site.example.com
+  adminPasswordSecretRef:
+    name: demo-site-admin-password
   
   # Database configuration (Shared Instance from frappe-operator-system)
   dbConfig:

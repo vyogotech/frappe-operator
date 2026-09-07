@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -22,15 +22,15 @@ import (
 func TestFrappeBenchReconciler_getBenchImage(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 
 	namespace := "test-ns"
 
 	t.Run("Override in spec", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: namespace},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
-				ImageConfig: &vyogotechv1alpha1.ImageConfig{
+			Spec: vyogotechv1.FrappeBenchSpec{
+				ImageConfig: &vyogotechv1.ImageConfig{
 					Repository: "custom/frappe",
 					Tag:        "v1.0",
 				},
@@ -45,24 +45,24 @@ func TestFrappeBenchReconciler_getBenchImage(t *testing.T) {
 	})
 
 	t.Run("Default image with version", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: namespace},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+			Spec: vyogotechv1.FrappeBenchSpec{
 				FrappeVersion: "v15",
 			},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).Build()
 		r := &FrappeBenchReconciler{Client: client}
 		image := r.getBenchImage(context.TODO(), bench)
-		if image != "ghcr.io/vyogotech/erpnext-for-operator:v15" {
-			t.Errorf("Expected ghcr.io/vyogotech/erpnext-for-operator:v15, got %s", image)
+		if image != "docker.io/frappe/erpnext:v15" {
+			t.Errorf("Expected docker.io/frappe/erpnext:v15, got %s", image)
 		}
 	})
 
 	t.Run("ConfigMap default", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 
 		configMap := &corev1.ConfigMap{
@@ -85,9 +85,9 @@ func TestFrappeBenchReconciler_getBenchImage(t *testing.T) {
 	})
 
 	t.Run("Fallback to constant", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: namespace},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).Build()
 		r := &FrappeBenchReconciler{Client: client}
@@ -100,15 +100,15 @@ func TestFrappeBenchReconciler_getBenchImage(t *testing.T) {
 
 func TestFrappeBenchReconciler_isGitEnabled(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 
 	t.Run("Bench override true", func(t *testing.T) {
 		client := fake.NewClientBuilder().WithScheme(scheme).Build()
 		r := &FrappeBenchReconciler{Client: client}
 		enabled := true
-		bench := &vyogotechv1alpha1.FrappeBench{
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
-				GitConfig: &vyogotechv1alpha1.GitConfig{
+		bench := &vyogotechv1.FrappeBench{
+			Spec: vyogotechv1.FrappeBenchSpec{
+				GitConfig: &vyogotechv1.GitConfig{
 					Enabled: &enabled,
 				},
 			},
@@ -121,7 +121,7 @@ func TestFrappeBenchReconciler_isGitEnabled(t *testing.T) {
 	t.Run("ConfigMap default true", func(t *testing.T) {
 		client := fake.NewClientBuilder().WithScheme(scheme).Build()
 		r := &FrappeBenchReconciler{Client: client}
-		bench := &vyogotechv1alpha1.FrappeBench{}
+		bench := &vyogotechv1.FrappeBench{}
 		cm := &corev1.ConfigMap{
 			Data: map[string]string{
 				"gitEnabled": "true",
@@ -147,17 +147,17 @@ func TestFrappeBenchReconciler_getOperatorConfig_NilClient(t *testing.T) {
 func TestFrappeBenchReconciler_Reconcile(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 
 	namespace := "frappe-system"
 	benchName := "main-bench"
 
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      benchName,
 			Namespace: namespace,
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
 		},
 	}
@@ -189,7 +189,7 @@ func TestFrappeBenchReconciler_Reconcile(t *testing.T) {
 	}
 
 	// Verify finalizer
-	updatedBench := &vyogotechv1alpha1.FrappeBench{}
+	updatedBench := &vyogotechv1.FrappeBench{}
 	err = client.Get(context.TODO(), req.NamespacedName, updatedBench)
 	if err != nil {
 		t.Fatalf("Failed to get bench: %v", err)

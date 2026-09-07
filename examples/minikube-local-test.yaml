@@ -1,5 +1,5 @@
 # Local Minikube Test with Fixed ERPNext Image
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: local-test-bench
@@ -51,7 +51,7 @@ spec:
   storageClassName: "standard"
 
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: test-site
@@ -61,6 +61,8 @@ spec:
     name: local-test-bench
   
   siteName: test.local
+  adminPasswordSecretRef:
+    name: test-site-admin-password
   
   dbConfig:
     mode: dedicated

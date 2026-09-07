@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 var _ = Describe("SiteBackup E2E", func() {
@@ -27,12 +27,12 @@ var _ = Describe("SiteBackup E2E", func() {
 	Context("Basic SiteBackup functionality", func() {
 		It("should create and manage a SiteBackup resource", func() {
 			// Create a basic FrappeBench first
-			bench := &vyogotechv1alpha1.FrappeBench{
+			bench := &vyogotechv1.FrappeBench{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-bench",
 					Namespace: "default",
 				},
-				Spec: vyogotechv1alpha1.FrappeBenchSpec{
+				Spec: vyogotechv1.FrappeBenchSpec{
 					FrappeVersion: "version-15",
 				},
 			}
@@ -40,14 +40,14 @@ var _ = Describe("SiteBackup E2E", func() {
 			Expect(k8sClient.Create(ctx, bench)).To(Succeed())
 
 			// Create a basic FrappeSite
-			site := &vyogotechv1alpha1.FrappeSite{
+			site := &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-site",
 					Namespace: "default",
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "e2e.example.com",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name: bench.Name,
 					},
 				},
@@ -56,12 +56,12 @@ var _ = Describe("SiteBackup E2E", func() {
 			Expect(k8sClient.Create(ctx, site)).To(Succeed())
 
 			// Create a SiteBackup
-			backup := &vyogotechv1alpha1.SiteBackup{
+			backup := &vyogotechv1.SiteBackup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-backup",
 					Namespace: "default",
 				},
-				Spec: vyogotechv1alpha1.SiteBackupSpec{
+				Spec: vyogotechv1.SiteBackupSpec{
 					Site:      "e2e.example.com",
 					WithFiles: true,
 					Compress:  true,
@@ -98,32 +98,32 @@ var _ = Describe("SiteBackup E2E", func() {
 			Expect(argsStr).To(ContainSubstring("--compress"))
 
 			// Clean up
-			k8sClient.Delete(ctx, backup)
-			k8sClient.Delete(ctx, site)
-			k8sClient.Delete(ctx, bench)
+			_ = k8sClient.Delete(ctx, backup)
+			_ = k8sClient.Delete(ctx, site)
+			_ = k8sClient.Delete(ctx, bench)
 		})
 
 		It("should create scheduled backups", func() {
 			// Create bench and site first
-			bench := &vyogotechv1alpha1.FrappeBench{
+			bench := &vyogotechv1.FrappeBench{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-scheduled-bench",
 					Namespace: "default",
 				},
-				Spec: vyogotechv1alpha1.FrappeBenchSpec{
+				Spec: vyogotechv1.FrappeBenchSpec{
 					FrappeVersion: "version-15",
 				},
 			}
 			Expect(k8sClient.Create(ctx, bench)).To(Succeed())
 
-			site := &vyogotechv1alpha1.FrappeSite{
+			site := &vyogotechv1.FrappeSite{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-scheduled-site",
 					Namespace: "default",
 				},
-				Spec: vyogotechv1alpha1.FrappeSiteSpec{
+				Spec: vyogotechv1.FrappeSiteSpec{
 					SiteName: "scheduled.example.com",
-					BenchRef: &vyogotechv1alpha1.NamespacedName{
+					BenchRef: &vyogotechv1.NamespacedName{
 						Name: bench.Name,
 					},
 				},
@@ -131,12 +131,12 @@ var _ = Describe("SiteBackup E2E", func() {
 			Expect(k8sClient.Create(ctx, site)).To(Succeed())
 
 			// Create scheduled backup
-			backup := &vyogotechv1alpha1.SiteBackup{
+			backup := &vyogotechv1.SiteBackup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "e2e-scheduled-backup",
 					Namespace: "default",
 				},
-				Spec: vyogotechv1alpha1.SiteBackupSpec{
+				Spec: vyogotechv1.SiteBackupSpec{
 					Site:     "scheduled.example.com",
 					Schedule: "0 2 * * *", // Daily at 2 AM
 					Compress: true,
@@ -164,9 +164,9 @@ var _ = Describe("SiteBackup E2E", func() {
 			Expect(cronJob.Spec.Schedule).To(Equal("0 2 * * *"))
 
 			// Clean up
-			k8sClient.Delete(ctx, backup)
-			k8sClient.Delete(ctx, site)
-			k8sClient.Delete(ctx, bench)
+			_ = k8sClient.Delete(ctx, backup)
+			_ = k8sClient.Delete(ctx, site)
+			_ = k8sClient.Delete(ctx, bench)
 		})
 	})
 })

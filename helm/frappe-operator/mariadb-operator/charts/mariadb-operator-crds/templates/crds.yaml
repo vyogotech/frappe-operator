@@ -28,7 +28,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: Backup is the Schema for the backups API. It is used to define
@@ -939,7 +939,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: Connection is the Schema for the connections API. It is used
@@ -1188,7 +1188,7 @@ spec:
     - jsonPath: .spec.name
       name: Name
       type: string
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: Database is the Schema for the databases API. It is used to define
@@ -1365,7 +1365,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: Grant is the Schema for the grants API. It is used to define
@@ -1547,7 +1547,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: MariaDB is the Schema for the mariadbs API. It is used to define
@@ -6473,7 +6473,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: MaxScale is the Schema for the maxscales API. It is used to define
@@ -8518,7 +8518,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: Restore is the Schema for the restores API. It is used to define
@@ -9301,7 +9301,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: SqlJob is the Schema for the sqljobs API. It is used to run sql
@@ -9931,7 +9931,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: User is the Schema for the users API.  It is used to define grants

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -33,7 +33,7 @@ import (
 )
 
 // ensureBenchStorage ensures the PVC for the bench exists
-func (r *FrappeBenchReconciler) ensureBenchStorage(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+func (r *FrappeBenchReconciler) ensureBenchStorage(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
@@ -62,7 +62,7 @@ func (r *FrappeBenchReconciler) ensureBenchStorage(ctx context.Context, bench *v
 	return r.createBenchPVC(ctx, bench, accessMode, sc)
 }
 
-func (r *FrappeBenchReconciler) createBenchPVC(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, accessMode corev1.PersistentVolumeAccessMode, sc *storagev1.StorageClass) error {
+func (r *FrappeBenchReconciler) createBenchPVC(ctx context.Context, bench *vyogotechv1.FrappeBench, accessMode corev1.PersistentVolumeAccessMode, sc *storagev1.StorageClass) error {
 	logger := log.FromContext(ctx)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 	sizeStr := bench.Spec.StorageSize
@@ -100,7 +100,7 @@ func (r *FrappeBenchReconciler) createBenchPVC(ctx context.Context, bench *vyogo
 	return r.Create(ctx, pvc)
 }
 
-func (r *FrappeBenchReconciler) chooseStorageClass(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) (*storagev1.StorageClass, error) {
+func (r *FrappeBenchReconciler) chooseStorageClass(ctx context.Context, bench *vyogotechv1.FrappeBench) (*storagev1.StorageClass, error) {
 	logger := log.FromContext(ctx)
 
 	if bench.Spec.StorageClassName != "" {
@@ -148,7 +148,7 @@ func (r *FrappeBenchReconciler) chooseStorageClass(ctx context.Context, bench *v
 	return sc, nil
 }
 
-func (r *FrappeBenchReconciler) determineAccessMode(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, sc *storagev1.StorageClass) (corev1.PersistentVolumeAccessMode, error) {
+func (r *FrappeBenchReconciler) determineAccessMode(ctx context.Context, bench *vyogotechv1.FrappeBench, sc *storagev1.StorageClass) (corev1.PersistentVolumeAccessMode, error) {
 	logger := log.FromContext(ctx)
 
 	if bench.Annotations != nil {
@@ -205,14 +205,15 @@ func isDefaultStorageClass(sc *storagev1.StorageClass) bool {
 	return false
 }
 
-func (r *FrappeBenchReconciler) getBenchStorageAccessMode(bench *vyogotechv1alpha1.FrappeBench) corev1.PersistentVolumeAccessMode {
+func (r *FrappeBenchReconciler) getBenchStorageAccessMode(bench *vyogotechv1.FrappeBench) corev1.PersistentVolumeAccessMode {
 	if bench.Annotations != nil && bench.Annotations["frappe.tech/storage-fallback"] == "true" {
 		return corev1.ReadWriteOnce
 	}
 	return corev1.ReadWriteMany
 }
 
-func (r *FrappeBenchReconciler) markStorageFallback(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench) error {
+//nolint:unused
+func (r *FrappeBenchReconciler) markStorageFallback(ctx context.Context, bench *vyogotechv1.FrappeBench) error {
 	logger := log.FromContext(ctx)
 
 	// Use patch instead of update to avoid race conditions
@@ -226,7 +227,7 @@ func (r *FrappeBenchReconciler) markStorageFallback(ctx context.Context, bench *
 	return r.Patch(ctx, bench, patch)
 }
 
-func shouldFallbackStorage(pvc *corev1.PersistentVolumeClaim, bench *vyogotechv1alpha1.FrappeBench) bool {
+func shouldFallbackStorage(pvc *corev1.PersistentVolumeClaim, bench *vyogotechv1.FrappeBench) bool {
 	if pvc.Status.Phase != corev1.ClaimPending {
 		return false
 	}

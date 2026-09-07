@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 type HPAProvider struct {
@@ -28,7 +28,7 @@ func (p *HPAProvider) IsAvailable(ctx context.Context) bool {
 	return true // HPA is built-in
 }
 
-func (p *HPAProvider) Ensure(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, componentName string, deploymentName string, config *vyogotechv1alpha1.ComponentAutoscaling) error {
+func (p *HPAProvider) Ensure(ctx context.Context, bench *vyogotechv1.FrappeBench, componentName string, deploymentName string, config *vyogotechv1.ComponentAutoscaling) error {
 	logger := log.FromContext(ctx)
 
 	hpaName := fmt.Sprintf("%s-%s", bench.Name, componentName)
@@ -96,7 +96,7 @@ func (p *HPAProvider) Ensure(ctx context.Context, bench *vyogotechv1alpha1.Frapp
 	return p.client.Update(ctx, hpa)
 }
 
-func (p *HPAProvider) Delete(ctx context.Context, bench *vyogotechv1alpha1.FrappeBench, componentName string) error {
+func (p *HPAProvider) Delete(ctx context.Context, bench *vyogotechv1.FrappeBench, componentName string) error {
 	logger := log.FromContext(ctx)
 	hpaName := fmt.Sprintf("%s-%s", bench.Name, componentName)
 

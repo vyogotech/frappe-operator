@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	routev1 "github.com/openshift/api/route/v1"
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,18 +22,18 @@ import (
 func TestFrappeSiteReconciler_ensureIngress(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	utilruntime.Must(networkingv1.AddToScheme(scheme))
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+		Spec: vyogotechv1.FrappeSiteSpec{
 			SiteName: "site.local",
-			BenchRef: &vyogotechv1alpha1.NamespacedName{Name: "bench"},
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench"},
 		},
 	}
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{Name: "bench", Namespace: "default"},
-		Spec:       vyogotechv1alpha1.FrappeBenchSpec{FrappeVersion: "15"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
 	}
 	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site, bench).Build()
 	r := &FrappeSiteReconciler{Client: client, Scheme: scheme}
@@ -58,18 +58,18 @@ func TestFrappeSiteReconciler_ensureIngress(t *testing.T) {
 func TestFrappeSiteReconciler_ensureIngress_Disabled(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	utilruntime.Must(networkingv1.AddToScheme(scheme))
 	enabled := false
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+		Spec: vyogotechv1.FrappeSiteSpec{
 			SiteName: "site.local",
-			BenchRef: &vyogotechv1alpha1.NamespacedName{Name: "bench"},
-			Ingress:  &vyogotechv1alpha1.IngressConfig{Enabled: &enabled},
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench"},
+			Ingress:  &vyogotechv1.IngressConfig{Enabled: &enabled},
 		},
 	}
-	bench := &vyogotechv1alpha1.FrappeBench{ObjectMeta: metav1.ObjectMeta{Name: "bench", Namespace: "default"}}
+	bench := &vyogotechv1.FrappeBench{ObjectMeta: metav1.ObjectMeta{Name: "bench", Namespace: "default"}}
 	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site, bench).Build()
 	r := &FrappeSiteReconciler{Client: client, Scheme: scheme}
 	ctx := context.Background()
@@ -87,18 +87,18 @@ func TestFrappeSiteReconciler_ensureIngress_Disabled(t *testing.T) {
 func TestFrappeSiteReconciler_ensureRoute(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	utilruntime.Must(routev1.AddToScheme(scheme))
-	site := &vyogotechv1alpha1.FrappeSite{
+	site := &vyogotechv1.FrappeSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "site", Namespace: "default"},
-		Spec: vyogotechv1alpha1.FrappeSiteSpec{
+		Spec: vyogotechv1.FrappeSiteSpec{
 			SiteName: "site.local",
-			BenchRef: &vyogotechv1alpha1.NamespacedName{Name: "bench"},
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench"},
 		},
 	}
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{Name: "bench", Namespace: "default"},
-		Spec:       vyogotechv1alpha1.FrappeBenchSpec{FrappeVersion: "15"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
 	}
 	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site, bench).Build()
 	r := &FrappeSiteReconciler{Client: client, Scheme: scheme}

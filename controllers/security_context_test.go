@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -29,12 +29,12 @@ import (
 func TestFrappeBenchReconciler_getPodSecurityContext_Defaults(t *testing.T) {
 	r := &FrappeBenchReconciler{}
 
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bench",
 			Namespace: "default",
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
 		},
 	}
@@ -55,14 +55,14 @@ func TestFrappeBenchReconciler_getPodSecurityContext_Override(t *testing.T) {
 	customGroup := int64(2001)
 	customFSGroup := int64(2002)
 
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bench",
 			Namespace: "default",
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
-			Security: &vyogotechv1alpha1.SecurityConfig{
+			Security: &vyogotechv1.SecurityConfig{
 				PodSecurityContext: &corev1.PodSecurityContext{
 					RunAsUser:  &customUser,
 					RunAsGroup: &customGroup,
@@ -96,12 +96,12 @@ func TestFrappeBenchReconciler_getPodSecurityContext_Override(t *testing.T) {
 func TestFrappeBenchReconciler_getContainerSecurityContext_Defaults(t *testing.T) {
 	r := &FrappeBenchReconciler{}
 
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bench",
 			Namespace: "default",
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
 		},
 	}
@@ -122,14 +122,14 @@ func TestFrappeBenchReconciler_getContainerSecurityContext_Override(t *testing.T
 	customGroup := int64(3001)
 	allowPrivEsc := true
 
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bench",
 			Namespace: "default",
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
-			Security: &vyogotechv1alpha1.SecurityConfig{
+			Security: &vyogotechv1.SecurityConfig{
 				SecurityContext: &corev1.SecurityContext{
 					RunAsUser:                &customUser,
 					RunAsGroup:               &customGroup,
@@ -163,12 +163,12 @@ func TestFrappeBenchReconciler_getContainerSecurityContext_Override(t *testing.T
 func TestFrappeSiteReconciler_getPodSecurityContext_Defaults(t *testing.T) {
 	r := &FrappeSiteReconciler{}
 
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bench",
 			Namespace: "default",
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
 		},
 	}
@@ -185,12 +185,12 @@ func TestFrappeSiteReconciler_getPodSecurityContext_Defaults(t *testing.T) {
 func TestFrappeSiteReconciler_getContainerSecurityContext_Defaults(t *testing.T) {
 	r := &FrappeSiteReconciler{}
 
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bench",
 			Namespace: "default",
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
 		},
 	}
@@ -207,12 +207,12 @@ func TestFrappeSiteReconciler_getContainerSecurityContext_Defaults(t *testing.T)
 func TestSecurityContext_NoRootUser(t *testing.T) {
 	r := &FrappeBenchReconciler{}
 
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bench",
 			Namespace: "default",
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
 		},
 	}
@@ -238,12 +238,12 @@ func TestSecurityContext_NoRootUser(t *testing.T) {
 func TestSecurityContext_PSPCompliance(t *testing.T) {
 	r := &FrappeBenchReconciler{}
 
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bench",
 			Namespace: "default",
 		},
-		Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		Spec: vyogotechv1.FrappeBenchSpec{
 			FrappeVersion: "v15",
 		},
 	}

@@ -95,6 +95,14 @@ func (b *StatefulSetBuilder) WithReplicas(replicas int32) *StatefulSetBuilder {
 	return b
 }
 
+// WithImagePullSecrets sets the image pull secrets
+func (b *StatefulSetBuilder) WithImagePullSecrets(secrets []corev1.LocalObjectReference) *StatefulSetBuilder {
+	if len(secrets) > 0 {
+		b.sts.Spec.Template.Spec.ImagePullSecrets = secrets
+	}
+	return b
+}
+
 // WithContainer adds a container to the statefulset
 func (b *StatefulSetBuilder) WithContainer(container corev1.Container) *StatefulSetBuilder {
 	b.sts.Spec.Template.Spec.Containers = append(

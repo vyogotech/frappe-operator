@@ -1,0 +1,204 @@
+/*
+Copyright 2023 Vyogo Technologies.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package v1
+
+import (
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// Note: Common types (NamespacedName, TLSConfig, DatabaseConfig, etc.) are defined in shared_types.go
+
+// FrappeSiteSpec defines the desired state of FrappeSite
+type FrappeSiteSpec struct {
+	// BenchRef references the FrappeBench this site belongs to
+	// +kubebuilder:validation:Required
+	BenchRef *NamespacedName `json:"benchRef"`
+
+	// SiteName is the Frappe site name - MUST match the domain that will receive traffic
+	// This is what Frappe uses to route requests based on HTTP Host header
+	// Example: "erp.customer.com" or "customer1.myplatform.com"
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	SiteName string `json:"siteName"`
+
+	// AdminPasswordSecretRef references the Secret containing admin password
+	// +optional
+	AdminPasswordSecretRef *corev1.SecretReference `json:"adminPasswordSecretRef,omitempty"`
+
+	// EncryptionKeySecretRef references a Secret containing an external encryption_key
+	// Key must be "encryption_key" in the referenced secret
+	// +optional
+	EncryptionKeySecretRef *corev1.SecretKeySelector `json:"encryptionKeySecretRef,omitempty"`
+
+	// DBConfig defines database configuration for this site
+	// +optional
+	DBConfig DatabaseConfig `json:"dbConfig,omitempty"`
+
+	// Domain is the external domain for ingress
+	// MUST match siteName (defaults to siteName if not specified)
+	// +optional
+	Domain string `json:"domain,omitempty"`
+
+	// TLS configuration
+	// +optional
+	TLS TLSConfig `json:"tls,omitempty"`
+
+	// IngressClassName specifies the ingress class
+	// +optional
+	IngressClassName string `json:"ingressClassName,omitempty"`
+
+	// Ingress configuration
+	// +optional
+	Ingress *IngressConfig `json:"ingress,omitempty"`
+
+	// Route configuration for OpenShift platforms
+	// +optional
+	RouteConfig *RouteConfig `json:"routeConfig,omitempty"`
+
+	// Apps to install on this site
+	// These apps are checked against the actual container filesystem during installation
+	// Apps not available in the container will be gracefully skipped with warnings
+	// Note: Apps can only be installed during initial site creation and are immutable thereafter
+	// +optional
+	Apps []string `json:"apps,omitempty"`
+
+	// PodConfig defines advanced pod configuration for site-specific jobs (init, backup, etc.)
+	// +optional
+	PodConfig *PodConfig `json:"podConfig,omitempty"`
+
+	// SkipInit bypasses the bench new-site initialization.
+	// Use this when the database already contains a valid Frappe schema.
+	// When true, the initialization job only performs migrations and configuration updates.
+	// +optional
+	SkipInit bool `json:"skipInit,omitempty"`
+
+	// DeletionPolicy controls what happens to the site's database resources when the
+	// FrappeSite is deleted. Applies to both MariaDB and PostgreSQL.
+	//   - Retain (default): keep the database, user, and credential Secret (GitOps-safe;
+	//     an accidental CR delete or ArgoCD prune won't drop tenant data).
+	//   - Delete: hard-delete the database and user (and, for dedicated Postgres, the cluster).
+	// +kubebuilder:validation:Enum=Retain;Delete
+	// +kubebuilder:default=Retain
+	// +optional
+	DeletionPolicy string `json:"deletionPolicy,omitempty"`
+}
+
+// FrappeSitePhase represents the current phase
+type FrappeSitePhase string
+
+const (
+	FrappeSitePhasePending      FrappeSitePhase = "Pending"
+	FrappeSitePhaseProvisioning FrappeSitePhase = "Provisioning"
+	FrappeSitePhaseReady        FrappeSitePhase = "Ready"
+	FrappeSitePhaseFailed       FrappeSitePhase = "Failed"
+)
+
+// FrappeSiteStatus defines the observed state of FrappeSite
+type FrappeSiteStatus struct {
+	// Phase is the current phase
+	// +optional
+	Phase FrappeSitePhase `json:"phase,omitempty"`
+
+	// BenchReady indicates if the referenced bench is ready
+	// +optional
+	BenchReady bool `json:"benchReady,omitempty"`
+
+	// DatabaseReady indicates if the database is provisioned and ready
+	// +optional
+	DatabaseReady bool `json:"databaseReady,omitempty"`
+
+	// DatabaseName is the actual database name created
+	// +optional
+	DatabaseName string `json:"databaseName,omitempty"`
+
+	// DatabaseCredentialsSecret is the name of the Secret with site-specific DB credentials
+	// +optional
+	DatabaseCredentialsSecret string `json:"databaseCredentialsSecret,omitempty"`
+
+	// SiteURL is the accessible URL
+	// +optional
+	SiteURL string `json:"siteURL,omitempty"`
+
+	// Conditions represent the latest available observations of site's state
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// DBConnectionSecret is the name of the Secret with DB credentials (legacy)
+	// +optional
+	DBConnectionSecret string `json:"dbConnectionSecret,omitempty"`
+
+	// ResolvedDomain is the final domain after resolution
+	// +optional
+	ResolvedDomain string `json:"resolvedDomain,omitempty"`
+
+	// DomainSource indicates how domain was determined
+	// Values: explicit, bench-suffix, auto-detected, sitename-default
+	// +optional
+	DomainSource string `json:"domainSource,omitempty"`
+
+	// InstalledApps lists the apps that were requested for installation on this site.
+	// Some requested apps may have been skipped or failed; see FailedApps and AppInstallationStatus.
+	// +optional
+	InstalledApps []string `json:"installedApps,omitempty"`
+
+	// AppInstallationStatus provides detailed status of app installation
+	// +optional
+	AppInstallationStatus string `json:"appInstallationStatus,omitempty"`
+
+	// FailedApps lists apps that failed to install with error messages
+	// +optional
+	FailedApps map[string]string `json:"failedApps,omitempty"`
+
+	// ObservedGeneration reflects the generation of the most recently observed FrappeSite spec
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// ObservedSiteVersion reflects the frappe.io/site-version annotation value most recently processed
+	// +optional
+	ObservedSiteVersion string `json:"observedSiteVersion,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+//+kubebuilder:printcolumn:name="Bench",type=string,JSONPath=`.spec.benchRef.name`
+//+kubebuilder:printcolumn:name="URL",type=string,JSONPath=`.status.siteURL`
+//+kubebuilder:printcolumn:name="Apps",type=string,JSONPath=`.status.installedApps`
+//+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+
+// FrappeSite is the Schema for the frappesites API
+type FrappeSite struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   FrappeSiteSpec   `json:"spec,omitempty"`
+	Status FrappeSiteStatus `json:"status,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+
+// FrappeSiteList contains a list of FrappeSite
+type FrappeSiteList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []FrappeSite `json:"items"`
+}
+
+func init() {
+	SchemeBuilder.Register(&FrappeSite{}, &FrappeSiteList{})
+}

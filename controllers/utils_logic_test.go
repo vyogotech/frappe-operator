@@ -13,7 +13,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/constants"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 )
@@ -21,12 +21,13 @@ import (
 func TestGetDefaultSecurityValues(t *testing.T) {
 	t.Run("GetDefaultUID", func(t *testing.T) {
 		os.Unsetenv("FRAPPE_DEFAULT_UID")
-		if getDefaultUID() != nil {
-			t.Error("Expected nil when env not set")
+		uid := getDefaultUID()
+		if uid == nil || *uid != 1000 {
+			t.Errorf("Expected default 1000, got %v", uid)
 		}
 
 		os.Setenv("FRAPPE_DEFAULT_UID", "2000")
-		uid := getDefaultUID()
+		uid = getDefaultUID()
 		if uid == nil || *uid != 2000 {
 			t.Errorf("Expected 2000, got %v", uid)
 		}
@@ -35,12 +36,13 @@ func TestGetDefaultSecurityValues(t *testing.T) {
 
 	t.Run("GetDefaultGID", func(t *testing.T) {
 		os.Unsetenv("FRAPPE_DEFAULT_GID")
-		if getDefaultGID() != nil {
-			t.Error("Expected nil when env not set")
+		gid := getDefaultGID()
+		if gid == nil || *gid != 0 {
+			t.Errorf("Expected default 0, got %v", gid)
 		}
 
 		os.Setenv("FRAPPE_DEFAULT_GID", "3000")
-		gid := getDefaultGID()
+		gid = getDefaultGID()
 		if gid == nil || *gid != 3000 {
 			t.Errorf("Expected 3000, got %v", gid)
 		}
@@ -145,11 +147,12 @@ func TestGetEnvAsInt64(t *testing.T) {
 
 func TestGetDefaultFSGroup(t *testing.T) {
 	os.Unsetenv("FRAPPE_DEFAULT_FSGROUP")
-	if getDefaultFSGroup() != nil {
-		t.Error("expected nil when env not set")
+	g := getDefaultFSGroup()
+	if g == nil || *g != 1000 {
+		t.Errorf("expected 1000, got %v", g)
 	}
 	os.Setenv("FRAPPE_DEFAULT_FSGROUP", "2000")
-	g := getDefaultFSGroup()
+	g = getDefaultFSGroup()
 	if g == nil || *g != 2000 {
 		t.Errorf("expected 2000, got %v", g)
 	}
@@ -177,14 +180,14 @@ func TestInt32Ptr(t *testing.T) {
 func TestFrappeSiteReconciler_getBenchImage(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	ctx := context.Background()
 
 	t.Run("bench ImageConfig override", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "default"},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
-				ImageConfig: &vyogotechv1alpha1.ImageConfig{
+			Spec: vyogotechv1.FrappeBenchSpec{
+				ImageConfig: &vyogotechv1.ImageConfig{
 					Repository: "myreg/frappe",
 					Tag:        "v15",
 				},
@@ -199,9 +202,9 @@ func TestFrappeSiteReconciler_getBenchImage(t *testing.T) {
 	})
 
 	t.Run("fallback to constant when no config", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "default"},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		client := fake.NewClientBuilder().WithScheme(scheme).Build()
 		r := &FrappeSiteReconciler{Client: client}
@@ -212,9 +215,9 @@ func TestFrappeSiteReconciler_getBenchImage(t *testing.T) {
 	})
 
 	t.Run("ConfigMap default image", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
+		bench := &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "default"},
-			Spec:       vyogotechv1alpha1.FrappeBenchSpec{},
+			Spec:       vyogotechv1.FrappeBenchSpec{},
 		}
 		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{

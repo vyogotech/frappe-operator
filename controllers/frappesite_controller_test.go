@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	routev1 "github.com/openshift/api/route/v1"
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
 var _ = Describe("FrappeSite Controller", func() {
@@ -44,8 +44,8 @@ var _ = Describe("FrappeSite Controller", func() {
 		reconciler   *FrappeSiteReconciler
 		fakeClient   client.Client
 		fakeRecorder *record.FakeRecorder
-		site         *vyogotechv1alpha1.FrappeSite
-		bench        *vyogotechv1alpha1.FrappeBench
+		site         *vyogotechv1.FrappeSite
+		bench        *vyogotechv1.FrappeBench
 		namespace    string
 	)
 
@@ -54,15 +54,15 @@ var _ = Describe("FrappeSite Controller", func() {
 		namespace = "test-namespace"
 		fakeRecorder = record.NewFakeRecorder(10)
 
-		bench = &vyogotechv1alpha1.FrappeBench{
+		bench = &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-bench",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+			Spec: vyogotechv1.FrappeBenchSpec{
 				FrappeVersion: "15",
 			},
-			Status: vyogotechv1alpha1.FrappeBenchStatus{
+			Status: vyogotechv1.FrappeBenchStatus{
 				Conditions: []metav1.Condition{
 					{
 						Type:   "Ready",
@@ -72,14 +72,14 @@ var _ = Describe("FrappeSite Controller", func() {
 			},
 		}
 
-		site = &vyogotechv1alpha1.FrappeSite{
+		site = &vyogotechv1.FrappeSite{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-site",
 				Namespace: namespace,
 			},
-			Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			Spec: vyogotechv1.FrappeSiteSpec{
 				SiteName: "test-site.local",
-				BenchRef: &vyogotechv1alpha1.NamespacedName{
+				BenchRef: &vyogotechv1.NamespacedName{
 					Name:      bench.Name,
 					Namespace: bench.Namespace,
 				},
@@ -87,13 +87,13 @@ var _ = Describe("FrappeSite Controller", func() {
 		}
 
 		s := runtime.NewScheme()
-		_ = vyogotechv1alpha1.AddToScheme(s)
+		_ = vyogotechv1.AddToScheme(s)
 		_ = corev1.AddToScheme(s)
 		_ = networkingv1.AddToScheme(s)
 		_ = batchv1.AddToScheme(s)
 		_ = routev1.AddToScheme(s)
 
-		fakeClient = fake.NewClientBuilder().WithScheme(s).WithObjects(bench).WithStatusSubresource(&vyogotechv1alpha1.FrappeSite{}).Build()
+		fakeClient = fake.NewClientBuilder().WithScheme(s).WithObjects(bench).WithStatusSubresource(&vyogotechv1.FrappeSite{}).Build()
 
 		reconciler = &FrappeSiteReconciler{
 			Client:   fakeClient,
@@ -120,7 +120,7 @@ var _ = Describe("FrappeSite Controller", func() {
 			reconciler.setCondition(site, condition)
 			Expect(fakeClient.Status().Update(ctx, site)).To(Succeed())
 
-			updatedSite := &vyogotechv1alpha1.FrappeSite{}
+			updatedSite := &vyogotechv1.FrappeSite{}
 			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: site.Namespace}, updatedSite)).To(Succeed())
 
 			foundCondition := meta.FindStatusCondition(updatedSite.Status.Conditions, "Progressing")
@@ -138,6 +138,71 @@ var _ = Describe("FrappeSite Controller", func() {
 
 			// Verify event was recorded
 			Eventually(fakeRecorder.Events).Should(Receive(ContainSubstring("Reconciling")))
+		})
+	})
+
+	Describe("Terminal Failure Handling (failTerminal)", func() {
+		It("should mark site phase as Failed", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			_, _ = reconciler.failTerminal(ctx, site, "init job exhausted backoff", "SiteInitializationFailed")
+
+			Expect(site.Status.Phase).To(Equal(vyogotechv1.FrappeSitePhaseFailed))
+		})
+
+		It("should return nil error so controller-runtime does not requeue", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			result, err := reconciler.failTerminal(ctx, site, "init job exhausted backoff", "SiteInitializationFailed")
+
+			// nil error = no automatic requeue by controller-runtime
+			Expect(err).NotTo(HaveOccurred(), "failTerminal must return nil error to stop the requeue loop")
+			Expect(result).To(Equal(ctrl.Result{}))
+		})
+
+		It("should set Ready condition to False with the supplied reason", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			_, _ = reconciler.failTerminal(ctx, site, "backoff exhausted", "SiteInitializationFailed")
+
+			readyCond := meta.FindStatusCondition(site.Status.Conditions, "Ready")
+			Expect(readyCond).NotTo(BeNil())
+			Expect(readyCond.Status).To(Equal(metav1.ConditionFalse))
+			Expect(readyCond.Reason).To(Equal("SiteInitializationFailed"))
+			Expect(readyCond.Message).To(ContainSubstring("backoff exhausted"))
+		})
+
+		It("should emit a Warning event with the failure reason", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			_, _ = reconciler.failTerminal(ctx, site, "init job exhausted backoff", "SiteInitializationFailed")
+
+			Eventually(fakeRecorder.Events).Should(Receive(ContainSubstring("SiteInitializationFailed")))
+		})
+	})
+
+	Describe("Transient Failure Handling (failReconciliation)", func() {
+		It("should return a non-nil error to trigger controller-runtime requeue", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			_, err := reconciler.failReconciliation(ctx, site, "database unavailable", "DatabaseFailed")
+
+			Expect(err).To(HaveOccurred(), "failReconciliation must return non-nil error so controller-runtime requeues")
+			Expect(err.Error()).To(ContainSubstring("database unavailable"))
+		})
+
+		It("should mark site phase as Failed", func() {
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+			Expect(fakeClient.Get(ctx, types.NamespacedName{Name: site.Name, Namespace: namespace}, site)).To(Succeed())
+
+			_, _ = reconciler.failReconciliation(ctx, site, "database unavailable", "DatabaseFailed")
+
+			Expect(site.Status.Phase).To(Equal(vyogotechv1.FrappeSitePhaseFailed))
 		})
 	})
 

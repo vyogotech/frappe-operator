@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: demo-bench
@@ -10,8 +10,8 @@ spec:
     podSecurityContext: {}
 
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-c39d75f
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: v3.1.0
     pullPolicy: Always
   
   # Permanent Fix for OpenShift RWX

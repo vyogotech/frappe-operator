@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: external-redis-bench
@@ -6,8 +6,8 @@ metadata:
 spec:
   frappeVersion: "15.0.0"
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-7bc7484
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: v3.1.0
     pullPolicy: Always
   
   # External Redis configuration
@@ -20,12 +20,24 @@ spec:
       name: external-redis-creds
   
   # Define replicas for components
-  componentReplicas:
-    gunicorn: 1
-    nginx: 1
-    socketio: 1
-    workerDefault: 1
-    workerLong: 1
-    workerShort: 1
+  componentAutoscaling:
+    gunicorn:
+      enabled: false
+      staticReplicas: 1
+    nginx:
+      enabled: false
+      staticReplicas: 1
+    socketio:
+      enabled: false
+      staticReplicas: 1
+    worker-default:
+      enabled: false
+      staticReplicas: 1
+    worker-long:
+      enabled: false
+      staticReplicas: 1
+    worker-short:
+      enabled: false
+      staticReplicas: 1
   
   storageSize: 2Gi

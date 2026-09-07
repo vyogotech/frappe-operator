@@ -1,10 +1,12 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: vyogodemo1
   namespace: frappe
 spec:
   siteName: vyogodemo1.apps.crc.testing
+  adminPasswordSecretRef:
+    name: vyogodemo1-admin-password
   benchRef:
     name: vyogobench
   dbConfig:

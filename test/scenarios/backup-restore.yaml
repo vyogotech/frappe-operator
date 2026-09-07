@@ -1,0 +1,34 @@
+apiVersion: vyogo.tech/v1
+kind: FrappeBench
+metadata:
+  name: backup-bench
+spec:
+  frappeVersion: "15"
+  imageConfig:
+    repository: ghcr.io/vyogotech/frappe_base
+    tag: latest
+    pullPolicy: Always
+  storageSize: 2Gi
+---
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: backup-site
+spec:
+  benchRef:
+    name: backup-bench
+  siteName: backup.test.local
+  dbConfig:
+    mode: shared
+    mariadbRef:
+      name: frappe-mariadb
+      namespace: mariadb
+---
+apiVersion: vyogo.tech/v1
+kind: SiteBackup
+metadata:
+  name: test-backup
+spec:
+  site: backup.test.local
+  withFiles: true
+  compress: true

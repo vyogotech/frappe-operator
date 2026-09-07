@@ -1,4 +1,4 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: ${BENCH_NAME}
@@ -13,16 +13,16 @@ spec:
       source: image
   redisConfig:
     type: redis
-  workerAutoscaling:
-    short:
+  componentAutoscaling:
+    workerShort:
       enabled: false
-    long:
+    workerLong:
       enabled: false
-    default:
+    workerDefault:
       enabled: false
       staticReplicas: 1
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: ${SITE_NAME}
@@ -32,10 +32,8 @@ spec:
   siteName: ${DOMAIN}
   adminPasswordSecretRef:
     name: ${SITE_NAME}-admin-password
-    key: password
   dbConfig:
     provider: mariadb
   routeConfig:
     enabled: true
-    domain: ${DOMAIN}
     termination: edge

@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,17 +32,17 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
 )
 
 func TestSiteBackupReconciler_getBenchImage(t *testing.T) {
 	r := &SiteBackupReconciler{}
 	t.Run("ImageConfig override", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+		bench := &vyogotechv1.FrappeBench{
+			Spec: vyogotechv1.FrappeBenchSpec{
 				FrappeVersion: "15",
-				ImageConfig: &vyogotechv1alpha1.ImageConfig{
+				ImageConfig: &vyogotechv1.ImageConfig{
 					Repository: "myreg/erpnext",
 					Tag:        "v15",
 				},
@@ -53,8 +54,8 @@ func TestSiteBackupReconciler_getBenchImage(t *testing.T) {
 		}
 	})
 	t.Run("Default with version", func(t *testing.T) {
-		bench := &vyogotechv1alpha1.FrappeBench{
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{FrappeVersion: "15"},
+		bench := &vyogotechv1.FrappeBench{
+			Spec: vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
 		}
 		img := r.getBenchImage(bench)
 		if img != "frappe/erpnext:15" {
@@ -65,7 +66,7 @@ func TestSiteBackupReconciler_getBenchImage(t *testing.T) {
 
 func TestSiteBackupReconciler_getSitesPVCName(t *testing.T) {
 	r := &SiteBackupReconciler{}
-	bench := &vyogotechv1alpha1.FrappeBench{ObjectMeta: metav1.ObjectMeta{Name: "my-bench"}}
+	bench := &vyogotechv1.FrappeBench{ObjectMeta: metav1.ObjectMeta{Name: "my-bench"}}
 	name := r.getSitesPVCName(bench)
 	if name != "my-bench-sites" {
 		t.Errorf("expected my-bench-sites, got %s", name)
@@ -75,7 +76,7 @@ func TestSiteBackupReconciler_getSitesPVCName(t *testing.T) {
 func TestSiteBackupReconciler_buildBackupArgs(t *testing.T) {
 	r := &SiteBackupReconciler{}
 	t.Run("minimal", func(t *testing.T) {
-		sb := &vyogotechv1alpha1.SiteBackup{Spec: vyogotechv1alpha1.SiteBackupSpec{Site: "site1.local"}}
+		sb := &vyogotechv1.SiteBackup{Spec: vyogotechv1.SiteBackupSpec{Site: "site1.local"}}
 		args := r.buildBackupArgs(sb)
 		if len(args) < 3 {
 			t.Fatalf("expected at least --site site1.local backup, got %v", args)
@@ -86,8 +87,8 @@ func TestSiteBackupReconciler_buildBackupArgs(t *testing.T) {
 	})
 	t.Run("with options", func(t *testing.T) {
 		withFiles := true
-		sb := &vyogotechv1alpha1.SiteBackup{
-			Spec: vyogotechv1alpha1.SiteBackupSpec{
+		sb := &vyogotechv1.SiteBackup{
+			Spec: vyogotechv1.SiteBackupSpec{
 				Site:       "site2.local",
 				WithFiles:  withFiles,
 				Compress:   true,
@@ -115,23 +116,135 @@ func TestSiteBackupReconciler_buildBackupArgs(t *testing.T) {
 			t.Error("expected --compress in args")
 		}
 	})
+	t.Run("normalizes backup paths for bench (strip sites/, relocate to vyogo-backups)", func(t *testing.T) {
+		// The console sends bench-root-relative paths ("sites/<site>/private/backups/<name>/..."),
+		// but the operator must (1) strip the leading "sites/" because `bench backup
+		// --backup-path*` resolves relative to the sites dir (otherwise paths double to
+		// "sites/sites/..."), and (2) relocate the "private/backups/" segment to the
+		// Frappe-safe "private/vyogo-backups/" dir (a per-backup subdir inside
+		// private/backups makes Frappe's delete_temp_backups crash on the next backup).
+		sb := &vyogotechv1.SiteBackup{
+			Spec: vyogotechv1.SiteBackupSpec{
+				Site:                   "site3.local",
+				BackupPath:             "sites/site3.local/private/backups/bk1",
+				BackupPathDB:           "sites/site3.local/private/backups/bk1/database.sql.gz",
+				BackupPathConf:         "sites/site3.local/private/backups/bk1/site_config_backup.json",
+				BackupPathFiles:        "sites/site3.local/private/backups/bk1/files.tar",
+				BackupPathPrivateFiles: "sites/site3.local/private/backups/bk1/private-files.tar",
+			},
+		}
+		args := r.buildBackupArgs(sb)
+		want := map[string]string{
+			"--backup-path":               "site3.local/private/vyogo-backups/bk1",
+			"--backup-path-db":            "site3.local/private/vyogo-backups/bk1/database.sql.gz",
+			"--backup-path-conf":          "site3.local/private/vyogo-backups/bk1/site_config_backup.json",
+			"--backup-path-files":         "site3.local/private/vyogo-backups/bk1/files.tar",
+			"--backup-path-private-files": "site3.local/private/vyogo-backups/bk1/private-files.tar",
+		}
+		for flag, expected := range want {
+			found := false
+			for i, a := range args {
+				if a == flag {
+					found = true
+					if i+1 >= len(args) || args[i+1] != expected {
+						t.Errorf("%s: expected %q, got %q", flag, expected, args[i+1])
+					}
+					if strings.HasPrefix(args[i+1], "sites/") {
+						t.Errorf("%s: value still has leading sites/: %q", flag, args[i+1])
+					}
+					if strings.Contains(args[i+1], "private/backups/") {
+						t.Errorf("%s: value not relocated off private/backups/: %q", flag, args[i+1])
+					}
+				}
+			}
+			if !found {
+				t.Errorf("expected flag %s in args %v", flag, args)
+			}
+		}
+	})
+}
+
+func TestSiteBackupReconciler_backupCommandAndArgs(t *testing.T) {
+	r := &SiteBackupReconciler{}
+	t.Run("no S3 runs bench directly", func(t *testing.T) {
+		sb := &vyogotechv1.SiteBackup{Spec: vyogotechv1.SiteBackupSpec{Site: "s1.local"}}
+		cmd, args := r.backupCommandAndArgs(sb)
+		if len(cmd) != 1 || cmd[0] != "bench" {
+			t.Fatalf("expected command [bench], got %v", cmd)
+		}
+		if len(args) < 3 || args[0] != "--site" {
+			t.Errorf("expected bench backup args, got %v", args)
+		}
+	})
+	t.Run("S3 wraps bench + upload script", func(t *testing.T) {
+		sb := &vyogotechv1.SiteBackup{
+			ObjectMeta: metav1.ObjectMeta{Name: "bk1"},
+			Spec: vyogotechv1.SiteBackupSpec{
+				Site:         "s1.local",
+				BackupPathDB: "sites/s1.local/private/backups/bk1/database.sql.gz",
+				Storage: &vyogotechv1.BackupStorageConfig{
+					Type: "s3",
+					S3: &vyogotechv1.S3Config{
+						Endpoint: "https://minio:9000", Bucket: "backups",
+						AccessKeySecret: corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "s3-creds"}, Key: "access"},
+						SecretKeySecret: corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "s3-creds"}, Key: "secret"},
+					},
+				},
+			},
+		}
+		cmd, args := r.backupCommandAndArgs(sb)
+		if len(cmd) != 2 || cmd[0] != "bash" || cmd[1] != "-c" {
+			t.Fatalf("expected [bash -c], got %v", cmd)
+		}
+		if len(args) != 1 {
+			t.Fatalf("expected one script arg, got %d", len(args))
+		}
+		script := args[0]
+		for _, want := range []string{
+			"bench ", "backup", "boto3", "upload_file",
+			"/home/frappe/frappe-bench/sites/s1.local/private/vyogo-backups/bk1/database.sql.gz",
+			"s1.local/bk1/database.sql.gz",
+		} {
+			if !strings.Contains(script, want) {
+				t.Errorf("script missing %q\n---\n%s", want, script)
+			}
+		}
+		// upload path must be relocated off private/backups
+		if strings.Contains(script, "private/backups/bk1/database.sql.gz") {
+			t.Errorf("upload local path not relocated to vyogo-backups:\n%s", script)
+		}
+		// S3 env should resolve keys from the secret
+		env := backupS3Env(sb.Spec.Storage.S3)
+		var gotBucket, gotAccessFrom bool
+		for _, e := range env {
+			if e.Name == "S3_BUCKET" && e.Value == "backups" {
+				gotBucket = true
+			}
+			if e.Name == "S3_ACCESS_KEY" && e.ValueFrom != nil && e.ValueFrom.SecretKeyRef != nil && e.ValueFrom.SecretKeyRef.Name == "s3-creds" {
+				gotAccessFrom = true
+			}
+		}
+		if !gotBucket || !gotAccessFrom {
+			t.Errorf("S3 env incomplete: bucket=%v accessFromSecret=%v", gotBucket, gotAccessFrom)
+		}
+	})
 }
 
 func TestSiteBackupReconciler_buildBackupJob(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(batchv1.AddToScheme(scheme))
-	utilruntime.Must(vyogotechv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	r := &SiteBackupReconciler{Scheme: scheme}
-	siteBackup := &vyogotechv1alpha1.SiteBackup{
+	siteBackup := &vyogotechv1.SiteBackup{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-backup", Namespace: "default"},
-		Spec:       vyogotechv1alpha1.SiteBackupSpec{Site: "site.local"},
+		Spec:       vyogotechv1.SiteBackupSpec{Site: "site.local"},
 	}
-	bench := &vyogotechv1alpha1.FrappeBench{
+	bench := &vyogotechv1.FrappeBench{
 		ObjectMeta: metav1.ObjectMeta{Name: "bench", Namespace: "default"},
-		Spec:       vyogotechv1alpha1.FrappeBenchSpec{FrappeVersion: "15"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
 	}
-	job := r.buildBackupJob(siteBackup, bench)
+	job := r.buildBackupJob(context.Background(), siteBackup, bench)
 	if job.Name != "my-backup-backup" || job.Namespace != "default" {
 		t.Errorf("job name/ns: got %s/%s", job.Name, job.Namespace)
 	}
@@ -151,19 +264,19 @@ func TestSiteBackupReconciler_buildBackupJob(t *testing.T) {
 
 func TestSiteBackupReconciler_updateSiteBackupStatus(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = vyogotechv1alpha1.AddToScheme(scheme)
-	siteBackup := &vyogotechv1alpha1.SiteBackup{
+	_ = vyogotechv1.AddToScheme(scheme)
+	siteBackup := &vyogotechv1.SiteBackup{
 		ObjectMeta: metav1.ObjectMeta{Name: "sb", Namespace: "default"},
-		Spec:       vyogotechv1alpha1.SiteBackupSpec{Site: "site.local"},
+		Spec:       vyogotechv1.SiteBackupSpec{Site: "site.local"},
 	}
-	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteBackup).WithStatusSubresource(&vyogotechv1alpha1.SiteBackup{}).Build()
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteBackup).WithStatusSubresource(&vyogotechv1.SiteBackup{}).Build()
 	r := &SiteBackupReconciler{Client: client}
 	ctx := context.Background()
 	err := r.updateSiteBackupStatus(ctx, siteBackup, "Running", "Backup in progress", "sb-backup")
 	if err != nil {
 		t.Fatalf("updateSiteBackupStatus: %v", err)
 	}
-	updated := &vyogotechv1alpha1.SiteBackup{}
+	updated := &vyogotechv1.SiteBackup{}
 	if err := client.Get(ctx, types.NamespacedName{Name: "sb", Namespace: "default"}, updated); err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -176,44 +289,44 @@ var _ = Describe("SiteBackup Controller", func() {
 	var (
 		ctx        context.Context
 		reconciler *SiteBackupReconciler
-		siteBackup *vyogotechv1alpha1.SiteBackup
-		site       *vyogotechv1alpha1.FrappeSite
-		bench      *vyogotechv1alpha1.FrappeBench
+		siteBackup *vyogotechv1.SiteBackup
+		site       *vyogotechv1.FrappeSite
+		bench      *vyogotechv1.FrappeBench
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		bench = &vyogotechv1alpha1.FrappeBench{
+		bench = &vyogotechv1.FrappeBench{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-bench",
 				Namespace: "default",
 			},
-			Spec: vyogotechv1alpha1.FrappeBenchSpec{
+			Spec: vyogotechv1.FrappeBenchSpec{
 				FrappeVersion: "15",
 			},
 		}
 
-		site = &vyogotechv1alpha1.FrappeSite{
+		site = &vyogotechv1.FrappeSite{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-site",
 				Namespace: "default",
 			},
-			Spec: vyogotechv1alpha1.FrappeSiteSpec{
+			Spec: vyogotechv1.FrappeSiteSpec{
 				SiteName: "test-site.local",
-				BenchRef: &vyogotechv1alpha1.NamespacedName{
+				BenchRef: &vyogotechv1.NamespacedName{
 					Name:      bench.Name,
 					Namespace: bench.Namespace,
 				},
 			},
 		}
 
-		siteBackup = &vyogotechv1alpha1.SiteBackup{
+		siteBackup = &vyogotechv1.SiteBackup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-backup",
 				Namespace: "default",
 			},
-			Spec: vyogotechv1alpha1.SiteBackupSpec{
+			Spec: vyogotechv1.SiteBackupSpec{
 				Site: "test-site.local",
 			},
 		}
@@ -226,13 +339,17 @@ var _ = Describe("SiteBackup Controller", func() {
 		// Create bench and site
 		Expect(k8sClient.Create(ctx, bench)).To(Succeed())
 		Expect(k8sClient.Create(ctx, site)).To(Succeed())
+
+		// Mock site status to Ready
+		site.Status.Phase = vyogotechv1.FrappeSitePhaseReady
+		Expect(k8sClient.Status().Update(ctx, site)).To(Succeed())
 	})
 
 	AfterEach(func() {
 		// Clean up
-		k8sClient.Delete(ctx, siteBackup)
-		k8sClient.Delete(ctx, site)
-		k8sClient.Delete(ctx, bench)
+		_ = k8sClient.Delete(ctx, siteBackup)
+		_ = k8sClient.Delete(ctx, site)
+		_ = k8sClient.Delete(ctx, bench)
 	})
 
 	Context("One-time backup", func() {

@@ -30,17 +30,17 @@ type: Opaque
 stringData:
   password: admin
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: e2e-test-bench
   namespace: frappe
 spec:
   frappeVersion: "version-15"
-  # rmallam image (includes frappe + erpnext; amd64)
+  # vyogotech image (includes frappe + erpnext; amd64)
   imageConfig:
-    repository: ghcr.io/rmallam/frappe_docker
-    tag: sha-3db38eb
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-15
     pullPolicy: IfNotPresent
   apps:
     - name: erpnext
@@ -62,7 +62,7 @@ spec:
     labels:
       e2e-custom-label: verified
 ---
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: e2e-test-site

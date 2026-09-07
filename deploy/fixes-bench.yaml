@@ -1,38 +1,48 @@
-apiVersion: vyogo.tech/v1alpha1
+apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
-  name: bench-test
+  name: central-bench
   namespace: frappe
 spec:
   frappeVersion: "15.0.0"
   imageConfig:
-    repository: ghcr.io/vyogotech/frappe_base
-    tag: latest
+    repository: ghcr.io/atxinvox/central-site
+    tag: v3.1.0
     pullPolicy: Always
+    pullSecrets:
+      - name: ghcr-secret
   storageSize: 2Gi
 
+  # Apps to install
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image
+
+  # Component replicas (minimal for development)
   componentAutoscaling:
     gunicorn:
-      enabled: false # Static replicas
+      enabled: false
       staticReplicas: 1
-    
     nginx:
-      enabled: false # Static replicas
+      enabled: false
       staticReplicas: 1
-    
+    socketio:
+      enabled: false
+      staticReplicas: 1
+    scheduler:
+      enabled: false
+      staticReplicas: 0
     worker-default:
-      enabled: false # Static replicas
-      staticReplicas: 0
-    
+      enabled: false
+      staticReplicas: 1
     worker-short:
-      enabled: false # Static replicas
+      enabled: false
       staticReplicas: 0
-    
     worker-long:
       enabled: false
       staticReplicas: 0
-      
-    socketio:
-      enabled: false
-      staticReplicas: 0
-
+  podConfig:
+    labels:
+      e2e-custom-label: verified

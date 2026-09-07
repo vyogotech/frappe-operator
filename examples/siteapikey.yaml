@@ -1,0 +1,10 @@
+apiVersion: vyogo.tech/v1
+kind: SiteAPIKey
+metadata:
+  name: admin-api-key
+  namespace: default
+spec:
+  siteRef:
+    name: central-site-25mar2026
+  user: Administrator
+  secretName: admin-api-key-secret

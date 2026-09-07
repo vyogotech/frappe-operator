@@ -10,8 +10,13 @@ permissions:
   packages: write
 
 jobs:
+  e2e-tests:
+    name: Run E2E Tests Before Release
+    uses: ./.github/workflows/e2e-upgrades.yml
+
   build-and-release:
     name: Build and Release
+    needs: e2e-tests
     runs-on: ubuntu-latest
     
     steps:
@@ -61,12 +66,9 @@ jobs:
         run: |
           mkdir -p dist
           make manifests
-          # Create consolidated install.yaml
-          cat config/crd/bases/*.yaml > dist/install.yaml
-          echo "---" >> dist/install.yaml
-          cat config/rbac/*.yaml >> dist/install.yaml
-          echo "---" >> dist/install.yaml  
-          cat config/manager/manager.yaml >> dist/install.yaml
+          make kustomize
+          # Create consolidated install.yaml using native kustomize
+          ./bin/kustomize build config/default > dist/install.yaml
           
           # Create manifest archive
           tar czf dist/manifests-${{ steps.version.outputs.VERSION }}.tar.gz -C config .
@@ -105,7 +107,13 @@ jobs:
           
           #### Using Helm
           ```bash
-          helm install frappe-operator oci://ghcr.io/${{ github.repository }}/helm/frappe-operator --version ${{ steps.version.outputs.VERSION }}
+          helm repo add frappe-operator https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/helm-repo
+          helm install frappe-operator frappe-operator/frappe-operator --version ${{ steps.version.outputs.VERSION }}
+          ```
+          
+          #### Using Operator Lifecycle Manager (OLM)
+          ```bash
+          kubectl create -f https://operatorhub.io/install/frappe-operator.yaml
           ```
           
           ### Docker Image Platforms
@@ -130,4 +138,120 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # DISABLED as of v4.2.0: Frappe Operator is now licensed under the Elastic
+  # License 2.0 (source-available, NOT an OSI-approved open-source license).
+  # OperatorHub / k8s-operatorhub community-operators only accepts open-source
+  # operators, so submitting the bundle there is no longer applicable and would
+  # be rejected. Left in place (guarded off) rather than deleted; re-enable only
+  # if the project ever returns to an OSI open-source license.
+  submit-to-operatorhub:
+    if: false
+    name: Submit OLM Bundle to OperatorHub
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Get Fork Owner Username
+        id: fork_owner
+        env:
+          GH_TOKEN: ${{ secrets.COMMUNITY_OP_PAT }}
+        run: |
+          echo "USER=$(gh api user --jq .login)" >> $GITHUB_OUTPUT
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+
+      - name: Install Operator SDK
+        run: |
+          export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
+          export OS=$(uname | awk '{print tolower($0)}')
+          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.34.1
+          curl -LO ${OPERATOR_SDK_DL_URL}/operator-sdk_${OS}_${ARCH}
+          chmod +x operator-sdk_${OS}_${ARCH} && sudo mv operator-sdk_${OS}_${ARCH} /usr/local/bin/operator-sdk
+
+      - name: Fetch all tags
+        run: git fetch --tags --force
+
+      - name: Generate OLM Bundle
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          PREVIOUS_VERSION=$(git tag -l "v*" --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^v${{ steps.version.outputs.VERSION }}$" | head -n 1 | sed 's/^v//')
+          export PREVIOUS_VERSION
+          
+          make manifests
+          make bundle VERSION=${{ steps.version.outputs.VERSION }} IMG=ghcr.io/${{ github.repository }}:v${{ steps.version.outputs.VERSION }}
+          
+          # Inject containerImage annotation and replaces upgrade path required by OperatorHub
+          python3 -c "
+          import os
+          path = 'bundle/manifests/frappe-operator.clusterserviceversion.yaml'
+          with open(path, 'r') as f:
+              content = f.read()
+          
+          # Inject containerImage annotation
+          target_ann = '  annotations:\n'
+          replacement_ann = f'  annotations:\n    containerImage: ghcr.io/vyogotech/frappe-operator:v{os.environ[\"VERSION\"]}\n'
+          content = content.replace(target_ann, replacement_ann, 1)
+          
+          # Inject replaces field if previous version exists
+          prev = os.environ.get('PREVIOUS_VERSION')
+          if prev:
+              target_spec = 'spec:\n'
+              replacement_spec = f'spec:\n  replaces: frappe-operator.v{prev}\n'
+              content = content.replace(target_spec, replacement_spec, 1)
+              
+          with open(path, 'w') as f:
+              f.write(content)
+          "
+
+      - name: Fork and Clone Community Operators Repository
+        env:
+          GH_TOKEN: ${{ secrets.COMMUNITY_OP_PAT }}
+        run: |
+          # Configure Git to use PAT for authentication
+          git config --global url."https://x-access-token:${{ secrets.COMMUNITY_OP_PAT }}@github.com/".insteadOf "https://github.com/"
+          
+          # Fork (if not already forked) and clone the repository
+          gh repo fork k8s-operatorhub/community-operators --clone
+          cd community-operators
+
+          # Add upstream (tolerating if it already exists) and sync the fork's main branch with upstream main
+          git remote add upstream https://github.com/k8s-operatorhub/community-operators.git || true
+          git fetch upstream
+          git checkout main
+          git reset --hard upstream/main
+          git push origin main --force
+          
+          # Create directory for the new operator version
+          OPERATOR_DIR="operators/frappe-operator/${{ steps.version.outputs.VERSION }}"
+          mkdir -p "$OPERATOR_DIR"
+          
+          # Copy our local OLM bundle files into the cloned repository
+          cp -r ../bundle/* "$OPERATOR_DIR/"
+          
+          # Create new branch, commit, and push to your fork
+          git checkout -b frappe-operator-${{ steps.version.outputs.VERSION }}
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Update frappe-operator to ${{ steps.version.outputs.VERSION }}"
+          git push origin frappe-operator-${{ steps.version.outputs.VERSION }} --force
+          
+          # Open Pull Request targeting the community-operators master/main branch
+          gh pr create \
+            --repo k8s-operatorhub/community-operators \
+            --title "Update frappe-operator to v${{ steps.version.outputs.VERSION }}" \
+            --body "Automated release update for frappe-operator version ${{ steps.version.outputs.VERSION }}." \
+            --head "${{ steps.fork_owner.outputs.USER }}:frappe-operator-${{ steps.version.outputs.VERSION }}" \
+            --base main || echo "Pull Request already exists or could not be created."
 

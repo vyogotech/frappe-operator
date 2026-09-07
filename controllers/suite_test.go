@@ -31,7 +31,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	vyogotechv1alpha1 "github.com/vyogotech/frappe-operator/api/v1alpha1"
+	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -65,7 +65,7 @@ func init() {
 	binPath := filepath.Join(cwd, "..", "bin", "k8s")
 
 	// Try to find any etcd in bin/k8s subdirectories
-	filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(binPath, func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.Name() == "etcd" && !info.IsDir() {
 			os.Setenv("KUBEBUILDER_ASSETS", filepath.Dir(path))
 			skipControllerTests = false
@@ -119,7 +119,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = vyogotechv1alpha1.AddToScheme(scheme.Scheme)
+	err = vyogotechv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme

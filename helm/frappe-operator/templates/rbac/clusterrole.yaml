@@ -6,20 +6,16 @@ metadata:
   labels:
     {{- include "frappe-operator.labels" . | nindent 4 }}
 rules:
-# Frappe CRDs
+# Frappe/Site CRDs — grant the ENTIRE vyogo.tech API group. This operator is the
+# controller for every vyogo.tech kind (and their /status + /finalizers
+# subresources), so "*" is correct and, crucially, drift-proof: the previous
+# hand-listed set went stale as new CRDs/controllers were added (sitedomains,
+# sitecrons, siteuserpermissions, ...) and the manager crash-looped being unable
+# to list them at cluster scope.
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappebenches
-  - frappesites
-  - frappeworkpaces
-  - sitebackups
-  - siterestores
-  - sitedashboards
-  - sitedashboardcharts
-  - sitejobs
-  - siteusers
-  - siteworkspaces
+  - "*"
   verbs:
   - create
   - delete
@@ -28,31 +24,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - frappebenches/finalizers
-  - frappesites/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - frappebenches/status
-  - frappesites/status
-  - sitebackups/status
-  - siterestores/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - vyogo.tech
-  resources:
-  - sitebackups/finalizers
-  - siterestores/finalizers
-  verbs:
-  - update
 
 # Core Kubernetes resources
 - apiGroups:
@@ -60,8 +31,10 @@ rules:
   resources:
   - configmaps
   - events
+  - limitranges
   - persistentvolumeclaims
   - pods
+  - resourcequotas
   - secrets
   - services
   verbs:

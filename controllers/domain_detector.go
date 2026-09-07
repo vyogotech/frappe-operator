@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -39,6 +41,13 @@ func (d *DomainDetector) DetectDomainSuffix(ctx context.Context, namespace strin
 		return "", fmt.Errorf("nil Kubernetes client for DomainDetector")
 	}
 	logger := log.FromContext(ctx)
+
+	// On OpenShift the router's wildcard domain is authoritative, and no
+	// nginx/traefik Service exists to infer it from.
+	if suffix := d.detectOpenShiftAppsDomain(ctx); suffix != "" {
+		logger.Info("Detected domain suffix from OpenShift cluster ingress config", "suffix", suffix)
+		return suffix, nil
+	}
 
 	// Common Ingress Controller service names and namespaces
 	ingressServices := []types.NamespacedName{
@@ -82,6 +91,26 @@ func (d *DomainDetector) DetectDomainSuffix(ctx context.Context, namespace strin
 
 	logger.V(1).Info("Could not auto-detect domain suffix")
 	return "", fmt.Errorf("no domain suffix detected from Ingress Controller services")
+}
+
+// detectOpenShiftAppsDomain reads the wildcard domain the OpenShift router serves
+// (ingresses.config.openshift.io/cluster). Returns "" on any non-OpenShift cluster.
+func (d *DomainDetector) detectOpenShiftAppsDomain(ctx context.Context) string {
+	ingressConfig := &unstructured.Unstructured{}
+	ingressConfig.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "config.openshift.io",
+		Version: "v1",
+		Kind:    "Ingress",
+	})
+	if err := d.Client.Get(ctx, types.NamespacedName{Name: "cluster"}, ingressConfig); err != nil {
+		return ""
+	}
+
+	domain, found, err := unstructured.NestedString(ingressConfig.Object, "spec", "domain")
+	if err != nil || !found || domain == "" {
+		return ""
+	}
+	return "." + strings.TrimPrefix(domain, ".")
 }
 
 // extractDomainSuffix extracts a domain suffix from a hostname
