@@ -81,7 +81,7 @@ jobs:
         run: |
           mkdir -p docs/helm-repo
           echo "🔍 Fetching previous index.yaml from the gh-pages branch to merge..."
-          git fetch origin gh-pages
+          git fetch origin gh-pages 2>/dev/null || true
           if git cat-file -e origin/gh-pages:helm-repo/index.yaml 2>/dev/null; then
             git show origin/gh-pages:helm-repo/index.yaml > docs/helm-repo/index.yaml
             echo "✅ Found previous index.yaml in gh-pages branch"

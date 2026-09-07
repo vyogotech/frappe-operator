@@ -50,5 +50,12 @@ if [ -f "install.yaml" ]; then
     rm -f install.yaml.bak
 fi
 
+# 6. Update Dockerfile ARG VERSION
+if [ -f "Dockerfile" ]; then
+    echo "Updating Dockerfile ARG VERSION..."
+    sed -i.bak -e "s/^ARG VERSION=.*/ARG VERSION=\"$V_VERSION\"/" Dockerfile
+    rm -f Dockerfile.bak
+fi
+
 echo "✅ Version bump complete!"
 echo "Check your git diff, then run 'make manifests' or 'make bundle' (if using OLM) to ensure everything is generated cleanly."
