@@ -78,6 +78,17 @@ spec:
           capabilities:
             drop:
               - "ALL"
+        env:
+        - name: RELATED_IMAGE_FRAPPE_BENCH_V15
+          value: frappe/erpnext:version-15
+        - name: RELATED_IMAGE_FRAPPE_BENCH_V14
+          value: frappe/erpnext:version-14
+        - name: RELATED_IMAGE_MARIADB
+          value: mariadb:10.6
+        - name: RELATED_IMAGE_REDIS
+          value: redis:7.0-alpine
+        - name: RELATED_IMAGE_UTILITY_UBI
+          value: registry.access.redhat.com/ubi9/ubi-minimal:latest
         livenessProbe:
           httpGet:
             path: /healthz

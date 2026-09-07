@@ -4,25 +4,28 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
-  name: siteusers.vyogo.tech
+  name: siteclientscripts.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: SiteUser
-    listKind: SiteUserList
-    plural: siteusers
-    singular: siteuser
+    kind: SiteClientScript
+    listKind: SiteClientScriptList
+    plural: siteclientscripts
+    singular: siteclientscript
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.phase
-      name: Phase
-      type: string
-    - jsonPath: .spec.email
-      name: Email
-      type: string
     - jsonPath: .spec.siteRef.name
       name: Site
+      type: string
+    - jsonPath: .spec.dt
+      name: DocType
+      type: string
+    - jsonPath: .spec.enabled
+      name: Enabled
+      type: boolean
+    - jsonPath: .status.phase
+      name: Status
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -30,7 +33,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: SiteUser is the Schema for the siteusers API
+        description: SiteClientScript is the Schema for the siteclientscripts API
         properties:
           apiVersion:
             description: |-
@@ -50,43 +53,21 @@ spec:
           metadata:
             type: object
           spec:
-            description: SiteUserSpec defines the desired state of SiteUser
+            description: SiteClientScriptSpec defines the desired state of SiteClientScript
             properties:
-              apiKeySecretRef:
-                description: APIKeySecretRef specifies an optional Secret to store
-                  the auto-generated API Key and API Secret.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              email:
-                description: Email specifies the user's primary email address (acts
-                  as Frappe User name).
-                minLength: 3
+              dt:
+                description: DT specifies the target DocType for the JavaScript client
+                  script.
+                minLength: 1
                 type: string
-              firstName:
-                description: FirstName specifies the user's first name.
-                type: string
-              lastName:
-                description: LastName specifies the user's last name.
-                type: string
-              roles:
-                description: Roles lists the Frappe roles to assign to this user.
-                items:
-                  type: string
-                type: array
-              sendPasswordReset:
-                description: SendPasswordReset determines whether to trigger a password
-                  reset email upon creation.
+              enabled:
+                default: true
+                description: Enabled specifies whether the client script is enabled.
+                  Defaults to true.
                 type: boolean
+              script:
+                description: Script specifies the JavaScript client script.
+                type: string
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
                 properties:
@@ -99,31 +80,17 @@ spec:
                 required:
                 - name
                 type: object
-              userType:
-                default: System User
-                description: UserType specifies "System User" or "Website User". Defaults
-                  to "System User".
-                type: string
             required:
-            - email
-            - firstName
+            - dt
+            - script
             - siteRef
             type: object
           status:
-            description: SiteUserStatus defines the observed state of SiteUser
+            description: SiteClientScriptStatus defines the observed state of SiteClientScript
             properties:
-              apiKeysGenerated:
-                description: APIKeysGenerated indicates whether Frappe API keys were
-                  generated and exported to the Secret.
-                type: boolean
-              assignedRoles:
-                description: AssignedRoles lists the roles currently assigned in Frappe.
-                items:
-                  type: string
-                type: array
               conditions:
-                description: Conditions represent the latest available observations
-                  of the SiteUser's state.
+                description: Conditions represents the latest available observations
+                  of the resource state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -185,12 +152,8 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current state of the SiteUser (Pending,
-                  Provisioning, Ready, Failed).
-                type: string
-              secretName:
-                description: SecretName stores the name of the Secret holding the
-                  API key/secret.
+                description: Phase represents the current state of the SiteClientScript
+                  (Pending, Ready, Failed).
                 type: string
             type: object
         type: object

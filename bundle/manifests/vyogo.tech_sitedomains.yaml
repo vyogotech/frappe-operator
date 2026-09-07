@@ -4,22 +4,22 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
-  name: siteusers.vyogo.tech
+  name: sitedomains.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: SiteUser
-    listKind: SiteUserList
-    plural: siteusers
-    singular: siteuser
+    kind: SiteDomain
+    listKind: SiteDomainList
+    plural: sitedomains
+    singular: sitedomain
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
       name: Phase
       type: string
-    - jsonPath: .spec.email
-      name: Email
+    - jsonPath: .spec.domain
+      name: Domain
       type: string
     - jsonPath: .spec.siteRef.name
       name: Site
@@ -30,7 +30,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: SiteUser is the Schema for the siteusers API
+        description: SiteDomain is the Schema for the sitedomains API
         properties:
           apiVersion:
             description: |-
@@ -50,42 +50,15 @@ spec:
           metadata:
             type: object
           spec:
-            description: SiteUserSpec defines the desired state of SiteUser
+            description: SiteDomainSpec defines the desired state of SiteDomain
             properties:
-              apiKeySecretRef:
-                description: APIKeySecretRef specifies an optional Secret to store
-                  the auto-generated API Key and API Secret.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              email:
-                description: Email specifies the user's primary email address (acts
-                  as Frappe User name).
+              domain:
+                description: Domain specifies the custom domain name (e.g. "erp.acmecorp.com").
                 minLength: 3
                 type: string
-              firstName:
-                description: FirstName specifies the user's first name.
-                type: string
-              lastName:
-                description: LastName specifies the user's last name.
-                type: string
-              roles:
-                description: Roles lists the Frappe roles to assign to this user.
-                items:
-                  type: string
-                type: array
-              sendPasswordReset:
-                description: SendPasswordReset determines whether to trigger a password
-                  reset email upon creation.
+              redirectPrimary:
+                description: RedirectPrimary determines whether to 301-redirect old
+                  site traffic to this custom domain.
                 type: boolean
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
@@ -99,31 +72,50 @@ spec:
                 required:
                 - name
                 type: object
-              userType:
-                default: System User
-                description: UserType specifies "System User" or "Website User". Defaults
-                  to "System User".
-                type: string
+              tls:
+                description: TLS defines cert-manager SSL/TLS certificate configuration.
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled determines whether to generate an automated
+                      TLS certificate.
+                    type: boolean
+                  issuerRef:
+                    description: IssuerRef references a cert-manager ClusterIssuer
+                      or Issuer.
+                    properties:
+                      apiGroup:
+                        description: |-
+                          APIGroup is the group for the resource being referenced.
+                          If APIGroup is not specified, the specified Kind must be in the core API group.
+                          For any other third-party types, APIGroup is required.
+                        type: string
+                      kind:
+                        description: Kind is the type of resource being referenced
+                        type: string
+                      name:
+                        description: Name is the name of resource being referenced
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  secretName:
+                    description: SecretName specifies the target K8s Secret to store
+                      the TLS cert/key.
+                    type: string
+                type: object
             required:
-            - email
-            - firstName
+            - domain
             - siteRef
             type: object
           status:
-            description: SiteUserStatus defines the observed state of SiteUser
+            description: SiteDomainStatus defines the observed state of SiteDomain
             properties:
-              apiKeysGenerated:
-                description: APIKeysGenerated indicates whether Frappe API keys were
-                  generated and exported to the Secret.
-                type: boolean
-              assignedRoles:
-                description: AssignedRoles lists the roles currently assigned in Frappe.
-                items:
-                  type: string
-                type: array
               conditions:
                 description: Conditions represent the latest available observations
-                  of the SiteUser's state.
+                  of the SiteDomain's state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -179,19 +171,27 @@ spec:
                   - type
                   type: object
                 type: array
+              dnsConfigured:
+                description: DNSConfigured indicates whether public DNS lookup resolves
+                  to the cluster ingress.
+                type: boolean
+              ingressName:
+                description: IngressName stores the name of the generated Kubernetes
+                  Ingress.
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent generation observed
                   by the controller.
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current state of the SiteUser (Pending,
+                description: Phase represents the current state (Pending, DNSUnreachable,
                   Provisioning, Ready, Failed).
                 type: string
-              secretName:
-                description: SecretName stores the name of the Secret holding the
-                  API key/secret.
-                type: string
+              tlsCertificateIssued:
+                description: TLSCertificateIssued indicates whether cert-manager issued
+                  a valid SSL cert.
+                type: boolean
             type: object
         type: object
     served: true

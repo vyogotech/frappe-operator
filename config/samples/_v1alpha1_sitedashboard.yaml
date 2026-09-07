@@ -9,4 +9,4 @@ metadata:
     app.kubernetes.io/created-by: frappe-operator
   name: sitedashboard-sample
 spec:
-  # TODO(user): Add fields here
+  description: "Executive ERP dashboard"

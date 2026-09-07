@@ -4,22 +4,22 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
-  name: siteusers.vyogo.tech
+  name: siteapps.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: SiteUser
-    listKind: SiteUserList
-    plural: siteusers
-    singular: siteuser
+    kind: SiteApp
+    listKind: SiteAppList
+    plural: siteapps
+    singular: siteapp
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
       name: Phase
       type: string
-    - jsonPath: .spec.email
-      name: Email
+    - jsonPath: .spec.appName
+      name: App
       type: string
     - jsonPath: .spec.siteRef.name
       name: Site
@@ -30,7 +30,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: SiteUser is the Schema for the siteusers API
+        description: SiteApp is the Schema for the siteapps API
         properties:
           apiVersion:
             description: |-
@@ -50,43 +50,59 @@ spec:
           metadata:
             type: object
           spec:
-            description: SiteUserSpec defines the desired state of SiteUser
+            description: SiteAppSpec defines the desired state of SiteApp
             properties:
-              apiKeySecretRef:
-                description: APIKeySecretRef specifies an optional Secret to store
-                  the auto-generated API Key and API Secret.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              email:
-                description: Email specifies the user's primary email address (acts
-                  as Frappe User name).
-                minLength: 3
+              appName:
+                description: AppName specifies the name of the Frappe Python module/app
+                  (e.g. "erpnext_australian_localisation").
+                minLength: 1
                 type: string
-              firstName:
-                description: FirstName specifies the user's first name.
-                type: string
-              lastName:
-                description: LastName specifies the user's last name.
-                type: string
-              roles:
-                description: Roles lists the Frappe roles to assign to this user.
-                items:
-                  type: string
-                type: array
-              sendPasswordReset:
-                description: SendPasswordReset determines whether to trigger a password
-                  reset email upon creation.
+              autoMigrate:
+                default: true
+                description: AutoMigrate determines whether to trigger database migration
+                  after app installation. Defaults to true.
                 type: boolean
+              backupBeforeInstall:
+                default: true
+                description: |-
+                  BackupBeforeInstall determines whether the operator takes a full backup of
+                  the site and waits for it to succeed before installing/upgrading the app.
+                  This creates a rollback point in case the install corrupts the site.
+                  Defaults to true; set false to skip (e.g. for throwaway sites).
+                type: boolean
+              fpmPackage:
+                description: |-
+                  FPMPackage, when set, installs the app from a prebuilt FPM package
+                  ("<org>/<app>==<version>", e.g. "frappe/wiki==3.0.0") instead of a runtime
+                  git clone. The package ships compiled assets + vendored wheels, so no
+                  yarn/pip build runs on the bench. This is the preferred path; GitRepo is the
+                  fallback for apps that have no published package.
+                type: string
+              fpmRepo:
+                description: |-
+                  FPMRepo is the FPM registry the package is resolved from — either an HTTP
+                  registry ("https://fpm.vyogo.tech") or an OCI registry
+                  ("ghcr.io/vyogotech/fpm", where the built packages live). Required
+                  alongside FPMPackage.
+                type: string
+              fpmRepoType:
+                description: |-
+                  FPMRepoType is the registry backend: "oci" or "http" (default "http").
+                  OCI registries (ghcr) hold the prod-built packages and are usually private,
+                  so credentials come from the "fpm-registry-auth" Secret (keys: username,
+                  token) in the site's namespace.
+                enum:
+                - http
+                - oci
+                type: string
+              gitBranch:
+                description: GitBranch specifies the Git branch or tag to clone (defaults
+                  to "main" or "master").
+                type: string
+              gitRepo:
+                description: GitRepo specifies an optional Git repository URL to dynamically
+                  fetch the app source code if not already in the bench.
+                type: string
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
                 properties:
@@ -99,31 +115,16 @@ spec:
                 required:
                 - name
                 type: object
-              userType:
-                default: System User
-                description: UserType specifies "System User" or "Website User". Defaults
-                  to "System User".
-                type: string
             required:
-            - email
-            - firstName
+            - appName
             - siteRef
             type: object
           status:
-            description: SiteUserStatus defines the observed state of SiteUser
+            description: SiteAppStatus defines the observed state of SiteApp
             properties:
-              apiKeysGenerated:
-                description: APIKeysGenerated indicates whether Frappe API keys were
-                  generated and exported to the Secret.
-                type: boolean
-              assignedRoles:
-                description: AssignedRoles lists the roles currently assigned in Frappe.
-                items:
-                  type: string
-                type: array
               conditions:
                 description: Conditions represent the latest available observations
-                  of the SiteUser's state.
+                  of the SiteApp's state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -179,18 +180,23 @@ spec:
                   - type
                   type: object
                 type: array
+              installedVersion:
+                description: InstalledVersion stores the version or commit of the
+                  installed app.
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent generation observed
                   by the controller.
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current state of the SiteUser (Pending,
-                  Provisioning, Ready, Failed).
+                description: Phase represents the current state of the SiteApp (Pending,
+                  Installing, Ready, Failed, Uninstalling).
                 type: string
-              secretName:
-                description: SecretName stores the name of the Secret holding the
-                  API key/secret.
+              preBackupRef:
+                description: |-
+                  PreBackupRef is the name of the SiteBackup taken before this install as a
+                  rollback point (set when backupBeforeInstall is enabled).
                 type: string
             type: object
         type: object

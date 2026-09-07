@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -51,6 +52,7 @@ type SiteDomainReconciler struct {
 
 	// Optional injected DNS lookup function for testing
 	DNSLookupFunc func(host string) ([]string, error)
+	IsOpenShift   bool
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitedomains,verbs=get;list;watch;create;update;patch;delete
@@ -305,7 +307,7 @@ func (r *SiteDomainReconciler) ensureFrappeDomainAlias(ctx context.Context, site
 		return err
 	}
 
-	job := r.domainAliasJob(siteDomain, site, jobName, false)
+	job := r.domainAliasJob(ctx, siteDomain, site, jobName, false)
 	_ = controllerutil.SetControllerReference(siteDomain, job, r.Scheme)
 	if err := r.Create(ctx, job); err != nil && !errors.IsAlreadyExists(err) {
 		return err
@@ -322,18 +324,17 @@ func (r *SiteDomainReconciler) cleanupFrappeDomainAlias(ctx context.Context, sit
 	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteDomain.Namespace}, existing); err == nil {
 		return
 	}
-	job := r.domainAliasJob(siteDomain, site, jobName, true)
+	job := r.domainAliasJob(ctx, siteDomain, site, jobName, true)
 	_ = r.Create(ctx, job)
 }
 
 // domainAliasJob builds the create-or-remove alias Job. It passes the site name
 // and domain as env vars (never interpolated into the shell) and rejects a domain
 // containing a path separator, so a hostile domain value cannot escape sites/.
-func (r *SiteDomainReconciler) domainAliasJob(siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite, jobName string, cleanup bool) *batchv1.Job {
+func (r *SiteDomainReconciler) domainAliasJob(ctx context.Context, siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite, jobName string, cleanup bool) *batchv1.Job {
 	pvcName := fmt.Sprintf("%s-sites", site.Spec.BenchRef.Name)
 	backoff := int32(4)
 	ttl := int32(600)
-	runAsUser := int64(1000)
 
 	script := `set -e
 case "$DOMAIN" in */*|..|"") echo "invalid domain: $DOMAIN"; exit 1;; esac
@@ -349,6 +350,18 @@ cd /sites
 if [ -L "$DOMAIN" ]; then rm -f "$DOMAIN"; echo "removed alias $DOMAIN"; else echo "no alias $DOMAIN"; fi`
 	}
 
+	podSec := PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, siteDomain.Namespace, nil)
+	containerSec := ContainerSecurityContextForBench(r.IsOpenShift, nil)
+
+	aliasImage := os.Getenv("UTILITY_IMAGE")
+	if aliasImage == "" {
+		if r.IsOpenShift {
+			aliasImage = "registry.access.redhat.com/ubi9/ubi-minimal:latest"
+		} else {
+			aliasImage = "busybox:1.36"
+		}
+	}
+
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -361,13 +374,14 @@ if [ -L "$DOMAIN" ]; then rm -f "$DOMAIN"; echo "removed alias $DOMAIN"; else ec
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyOnFailure,
-					SecurityContext: &corev1.PodSecurityContext{FSGroup: &runAsUser},
+					SecurityContext: podSec,
 					Containers: []corev1.Container{{
 						Name:    "alias",
-						Image:   "busybox:latest",
+						Image:   aliasImage,
 						Command: []string{"sh", "-c", script},
 						// Built without the bench in scope: the built-in maintenance sizing.
-						Resources: vyogotechv1.ResolveJobResources(nil, vyogotechv1.JobKindMaintenance),
+						Resources:       vyogotechv1.ResolveJobResources(nil, vyogotechv1.JobKindMaintenance),
+						SecurityContext: containerSec,
 						Env: []corev1.EnvVar{
 							{Name: "SITE_NAME", Value: site.Spec.SiteName},
 							{Name: "DOMAIN", Value: siteDomain.Spec.Domain},
