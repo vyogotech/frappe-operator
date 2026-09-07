@@ -91,7 +91,7 @@ func (r *SiteQuotaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Evaluate Quotas (Mock/Observed metrics)
-	currentDBSize := int64(120)   // 120 MB observed
+	currentDBSize := int64(120)  // 120 MB observed
 	currentStorage := int64(450) // 450 MB observed
 	currentUsers := int32(5)     // 5 active users
 

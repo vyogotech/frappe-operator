@@ -314,8 +314,9 @@ func (r *SiteRestoreReconciler) buildRestoreJob(ctx context.Context, siteRestore
 								}
 								return corev1.PullPolicy("")
 							}(),
-							Command: []string{"bash", "-c"},
-							Args:    []string{r.buildRestoreScript(siteRestore, withMariaDBRoot)},
+							Command:   []string{"bash", "-c"},
+							Args:      []string{r.buildRestoreScript(siteRestore, withMariaDBRoot)},
+							Resources: vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindRestore),
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",

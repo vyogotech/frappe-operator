@@ -256,6 +256,7 @@ psql -h "%s" -p "%s" -U "$(cat /tmp/creds/user)" -d postgres -c "DROP ROLE IF EX
 
 		container := resources.NewContainerBuilder("pg-delete", "postgres:15-alpine").
 			WithCommand("sh", "-c").
+			WithResources(vyogotechv1.ResolveJobResources(nil, vyogotechv1.JobKindMaintenance)).
 			WithArgs(script).
 			WithVolumeMount("creds", "/tmp/creds").
 			Build()
@@ -358,6 +359,7 @@ psql -h "%s" -p "%s" -U "$(cat /tmp/creds/user)" -d postgres -c "CREATE DATABASE
 
 		container := resources.NewContainerBuilder("pg-provision", "postgres:15-alpine").
 			WithCommand("sh", "-c").
+			WithResources(vyogotechv1.ResolveJobResources(nil, vyogotechv1.JobKindMaintenance)).
 			WithArgs(script).
 			WithVolumeMount("creds", "/tmp/creds").
 			Build()
@@ -543,6 +545,7 @@ SQL
 
 	container := resources.NewContainerBuilder("pg-configure", "postgres:16-alpine").
 		WithCommand("sh", "-c").
+		WithResources(vyogotechv1.ResolveJobResources(nil, vyogotechv1.JobKindMaintenance)).
 		WithArgs(script).
 		WithVolumeMount("super", "/tmp/super").
 		Build()

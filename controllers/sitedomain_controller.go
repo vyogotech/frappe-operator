@@ -366,6 +366,8 @@ if [ -L "$DOMAIN" ]; then rm -f "$DOMAIN"; echo "removed alias $DOMAIN"; else ec
 						Name:    "alias",
 						Image:   "busybox:latest",
 						Command: []string{"sh", "-c", script},
+						// Built without the bench in scope: the built-in maintenance sizing.
+						Resources: vyogotechv1.ResolveJobResources(nil, vyogotechv1.JobKindMaintenance),
 						Env: []corev1.EnvVar{
 							{Name: "SITE_NAME", Value: site.Spec.SiteName},
 							{Name: "DOMAIN", Value: siteDomain.Spec.Domain},

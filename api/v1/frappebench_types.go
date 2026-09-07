@@ -33,6 +33,13 @@ type FrappeBenchSpec struct {
 	// +optional
 	ComponentResources *ComponentResources `json:"componentResources,omitempty"`
 
+	// JobResources sizes the one-off Jobs the operator runs for this bench and
+	// its sites (init, app install, backup, restore, migration, cron,
+	// maintenance). Unset entries fall back to the operator's built-in sizing;
+	// no Job ever runs without requests and limits.
+	// +optional
+	JobResources *JobResources `json:"jobResources,omitempty"`
+
 	// RedisConfig defines Redis/Dragonfly configuration
 	// +optional
 	RedisConfig *RedisConfig `json:"redisConfig,omitempty"`
