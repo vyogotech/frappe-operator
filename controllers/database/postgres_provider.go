@@ -598,10 +598,16 @@ func (p *PostgresProvider) generatePGUserName(site *vyogotechv1.FrappeSite) stri
 	return "u" + p.hashString(site.Namespace + "/" + site.Name)[:8]
 }
 
+// hashString is a stable 8-hex-character digest of s. It MUST be zero-padded:
+// generateDBName and generatePGUserName slice [:8], and an unpadded %x drops
+// leading zeros, so one site in sixteen (any whose FNV-32a starts with a zero
+// nibble) produced a 7-character hash and the reconciler panicked with
+// "slice bounds out of range [:8] with length 7" — the first Postgres site on
+// the v17 pool did exactly that. The MariaDB provider already pads.
 func (p *PostgresProvider) hashString(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
-	return fmt.Sprintf("%x", h.Sum32())
+	return fmt.Sprintf("%08x", h.Sum32())
 }
 
 func (p *PostgresProvider) sanitizeName(name string) string {
