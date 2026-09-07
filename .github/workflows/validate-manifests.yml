@@ -6,14 +6,24 @@ on:
       - 'examples/**'
       - 'deploy/**'
       - 'api/**'
-      - 'config/crd/**'
+      # All of config/, not just crd/: this job diffs install.yaml against
+      # `kustomize build config/default`, so a change under config/rbac/ or
+      # config/manager/ can put them out of sync just as easily.
+      - 'config/**'
+      - 'install.yaml'
+      - 'Makefile'
       - '.github/workflows/validate-manifests.yml'
   pull_request:
     paths:
       - 'examples/**'
       - 'deploy/**'
       - 'api/**'
-      - 'config/crd/**'
+      # All of config/, not just crd/: this job diffs install.yaml against
+      # `kustomize build config/default`, so a change under config/rbac/ or
+      # config/manager/ can put them out of sync just as easily.
+      - 'config/**'
+      - 'install.yaml'
+      - 'Makefile'
       - '.github/workflows/validate-manifests.yml'
 
 jobs:

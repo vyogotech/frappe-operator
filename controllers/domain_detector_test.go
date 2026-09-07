@@ -110,3 +110,38 @@ func TestDetectDomainSuffix_FromAnnotation(t *testing.T) {
 		t.Errorf("expected .example.com, got %q", suffix)
 	}
 }
+
+func TestCorrectUnroutableSiteName(t *testing.T) {
+	const suffix = ".apps.cluster-a.example.com"
+
+	tests := []struct {
+		name     string
+		siteName string
+		want     string
+		wantOK   bool
+	}{
+		{"bare label gets the cluster domain", "dev", "dev.apps.cluster-a.example.com", true},
+		{"reserved TLD is replaced", "dev.localhost", "dev.apps.cluster-a.example.com", true},
+		{"reserved TLD is matched case-insensitively", "dev.LOCAL", "dev.apps.cluster-a.example.com", true},
+		{"multi-label stem is preserved", "erp.acme.test", "erp.acme.apps.cluster-a.example.com", true},
+		{"real external domain is left alone", "erp.acme.com", "", false},
+		{"already on the cluster domain", "dev.apps.cluster-a.example.com", "", false},
+		{"empty siteName", "", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := correctUnroutableSiteName(tt.siteName, suffix)
+			if ok != tt.wantOK || got != tt.want {
+				t.Errorf("correctUnroutableSiteName(%q) = (%q, %v), want (%q, %v)",
+					tt.siteName, got, ok, tt.want, tt.wantOK)
+			}
+		})
+	}
+}
+
+func TestCorrectUnroutableSiteName_NoSuffix(t *testing.T) {
+	if _, ok := correctUnroutableSiteName("dev", ""); ok {
+		t.Error("expected no correction when the cluster domain is unknown")
+	}
+}

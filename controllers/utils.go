@@ -336,6 +336,36 @@ func getNamespaceMCSLabel(ctx context.Context, c client.Client, namespaceName st
 	return ""
 }
 
+// getNamespaceFSGroup returns the first GID of the namespace's OpenShift-allocated
+// range, for use as an explicit fsGroup. Leaving fsGroup unset only works when the
+// governing SCC uses the FSGroup MustRunAs strategy and injects one; under any more
+// permissive SCC nothing is injected, volumes stay root-owned, and the bench cannot
+// write to its sites directory. An in-range value is accepted by either kind of SCC.
+func getNamespaceFSGroup(ctx context.Context, c client.Client, namespaceName string) *int64 {
+	ns := &corev1.Namespace{}
+	if err := c.Get(ctx, types.NamespacedName{Name: namespaceName}, ns); err != nil {
+		return nil
+	}
+	if ns.Annotations == nil {
+		return nil
+	}
+
+	// OpenShift falls back to the UID range when no group range is annotated.
+	rangeSpec := ns.Annotations["openshift.io/sa.scc.supplemental-groups"]
+	if rangeSpec == "" {
+		rangeSpec = ns.Annotations["openshift.io/sa.scc.uid-range"]
+	}
+	if rangeSpec == "" {
+		return nil
+	}
+
+	start, err := strconv.ParseInt(strings.SplitN(rangeSpec, "/", 2)[0], 10, 64)
+	if err != nil {
+		return nil
+	}
+	return &start
+}
+
 // Helper functions for pointer types
 func boolPtr(b bool) *bool {
 	return &b

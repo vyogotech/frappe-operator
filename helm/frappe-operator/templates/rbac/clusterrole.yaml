@@ -101,6 +101,20 @@ rules:
   - list
   - watch
 
+# OpenShift cluster ingress config - the wildcard domain the router serves.
+# Without this the operator cannot resolve a site onto the cluster domain and
+# silently falls back to the raw siteName, producing an unroutable Route.
+# Keep in step with config/rbac/role.yaml; this chart's rules are maintained by
+# hand rather than generated from the kubebuilder markers.
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+
 # OpenShift Routes
 - apiGroups:
   - route.openshift.io

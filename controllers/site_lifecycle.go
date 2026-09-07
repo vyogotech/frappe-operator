@@ -170,6 +170,10 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
+		// The site directory keeps spec.SiteName: every other controller addresses
+		// the site by that name (bench --site, SITE_NAME, backup, restore,
+		// migration). When the resolved domain differs, Frappe is taught to answer
+		// on it with a sites/<domain> alias rather than by renaming the site.
 		"site_name":           []byte(site.Spec.SiteName),
 		"domain":              []byte(domain),
 		"admin_password":      []byte(adminPassword),
@@ -346,8 +350,19 @@ func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1.FrappeSite, ben
 	return config
 }
 
-// resolveDomain determines the final domain for the site with priority-based resolution
+// resolveDomain determines the final domain for the site with priority-based resolution.
+//
+// The returned domain names the Frappe site itself, not just the Route/Ingress host:
+// Frappe resolves incoming requests by matching the Host header against a directory
+// under sites/, so a host that differs from the site name is served a 404.
+//
+// Once a site has been provisioned the resolved domain is pinned, because the site
+// directory and its database name are both derived from it.
 func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench) (string, string) {
+	if site.Status.ResolvedDomain != "" && site.Status.Phase == vyogotechv1.FrappeSitePhaseReady {
+		return site.Status.ResolvedDomain, site.Status.DomainSource
+	}
+
 	if site.Spec.Domain != "" {
 		return site.Spec.Domain, "explicit"
 	}
@@ -366,12 +381,57 @@ func (r *FrappeSiteReconciler) resolveDomain(ctx context.Context, site *vyogotec
 		detector := &DomainDetector{Client: r.Client}
 		suffix, err := detector.DetectDomainSuffix(ctx, site.Namespace)
 		if err == nil && suffix != "" {
-			domain := site.Spec.SiteName + suffix
-			return domain, "auto-detected"
+			if corrected, ok := correctUnroutableSiteName(site.Spec.SiteName, suffix); ok {
+				if r.Recorder != nil {
+					r.Recorder.Event(site, corev1.EventTypeNormal, "DomainAutoCorrected",
+						fmt.Sprintf("siteName %q is not externally routable; using %q", site.Spec.SiteName, corrected))
+				}
+				return corrected, "auto-corrected"
+			}
+			return site.Spec.SiteName, "sitename-default"
 		}
 	}
 
 	return site.Spec.SiteName, "sitename-default"
+}
+
+// reservedTLDs never resolve in public DNS, so a siteName ending in one can only
+// have been a placeholder (RFC 2606 / RFC 6761).
+var reservedTLDs = []string{"localhost", "local", "internal", "test", "invalid", "example"}
+
+// correctUnroutableSiteName rewrites a siteName that provably cannot resolve — a bare
+// label, or one ending in a reserved TLD — onto the cluster's own domain. A name that
+// merely looks unfamiliar is left alone: it may be a real domain the user points at the
+// cluster with external DNS, which is not ours to second-guess.
+func correctUnroutableSiteName(siteName, suffix string) (string, bool) {
+	if siteName == "" || suffix == "" {
+		return "", false
+	}
+	if strings.HasSuffix(siteName, suffix) {
+		return "", false
+	}
+
+	labels := strings.Split(siteName, ".")
+	if len(labels) > 1 {
+		lastLabel := strings.ToLower(labels[len(labels)-1])
+		reserved := false
+		for _, tld := range reservedTLDs {
+			if lastLabel == tld {
+				reserved = true
+				break
+			}
+		}
+		if !reserved {
+			return "", false
+		}
+		labels = labels[:len(labels)-1]
+	}
+
+	stem := strings.Join(labels, ".")
+	if stem == "" {
+		return "", false
+	}
+	return stem + suffix, true
 }
 
 // getMariaDBRootCredentials retrieves root credentials for database operations

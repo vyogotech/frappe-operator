@@ -47,9 +47,9 @@ func PodSecurityContextForBench(ctx context.Context, c client.Client, isOpenShif
 		} else {
 			logger.Info("Namespace MCS label is empty, skipping SELinuxOptions")
 		}
-		secCtx.FSGroup = nil
+		secCtx.FSGroup = getNamespaceFSGroup(ctx, c, namespace)
 		secCtx.SupplementalGroups = nil
-		logger.Info("Using OpenShift defaults (no explicit FSGroup/SupplementalGroups due to SCC restricted-v2)")
+		logger.Info("Using OpenShift namespace-allocated FSGroup", "fsGroup", secCtx.FSGroup)
 	} else {
 		logger.V(1).Info("Not on OpenShift platform, skipping MCS label matching")
 	}

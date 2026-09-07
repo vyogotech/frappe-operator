@@ -52,6 +52,20 @@ jobs:
           # Print standard output for humans too
           $(go env GOPATH)/bin/golangci-lint run
 
+      # Without these assets controllers/suite_test.go sets skipControllerTests
+      # and every Ginkgo spec in the controllers package is skipped - including
+      # the fake-client ones that need no control plane - while the job still
+      # reports success. CI=true (set by Actions) makes that skip fatal.
+      - name: Set up envtest control plane
+        run: |
+          make envtest
+          ASSETS=$(./bin/setup-envtest use "${ENVTEST_K8S_VERSION}" --bin-dir ./bin -p path)
+          echo "Using envtest assets: ${ASSETS}"
+          test -x "${ASSETS}/etcd" || { echo "::error::etcd missing from envtest assets"; exit 1; }
+          echo "KUBEBUILDER_ASSETS=${ASSETS}" >> "$GITHUB_ENV"
+        env:
+          ENVTEST_K8S_VERSION: "1.26.0"
+
       - name: Run unit tests (Machine Readable)
         run: |
           gotestsum --format standard-verbose --jsonfile test-report.json -- -coverprofile=cover.out ./api/... ./pkg/... ./controllers/...
