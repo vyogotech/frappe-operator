@@ -153,10 +153,17 @@ func (r *FrappeBenchReconciler) getSchedulerResources(bench *vyogotechv1.FrappeB
 			Limits:   bench.Spec.ComponentResources.Scheduler.Limits,
 		}
 	}
+	// The scheduler enumerates every directory under sites/ and holds roughly
+	// 5MiB per site, so 128MiB was exhausted at about twenty sites - measured at
+	// 100MiB for 22 sites and 858MiB for 167. Requests are what the kube
+	// scheduler packs a node against, so understating this invites overcommit
+	// and eviction on a busy node. 256MiB covers a bench of ~30 sites; past
+	// that set spec.componentResources.scheduler explicitly, budgeting ~5MiB
+	// per site.
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("128Mi"),
+			corev1.ResourceMemory: resource.MustParse("256Mi"),
 		},
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("1"),
