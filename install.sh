@@ -137,6 +137,18 @@ echo -e "${YELLOW}Step 3: Installing Frappe Operator...${NC}"
 if [ -d "./helm/frappe-operator" ]; then
     CHART_PATH="./helm/frappe-operator"
     echo "Using local Helm chart from ./helm/frappe-operator"
+
+    # charts/*.tgz is covered by the *.tgz rule in .gitignore, so a fresh clone
+    # has Chart.yaml and Chart.lock but none of the subchart archives, and Helm
+    # refuses to install: "found in Chart.yaml, but missing in charts/".
+    # `build` (not `update`) fetches exactly the versions Chart.lock pins.
+    if ! ls "$CHART_PATH"/charts/*.tgz >/dev/null 2>&1; then
+        echo "Fetching chart dependencies (charts/ is not checked in)..."
+        if ! helm dependency build "$CHART_PATH"; then
+            echo -e "${RED}✗ Failed to fetch chart dependencies${NC}"
+            exit 1
+        fi
+    fi
 else
     # Try to use GitHub Pages Helm repository
     echo "Adding Helm repository..."

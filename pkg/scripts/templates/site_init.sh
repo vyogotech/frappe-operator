@@ -111,15 +111,35 @@ if os.path.exists(cache_json):
 " || echo "Warning: Failed to merge assets.json"
 fi
 
-# Create or update common_site_config.json BEFORE migration/initialization
-echo "Creating common_site_config.json..."
-cat > sites/common_site_config.json <<EOF
+# Ensure common_site_config.json exists BEFORE migration/initialization
+#
+# This file is bench-level, not site-level: it holds the bench's redis addresses
+# and socketio port, identical for every site on the bench, and bench_init.sh
+# already writes it when the bench is created. Rewriting it per site was pure
+# redundancy - and harmful, because every site on a bench shares it on one
+# ReadWriteMany volume and `cat >` truncates to zero before writing. A site
+# being created at the same time read the empty file and died with
+# "JSONDecodeError: Expecting value: line 1 column 1"; six of seventy sites
+# failed that way when provisioned together.
+#
+# So only write it when it is genuinely absent - a bench volume predating
+# bench_init writing it - and even then write via a temp file and rename, since
+# rename(2) is atomic within a directory and a concurrent reader must see either
+# the old file or the new one, never a partial one.
+if [ ! -s sites/common_site_config.json ]; then
+    echo "common_site_config.json missing, creating it..."
+    CSC_TMP="sites/.common_site_config.json.$$"
+    cat > "$CSC_TMP" <<EOF
 {
   "redis_cache": "redis://${REDIS_CACHE_ADDRESS}",
   "redis_queue": "redis://${REDIS_QUEUE_ADDRESS}",
   "socketio_port": 9000
 }
 EOF
+    mv -f "$CSC_TMP" sites/common_site_config.json
+else
+    echo "common_site_config.json present (written by bench init), leaving it alone"
+fi
 
 # Centralized function to intelligently merge site_config.json without destroying existing keys
 update_site_config_json() {
