@@ -147,6 +147,20 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	site := &vyogotechv1.FrappeSite{}
 	siteKey := types.NamespacedName{Name: siteApp.Spec.SiteRef.Name, Namespace: siteNamespace}
 	if err := r.Get(ctx, siteKey, site); err != nil {
+		if siteApp.DeletionTimestamp != nil && errors.IsNotFound(err) {
+			// The site is already gone, so there is nothing to uninstall the app
+			// FROM: the uninstall Job would fail forever ("site does not exist")
+			// and this CR would sit in Terminating behind its finalizer, which is
+			// exactly what deleting a site before its SiteApps used to leave
+			// behind - a dozen orphans per site. Release it.
+			if controllerutil.ContainsFinalizer(siteApp, siteAppFinalizer) {
+				controllerutil.RemoveFinalizer(siteApp, siteAppFinalizer)
+				if err := r.Update(ctx, siteApp); err != nil && !errors.IsNotFound(err) {
+					return ctrl.Result{}, err
+				}
+			}
+			return ctrl.Result{}, nil
+		}
 		siteApp.Status.Phase = "Pending"
 		r.setCondition(siteApp, metav1.Condition{
 			Type:    "SiteReady",

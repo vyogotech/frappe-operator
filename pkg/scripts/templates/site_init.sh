@@ -250,6 +250,22 @@ try:
     with open('/tmp/site-secrets/db_password', 'r') as f: db_password = f.read().strip()
     with open('/tmp/site-secrets/db_provider', 'r') as f: db_provider = f.read().strip()
 
+    if db_provider == 'postgres':
+        # Frappe hardcodes the public schema on Postgres. Without this branch a
+        # Postgres site always read "unknown", so a site directory left behind by
+        # a deleted site (deletionPolicy Retain keeps it) made the operator skip
+        # new-site and run migrate against the empty database the provisioner
+        # had just created - the site failed to initialise every time.
+        import psycopg2
+        db = psycopg2.connect(host=db_host, port=int(db_port), user=db_user, password=db_password, dbname=db_name)
+        cur = db.cursor()
+        cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tabInstalled Application'")
+        if cur.fetchone()[0] == 0:
+            print("false"); sys.exit(0)      # connected, table absent -> genuinely empty
+        cur.execute('SELECT COUNT(*) FROM "tabInstalled Application" WHERE app_name = %s', ('frappe',))
+        print("true" if cur.fetchone()[0] > 0 else "false")
+        sys.exit(0)
+
     if db_provider not in ('mariadb', 'external'):
         print("unknown"); sys.exit(0)
 
@@ -274,6 +290,23 @@ SITE_DIR="/home/frappe/frappe-bench/sites/$SITE_NAME"
 SITE_ALREADY_INITIALIZED="false"
 if [[ -f "$SITE_DIR/.init_complete" ]] || [[ -f "$SITE_DIR/site_config.json" ]]; then
     SITE_ALREADY_INITIALIZED="true"
+fi
+
+# A site directory whose database is CONFIRMED empty is stale, not evidence: it is
+# what a deleted site leaves behind (deletionPolicy Retain keeps the directory and
+# the database; if that database is later dropped or the server re-initialised, the
+# directory outlives it), and what a same-named site inherits when it is created
+# again. Skipping new-site here meant `bench migrate` against an empty schema and a
+# site that never left Provisioning. Only a DEFINITIVE "false" triggers this - an
+# "unknown" (transient DB error) still takes the conservative path below - and the
+# directory is moved aside, not deleted, so the old site's uploaded files survive.
+# Never during an explicit upgrade/skip, where the operator asserts the site exists.
+if [[ "$SITE_ALREADY_INITIALIZED" == "true" ]] && [[ "$DB_HAS_FRAPPE" == "false" ]] \
+   && [[ "$IS_UPGRADE" != "true" ]] && [[ "$SKIP_INIT" != "true" ]]; then
+    STALE_DIR="${SITE_DIR}.stale.$(date +%Y%m%d%H%M%S)"
+    echo "Warning: site directory $SITE_DIR exists but its database is confirmed empty - a site by this name was created before and its database is gone. Moving the directory to $STALE_DIR and creating the site fresh."
+    mv "$SITE_DIR" "$STALE_DIR"
+    SITE_ALREADY_INITIALIZED="false"
 fi
 
 # Decision — skip the destructive new-site whenever ANYTHING indicates the site already
