@@ -23,6 +23,7 @@ import (
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -207,3 +208,58 @@ func TestSiteDomainReconciler_BackendNameAndFrappeAlias(t *testing.T) {
 		t.Errorf("alias Job mount subPath = %q, want frappe-sites", sp)
 	}
 }
+
+func TestSiteDomainReconciler_SecurityContext_OpenShift(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(batchv1.AddToScheme(scheme))
+	utilruntime.Must(networkingv1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "tenant"},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			SiteName: "primary.domain.local",
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"},
+		},
+	}
+	sd := &vyogotechv1.SiteDomain{
+		ObjectMeta: metav1.ObjectMeta{Name: "sd1", Namespace: "tenant"},
+		Spec: vyogotechv1.SiteDomainSpec{
+			Domain:  "alias.domain.local",
+			SiteRef: &vyogotechv1.NamespacedName{Name: "site1"},
+		},
+	}
+
+	// Standard Kubernetes
+	rStd := &SiteDomainReconciler{
+		Client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme:      scheme,
+		IsOpenShift: false,
+	}
+	jobStd := rStd.domainAliasJob(context.Background(), sd, site, "test-alias-std", false)
+	if jobStd.Spec.Template.Spec.Containers[0].Image != "busybox:1.36" {
+		t.Errorf("expected busybox:1.36 for standard k8s, got %s", jobStd.Spec.Template.Spec.Containers[0].Image)
+	}
+	if jobStd.Spec.Template.Spec.SecurityContext.RunAsUser == nil || *jobStd.Spec.Template.Spec.SecurityContext.RunAsUser != 1000 {
+		t.Errorf("expected RunAsUser 1000 in standard k8s, got %v", jobStd.Spec.Template.Spec.SecurityContext.RunAsUser)
+	}
+
+	// OpenShift
+	rOcp := &SiteDomainReconciler{
+		Client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme:      scheme,
+		IsOpenShift: true,
+	}
+	jobOcp := rOcp.domainAliasJob(context.Background(), sd, site, "test-alias-ocp", false)
+	if jobOcp.Spec.Template.Spec.Containers[0].Image != "registry.access.redhat.com/ubi9/ubi-minimal:latest" {
+		t.Errorf("expected ubi-minimal for OpenShift, got %s", jobOcp.Spec.Template.Spec.Containers[0].Image)
+	}
+	if jobOcp.Spec.Template.Spec.SecurityContext.RunAsUser != nil {
+		t.Errorf("expected RunAsUser to be nil on OpenShift, got %v", *jobOcp.Spec.Template.Spec.SecurityContext.RunAsUser)
+	}
+	if jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser != nil {
+		t.Errorf("expected container RunAsUser to be nil on OpenShift, got %v", *jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser)
+	}
+}
+

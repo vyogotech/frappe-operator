@@ -16,7 +16,47 @@ resources:
     namespaced: true
   controller: true
   domain: vyogo.tech
+  kind: FrappeBench
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: vyogo.tech
   kind: FrappeSite
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: vyogo.tech
+  kind: SiteApp
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: vyogo.tech
+  kind: SiteDomain
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: vyogo.tech
+  kind: SiteMigration
+  path: github.com/vyogotech/frappe-operator/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: vyogo.tech
+  kind: SiteRestore
   path: github.com/vyogotech/frappe-operator/api/v1
   version: v1
 - api:

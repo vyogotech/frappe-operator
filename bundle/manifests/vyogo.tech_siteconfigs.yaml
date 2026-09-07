@@ -4,22 +4,19 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
-  name: siteusers.vyogo.tech
+  name: siteconfigs.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: SiteUser
-    listKind: SiteUserList
-    plural: siteusers
-    singular: siteuser
+    kind: SiteConfig
+    listKind: SiteConfigList
+    plural: siteconfigs
+    singular: siteconfig
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
       name: Phase
-      type: string
-    - jsonPath: .spec.email
-      name: Email
       type: string
     - jsonPath: .spec.siteRef.name
       name: Site
@@ -30,7 +27,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: SiteUser is the Schema for the siteusers API
+        description: SiteConfig is the Schema for the siteconfigs API
         properties:
           apiVersion:
             description: |-
@@ -50,11 +47,19 @@ spec:
           metadata:
             type: object
           spec:
-            description: SiteUserSpec defines the desired state of SiteUser
+            description: SiteConfigSpec defines the desired state of SiteConfig
             properties:
-              apiKeySecretRef:
-                description: APIKeySecretRef specifies an optional Secret to store
-                  the auto-generated API Key and API Secret.
+              customConfig:
+                additionalProperties:
+                  type: string
+                description: |-
+                  CustomConfig defines arbitrary key-value pairs to set in site_config.json.
+                  Values that parse as JSON (objects, arrays, numbers, booleans) are applied as such;
+                  everything else is applied as a string.
+                type: object
+              encryptionKeySecretRef:
+                description: EncryptionKeySecretRef specifies a K8s secret holding
+                  an encryption_key to inject into site_config.json.
                 properties:
                   name:
                     default: ""
@@ -67,26 +72,71 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              email:
-                description: Email specifies the user's primary email address (acts
-                  as Frappe User name).
-                minLength: 3
-                type: string
-              firstName:
-                description: FirstName specifies the user's first name.
-                type: string
-              lastName:
-                description: LastName specifies the user's last name.
-                type: string
-              roles:
-                description: Roles lists the Frappe roles to assign to this user.
-                items:
-                  type: string
-                type: array
-              sendPasswordReset:
-                description: SendPasswordReset determines whether to trigger a password
-                  reset email upon creation.
+              maintenanceMode:
+                description: MaintenanceMode determines whether maintenance mode is
+                  enabled for the site.
                 type: boolean
+              maxFileSize:
+                description: MaxFileSize specifies the maximum upload file size in
+                  bytes (max_file_size in site_config.json).
+                format: int64
+                type: integer
+              objectStorage:
+                description: |-
+                  ObjectStorage, when set, configures the site to offload File attachments to an
+                  S3-compatible object store via the cloud_storage app (baked into the bench image).
+                  The operator assembles the cloud_storage_settings block in site_config.json, sourcing
+                  the access key/secret from CredentialsSecretRef so they never appear in the CR.
+                properties:
+                  accessKeyKey:
+                    description: AccessKeyKey is the Secret key holding the access
+                      key. Defaults to "access_key".
+                    type: string
+                  bucket:
+                    description: Bucket is the S3 bucket name.
+                    type: string
+                  credentialsSecretRef:
+                    description: CredentialsSecretRef references a Secret holding
+                      the S3 credentials.
+                    properties:
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  endpointUrl:
+                    description: EndpointURL is the S3 endpoint (e.g. "https://s3.amazonaws.com",
+                      "http://minio:9000").
+                    type: string
+                  folder:
+                    description: |-
+                      Folder is the key prefix within the bucket. Defaults to the site name, giving each
+                      site its own prefix when a bucket is shared across tenants.
+                    type: string
+                  presignedUrlExpirySeconds:
+                    description: |-
+                      PresignedURLExpirySeconds is the TTL for presigned download URLs (cloud_storage
+                      "expiration"). Defaults to 120.
+                    format: int64
+                    type: integer
+                  region:
+                    description: Region is the S3 region (e.g. "us-east-1").
+                    type: string
+                  secretKeyKey:
+                    description: SecretKeyKey is the Secret key holding the secret
+                      key. Defaults to "secret".
+                    type: string
+                required:
+                - bucket
+                - credentialsSecretRef
+                - endpointUrl
+                type: object
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
                 properties:
@@ -99,31 +149,21 @@ spec:
                 required:
                 - name
                 type: object
-              userType:
-                default: System User
-                description: UserType specifies "System User" or "Website User". Defaults
-                  to "System User".
-                type: string
             required:
-            - email
-            - firstName
             - siteRef
             type: object
           status:
-            description: SiteUserStatus defines the observed state of SiteUser
+            description: SiteConfigStatus defines the observed state of SiteConfig
             properties:
-              apiKeysGenerated:
-                description: APIKeysGenerated indicates whether Frappe API keys were
-                  generated and exported to the Secret.
-                type: boolean
-              assignedRoles:
-                description: AssignedRoles lists the roles currently assigned in Frappe.
+              appliedKeys:
+                description: AppliedKeys lists the configuration keys successfully
+                  merged into site_config.json.
                 items:
                   type: string
                 type: array
               conditions:
                 description: Conditions represent the latest available observations
-                  of the SiteUser's state.
+                  of the SiteConfig's state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -185,12 +225,8 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current state of the SiteUser (Pending,
-                  Provisioning, Ready, Failed).
-                type: string
-              secretName:
-                description: SecretName stores the name of the Secret holding the
-                  API key/secret.
+                description: Phase represents the current state of the SiteConfig
+                  (Pending, Ready, Failed).
                 type: string
             type: object
         type: object

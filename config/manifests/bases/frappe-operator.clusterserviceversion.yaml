@@ -46,12 +46,79 @@ metadata:
       "frappe-operator"}, "name": "siteworkspace-sample"}, "spec": null}]'
     capabilities: Basic Install
     categories: Application Runtime,Database
+    features.operators.openshift.io/disconnected-compliant: "true"
+    features.operators.openshift.io/fips-compliant: "false"
+    features.operators.openshift.io/proxy-aware: "false"
+    olm.openShiftVersions: 4.12-4.18
+    olm.targetNamespaces: frappe-operator-system
+    operatorframework.io/suggested-namespace: frappe-operator-system
   name: frappe-operator.v0.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: Manages Frappe site API keys and secrets for programmatic access.
+      displayName: Site API Key
+      kind: SiteAPIKey
+      name: siteapikeys.vyogo.tech
+      version: v1
+    - description: Manages custom client-side JavaScript extensions in Frappe Desk.
+      displayName: Site Client Script
+      kind: SiteClientScript
+      name: siteclientscripts.vyogo.tech
+      version: v1
+    - description: Manages Frappe site configuration variables and maintenance modes.
+      displayName: Site Config
+      kind: SiteConfig
+      name: siteconfigs.vyogo.tech
+      version: v1
+    - description: Manages scheduled cron jobs and periodic bench method execution.
+      displayName: Site Cron
+      kind: SiteCron
+      name: sitecrons.vyogo.tech
+      version: v1
+    - description: Manages Frappe DocType custom fields declaratively.
+      displayName: Site Custom Field
+      kind: SiteCustomField
+      name: sitecustomfields.vyogo.tech
+      version: v1
+    - description: Manages Frappe DocType property overrides declaratively.
+      displayName: Site Property Setter
+      kind: SitePropertySetter
+      name: sitepropertysetters.vyogo.tech
+      version: v1
+    - description: Enforces storage, site, and resource quotas across Frappe sites.
+      displayName: Site Quota
+      kind: SiteQuota
+      name: sitequotas.vyogo.tech
+      version: v1
+    - description: Manages Frappe user roles and permission sets.
+      displayName: Site Role
+      kind: SiteRole
+      name: siteroles.vyogo.tech
+      version: v1
+    - description: Manages server-side Python scripts executed on DocType events or
+        API calls.
+      displayName: Site Server Script
+      kind: SiteServerScript
+      name: siteserverscripts.vyogo.tech
+      version: v1
+    - description: Manages Frappe user data-level document permissions.
+      displayName: Site User Permission
+      kind: SiteUserPermission
+      name: siteuserpermissions.vyogo.tech
+      version: v1
+    - description: Manages outgoing webhooks triggered by Frappe DocType events.
+      displayName: Site Webhook
+      kind: SiteWebhook
+      name: sitewebhooks.vyogo.tech
+      version: v1
+    - description: FrappeBench is the Schema for the frappebenches API
+      displayName: Frappe Bench
+      kind: FrappeBench
+      name: frappebenches.vyogo.tech
+      version: v1
     - description: FrappeSite is the Schema for the frappesites API
       displayName: Frappe Site
       kind: FrappeSite
@@ -61,6 +128,11 @@ spec:
       displayName: Frappe Workpace
       kind: FrappeWorkpace
       name: frappeworkpaces.vyogo.tech
+      version: v1
+    - description: SiteApp is the Schema for the siteapps API
+      displayName: Site App
+      kind: SiteApp
+      name: siteapps.vyogo.tech
       version: v1
     - description: SiteBackup is the Schema for the sitebackups API
       displayName: Site Backup
@@ -77,10 +149,25 @@ spec:
       kind: SiteDashboard
       name: sitedashboards.vyogo.tech
       version: v1
+    - description: SiteDomain is the Schema for the sitedomains API
+      displayName: Site Domain
+      kind: SiteDomain
+      name: sitedomains.vyogo.tech
+      version: v1
     - description: SiteJob is the Schema for the sitejobs API
       displayName: Site Job
       kind: SiteJob
       name: sitejobs.vyogo.tech
+      version: v1
+    - description: SiteMigration is the Schema for the sitemigrations API
+      displayName: Site Migration
+      kind: SiteMigration
+      name: sitemigrations.vyogo.tech
+      version: v1
+    - description: SiteRestore is the Schema for the siterestores API
+      displayName: Site Restore
+      kind: SiteRestore
+      name: siterestores.vyogo.tech
       version: v1
     - description: SiteUser is the Schema for the siteusers API
       displayName: Site User
@@ -137,4 +224,17 @@ spec:
   provider:
     name: Vyogo Tech
     url: https://vyogo.tech
+  relatedImages:
+  - image: ghcr.io/vyogotech/frappe-operator:v5.2.0
+    name: frappe-operator
+  - image: frappe/erpnext:version-15
+    name: frappe-bench-v15
+  - image: frappe/erpnext:version-14
+    name: frappe-bench-v14
+  - image: mariadb:10.6
+    name: mariadb
+  - image: redis:7.0-alpine
+    name: redis
+  - image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    name: utility-ubi
   version: 0.0.0

@@ -4,22 +4,22 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
-  name: siteusers.vyogo.tech
+  name: siteapikeys.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: SiteUser
-    listKind: SiteUserList
-    plural: siteusers
-    singular: siteuser
+    kind: SiteAPIKey
+    listKind: SiteAPIKeyList
+    plural: siteapikeys
+    singular: siteapikey
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
       name: Phase
       type: string
-    - jsonPath: .spec.email
-      name: Email
+    - jsonPath: .spec.user
+      name: User
       type: string
     - jsonPath: .spec.siteRef.name
       name: Site
@@ -30,7 +30,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: SiteUser is the Schema for the siteusers API
+        description: SiteAPIKey is the Schema for the siteapikeys API
         properties:
           apiVersion:
             description: |-
@@ -50,43 +50,13 @@ spec:
           metadata:
             type: object
           spec:
-            description: SiteUserSpec defines the desired state of SiteUser
+            description: SiteAPIKeySpec defines the desired state of SiteAPIKey
             properties:
-              apiKeySecretRef:
-                description: APIKeySecretRef specifies an optional Secret to store
-                  the auto-generated API Key and API Secret.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              email:
-                description: Email specifies the user's primary email address (acts
-                  as Frappe User name).
-                minLength: 3
+              secretName:
+                description: SecretName specifies the target K8s Secret where api_key
+                  and api_secret will be stored.
+                minLength: 1
                 type: string
-              firstName:
-                description: FirstName specifies the user's first name.
-                type: string
-              lastName:
-                description: LastName specifies the user's last name.
-                type: string
-              roles:
-                description: Roles lists the Frappe roles to assign to this user.
-                items:
-                  type: string
-                type: array
-              sendPasswordReset:
-                description: SendPasswordReset determines whether to trigger a password
-                  reset email upon creation.
-                type: boolean
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
                 properties:
@@ -99,31 +69,25 @@ spec:
                 required:
                 - name
                 type: object
-              userType:
-                default: System User
-                description: UserType specifies "System User" or "Website User". Defaults
-                  to "System User".
+              user:
+                description: User specifies the Frappe user email for whom the API
+                  key is generated (e.g. "Administrator" or "integration@acme.com").
+                minLength: 1
                 type: string
             required:
-            - email
-            - firstName
+            - secretName
             - siteRef
+            - user
             type: object
           status:
-            description: SiteUserStatus defines the observed state of SiteUser
+            description: SiteAPIKeyStatus defines the observed state of SiteAPIKey
             properties:
-              apiKeysGenerated:
-                description: APIKeysGenerated indicates whether Frappe API keys were
-                  generated and exported to the Secret.
+              apiKeyGenerated:
+                description: APIKeyGenerated indicates whether the API key was generated.
                 type: boolean
-              assignedRoles:
-                description: AssignedRoles lists the roles currently assigned in Frappe.
-                items:
-                  type: string
-                type: array
               conditions:
                 description: Conditions represent the latest available observations
-                  of the SiteUser's state.
+                  of the SiteAPIKey's state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -185,13 +149,12 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current state of the SiteUser (Pending,
-                  Provisioning, Ready, Failed).
+                description: Phase represents the current state (Pending, Ready, Failed).
                 type: string
-              secretName:
-                description: SecretName stores the name of the Secret holding the
-                  API key/secret.
-                type: string
+              secretCreated:
+                description: SecretCreated indicates whether the target K8s Secret
+                  was created.
+                type: boolean
             type: object
         type: object
     served: true

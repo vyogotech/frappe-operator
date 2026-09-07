@@ -1,0 +1,15 @@
+apiVersion: vyogo.tech/v1
+kind: FrappeBench
+metadata:
+  name: frappebench-sample
+  labels:
+    app.kubernetes.io/name: frappebench
+    app.kubernetes.io/instance: frappebench-sample
+    app.kubernetes.io/part-of: frappe-operator
+spec:
+  frappeVersion: "version-15"
+  apps:
+    - name: frappe
+      source: image
+    - name: erpnext
+      source: image

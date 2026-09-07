@@ -9,4 +9,7 @@ metadata:
     app.kubernetes.io/created-by: frappe-operator
   name: siteuser-sample
 spec:
-  # TODO(user): Add fields here
+  siteRef:
+    name: frappesite-sample
+  email: admin@example.com
+  firstName: Administrator

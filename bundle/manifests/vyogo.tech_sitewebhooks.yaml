@@ -4,25 +4,31 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
-  name: siteusers.vyogo.tech
+  name: sitewebhooks.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: SiteUser
-    listKind: SiteUserList
-    plural: siteusers
-    singular: siteuser
+    kind: SiteWebhook
+    listKind: SiteWebhookList
+    plural: sitewebhooks
+    singular: sitewebhook
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.phase
-      name: Phase
-      type: string
-    - jsonPath: .spec.email
-      name: Email
-      type: string
     - jsonPath: .spec.siteRef.name
       name: Site
+      type: string
+    - jsonPath: .spec.webhookDoctype
+      name: DocType
+      type: string
+    - jsonPath: .spec.webhookEvent
+      name: Event
+      type: string
+    - jsonPath: .spec.requestUrl
+      name: URL
+      type: string
+    - jsonPath: .status.phase
+      name: Status
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -30,7 +36,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: SiteUser is the Schema for the siteusers API
+        description: SiteWebhook is the Schema for the sitewebhooks API
         properties:
           apiVersion:
             description: |-
@@ -50,43 +56,22 @@ spec:
           metadata:
             type: object
           spec:
-            description: SiteUserSpec defines the desired state of SiteUser
+            description: SiteWebhookSpec defines the desired state of SiteWebhook
             properties:
-              apiKeySecretRef:
-                description: APIKeySecretRef specifies an optional Secret to store
-                  the auto-generated API Key and API Secret.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              email:
-                description: Email specifies the user's primary email address (acts
-                  as Frappe User name).
-                minLength: 3
-                type: string
-              firstName:
-                description: FirstName specifies the user's first name.
-                type: string
-              lastName:
-                description: LastName specifies the user's last name.
-                type: string
-              roles:
-                description: Roles lists the Frappe roles to assign to this user.
-                items:
-                  type: string
-                type: array
-              sendPasswordReset:
-                description: SendPasswordReset determines whether to trigger a password
-                  reset email upon creation.
+              enabled:
+                default: true
+                description: Enabled specifies whether the webhook is enabled. Defaults
+                  to true.
                 type: boolean
+              requestStructure:
+                default: JSON
+                description: RequestStructure specifies the HTTP request content type
+                  ("JSON", "Form URL-Encoded"). Defaults to "JSON".
+                type: string
+              requestUrl:
+                description: RequestURL specifies the target endpoint URL to post
+                  webhook payloads.
+                type: string
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
                 properties:
@@ -99,31 +84,33 @@ spec:
                 required:
                 - name
                 type: object
-              userType:
-                default: System User
-                description: UserType specifies "System User" or "Website User". Defaults
-                  to "System User".
+              webhookDoctype:
+                description: WebhookDocType specifies the DocType that triggers this
+                  webhook (e.g. "Sales Order", "Customer").
+                minLength: 1
+                type: string
+              webhookEvent:
+                description: WebhookEvent specifies the document event ("on_change",
+                  "on_update", "on_submit", "on_cancel", "on_trash").
+                enum:
+                - on_change
+                - on_update
+                - on_submit
+                - on_cancel
+                - on_trash
                 type: string
             required:
-            - email
-            - firstName
+            - requestUrl
             - siteRef
+            - webhookDoctype
+            - webhookEvent
             type: object
           status:
-            description: SiteUserStatus defines the observed state of SiteUser
+            description: SiteWebhookStatus defines the observed state of SiteWebhook
             properties:
-              apiKeysGenerated:
-                description: APIKeysGenerated indicates whether Frappe API keys were
-                  generated and exported to the Secret.
-                type: boolean
-              assignedRoles:
-                description: AssignedRoles lists the roles currently assigned in Frappe.
-                items:
-                  type: string
-                type: array
               conditions:
-                description: Conditions represent the latest available observations
-                  of the SiteUser's state.
+                description: Conditions represents the latest available observations
+                  of the resource state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -185,12 +172,8 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current state of the SiteUser (Pending,
-                  Provisioning, Ready, Failed).
-                type: string
-              secretName:
-                description: SecretName stores the name of the Secret holding the
-                  API key/secret.
+                description: Phase represents the current state of the SiteWebhook
+                  (Pending, Ready, Failed).
                 type: string
             type: object
         type: object

@@ -4,22 +4,22 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
-  name: siteusers.vyogo.tech
+  name: sitemigrations.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: SiteUser
-    listKind: SiteUserList
-    plural: siteusers
-    singular: siteuser
+    kind: SiteMigration
+    listKind: SiteMigrationList
+    plural: sitemigrations
+    singular: sitemigration
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
       name: Phase
       type: string
-    - jsonPath: .spec.email
-      name: Email
+    - jsonPath: .status.jobName
+      name: Job
       type: string
     - jsonPath: .spec.siteRef.name
       name: Site
@@ -30,7 +30,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: SiteUser is the Schema for the siteusers API
+        description: SiteMigration is the Schema for the sitemigrations API
         properties:
           apiVersion:
             description: |-
@@ -50,42 +50,19 @@ spec:
           metadata:
             type: object
           spec:
-            description: SiteUserSpec defines the desired state of SiteUser
+            description: SiteMigrationSpec defines the desired state of SiteMigration
             properties:
-              apiKeySecretRef:
-                description: APIKeySecretRef specifies an optional Secret to store
-                  the auto-generated API Key and API Secret.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              email:
-                description: Email specifies the user's primary email address (acts
-                  as Frappe User name).
-                minLength: 3
-                type: string
-              firstName:
-                description: FirstName specifies the user's first name.
-                type: string
-              lastName:
-                description: LastName specifies the user's last name.
-                type: string
-              roles:
-                description: Roles lists the Frappe roles to assign to this user.
-                items:
-                  type: string
-                type: array
-              sendPasswordReset:
-                description: SendPasswordReset determines whether to trigger a password
-                  reset email upon creation.
+              backupBeforeMigrate:
+                default: true
+                description: |-
+                  BackupBeforeMigrate determines whether the operator takes a full backup of
+                  the site and waits for it to succeed before running `bench migrate`. This
+                  creates a rollback point in case the migration corrupts the site.
+                  Defaults to true; set false to skip.
+                type: boolean
+              force:
+                description: Force determines whether to force migration even if schema
+                  is unchanged.
                 type: boolean
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
@@ -99,31 +76,23 @@ spec:
                 required:
                 - name
                 type: object
-              userType:
-                default: System User
-                description: UserType specifies "System User" or "Website User". Defaults
-                  to "System User".
-                type: string
+              skipFixtures:
+                description: SkipFixtures determines whether to skip fixture synchronization
+                  during migration.
+                type: boolean
             required:
-            - email
-            - firstName
             - siteRef
             type: object
           status:
-            description: SiteUserStatus defines the observed state of SiteUser
+            description: SiteMigrationStatus defines the observed state of SiteMigration
             properties:
-              apiKeysGenerated:
-                description: APIKeysGenerated indicates whether Frappe API keys were
-                  generated and exported to the Secret.
-                type: boolean
-              assignedRoles:
-                description: AssignedRoles lists the roles currently assigned in Frappe.
-                items:
-                  type: string
-                type: array
+              completionTime:
+                description: CompletionTime indicates when the migration completed.
+                format: date-time
+                type: string
               conditions:
                 description: Conditions represent the latest available observations
-                  of the SiteUser's state.
+                  of the SiteMigration's state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -179,18 +148,27 @@ spec:
                   - type
                   type: object
                 type: array
+              jobName:
+                description: JobName stores the name of the Kubernetes Job executing
+                  bench migrate.
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent generation observed
                   by the controller.
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current state of the SiteUser (Pending,
-                  Provisioning, Ready, Failed).
+                description: Phase represents the current state (Pending, Migrating,
+                  Succeeded, Failed).
                 type: string
-              secretName:
-                description: SecretName stores the name of the Secret holding the
-                  API key/secret.
+              preBackupRef:
+                description: |-
+                  PreBackupRef is the name of the SiteBackup taken before this migration as a
+                  rollback point (set when backupBeforeMigrate is enabled).
+                type: string
+              startTime:
+                description: StartTime indicates when the migration started.
+                format: date-time
                 type: string
             type: object
         type: object

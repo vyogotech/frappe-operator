@@ -4,22 +4,25 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
-  name: siteusers.vyogo.tech
+  name: sitecrons.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: SiteUser
-    listKind: SiteUserList
-    plural: siteusers
-    singular: siteuser
+    kind: SiteCron
+    listKind: SiteCronList
+    plural: sitecrons
+    singular: sitecron
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
       name: Phase
       type: string
-    - jsonPath: .spec.email
-      name: Email
+    - jsonPath: .spec.schedule
+      name: Schedule
+      type: string
+    - jsonPath: .spec.method
+      name: Method
       type: string
     - jsonPath: .spec.siteRef.name
       name: Site
@@ -30,7 +33,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: SiteUser is the Schema for the siteusers API
+        description: SiteCron is the Schema for the sitecrons API
         properties:
           apiVersion:
             description: |-
@@ -50,43 +53,18 @@ spec:
           metadata:
             type: object
           spec:
-            description: SiteUserSpec defines the desired state of SiteUser
+            description: SiteCronSpec defines the desired state of SiteCron
             properties:
-              apiKeySecretRef:
-                description: APIKeySecretRef specifies an optional Secret to store
-                  the auto-generated API Key and API Secret.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              email:
-                description: Email specifies the user's primary email address (acts
-                  as Frappe User name).
+              method:
+                description: Method specifies the Frappe Python method to execute
+                  (e.g. "saas_platform.api.sync_nightly_sales").
                 minLength: 3
                 type: string
-              firstName:
-                description: FirstName specifies the user's first name.
+              schedule:
+                description: Schedule specifies the cron schedule string (e.g. "0
+                  2 * * *").
+                minLength: 5
                 type: string
-              lastName:
-                description: LastName specifies the user's last name.
-                type: string
-              roles:
-                description: Roles lists the Frappe roles to assign to this user.
-                items:
-                  type: string
-                type: array
-              sendPasswordReset:
-                description: SendPasswordReset determines whether to trigger a password
-                  reset email upon creation.
-                type: boolean
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
                 properties:
@@ -99,31 +77,27 @@ spec:
                 required:
                 - name
                 type: object
-              userType:
-                default: System User
-                description: UserType specifies "System User" or "Website User". Defaults
-                  to "System User".
-                type: string
+              suspended:
+                description: Suspended determines whether the cron schedule is currently
+                  paused.
+                type: boolean
+              timeoutSeconds:
+                default: 3600
+                description: TimeoutSeconds specifies execution timeout in seconds.
+                  Defaults to 3600.
+                format: int64
+                type: integer
             required:
-            - email
-            - firstName
+            - method
+            - schedule
             - siteRef
             type: object
           status:
-            description: SiteUserStatus defines the observed state of SiteUser
+            description: SiteCronStatus defines the observed state of SiteCron
             properties:
-              apiKeysGenerated:
-                description: APIKeysGenerated indicates whether Frappe API keys were
-                  generated and exported to the Secret.
-                type: boolean
-              assignedRoles:
-                description: AssignedRoles lists the roles currently assigned in Frappe.
-                items:
-                  type: string
-                type: array
               conditions:
                 description: Conditions represent the latest available observations
-                  of the SiteUser's state.
+                  of the SiteCron's state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -179,18 +153,21 @@ spec:
                   - type
                   type: object
                 type: array
+              cronJobName:
+                description: CronJobName stores the generated Kubernetes CronJob name.
+                type: string
+              lastScheduleTime:
+                description: LastScheduleTime is the last time the cron job was scheduled.
+                format: date-time
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent generation observed
                   by the controller.
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current state of the SiteUser (Pending,
-                  Provisioning, Ready, Failed).
-                type: string
-              secretName:
-                description: SecretName stores the name of the Secret holding the
-                  API key/secret.
+                description: Phase represents the current state (Pending, Active,
+                  Suspended, Failed).
                 type: string
             type: object
         type: object

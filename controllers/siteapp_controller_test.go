@@ -485,3 +485,58 @@ func TestSiteAppReconciler_reloadBenchServingPods(t *testing.T) {
 		t.Errorf("expected reload annotation gen-2 after new generation, got %q", got)
 	}
 }
+
+func TestSiteAppReconciler_SecurityContext_OpenShift(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	sa := &vyogotechv1.SiteApp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-app",
+			Namespace: "test-ns",
+		},
+		Spec: vyogotechv1.SiteAppSpec{
+			AppName: "erpnext",
+			SiteRef: &vyogotechv1.NamespacedName{Name: "site-sample"},
+		},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bench-sample",
+			Namespace: "test-ns",
+		},
+	}
+
+	// Test non-OpenShift (standard Kubernetes)
+	rStandard := &SiteAppReconciler{
+		Client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme:      scheme,
+		IsOpenShift: false,
+	}
+	jobStd := rStandard.buildAppJob(context.Background(), sa, bench, "test-job-std", "installer", "image:v1", "pvc", "echo test", nil, corev1.ResourceRequirements{}, 1, nil)
+	if jobStd.Spec.Template.Spec.SecurityContext.RunAsUser == nil || *jobStd.Spec.Template.Spec.SecurityContext.RunAsUser != 1000 {
+		t.Errorf("expected RunAsUser 1000 in standard k8s, got %v", jobStd.Spec.Template.Spec.SecurityContext.RunAsUser)
+	}
+	if jobStd.Spec.Template.Spec.SecurityContext.RunAsGroup == nil || *jobStd.Spec.Template.Spec.SecurityContext.RunAsGroup != 0 {
+		t.Errorf("expected RunAsGroup 0 in standard k8s, got %v", jobStd.Spec.Template.Spec.SecurityContext.RunAsGroup)
+	}
+
+	// Test OpenShift (SCC compliance)
+	rOpenShift := &SiteAppReconciler{
+		Client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme:      scheme,
+		IsOpenShift: true,
+	}
+	jobOcp := rOpenShift.buildAppJob(context.Background(), sa, bench, "test-job-ocp", "installer", "image:v1", "pvc", "echo test", nil, corev1.ResourceRequirements{}, 1, nil)
+	if jobOcp.Spec.Template.Spec.SecurityContext.RunAsUser != nil {
+		t.Errorf("expected RunAsUser to be nil on OpenShift for SCC dynamic UID injection, got %v", *jobOcp.Spec.Template.Spec.SecurityContext.RunAsUser)
+	}
+	if jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser != nil {
+		t.Errorf("expected container RunAsUser to be nil on OpenShift, got %v", *jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser)
+	}
+	if jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation == nil || *jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation != false {
+		t.Errorf("expected AllowPrivilegeEscalation to be false on OpenShift, got %v", jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
+	}
+}
+

@@ -9,4 +9,5 @@ metadata:
     app.kubernetes.io/created-by: frappe-operator
   name: sitebackup-sample
 spec:
-  # TODO(user): Add fields here
+  site: site1.example.com
+  withFiles: true

@@ -9,4 +9,6 @@ metadata:
     app.kubernetes.io/created-by: frappe-operator
   name: frappesite-sample
 spec:
-  # TODO(user): Add fields here
+  benchRef:
+    name: frappebench-sample
+  siteName: site1.example.com

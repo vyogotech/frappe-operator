@@ -9,4 +9,4 @@ metadata:
     app.kubernetes.io/created-by: frappe-operator
   name: sitedashboardchart-sample
 spec:
-  # TODO(user): Add fields here
+  description: "Monthly revenue analytics chart"

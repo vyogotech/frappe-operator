@@ -1,0 +1,12 @@
+apiVersion: vyogo.tech/v1
+kind: SiteDomain
+metadata:
+  name: sitedomain-sample
+  labels:
+    app.kubernetes.io/name: sitedomain
+    app.kubernetes.io/instance: sitedomain-sample
+    app.kubernetes.io/part-of: frappe-operator
+spec:
+  siteRef:
+    name: frappesite-sample
+  domain: shop.example.com

@@ -4,25 +4,31 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
-  name: siteusers.vyogo.tech
+  name: siteuserpermissions.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: SiteUser
-    listKind: SiteUserList
-    plural: siteusers
-    singular: siteuser
+    kind: SiteUserPermission
+    listKind: SiteUserPermissionList
+    plural: siteuserpermissions
+    singular: siteuserpermission
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.phase
-      name: Phase
-      type: string
-    - jsonPath: .spec.email
-      name: Email
-      type: string
     - jsonPath: .spec.siteRef.name
       name: Site
+      type: string
+    - jsonPath: .spec.user
+      name: User
+      type: string
+    - jsonPath: .spec.allow
+      name: Allow
+      type: string
+    - jsonPath: .spec.forValue
+      name: For Value
+      type: string
+    - jsonPath: .status.phase
+      name: Status
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -30,7 +36,8 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: SiteUser is the Schema for the siteusers API
+        description: SiteUserPermission is the Schema for the siteuserpermissions
+          API
         properties:
           apiVersion:
             description: |-
@@ -50,43 +57,23 @@ spec:
           metadata:
             type: object
           spec:
-            description: SiteUserSpec defines the desired state of SiteUser
+            description: SiteUserPermissionSpec defines the desired state of SiteUserPermission
             properties:
-              apiKeySecretRef:
-                description: APIKeySecretRef specifies an optional Secret to store
-                  the auto-generated API Key and API Secret.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              email:
-                description: Email specifies the user's primary email address (acts
-                  as Frappe User name).
-                minLength: 3
+              allow:
+                description: Allow specifies the DocType to restrict (e.g. "Company",
+                  "Warehouse", "Territory").
+                minLength: 1
                 type: string
-              firstName:
-                description: FirstName specifies the user's first name.
-                type: string
-              lastName:
-                description: LastName specifies the user's last name.
-                type: string
-              roles:
-                description: Roles lists the Frappe roles to assign to this user.
-                items:
-                  type: string
-                type: array
-              sendPasswordReset:
-                description: SendPasswordReset determines whether to trigger a password
-                  reset email upon creation.
+              applyToAllDoctypes:
+                default: true
+                description: ApplyToAllDocTypes specifies whether this restriction
+                  applies across all linked DocTypes. Defaults to true.
                 type: boolean
+              forValue:
+                description: ForValue specifies the target document ID/value to allow
+                  (e.g. "Acme Corp", "Main Warehouse").
+                minLength: 1
+                type: string
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
                 properties:
@@ -99,31 +86,22 @@ spec:
                 required:
                 - name
                 type: object
-              userType:
-                default: System User
-                description: UserType specifies "System User" or "Website User". Defaults
-                  to "System User".
+              user:
+                description: User specifies the target Frappe user email (e.g. "john.doe@example.com").
+                minLength: 1
                 type: string
             required:
-            - email
-            - firstName
+            - allow
+            - forValue
             - siteRef
+            - user
             type: object
           status:
-            description: SiteUserStatus defines the observed state of SiteUser
+            description: SiteUserPermissionStatus defines the observed state of SiteUserPermission
             properties:
-              apiKeysGenerated:
-                description: APIKeysGenerated indicates whether Frappe API keys were
-                  generated and exported to the Secret.
-                type: boolean
-              assignedRoles:
-                description: AssignedRoles lists the roles currently assigned in Frappe.
-                items:
-                  type: string
-                type: array
               conditions:
-                description: Conditions represent the latest available observations
-                  of the SiteUser's state.
+                description: Conditions represents the latest available observations
+                  of the resource state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -185,12 +163,8 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current state of the SiteUser (Pending,
-                  Provisioning, Ready, Failed).
-                type: string
-              secretName:
-                description: SecretName stores the name of the Secret holding the
-                  API key/secret.
+                description: Phase represents the current state of the SiteUserPermission
+                  (Pending, Ready, Failed).
                 type: string
             type: object
         type: object

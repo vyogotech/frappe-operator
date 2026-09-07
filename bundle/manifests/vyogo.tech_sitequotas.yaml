@@ -4,23 +4,23 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
   creationTimestamp: null
-  name: siteusers.vyogo.tech
+  name: sitequotas.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: SiteUser
-    listKind: SiteUserList
-    plural: siteusers
-    singular: siteuser
+    kind: SiteQuota
+    listKind: SiteQuotaList
+    plural: sitequotas
+    singular: sitequota
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
       name: Phase
       type: string
-    - jsonPath: .spec.email
-      name: Email
-      type: string
+    - jsonPath: .status.quotaExceeded
+      name: Exceeded
+      type: boolean
     - jsonPath: .spec.siteRef.name
       name: Site
       type: string
@@ -30,7 +30,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: SiteUser is the Schema for the siteusers API
+        description: SiteQuota is the Schema for the sitequotas API
         properties:
           apiVersion:
             description: |-
@@ -50,43 +50,27 @@ spec:
           metadata:
             type: object
           spec:
-            description: SiteUserSpec defines the desired state of SiteUser
+            description: SiteQuotaSpec defines the desired state of SiteQuota
             properties:
-              apiKeySecretRef:
-                description: APIKeySecretRef specifies an optional Secret to store
-                  the auto-generated API Key and API Secret.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              email:
-                description: Email specifies the user's primary email address (acts
-                  as Frappe User name).
-                minLength: 3
+              actionOnExceeded:
+                default: Warn
+                description: 'ActionOnExceeded specifies action when quota is exceeded:
+                  "Warn", "ReadOnly", or "Maintenance".'
                 type: string
-              firstName:
-                description: FirstName specifies the user's first name.
-                type: string
-              lastName:
-                description: LastName specifies the user's last name.
-                type: string
-              roles:
-                description: Roles lists the Frappe roles to assign to this user.
-                items:
-                  type: string
-                type: array
-              sendPasswordReset:
-                description: SendPasswordReset determines whether to trigger a password
-                  reset email upon creation.
-                type: boolean
+              maxDbSizeMb:
+                description: MaxDBSizeMB specifies maximum database size limit in
+                  megabytes.
+                format: int64
+                type: integer
+              maxStorageMb:
+                description: MaxStorageMB specifies maximum file attachment storage
+                  limit in megabytes.
+                format: int64
+                type: integer
+              maxUsers:
+                description: MaxUsers specifies maximum active users limit.
+                format: int32
+                type: integer
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
                 properties:
@@ -99,31 +83,15 @@ spec:
                 required:
                 - name
                 type: object
-              userType:
-                default: System User
-                description: UserType specifies "System User" or "Website User". Defaults
-                  to "System User".
-                type: string
             required:
-            - email
-            - firstName
             - siteRef
             type: object
           status:
-            description: SiteUserStatus defines the observed state of SiteUser
+            description: SiteQuotaStatus defines the observed state of SiteQuota
             properties:
-              apiKeysGenerated:
-                description: APIKeysGenerated indicates whether Frappe API keys were
-                  generated and exported to the Secret.
-                type: boolean
-              assignedRoles:
-                description: AssignedRoles lists the roles currently assigned in Frappe.
-                items:
-                  type: string
-                type: array
               conditions:
                 description: Conditions represent the latest available observations
-                  of the SiteUser's state.
+                  of the SiteQuota's state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -179,19 +147,31 @@ spec:
                   - type
                   type: object
                 type: array
+              currentDbSizeMb:
+                description: CurrentDBSizeMB is the observed DB size in megabytes.
+                format: int64
+                type: integer
+              currentStorageMb:
+                description: CurrentStorageMB is the observed storage usage in megabytes.
+                format: int64
+                type: integer
+              currentUsers:
+                description: CurrentUsers is the observed count of active users.
+                format: int32
+                type: integer
               observedGeneration:
                 description: ObservedGeneration is the most recent generation observed
                   by the controller.
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current state of the SiteUser (Pending,
-                  Provisioning, Ready, Failed).
+                description: Phase represents the current state (Normal, Warning,
+                  QuotaExceeded, Failed).
                 type: string
-              secretName:
-                description: SecretName stores the name of the Secret holding the
-                  API key/secret.
-                type: string
+              quotaExceeded:
+                description: QuotaExceeded indicates whether any quota limit is currently
+                  breached.
+                type: boolean
             type: object
         type: object
     served: true
