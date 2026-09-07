@@ -170,10 +170,11 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
-		// Must match "domain": Frappe serves a request by looking up the Host header
-		// as a directory under sites/, so the site has to be created under the same
-		// name the Route/Ingress sends.
-		"site_name":           []byte(domain),
+		// The site directory keeps spec.SiteName: every other controller addresses
+		// the site by that name (bench --site, SITE_NAME, backup, restore,
+		// migration). When the resolved domain differs, Frappe is taught to answer
+		// on it with a sites/<domain> alias rather than by renaming the site.
+		"site_name":           []byte(site.Spec.SiteName),
 		"domain":              []byte(domain),
 		"admin_password":      []byte(adminPassword),
 		"bench_name":          []byte(bench.Name),

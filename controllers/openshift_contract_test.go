@@ -45,6 +45,7 @@ import (
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/controllers/database"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
+	"github.com/vyogotech/frappe-operator/pkg/scripts"
 )
 
 const (
@@ -205,13 +206,16 @@ var _ = Describe("OpenShift emitted-object contracts", func() {
 		})
 	})
 
-	// Regression: site_name and domain were handed to the init job as separate
-	// values. Frappe resolves a request by matching the Host header to a
-	// directory under sites/, so any divergence yields a site the Route can
-	// reach but Frappe answers 404 on.
+	// Regression: Frappe resolves a request by matching the Host header to a
+	// directory under sites/, so a Route host that differs from the site name
+	// is answered 404. Renaming the site to the resolved domain fixed that but
+	// broke every controller that addresses the site by spec.SiteName (backup,
+	// restore, migration, app install, deletion). The site therefore keeps its
+	// own name, and the init script aliases sites/<domain> -> <siteName>.
 	Describe("site initialization secret", func() {
-		It("creates the site under exactly the host the Route serves", func() {
+		It("keeps the site under spec.SiteName and aliases the Route host to it", func() {
 			domain := "dev." + testClusterDomain
+			Expect(domain).NotTo(Equal(site.Spec.SiteName), "test must exercise the diverging case")
 
 			Expect(reconciler.ensureInitSecrets(ctx, site, bench, domain,
 				&database.DatabaseInfo{Host: "db", Port: "3306", Name: "sitedb", Provider: "mariadb"},
@@ -225,9 +229,14 @@ var _ = Describe("OpenShift emitted-object contracts", func() {
 				Namespace: namespace,
 			}, secret)).To(Succeed())
 
-			Expect(string(secret.Data["site_name"])).To(Equal(domain))
-			Expect(string(secret.Data["site_name"])).To(Equal(string(secret.Data["domain"])),
-				"Frappe serves by Host header lookup under sites/, so these must not diverge")
+			Expect(string(secret.Data["site_name"])).To(Equal(site.Spec.SiteName),
+				"bench --site, backups, restores and migrations all address the site by spec.SiteName")
+			Expect(string(secret.Data["domain"])).To(Equal(domain),
+				"the Route host and site_config host_name come from the resolved domain")
+
+			initScript := scripts.MustGetScript(scripts.SiteInit)
+			Expect(initScript).To(ContainSubstring(`ln -sfn "$SITE_NAME" "/home/frappe/frappe-bench/sites/$DOMAIN"`),
+				"without the sites/<domain> alias, a request on the Route host is answered 404")
 		})
 	})
 
