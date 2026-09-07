@@ -264,22 +264,43 @@ if [ "$PLATFORM" == "openshift-sim" ]; then
     log "✅ SUCCESS: Route created."
 
     # A Route on a host that resolves nowhere is indistinguishable from a
-    # working one unless the host is actually checked. The operator should have
-    # taken the domain from the cluster ingress config seeded above; falling
-    # back to a bare or reserved siteName is the defect this guards.
-    log "Verifying Route host uses the detected cluster domain..."
+    # working one unless the host is actually checked. Only sites whose domain
+    # the operator resolved itself are checked: a site that sets spec.domain is
+    # reported as "explicit" and is meant to keep that host verbatim, so
+    # requiring the cluster domain there would be asserting a bug.
+    log "Verifying Route host matches the domain the operator resolved..."
     ROUTE_HOSTS=$(kubectl get route -n $NAMESPACE -o jsonpath='{.items[*].spec.host}')
     log "Route hosts: ${ROUTE_HOSTS:-<none>}"
     if [ -z "$ROUTE_HOSTS" ]; then
         error "FAILED: Route has no host set."
     fi
-    for h in $ROUTE_HOSTS; do
-        case "$h" in
-            *.apps.e2e.example.com) ;;
-            *) error "FAILED: Route host '$h' does not use the cluster domain from config.openshift.io/v1 Ingress (apps.e2e.example.com)." ;;
+
+    for site in $(kubectl get frappesite -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}'); do
+        SOURCE=$(kubectl get frappesite "$site" -n $NAMESPACE -o jsonpath='{.status.domainSource}')
+        RESOLVED=$(kubectl get frappesite "$site" -n $NAMESPACE -o jsonpath='{.status.resolvedDomain}')
+        ROUTE_HOST=$(kubectl get route -n $NAMESPACE \
+            -o jsonpath="{.items[?(@.metadata.name=='${site}-route')].spec.host}")
+        [ -z "$ROUTE_HOST" ] && continue
+
+        # Whatever the source, the Route must serve exactly the name the site was
+        # created under - Frappe matches the Host header to a directory in sites/.
+        if [ "$ROUTE_HOST" != "$RESOLVED" ]; then
+            error "FAILED: site '$site' resolved to '$RESOLVED' but its Route serves '$ROUTE_HOST'; Frappe will answer 404."
+        fi
+
+        case "$SOURCE" in
+            auto-detected|auto-corrected)
+                case "$RESOLVED" in
+                    *.apps.e2e.example.com) ;;
+                    *) error "FAILED: site '$site' resolved to '$RESOLVED' via '$SOURCE' but did not use the cluster domain from config.openshift.io/v1 Ingress (apps.e2e.example.com)." ;;
+                esac
+                ;;
+            *)
+                log "site '$site': domainSource=$SOURCE, host kept verbatim ($RESOLVED)"
+                ;;
         esac
     done
-    log "✅ SUCCESS: Route host uses the detected cluster domain."
+    log "✅ SUCCESS: Route hosts match the resolved domains."
 else
     log "Verifying Ingress creation..."
     # Many scenarios don't enable Ingress explicitly in the manifest, 
