@@ -39,8 +39,7 @@ jobs:
 
       - name: Build Operator Image
         run: |
-          make build
-          docker build -t ghcr.io/vyogotech/frappe-operator:local-install-test -f Dockerfile .
+          make docker-build IMG=ghcr.io/vyogotech/frappe-operator:local-install-test CONTAINER_TOOL=docker
 
       - name: Load image into Kind
         run: |
@@ -128,8 +127,7 @@ jobs:
 
       - name: Build Operator Image
         run: |
-          make build
-          docker build -t ghcr.io/vyogotech/frappe-operator:local-e2e -f Dockerfile .
+          make docker-build IMG=ghcr.io/vyogotech/frappe-operator:local-e2e CONTAINER_TOOL=docker
 
       - name: Run Operator Bundle
         run: |

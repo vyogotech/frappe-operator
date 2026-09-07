@@ -7,7 +7,7 @@ spec:
   imageConfig:
     repository: ghcr.io/vyogotech/frappe_base
     tag: latest
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
   # Image is substituted by the test script/workflow
   storageSize: 2Gi
 ---
