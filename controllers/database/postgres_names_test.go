@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -45,5 +46,82 @@ func TestPostgresNamesDoNotPanicOnShortHash(t *testing.T) {
 	}
 	if user := p.generatePGUserName(site); len(user) != 9 || !strings.HasPrefix(user, "u0") {
 		t.Fatalf("generatePGUserName = %q, want u + 8 hex characters", user)
+	}
+}
+
+// A shared-mode site must be able to reach any PostgreSQL. Deriving the host
+// solely from "<postgresRef>-pgbouncer" encodes Percona's topology and locks out
+// every other operator: CloudNativePG publishes "<cluster>-rw", StackGres
+// "<cluster>", and a managed service is an arbitrary name. dbConfig.host exists
+// on the CRD for exactly this and was previously ignored.
+func TestGetSharedHostPort(t *testing.T) {
+	p := &PostgresProvider{}
+
+	siteWith := func(host, port, refName, refNS string) *vyogotechv1.FrappeSite {
+		db := vyogotechv1.DatabaseConfig{Host: host, Port: port}
+		if refName != "" {
+			db.PostgresRef = &vyogotechv1.NamespacedName{Name: refName, Namespace: refNS}
+		}
+		return &vyogotechv1.FrappeSite{
+			ObjectMeta: metav1.ObjectMeta{Name: "s", Namespace: "sites"},
+			Spec:       vyogotechv1.FrappeSiteSpec{DBConfig: db},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		site     *vyogotechv1.FrappeSite
+		wantHost string
+		wantPort string
+	}{
+		{
+			name:     "explicit host wins over the ref",
+			site:     siteWith("db.example.com", "", "frappe-postgres", "frappe-pg"),
+			wantHost: "db.example.com",
+			wantPort: "5432",
+		},
+		{
+			// An external host must not be suffixed with .svc.cluster.local.
+			name:     "explicit host is used verbatim",
+			site:     siteWith("my-cnpg-rw.frappe-pg.svc.cluster.local", "", "", ""),
+			wantHost: "my-cnpg-rw.frappe-pg.svc.cluster.local",
+			wantPort: "5432",
+		},
+		{
+			name:     "explicit port is honoured",
+			site:     siteWith("db.example.com", "6432", "", ""),
+			wantHost: "db.example.com",
+			wantPort: "6432",
+		},
+		{
+			name:     "falls back to the percona convention",
+			site:     siteWith("", "", "frappe-postgres", "frappe-pg"),
+			wantHost: "frappe-postgres-pgbouncer.frappe-pg.svc.cluster.local",
+			wantPort: "5432",
+		},
+		{
+			name:     "ref without a namespace uses the site's",
+			site:     siteWith("", "", "cluster-a", ""),
+			wantHost: "cluster-a-pgbouncer.sites.svc.cluster.local",
+			wantPort: "5432",
+		},
+		{
+			name:     "no host and no ref keeps the historical default",
+			site:     siteWith("", "", "", ""),
+			wantHost: "frappe-postgres-pgbouncer.sites.svc.cluster.local",
+			wantPort: "5432",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			host, port, err := p.getSharedHostPort(context.Background(), tt.site)
+			if err != nil {
+				t.Fatalf("getSharedHostPort: %v", err)
+			}
+			if host != tt.wantHost || port != tt.wantPort {
+				t.Errorf("got (%q, %q), want (%q, %q)", host, port, tt.wantHost, tt.wantPort)
+			}
+		})
 	}
 }

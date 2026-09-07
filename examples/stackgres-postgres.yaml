@@ -1,0 +1,177 @@
+# Frappe on StackGres PostgreSQL (https://stackgres.io) - shared mode.
+#
+# StackGres is a declarative PostgreSQL stack: instance sizing, postgres.conf and
+# connection pooling are each their own CR rather than fields buried in one giant
+# cluster spec. That is the reason to pick it over the alternatives.
+#
+# Install the operator first. On OpenShift it is in OperatorHub as
+# "stackgres-community" (channel stable, v1.18.8 confirmed present on OpenShift
+# 4.22), or upstream:
+#   helm repo add stackgres https://stackgres.io/downloads/stackgres-k8s/stackgres/helm
+#   helm install stackgres-operator stackgres/stackgres-operator -n stackgres --create-namespace
+#
+# Then:
+#   oc apply -f examples/stackgres-postgres.yaml
+#
+# WHY dbConfig.host IS SET BELOW
+# The operator otherwise derives the endpoint as "<postgresRef>-pgbouncer", which
+# is Percona's Service layout. StackGres publishes its primary as "<cluster>" and
+# runs PgBouncer as a sidecar behind that same Service, so the derived name does
+# not exist. Setting dbConfig.host explicitly is the supported way to point at any
+# PostgreSQL - StackGres, CloudNativePG, or a managed instance.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frappe-pg
+---
+# How big each instance is. Kept separate so you can resize the pool without
+# touching the cluster's other settings.
+apiVersion: stackgres.io/v1
+kind: SGInstanceProfile
+metadata:
+  name: frappe-medium
+  namespace: frappe-pg
+spec:
+  cpu: "2"
+  memory: 4Gi
+---
+# postgres.conf. Frappe opens a connection per gunicorn worker and per background
+# worker, and every site on a bench shares this instance, so max_connections has
+# to account for the whole bench rather than one site.
+apiVersion: stackgres.io/v1
+kind: SGPostgresConfig
+metadata:
+  name: frappe-pgconfig
+  namespace: frappe-pg
+spec:
+  postgresVersion: "16"
+  postgresql.conf:
+    max_connections: "300"
+    shared_buffers: "1GB"
+    work_mem: "8MB"
+---
+# PgBouncer, which StackGres runs as a sidecar reachable through the cluster's own
+# Service. Transaction pooling suits Frappe: it does not hold session state across
+# requests, and pooling is what keeps a shared instance viable once site count grows.
+apiVersion: stackgres.io/v1
+kind: SGPoolingConfig
+metadata:
+  name: frappe-pooling
+  namespace: frappe-pg
+spec:
+  pgBouncer:
+    pgbouncer.ini:
+      pgbouncer:
+        pool_mode: transaction
+        max_client_conn: "1000"
+        default_pool_size: "50"
+---
+apiVersion: stackgres.io/v1
+kind: SGCluster
+metadata:
+  name: frappe-postgres
+  namespace: frappe-pg
+spec:
+  postgres:
+    version: "16"
+  instances: 1
+  sgInstanceProfile: frappe-medium
+  configurations:
+    sgPostgresConfig: frappe-pgconfig
+    sgPoolingConfig: frappe-pooling
+  pods:
+    persistentVolume:
+      size: 20Gi
+      # An RWO block class is right here - only the postgres pod mounts it. The
+      # bench's sites volume is the one that needs RWX.
+      storageClass: ocs-external-storagecluster-ceph-rbd
+---
+# Credentials the operator's pg-provision Job uses to CREATE ROLE and CREATE
+# DATABASE for each site. Two things to know:
+#
+#  1. The Secret must be named after dbConfig.postgresRef.name, with keys exactly
+#     "user" and "password" - that is the convention the provision and delete Jobs
+#     mount at /tmp/creds.
+#  2. It must live in the SITE's namespace. The Job is created there, so a Secret
+#     sitting beside the cluster in another namespace is not reachable even when
+#     postgresRef.namespace points at it.
+#
+# StackGres generates its own superuser Secret for the cluster; copy the values
+# across rather than inventing a password, e.g.
+#   oc get secret frappe-postgres -n frappe-pg \
+#     -o jsonpath='{.data.superuser-password}' | base64 -d
+# Confirm the key names against your StackGres version before relying on them.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: frappe-postgres
+  namespace: frappe-pg
+type: Opaque
+stringData:
+  user: postgres
+  password: "REPLACE-WITH-THE-STACKGRES-SUPERUSER-PASSWORD"
+---
+apiVersion: vyogo.tech/v1
+kind: FrappeBench
+metadata:
+  name: pg-bench
+  namespace: frappe-pg
+spec:
+  # Postgres support needs a Frappe build with psycopg2 and libpq present; the
+  # v17/develop image ships them, the version-15 images do not.
+  frappeVersion: "develop"
+  imageConfig:
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: v17
+    pullPolicy: IfNotPresent
+  redisConfig:
+    type: redis
+  # Every bench component mounts this, so it has to be ReadWriteMany. On ODF that
+  # means the CephFS class - the RBD default is RWO and provisioning fails with
+  # "multi node access modes are only supported on rbd `block` type volumes".
+  storageClassName: "ocs-external-storagecluster-cephfs"
+  storageSize: "10Gi"
+  componentAutoscaling:
+    gunicorn:
+      enabled: false
+      staticReplicas: 1
+    scheduler:
+      enabled: false
+      staticReplicas: 1
+    worker-default:
+      enabled: false
+      staticReplicas: 1
+    worker-short:
+      enabled: false
+      staticReplicas: 1
+    worker-long:
+      enabled: false
+      staticReplicas: 1
+---
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: pg-site
+  namespace: frappe-pg
+spec:
+  benchRef:
+    name: pg-bench
+  # A bare label is fine: on OpenShift the operator appends the cluster's ingress
+  # domain, so this resolves on the wildcard DNS.
+  siteName: pgsite
+  dbConfig:
+    provider: postgres
+    mode: shared
+    # StackGres serves both postgres and its PgBouncer sidecar on the cluster's
+    # own Service, so this is the endpoint - not a "-pgbouncer" name.
+    host: frappe-postgres.frappe-pg.svc.cluster.local
+    port: "5432"
+    # Still set, because the provisioner Secret above is looked up by this name.
+    postgresRef:
+      name: frappe-postgres
+      namespace: frappe-pg
+---
+# Only shared mode is supported on StackGres. dbConfig.mode "dedicated" builds a
+# PerconaPGCluster and is Percona-specific; a per-site StackGres cluster would
+# mean teaching the provider to emit SGCluster CRs, which this does not do.
