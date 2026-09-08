@@ -519,3 +519,23 @@ func TestPostgresProvider_RejectsEngineSwitch(t *testing.T) {
 		t.Errorf("expected stackgres with no error, got %q err=%v", engine, err)
 	}
 }
+
+// TestPerconaImagesAreFullyQualified guards against a regression that made
+// dedicated Percona mode impossible on OpenShift. An unqualified reference such
+// as "percona/percona-postgresql-operator:tag" is resolved through the
+// cluster's unqualified-search-registries list; on OpenShift that does not
+// begin with Docker Hub, so CRI-O resolved it to registry.connect.redhat.com
+// and every pod sat in ImagePullBackOff with "name unknown: Image not found".
+func TestPerconaImagesAreFullyQualified(t *testing.T) {
+	for _, img := range []string{
+		defaultPerconaPostgresImage,
+		defaultPerconaPGBouncerImage,
+		defaultPerconaPGBackRestImage,
+	} {
+		host := strings.SplitN(img, "/", 2)[0]
+		if !strings.Contains(host, ".") && host != "localhost" {
+			t.Errorf("image %q is unqualified: registry host %q has no dot, so the cluster's "+
+				"unqualified-search-registries list decides where it resolves", img, host)
+		}
+	}
+}

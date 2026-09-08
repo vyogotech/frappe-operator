@@ -52,10 +52,16 @@ var (
 const perconaStatusGracePeriod = 5 * time.Minute
 
 const (
-	defaultPerconaPGVersion       = 16
-	defaultPerconaPostgresImage   = "percona/percona-postgresql-operator:2.3.1-ppg16-postgres"
-	defaultPerconaPGBouncerImage  = "percona/percona-postgresql-operator:2.3.1-ppg16-pgbouncer"
-	defaultPerconaPGBackRestImage = "percona/percona-postgresql-operator:2.3.1-ppg16-pgbackrest"
+	defaultPerconaPGVersion = 16
+	// Fully qualified on purpose. An unqualified name like
+	// "percona/percona-postgresql-operator:..." is resolved through the
+	// cluster's unqualified-search-registries list, which on OpenShift does not
+	// start with Docker Hub: CRI-O tries registry.connect.redhat.com first and
+	// the pull fails with "name unknown: Image not found", leaving every
+	// dedicated Percona cluster stuck in ImagePullBackOff.
+	defaultPerconaPostgresImage   = "docker.io/percona/percona-postgresql-operator:2.3.1-ppg16-postgres"
+	defaultPerconaPGBouncerImage  = "docker.io/percona/percona-postgresql-operator:2.3.1-ppg16-pgbouncer"
+	defaultPerconaPGBackRestImage = "docker.io/percona/percona-postgresql-operator:2.3.1-ppg16-pgbackrest"
 )
 
 // PerconaPostgresProvider implements database.Provider for dedicated Percona PostgreSQL clusters
