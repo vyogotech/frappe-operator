@@ -556,7 +556,7 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         name:
-                          description: Name of the repository (e.g., "company-private", "frappe-community")
+                          description: Name of the repository (e.g., "company-private", "vyogo-official")
                           type: string
                         priority:
                           default: 50
@@ -7792,8 +7792,8 @@ data:
   fpmRepositories: |
     [
       {
-        "name": "frappe-community",
-        "url": "https://fpm.frappe.io",
+        "name": "vyogo-official",
+        "url": "https://fpm.vyogo.tech",
         "priority": 100
       }
     ]

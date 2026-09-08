@@ -177,8 +177,8 @@ data:
   fpmRepositories: |
     [
       {
-        "name": "frappe-community",
-        "url": "https://fpm.frappe.io",
+        "name": "vyogo-official",
+        "url": "https://fpm.vyogo.tech",
         "priority": 100
       }
     ]

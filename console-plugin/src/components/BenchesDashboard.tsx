@@ -1,201 +1,163 @@
-import React, { useState } from 'react';
-import '../patternfly-theme.css';
+import * as React from 'react';
 import {
-  PageSection,
-  Title,
-  Card,
-  CardBody,
-  SearchInput,
-} from '@patternfly/react-core';
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { Server, Layers, Plus, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+  ListPageHeader,
+  ListPageCreateDropdown,
+  ListPageBody,
+  ListPageFilter,
+  VirtualizedTable,
+  TableData,
+  useListPageFilter,
+  useK8sWatchResource,
+  ResourceLink,
+  Timestamp,
+  RowProps,
+  TableColumn,
+  useActiveNamespace,
+} from '@openshift-console/dynamic-plugin-sdk';
+import { Label } from '@patternfly/react-core';
+import { FrappeBenchGVK } from '../frappe/models';
+import { FrappeBench } from '../frappe/types';
+import { benchAppSources, createYAMLPath, navigateTo, phaseColor } from '../frappe/utils';
+import { DatabaseLabel, RedisLabel } from './DataServiceLabels';
+import PluginRoot from './PluginRoot';
 
-export interface FrappeBenchResource {
-  name: string;
-  namespace: string;
-  frappeVersion: string;
-  apps: string[];
-  storageSize: string;
-  ready: boolean;
-  activeSites: number;
-  fpmReposCount: number;
-}
+// ── Columns ──────────────────────────────────────────────────────────────────
 
-export const BenchesDashboard: React.FC = () => {
-  const [filter, setFilter] = useState('');
+const columns: TableColumn<FrappeBench>[] = [
+  { title: 'Name',         id: 'name' },
+  { title: 'Namespace',    id: 'namespace' },
+  { title: 'Version',      id: 'version' },
+  { title: 'Status',       id: 'status' },
+  { title: 'Apps',         id: 'apps' },
+  { title: 'Database',     id: 'database' },
+  { title: 'Redis',        id: 'redis' },
+  { title: 'Tenant Sites', id: 'sites' },
+  { title: 'Created',      id: 'created' },
+];
 
-  // Sample data reflecting active FrappeBench custom resources
-  const benches: FrappeBenchResource[] = [
-    {
-      name: 'production-bench',
-      namespace: 'frappe-system',
-      frappeVersion: 'version-15',
-      apps: ['frappe', 'erpnext', 'hrms'],
-      storageSize: '50Gi',
-      ready: true,
-      activeSites: 12,
-      fpmReposCount: 2,
-    },
-    {
-      name: 'staging-bench',
-      namespace: 'frappe-staging',
-      frappeVersion: 'version-15',
-      apps: ['frappe', 'erpnext'],
-      storageSize: '20Gi',
-      ready: true,
-      activeSites: 3,
-      fpmReposCount: 1,
-    },
-  ];
+// ── Row ───────────────────────────────────────────────────────────────────────
 
-  const filtered = benches.filter(
-    (b) =>
-      b.name.toLowerCase().includes(filter.toLowerCase()) ||
-      b.namespace.toLowerCase().includes(filter.toLowerCase())
-  );
+const BenchRow: React.FC<RowProps<FrappeBench>> = ({ obj, activeColumnIDs }) => {
+  const phase = obj.status?.phase;
+  const apps = benchAppSources(obj);
 
   return (
-    <PageSection className="frappe-plugin-page">
-      {/* Header Container */}
-      <div className="frappe-header-container">
-        <div>
-          <Title headingLevel="h1" size="2xl" className="frappe-header-title">
-            <Server color="#0066CC" size={30} />
-            Frappe Benches
-          </Title>
-          <div className="frappe-header-subtitle">
-            Enterprise multi-tenant infrastructure, runtime worker pools, and automated bench lifecycle management for OpenShift.
-          </div>
+    <>
+      <TableData id="name" activeColumnIDs={activeColumnIDs}>
+        <ResourceLink
+          groupVersionKind={FrappeBenchGVK}
+          name={obj.metadata!.name}
+          namespace={obj.metadata!.namespace}
+        />
+      </TableData>
+
+      <TableData id="namespace" activeColumnIDs={activeColumnIDs}>
+        <ResourceLink kind="Namespace" name={obj.metadata!.namespace} />
+      </TableData>
+
+      <TableData id="version" activeColumnIDs={activeColumnIDs}>
+        <Label isCompact color="blue">{obj.spec?.frappeVersion ?? '—'}</Label>
+      </TableData>
+
+      <TableData id="status" activeColumnIDs={activeColumnIDs}>
+        {phase ? (
+          <Label isCompact color={phaseColor(phase)}>{phase}</Label>
+        ) : '—'}
+      </TableData>
+
+      <TableData id="apps" activeColumnIDs={activeColumnIDs}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {apps.map((app) => (
+            <Label key={app.name} isCompact>{app.name}</Label>
+          ))}
+          {apps.length === 0 && '—'}
         </div>
-        <a
-          href="/k8s/all-namespaces/vyogo.tech~v1~FrappeBench/~new"
-          className="frappe-btn-primary"
-        >
-          <Plus size={16} />
-          Create FrappeBench
-        </a>
-      </div>
+      </TableData>
 
-      {/* KPI Cards Grid */}
-      <div className="frappe-metrics-grid">
-        <Card className="frappe-stat-card">
-          <div className="frappe-stat-title">
-            <Layers size={18} color="#0066CC" />
-            Total Benches
-          </div>
-          <div className="frappe-stat-number primary">{benches.length}</div>
-        </Card>
+      <TableData id="database" activeColumnIDs={activeColumnIDs}>
+        <DatabaseLabel db={obj.spec?.dbConfig} />
+      </TableData>
 
-        <Card className="frappe-stat-card">
-          <div className="frappe-stat-title">
-            <Server size={18} color="#3E8635" />
-            Active Tenant Sites
-          </div>
-          <div className="frappe-stat-number success">
-            {benches.reduce((acc, b) => acc + b.activeSites, 0)}
-          </div>
-        </Card>
+      <TableData id="redis" activeColumnIDs={activeColumnIDs}>
+        <RedisLabel redis={obj.spec?.redisConfig} />
+      </TableData>
 
-        <Card className="frappe-stat-card">
-          <div className="frappe-stat-title">
-            <ShieldCheck size={18} color="#6A27B8" />
-            FPM Air-Gapped Repos
-          </div>
-          <div className="frappe-stat-number purple">
-            {benches.reduce((acc, b) => acc + b.fpmReposCount, 0)}
-          </div>
-        </Card>
-      </div>
+      <TableData id="sites" activeColumnIDs={activeColumnIDs}>
+        {obj.status?.activeSites ?? '—'}
+      </TableData>
 
-      {/* Table Card */}
-      <Card className="frappe-table-card">
-        <div className="frappe-toolbar-bar">
-          <SearchInput
-            placeholder="Filter benches by name or namespace..."
-            value={filter}
-            onChange={(_e, val) => setFilter(val)}
-            onClear={() => setFilter('')}
-            style={{ minWidth: 340 }}
-          />
-          <div style={{ fontSize: 13, color: '#6A6E73' }}>
-            Showing {filtered.length} of {benches.length} benches
-          </div>
-        </div>
-
-        <CardBody style={{ padding: 0 }}>
-          <Table aria-label="Frappe Benches Table" variant="compact">
-            <Thead>
-              <Tr>
-                <Th>Name</Th>
-                <Th>Namespace</Th>
-                <Th>Version</Th>
-                <Th>Status</Th>
-                <Th>Apps</Th>
-                <Th>Tenant Sites</Th>
-                <Th>FPM Repos</Th>
-                <Th>Storage</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {filtered.map((bench) => (
-                <Tr key={bench.name}>
-                  <Td dataLabel="Name" style={{ fontWeight: 600 }}>
-                    <a
-                      href={`/k8s/ns/${bench.namespace}/vyogo.tech~v1~FrappeBench/${bench.name}`}
-                      style={{ color: '#0066CC', textDecoration: 'none', fontWeight: 600 }}
-                    >
-                      {bench.name}
-                    </a>
-                  </Td>
-                  <Td dataLabel="Namespace">
-                    <span className="frappe-tag frappe-tag-blue">{bench.namespace}</span>
-                  </Td>
-                  <Td dataLabel="Version">
-                    <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>
-                      {bench.frappeVersion}
-                    </code>
-                  </Td>
-                  <Td dataLabel="Status">
-                    {bench.ready ? (
-                      <span className="frappe-tag frappe-tag-green">
-                        <CheckCircle2 size={13} />
-                        Ready
-                      </span>
-                    ) : (
-                      <span className="frappe-tag frappe-tag-orange">
-                        <AlertCircle size={13} />
-                        Configuring
-                      </span>
-                    )}
-                  </Td>
-                  <Td dataLabel="Apps">
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {bench.apps.map((app) => (
-                        <span key={app} className="frappe-tag frappe-tag-gray">
-                          {app}
-                        </span>
-                      ))}
-                    </div>
-                  </Td>
-                  <Td dataLabel="Tenant Sites" style={{ fontWeight: 600 }}>
-                    {bench.activeSites} sites
-                  </Td>
-                  <Td dataLabel="FPM Repos">
-                    <span className="frappe-tag frappe-tag-purple">
-                      {bench.fpmReposCount} Repos
-                    </span>
-                  </Td>
-                  <Td dataLabel="Storage" style={{ color: '#6A6E73' }}>
-                    {bench.storageSize}
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-        </CardBody>
-      </Card>
-    </PageSection>
+      <TableData id="created" activeColumnIDs={activeColumnIDs}>
+        <Timestamp timestamp={obj.metadata!.creationTimestamp!} />
+      </TableData>
+    </>
   );
 };
 
-export default BenchesDashboard;
+// ── Page ─────────────────────────────────────────────────────────────────────
+
+export const BenchesDashboard: React.FC = () => {
+  const [activeNamespace] = useActiveNamespace();
+  const [benches, loaded, loadError] = useK8sWatchResource<FrappeBench[]>({
+    groupVersionKind: FrappeBenchGVK,
+    isList: true,
+    namespaced: false,
+  });
+
+  const [staticData, filteredData, onFilterChange] = useListPageFilter(benches ?? []);
+
+  const namespace = activeNamespace !== '#ALL_NS#' ? activeNamespace : undefined;
+
+  const onCreate = React.useCallback(
+    (item: string) => {
+      navigateTo(
+        item === 'form'
+          ? `/frappe/benches/~new${namespace ? `?namespace=${encodeURIComponent(namespace)}` : ''}`
+          : createYAMLPath(FrappeBenchGVK, namespace),
+      );
+    },
+    [namespace],
+  );
+
+  return (
+    <>
+      <ListPageHeader title="Frappe Benches">
+        <ListPageCreateDropdown
+          items={{ form: 'With Form', yaml: 'With YAML' }}
+          onClick={onCreate}
+          createAccessReview={{ groupVersionKind: FrappeBenchGVK, namespace }}
+        >
+          Create Bench
+        </ListPageCreateDropdown>
+      </ListPageHeader>
+
+      <ListPageBody>
+        <ListPageFilter
+          data={staticData}
+          loaded={loaded}
+          onFilterChange={onFilterChange}
+        />
+        <VirtualizedTable<FrappeBench>
+          data={filteredData}
+          unfilteredData={benches ?? []}
+          loaded={loaded}
+          loadError={loadError}
+          columns={columns}
+          Row={BenchRow}
+        />
+      </ListPageBody>
+    </>
+  );
+};
+
+/**
+ * The console renders this through the extension's `$codeRef`, so the themed
+ * wrapper has to be the default export — it is what puts the plugin's bundled
+ * PatternFly styles and theme scope around the tree.
+ */
+const BenchesDashboardPage: React.FC<React.ComponentProps<typeof BenchesDashboard>> = (props) => (
+  <PluginRoot>
+    <BenchesDashboard {...props} />
+  </PluginRoot>
+);
+
+export default BenchesDashboardPage;

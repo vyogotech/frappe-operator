@@ -1,240 +1,221 @@
-import React, { useState } from 'react';
-import '../patternfly-theme.css';
+import * as React from 'react';
 import {
-  PageSection,
-  Title,
-  Card,
-  CardBody,
-  SearchInput,
-} from '@patternfly/react-core';
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { Globe, Database, ExternalLink, Plus, CheckCircle2, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
+  ListPageHeader,
+  ListPageCreateDropdown,
+  ListPageBody,
+  ListPageFilter,
+  VirtualizedTable,
+  TableData,
+  useListPageFilter,
+  useK8sWatchResource,
+  ResourceLink,
+  Timestamp,
+  RowProps,
+  TableColumn,
+  useActiveNamespace,
+} from '@openshift-console/dynamic-plugin-sdk';
+import { Label } from '@patternfly/react-core';
+import { FrappeBenchGVK, FrappeSiteGVK } from '../frappe/models';
+import { FrappeBench, FrappeSite } from '../frappe/types';
+import {
+  benchRefOf,
+  createYAMLPath,
+  navigateTo,
+  phaseColor,
+  siteNameOf,
+} from '../frappe/utils';
+import { DatabaseLabel } from './DataServiceLabels';
+import PluginRoot from './PluginRoot';
 
-export interface FrappeSiteResource {
-  name: string;
-  namespace: string;
-  benchName: string;
-  domain: string;
-  siteURL: string;
-  phase: 'Ready' | 'Provisioning' | 'Failed';
-  dbProvider: 'postgres' | 'mariadb' | 'external';
-  dbEngine?: 'stackgres' | 'percona';
-  dbMode: 'dedicated' | 'shared';
-  tlsEnabled: boolean;
-}
+// ── Columns ──────────────────────────────────────────────────────────────────
 
-export const SitesDirectory: React.FC = () => {
-  const [filter, setFilter] = useState('');
+const columns: TableColumn<FrappeSite>[] = [
+  { title: 'Name',         id: 'name' },
+  { title: 'Namespace',    id: 'namespace' },
+  { title: 'Parent Bench', id: 'bench' },
+  { title: 'Site / URL',   id: 'domain' },
+  { title: 'Phase',        id: 'phase' },
+  { title: 'Database',     id: 'db' },
+  { title: 'Apps',         id: 'apps' },
+  { title: 'Route',        id: 'route' },
+  { title: 'Created',      id: 'created' },
+];
 
-  const sites: FrappeSiteResource[] = [
-    {
-      name: 'prod-customer1',
-      namespace: 'frappe-system',
-      benchName: 'production-bench',
-      domain: 'customer1.myplatform.com',
-      siteURL: 'https://customer1.myplatform.com',
-      phase: 'Ready',
-      dbProvider: 'postgres',
-      dbEngine: 'stackgres',
-      dbMode: 'dedicated',
-      tlsEnabled: true,
-    },
-    {
-      name: 'prod-customer2',
-      namespace: 'frappe-system',
-      benchName: 'production-bench',
-      domain: 'erp.customer2.corp',
-      siteURL: 'https://erp.customer2.corp',
-      phase: 'Ready',
-      dbProvider: 'postgres',
-      dbEngine: 'percona',
-      dbMode: 'dedicated',
-      tlsEnabled: true,
-    },
-    {
-      name: 'staging-tenant',
-      namespace: 'frappe-staging',
-      benchName: 'staging-bench',
-      domain: 'stage.myplatform.com',
-      siteURL: 'https://stage.myplatform.com',
-      phase: 'Provisioning',
-      dbProvider: 'postgres',
-      dbEngine: 'stackgres',
-      dbMode: 'shared',
-      tlsEnabled: true,
-    },
-  ];
+type SiteRowData = { benchesByName: Record<string, FrappeBench> };
 
-  const filtered = sites.filter(
-    (s) =>
-      s.name.toLowerCase().includes(filter.toLowerCase()) ||
-      s.domain.toLowerCase().includes(filter.toLowerCase()) ||
-      s.benchName.toLowerCase().includes(filter.toLowerCase())
-  );
+// ── Row ───────────────────────────────────────────────────────────────────────
+
+const SiteRow: React.FC<RowProps<FrappeSite, SiteRowData>> = ({
+  obj,
+  activeColumnIDs,
+  rowData,
+}) => {
+  const phase = obj.status?.phase;
+  const benchRef = benchRefOf(obj);
+  const bench = benchRef ? rowData?.benchesByName?.[benchRef.name] : undefined;
+  const apps = obj.status?.installedApps ?? obj.spec?.apps ?? [];
 
   return (
-    <PageSection className="frappe-plugin-page">
-      {/* Header Container */}
-      <div className="frappe-header-container">
-        <div>
-          <Title headingLevel="h1" size="2xl" className="frappe-header-title">
-            <Globe color="#0066CC" size={30} />
-            Tenant Sites Directory
-          </Title>
-          <div className="frappe-header-subtitle">
-            Enterprise multi-tenant Frappe & ERPNext tenant sites with automated database provisioning and TLS routing.
-          </div>
-        </div>
-        <a
-          href="/k8s/all-namespaces/vyogo.tech~v1~FrappeSite/~new"
-          className="frappe-btn-primary"
-        >
-          <Plus size={16} />
-          Create FrappeSite
-        </a>
-      </div>
+    <>
+      <TableData id="name" activeColumnIDs={activeColumnIDs}>
+        <ResourceLink
+          groupVersionKind={FrappeSiteGVK}
+          name={obj.metadata!.name}
+          namespace={obj.metadata!.namespace}
+        />
+      </TableData>
 
-      {/* KPI Cards Grid */}
-      <div className="frappe-metrics-grid">
-        <Card className="frappe-stat-card">
-          <div className="frappe-stat-title">
-            <Globe size={18} color="#0066CC" />
-            Total Tenant Sites
-          </div>
-          <div className="frappe-stat-number primary">{sites.length}</div>
-        </Card>
+      <TableData id="namespace" activeColumnIDs={activeColumnIDs}>
+        <ResourceLink kind="Namespace" name={obj.metadata!.namespace} />
+      </TableData>
 
-        <Card className="frappe-stat-card">
-          <div className="frappe-stat-title">
-            <Database size={18} color="#3E8635" />
-            Dedicated Postgres
-          </div>
-          <div className="frappe-stat-number success">
-            {sites.filter((s) => s.dbMode === 'dedicated').length}
-          </div>
-        </Card>
-
-        <Card className="frappe-stat-card">
-          <div className="frappe-stat-title">
-            <ShieldCheck size={18} color="#6A27B8" />
-            TLS Encrypted Routes
-          </div>
-          <div className="frappe-stat-number purple">
-            {sites.filter((s) => s.tlsEnabled).length}
-          </div>
-        </Card>
-      </div>
-
-      {/* Table Card */}
-      <Card className="frappe-table-card">
-        <div className="frappe-toolbar-bar">
-          <SearchInput
-            placeholder="Filter sites by name, domain, or bench..."
-            value={filter}
-            onChange={(_e, val) => setFilter(val)}
-            onClear={() => setFilter('')}
-            style={{ minWidth: 340 }}
+      <TableData id="bench" activeColumnIDs={activeColumnIDs}>
+        {benchRef ? (
+          <ResourceLink
+            groupVersionKind={FrappeBenchGVK}
+            name={benchRef.name}
+            namespace={benchRef.namespace}
           />
-          <div style={{ fontSize: 13, color: '#6A6E73' }}>
-            Showing {filtered.length} of {sites.length} sites
-          </div>
-        </div>
+        ) : '—'}
+      </TableData>
 
-        <CardBody style={{ padding: 0 }}>
-          <Table aria-label="Frappe Sites Table" variant="compact">
-            <Thead>
-              <Tr>
-                <Th>Site Name</Th>
-                <Th>Namespace</Th>
-                <Th>Parent Bench</Th>
-                <Th>Domain & Ingress</Th>
-                <Th>Phase</Th>
-                <Th>Database Engine</Th>
-                <Th>DB Mode</Th>
-                <Th>TLS</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {filtered.map((site) => (
-                <Tr key={site.name}>
-                  <Td dataLabel="Site Name" style={{ fontWeight: 600 }}>
-                    <a
-                      href={`/k8s/ns/${site.namespace}/vyogo.tech~v1~FrappeSite/${site.name}`}
-                      style={{ color: '#0066CC', textDecoration: 'none', fontWeight: 600 }}
-                    >
-                      {site.name}
-                    </a>
-                  </Td>
-                  <Td dataLabel="Namespace">
-                    <span className="frappe-tag frappe-tag-blue">{site.namespace}</span>
-                  </Td>
-                  <Td dataLabel="Parent Bench">
-                    <a
-                      href={`/k8s/ns/${site.namespace}/vyogo.tech~v1~FrappeBench/${site.benchName}`}
-                      style={{ color: '#0066CC', textDecoration: 'none' }}
-                    >
-                      {site.benchName}
-                    </a>
-                  </Td>
-                  <Td dataLabel="Domain & Ingress">
-                    <a
-                      href={site.siteURL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0066CC', textDecoration: 'none' }}
-                    >
-                      {site.domain}
-                      <ExternalLink size={12} />
-                    </a>
-                  </Td>
-                  <Td dataLabel="Phase">
-                    {site.phase === 'Ready' && (
-                      <span className="frappe-tag frappe-tag-green">
-                        <CheckCircle2 size={13} />
-                        Ready
-                      </span>
-                    )}
-                    {site.phase === 'Provisioning' && (
-                      <span className="frappe-tag frappe-tag-orange">
-                        <Clock size={13} />
-                        Provisioning
-                      </span>
-                    )}
-                    {site.phase === 'Failed' && (
-                      <span className="frappe-tag" style={{ background: '#fdf2f2', color: '#c9190b', border: '1px solid #f9c6c6' }}>
-                        <AlertTriangle size={13} />
-                        Failed
-                      </span>
-                    )}
-                  </Td>
-                  <Td dataLabel="Database Engine">
-                    <span className="frappe-tag frappe-tag-gray">
-                      {site.dbProvider} ({site.dbEngine})
-                    </span>
-                  </Td>
-                  <Td dataLabel="DB Mode">
-                    <span className={site.dbMode === 'dedicated' ? 'frappe-tag frappe-tag-blue' : 'frappe-tag frappe-tag-gray'}>
-                      {site.dbMode}
-                    </span>
-                  </Td>
-                  <Td dataLabel="TLS">
-                    {site.tlsEnabled ? (
-                      <span className="frappe-tag frappe-tag-green">
-                        <ShieldCheck size={13} />
-                        Active
-                      </span>
-                    ) : (
-                      <span className="frappe-tag frappe-tag-gray">Disabled</span>
-                    )}
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-        </CardBody>
-      </Card>
-    </PageSection>
+      <TableData id="domain" activeColumnIDs={activeColumnIDs}>
+        {obj.status?.siteURL ? (
+          <a href={obj.status.siteURL} target="_blank" rel="noopener noreferrer">
+            {siteNameOf(obj)}
+          </a>
+        ) : (
+          <code>{siteNameOf(obj) || '—'}</code>
+        )}
+      </TableData>
+
+      <TableData id="phase" activeColumnIDs={activeColumnIDs}>
+        {phase ? (
+          <Label isCompact color={phaseColor(phase)}>{phase}</Label>
+        ) : '—'}
+      </TableData>
+
+      <TableData id="db" activeColumnIDs={activeColumnIDs}>
+        {/* A site without its own dbConfig runs on whatever the bench declares,
+            so resolve through the bench and mark the value as inherited. */}
+        <DatabaseLabel
+          db={obj.spec?.dbConfig?.provider ? obj.spec.dbConfig : bench?.spec?.dbConfig}
+          inheritedFrom={obj.spec?.dbConfig?.provider ? undefined : benchRef?.name}
+        />
+      </TableData>
+
+      <TableData id="apps" activeColumnIDs={activeColumnIDs}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {apps.map((app) => (
+            <Label key={app} isCompact color="blue">{app}</Label>
+          ))}
+          {apps.length === 0 && '—'}
+        </div>
+      </TableData>
+
+      <TableData id="route" activeColumnIDs={activeColumnIDs}>
+        {obj.spec?.routeConfig?.enabled === false ? (
+          <Label isCompact color="grey">Disabled</Label>
+        ) : (
+          <Label isCompact color="green">
+            {obj.spec?.routeConfig?.tlsTermination ?? 'edge'}
+          </Label>
+        )}
+      </TableData>
+
+      <TableData id="created" activeColumnIDs={activeColumnIDs}>
+        <Timestamp timestamp={obj.metadata!.creationTimestamp!} />
+      </TableData>
+    </>
   );
 };
 
-export default SitesDirectory;
+// ── Page ─────────────────────────────────────────────────────────────────────
+
+export const SitesDirectory: React.FC = () => {
+  const [activeNamespace] = useActiveNamespace();
+
+  const [sites, loaded, loadError] = useK8sWatchResource<FrappeSite[]>({
+    groupVersionKind: FrappeSiteGVK,
+    isList: true,
+    namespaced: false,
+  });
+
+  // Benches are watched so a site that inherits its database configuration can
+  // still show what it actually runs on.
+  const [benches] = useK8sWatchResource<FrappeBench[]>({
+    groupVersionKind: FrappeBenchGVK,
+    isList: true,
+    namespaced: false,
+  });
+
+  const benchesByName = React.useMemo(
+    () =>
+      (benches ?? []).reduce<Record<string, FrappeBench>>((acc, b) => {
+        if (b.metadata?.name) {
+          acc[b.metadata.name] = b;
+        }
+        return acc;
+      }, {}),
+    [benches],
+  );
+
+  const [staticData, filteredData, onFilterChange] = useListPageFilter(sites ?? []);
+
+  const namespace = activeNamespace !== '#ALL_NS#' ? activeNamespace : undefined;
+
+  const onCreate = React.useCallback(
+    (item: string) => {
+      navigateTo(
+        item === 'form'
+          ? `/frappe/sites/~new${namespace ? `?namespace=${encodeURIComponent(namespace)}` : ''}`
+          : createYAMLPath(FrappeSiteGVK, namespace),
+      );
+    },
+    [namespace],
+  );
+
+  return (
+    <>
+      <ListPageHeader title="Tenant Sites">
+        <ListPageCreateDropdown
+          items={{ form: 'With Form', yaml: 'With YAML' }}
+          onClick={onCreate}
+          createAccessReview={{ groupVersionKind: FrappeSiteGVK, namespace }}
+        >
+          Create Site
+        </ListPageCreateDropdown>
+      </ListPageHeader>
+
+      <ListPageBody>
+        <ListPageFilter
+          data={staticData}
+          loaded={loaded}
+          onFilterChange={onFilterChange}
+        />
+        <VirtualizedTable<FrappeSite, SiteRowData>
+          data={filteredData}
+          unfilteredData={sites ?? []}
+          loaded={loaded}
+          loadError={loadError}
+          columns={columns}
+          Row={SiteRow}
+          rowData={{ benchesByName }}
+        />
+      </ListPageBody>
+    </>
+  );
+};
+
+/**
+ * The console renders this through the extension's `$codeRef`, so the themed
+ * wrapper has to be the default export — it is what puts the plugin's bundled
+ * PatternFly styles and theme scope around the tree.
+ */
+const SitesDirectoryPage: React.FC<React.ComponentProps<typeof SitesDirectory>> = (props) => (
+  <PluginRoot>
+    <SitesDirectory {...props} />
+  </PluginRoot>
+);
+
+export default SitesDirectoryPage;

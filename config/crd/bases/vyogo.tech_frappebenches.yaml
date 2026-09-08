@@ -577,7 +577,7 @@ spec:
                           x-kubernetes-map-type: atomic
                         name:
                           description: Name of the repository (e.g., "company-private",
-                            "frappe-community")
+                            "vyogo-official")
                           type: string
                         priority:
                           default: 50

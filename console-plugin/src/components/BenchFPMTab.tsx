@@ -1,91 +1,158 @@
-import React from 'react';
-import '../patternfly-theme.css';
-import { Card, CardBody, CardTitle, Label, Title } from '@patternfly/react-core';
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { Package, ShieldCheck } from 'lucide-react';
+import * as React from 'react';
+import {
+  K8sResourceCommon,
+  ResourceLink,
+  VirtualizedTable,
+  TableData,
+  RowProps,
+  TableColumn,
+} from '@openshift-console/dynamic-plugin-sdk';
+import {
+  Card,
+  CardBody,
+  CardTitle,
+  Label,
+  Title,
+  EmptyState,
+  EmptyStateBody,
+} from '@patternfly/react-core';
+import PluginRoot from './PluginRoot';
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 export interface BenchFPMTabProps {
-  obj?: any;
+  obj?: K8sResourceCommon & {
+    spec?: {
+      apps?: (string | { name: string; source: string })[];
+      fpmConfig?: {
+        repositories?: {
+          name: string;
+          url?: string;
+          priority?: number;
+          authSecretRef?: { name: string };
+        }[];
+      };
+    };
+  };
 }
 
+interface FPMRepoRowItem {
+  name: string;
+  url?: string;
+  priority?: number;
+  authSecretName?: string;
+  namespace?: string;
+}
+
+const repoColumns: TableColumn<FPMRepoRowItem>[] = [
+  { title: 'Repository Name', id: 'name' },
+  { title: 'Endpoint URL',    id: 'url' },
+  { title: 'Priority',        id: 'priority' },
+  { title: 'Auth Secret',     id: 'authSecret' },
+];
+
+const FPMRepoRow: React.FC<RowProps<FPMRepoRowItem>> = ({ obj, activeColumnIDs }) => (
+  <>
+    <TableData id="name" activeColumnIDs={activeColumnIDs}>
+      <strong>{obj.name}</strong>
+    </TableData>
+    <TableData id="url" activeColumnIDs={activeColumnIDs}>
+      <code>{obj.url ?? '—'}</code>
+    </TableData>
+    <TableData id="priority" activeColumnIDs={activeColumnIDs}>
+      <Label isCompact color="grey">{obj.priority ?? 50}</Label>
+    </TableData>
+    <TableData id="authSecret" activeColumnIDs={activeColumnIDs}>
+      {obj.authSecretName ? (
+        <ResourceLink
+          kind="Secret"
+          name={obj.authSecretName}
+          namespace={obj.namespace}
+        />
+      ) : (
+        '—'
+      )}
+    </TableData>
+  </>
+);
+
+// ── Component ────────────────────────────────────────────────────────────────
+
 export const BenchFPMTab: React.FC<BenchFPMTabProps> = ({ obj }) => {
-  const fpmConfig = obj?.spec?.fpmConfig;
-  const repos = fpmConfig?.repositories || [];
-  const apps = obj?.spec?.apps || [];
+  const apps = obj?.spec?.apps ?? [];
+  const repos = obj?.spec?.fpmConfig?.repositories ?? [];
+  const namespace = obj?.metadata?.namespace;
+
+  const repoRows: FPMRepoRowItem[] = React.useMemo(() => {
+    return repos.map((r) => ({
+      name: r.name,
+      url: r.url,
+      priority: r.priority,
+      authSecretName: r.authSecretRef?.name,
+      namespace,
+    }));
+  }, [repos, namespace]);
 
   return (
-    <div style={{ padding: '24px 0' }}>
-      <Title headingLevel="h2" size="xl" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <ShieldCheck color="#00BC86" size={22} />
-        Air-Gapped Package Manager (FPM) Configuration
-      </Title>
-
-      <Card style={{ marginBottom: 20 }}>
-        <CardTitle>Installed Applications on Bench</CardTitle>
+    <div className="co-m-pane__body">
+      {/* Installed Apps */}
+      <Card style={{ marginBottom: '16px' }}>
+        <CardTitle>Installed Applications</CardTitle>
         <CardBody>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {apps.length > 0 ? (
-              apps.map((app: any) => {
+          {apps.length > 0 ? (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {apps.map((app) => {
                 const name = typeof app === 'string' ? app : app.name;
-                const source = typeof app === 'object' ? app.source : 'image/fpm';
+                const source = typeof app === 'object' ? app.source : undefined;
                 return (
-                  <Label key={name} color="blue">
-                    {name} ({source})
+                  <Label key={name} color="blue" isCompact>
+                    {name}{source ? ` (${source})` : ''}
                   </Label>
                 );
-              })
-            ) : (
-              <p style={{ color: '#6A6E73' }}>No explicit apps list configured on bench spec.</p>
-            )}
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardTitle>Configured FPM Repositories</CardTitle>
-        <CardBody>
-          {repos.length > 0 ? (
-            <Table aria-label="Bench FPM Repos" variant="compact">
-              <Thead>
-                <Tr>
-                  <Th>Repository Name</Th>
-                  <Th>Endpoint URL</Th>
-                  <Th>Priority</Th>
-                  <Th>Auth Secret</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {repos.map((repo: any) => (
-                  <Tr key={repo.name}>
-                    <Td dataLabel="Name" style={{ fontWeight: 600 }}>
-                      {repo.name}
-                    </Td>
-                    <Td dataLabel="URL">
-                      <code>{repo.url}</code>
-                    </Td>
-                    <Td dataLabel="Priority">{repo.priority || 50}</Td>
-                    <Td dataLabel="Auth Secret">
-                      {repo.authSecretRef?.name ? (
-                        <Label color="blue" isCompact>
-                          {repo.authSecretRef.name}
-                        </Label>
-                      ) : (
-                        'None'
-                      )}
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
+              })}
+            </div>
           ) : (
-            <p style={{ color: '#6A6E73' }}>
-              No custom FPM repositories declared on this bench. Bench uses operator-level defaults or local images.
-            </p>
+            <EmptyState variant="xs">
+              <EmptyStateBody>No apps configured on this bench spec.</EmptyStateBody>
+            </EmptyState>
           )}
         </CardBody>
       </Card>
+
+      {/* FPM Repositories */}
+      <Title headingLevel="h3" size="lg" style={{ marginBottom: '8px' }}>
+        Configured FPM Repositories
+      </Title>
+
+      {repoRows.length > 0 ? (
+        <VirtualizedTable<FPMRepoRowItem>
+          data={repoRows}
+          unfilteredData={repoRows}
+          loaded={true}
+          loadError={undefined}
+          columns={repoColumns}
+          Row={FPMRepoRow}
+        />
+      ) : (
+        <EmptyState variant="xs">
+          <EmptyStateBody>
+            No FPM repositories configured on this bench. Bench uses operator-level defaults or local images.
+          </EmptyStateBody>
+        </EmptyState>
+      )}
     </div>
   );
 };
 
-export default BenchFPMTab;
+/**
+ * The console renders this through the extension's `$codeRef`, so the themed
+ * wrapper has to be the default export — it is what puts the plugin's bundled
+ * PatternFly styles and theme scope around the tree.
+ */
+const BenchFPMTabPage: React.FC<React.ComponentProps<typeof BenchFPMTab>> = (props) => (
+  <PluginRoot>
+    <BenchFPMTab {...props} />
+  </PluginRoot>
+);
+
+export default BenchFPMTabPage;
