@@ -18,8 +18,8 @@ spec:
     spec:
       containers:
         - name: plugin
-          image: ghcr.io/vyogotech/frappe-console-plugin:v5.2.0
-          imagePullPolicy: IfNotPresent
+          image: image-registry.openshift-image-registry.svc:5000/frappe-operator-system/frappe-console-plugin:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
               name: http
