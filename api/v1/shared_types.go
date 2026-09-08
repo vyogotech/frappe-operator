@@ -174,7 +174,15 @@ type IngressConfig struct {
 
 // TLSConfig defines TLS/SSL configuration
 type TLSConfig struct {
-	// Enabled controls whether TLS is enabled
+	// Enabled requests TLS for this site's Ingress: a TLS block and an HTTPS
+	// redirect are added, using SecretName (or Issuer, if set) to obtain the
+	// certificate. This field is a per-site opt-in and has no effect on
+	// OpenShift Routes, which are always HTTPS via edge termination.
+	//
+	// If the operator is running with its enforceHTTPS setting on (see the
+	// frappe-operator-config ConfigMap / FRAPPE_ENFORCE_HTTPS), every site's
+	// Ingress is TLS-only regardless of this field, and any ingress
+	// annotation that tries to disable the HTTPS redirect is ignored.
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
 

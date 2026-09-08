@@ -2,154 +2,86 @@
 layout: default
 title: Frappe Operator Documentation
 nav_order: 1
-description: "Complete guide for deploying and managing Frappe Framework applications on Kubernetes"
+description: "Complete guide for deploying and managing Frappe Framework applications on Kubernetes & OpenShift"
 permalink: /
 has_toc: true
 ---
 
 # Frappe Operator Documentation
 
-Welcome to the comprehensive documentation for the **Frappe Operator** - a Kubernetes operator that automates the deployment, scaling, and management of Frappe Framework applications (including ERPNext) on Kubernetes clusters.
+Welcome to the comprehensive documentation for the **Frappe Operator** by **Vyogo Technologies** — an enterprise-grade Kubernetes operator that automates the deployment, scaling, multi-database provisioning, and lifecycle management of [Frappe Framework](https://frappeframework.com/) applications (including ERPNext) on Kubernetes and OpenShift.
 
 ## What is Frappe Operator?
 
-Frappe Operator brings the power of Kubernetes orchestration to Frappe deployments, making it easy to:
+Frappe Operator brings cloud-native Kubernetes orchestration to Frappe deployments, making it easy to:
 
-- 🚀 **Deploy** Frappe applications with a single command
-- 📈 **Scale** automatically based on traffic and resource usage
-- 🏢 **Manage** multiple sites efficiently on shared infrastructure
-- 🔄 **Update** with zero-downtime rolling updates
-- 🔐 **Secure** with auto-generated credentials and RBAC
+- <i data-lucide="rocket"></i> **Declarative Deployment** — Deploy Frappe & ERPNext applications with declarative YAML manifests
+- <i data-lucide="layers"></i> **Multi-Tenancy** — Run hundreds of isolated sites on shared bench infrastructure
+- <i data-lucide="database"></i> **Polymorphic Databases** — Seamlessly provision PostgreSQL (StackGres & Percona) or MariaDB
+- <i data-lucide="shield-check"></i> **Enterprise Security** — Fully compatible with OpenShift `restricted-v2` SCCs out-of-the-box
+- <i data-lucide="lock"></i> **HTTPS-Only Ingress** — Automatic TLS certificate mounting and edge redirection
+- <i data-lucide="trending-up"></i> **Provider-Agnostic Autoscaling** — Scale workers and web tiers dynamically using HPA or KEDA
+- <i data-lucide="refresh-cw"></i> **Zero-Downtime Lifecycles** — Rolling updates and declarative schema migrations
 
 ## Quick Navigation
 
-### 📘 Comprehensive Guide
+### <i data-lucide="book-open"></i> Core Guides
+- **[Getting Started](getting-started.md)** - 5-minute quickstart on Kubernetes or OpenShift
+- **[Comprehensive Guide](COMPREHENSIVE_GUIDE.md)** - Complete reference guide and production best practices
+- **[Architecture Overview](ARCHITECTURE.md)** - Internal controller architecture, CRDs, and lifecycle loops
 
-- **[Complete Reference Guide](COMPREHENSIVE_GUIDE.md)** - Everything you need to know in one place
+### <i data-lucide="server"></i> Platform & Installation
+- **[OpenShift Production Guide](INSTALL_OPENSHIFT.md)** - Complete OpenShift guide & `restricted-v2` SCC compliance
+- **[Helm Installation Guide](INSTALLATION_HELM.md)** - Deploy via official Vyogo Helm chart
+- **[Upgrade Guide](upgrade-guide.md)** - Seamlessly upgrade to v5.2.0
 
-### For Platform Operators
+### <i data-lucide="database"></i> Database Management
+- **[PostgreSQL Integration Guide](POSTGRESQL_INTEGRATION.md)** - Dedicated (StackGres & Percona) & shared PostgreSQL
+- **[MariaDB Integration Guide](MARIADB_INTEGRATION.md)** - Dedicated & shared MariaDB Operator integration
+- **[External Resources](external-resources.md)** - Connect to external AWS RDS, Cloud SQL, and Redis
 
-- **[Installation Guide](getting-started.md)** - Get started in 5 minutes
-- **[Configuration Guide](COMPREHENSIVE_GUIDE.md#configuration)** - Configure operator defaults
-- **[Image Configuration](COMPREHENSIVE_GUIDE.md#image-configuration)** - Set up custom registries
-- **[Operations Guide](operations.md)** - Day-to-day operations and maintenance
-- **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
-
-### For Developers
-
-- **[Getting Started](getting-started.md)** - Quick start guide
-- **[Concepts](concepts.md)** - Understanding Frappe Operator architecture
-- **[API Reference](api-reference.md)** - Complete CRD documentation
-- **[Examples](examples.md)** - Real-world deployment examples
-- **[Site App Installation](SITE_APP_INSTALLATION.md)** - Install specific apps per site
-- **[Backup Management](examples.md#site-backup-management)** - Automated site backups
-- **[Best Practices](COMPREHENSIVE_GUIDE.md#best-practices)** - Production deployment patterns
-
-## Key Features
-
-### 🎯 Core Capabilities
-
-- **Declarative Configuration** - Define infrastructure as YAML
-- **Multi-Tenancy** - Run hundreds of sites on shared infrastructure
-- **Auto-Scaling** - Scale workers based on queue length (KEDA integration)
-- **Database Management** - Automatic MariaDB/PostgreSQL provisioning
-- **External Database Support** - Connect to RDS, Cloud SQL, or any external DB
-- **OpenShift Ready** - Optimized for restricted security contexts
-- **GitOps Compatible** - Manage infrastructure as code
-
-### 🔧 Advanced Features
-
-- **Site-Specific App Installation** - Install different apps per site with graceful degradation
-- **Hybrid App Installation** - Install from FPM packages, Git, or images
-- **Worker Autoscaling** - Scale-to-zero for cost optimization
-- **Site reconciliation concurrency** - Tune concurrent site reconciles for 100+ sites (operator config or per-bench)
-- **Backup Management** - Automated backups with retention policies
-- **Observability** - Built-in Prometheus metrics and logging
-- **Multi-Platform** - ARM64 and AMD64 compatible
+### <i data-lucide="activity"></i> Day-2 Operations & Reference
+- **[Operations Guide](operations.md)** - Site provisioning, updates, and maintenance
+- **[Site App Installation](SITE_APP_INSTALLATION.md)** - Declarative per-site app installation
+- **[API Reference](api-reference.md)** - Complete CRD specification
+- **[Examples](examples.md)** - Ready-to-use production manifests
+- **[Troubleshooting Guide](troubleshooting.md)** - Common issues, diagnostics, and debugging
+- **[Monitoring & Metrics](monitoring.md)** - Prometheus metrics and Grafana dashboards
 
 ## Quick Start
 
 ```bash
-# Install operator
-curl -fsSL https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.sh | bash
+# 1. Install Frappe Operator using official Helm chart
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
+helm repo update
+helm install frappe-operator frappe-operator/frappe-operator \
+  --namespace frappe-operator-system \
+  --create-namespace
 
-# Create a bench
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-bench.yaml
+# 2. Deploy a bench
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/examples/basic-bench.yaml
 
-# Create a site
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-site.yaml
+# 3. Deploy a site
+kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/examples/basic-site.yaml
 ```
-
-## Documentation Structure
-
-### 📚 Getting Started
-- [Installation](getting-started.md) - Step-by-step installation guide
-- [Quick Start](getting-started.md#quick-start) - Deploy your first bench and site
-- [Prerequisites](getting-started.md#prerequisites) - What you need before starting
-
-### 🏗️ Architecture & Concepts
-- [Concepts](concepts.md) - Understanding how Frappe Operator works
-- [Architecture Overview](concepts.md#architecture) - Component interactions
-- [Resource Model](concepts.md#resource-model) - CRDs and their relationships
-
-### ⚙️ Configuration & Operations
-- [Operations Guide](operations.md) - Day-to-day operations
-- [Image Configuration](operations.md#image-configuration) - Custom registries and images
-- [Database Configuration](operations.md#database-configuration) - DB setup and management
-- [Scaling Configuration](operations.md#scaling) - Auto-scaling setup
-
-### 📖 API Reference
-- [API Reference](api-reference.md) - Complete CRD documentation
-- [FrappeBench Spec](api-reference.md#frappebench) - Bench configuration options
-- [FrappeSite Spec](api-reference.md#frappesite) - Site configuration options
-
-### 💡 Examples
-- [Examples](examples.md) - Real-world deployment scenarios
-- [Basic Deployment](examples.md#basic-deployment) - Simple bench and site
-- [Production Deployment](examples.md#production-deployment) - High-availability setup
-- [OpenShift Deployment](examples.md#openshift-deployment) - OpenShift-specific examples
-
-### 🔧 Troubleshooting
-- [Troubleshooting Guide](troubleshooting.md) - Common issues and solutions
-- [Debugging](troubleshooting.md#debugging) - How to debug issues
-- [Logs and Metrics](troubleshooting.md#logs-and-metrics) - Observability tools
 
 ## Version Information
 
-- **Current Version**: v2.5.0
-- **Kubernetes**: 1.19+
-- **Go Version**: 1.24+
-- **License**: Apache 2.0
+- **Current Version**: v5.2.0
+- **Helm Chart**: 5.2.0
+- **API Group**: `vyogo.tech/v1`
+- **Kubernetes**: 1.22+
+- **OpenShift**: 4.10+ (`restricted-v2` SCC compliant)
+- **Go Version**: 1.22+
+- **License**: Elastic License 2.0 (ELv2)
 
-## Support & Community
+## What's New in v5.2.0
 
-- **GitHub**: [vyogotech/frappe-operator](https://github.com/vyogotech/frappe-operator)
-- **Issues**: [GitHub Issues](https://github.com/vyogotech/frappe-operator/issues)
-- **Releases**: [GitHub Releases](https://github.com/vyogotech/frappe-operator/releases)
+- ✅ **Polymorphic Database Architecture**: Dedicated and shared PostgreSQL support alongside MariaDB.
+- ✅ **StackGres Integration**: Fully declarative per-site `SGCluster` and `SGScript` templates for dedicated PostgreSQL.
+- ✅ **Percona PostgreSQL Toggle**: Dedicated `PerconaPGCluster` option with backward-compatibility preservation for existing clusters.
+- ✅ **HTTPS-Only Ingress & Routes**: Enforced TLS termination and edge redirect policy (`tls.insecureEdgeTerminationPolicy: Redirect`) across all sites and custom domains.
+- ✅ **OpenShift `restricted-v2` SCC Compliance**: Out-of-the-box support for strict security contexts (dynamic non-root UIDs, platform-allocated fsGroup, no privileged permissions).
+- ✅ **Provider-Agnostic Autoscaling**: Unified `componentAutoscaling` supporting both Kubernetes HPA and KEDA.
 
-## What's New
-
-### v2.6.0 (Upcoming)
-- ✅ **Site-Specific App Installation**: Install different apps per site with graceful degradation
-- ✅ **SiteBackup CRD**: Automated site backups with `bench backup`
-- ✅ Full backup options support (files, compression, selective DocTypes)
-- ✅ Scheduled backups via CronJob and one-time via Job
-- ✅ Custom backup paths and filtering capabilities
-
-### v2.5.0
-- ✅ OpenShift Route support
-- ✅ Configurable image defaults via ConfigMap
-- ✅ Enhanced Conditions and Events
-- ✅ Improved finalizer cleanup logic
-- ✅ Exponential backoff for retries
-
-### v2.4.0
-- ✅ External database support (RDS, Cloud SQL)
-- ✅ Production-ready features
-- ✅ Enhanced security contexts
-
-See [Release Notes](RELEASE_NOTES_v2.5.0.md) for complete changelog.
-
----
-
-**Ready to get started?** Head to the [Installation Guide](getting-started.md)!
+See [CHANGELOG](https://github.com/vyogotech/frappe-operator/blob/main/CHANGELOG.md) for full release history.

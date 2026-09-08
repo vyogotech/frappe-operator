@@ -142,6 +142,8 @@ The generated StackGres resources:
 - `SGPostgresConfig/frappe-postgres-dedicated-defaults`: shared namespace configuration (`postgresql.conf`).
 - `SGPoolingConfig/frappe-postgres-dedicated-pooling`: shared namespace configuration (`pgbouncer.ini` in transaction pooling mode).
 - `SGInstanceProfile/frappe-postgres-dedicated-default` (or `<site>-postgres-profile` if custom resources are set).
+- `SGScript/<site>-postgres-script`: declarative database, role, and schema permissions script executed by StackGres controller.
+- `Secret/<site>-postgres-script-secret`: script contents mounted by `SGScript`.
 - Credentials stored in `Secret/<site>-db-password`.
 - Note: Site-level backups via `SiteBackup` (`bench backup`) are fully supported. Cluster-level continuous PITR via `SGObjectStorage` is an optional upcoming enhancement.
 
@@ -171,13 +173,15 @@ The generated cluster is `PerconaPGCluster/<site>-postgres` with:
 - a PVC-backed pgBackRest repo (`repo1`) for cluster-level PITR
 - credentials stored in `Secret/<site>-postgres-pguser-<user>`
 
-### Schema Ownership Fix (Both Engines)
+### Schema Ownership & Initialization
 
-On PostgreSQL 15+, the `public` schema is locked to the database owner. Frappe requires `public`, so the operator connects as the cluster superuser and runs a one-time, idempotent **configure Job** that hands the database to the app user (giving it `public` ownership) and sets its `search_path` to `public`. The site only reports `Ready` once both the database cluster and that configure Job succeed.
+On PostgreSQL 15+, the `public` schema is locked to the database owner. Frappe requires `public` access:
+- **StackGres**: The operator declaratively provisions user creation, database creation, and `ALTER SCHEMA public OWNER TO ...` using native `SGScript` and `spec.managedSql.scripts`. The site checks script completion status before reporting `DatabaseReady`.
+- **Percona**: The operator connects as the cluster superuser and runs a one-time idempotent configure Job that hands the database to the app user and sets its `search_path` to `public`.
 
 > The Percona CRD constrains the role name to a DNS label, so the operator uses
-> a stable label-safe name (`u<hash>`) derived from the site — distinct from the
-> underscore-form database identifier used in shared mode.
+> a stable label-safe name (`u<hash>`) derived from the site for Percona. StackGres
+> uses standard database user identifiers matching the site name.
 
 ### Image overrides
 

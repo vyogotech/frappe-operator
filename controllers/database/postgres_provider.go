@@ -22,6 +22,7 @@ import (
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,6 +33,7 @@ import (
 // mode (shared vs dedicated) and engine (Percona vs StackGres) and delegates to the
 // corresponding polymorphic engine provider.
 type PostgresProvider struct {
+	config    vyogotechv1.DatabaseConfig
 	client    client.Client
 	scheme    *runtime.Scheme
 	shared    Provider
@@ -40,14 +42,44 @@ type PostgresProvider struct {
 }
 
 // NewPostgresProvider constructs a polymorphic PostgresProvider
-func NewPostgresProvider(client client.Client, scheme *runtime.Scheme) Provider {
+func NewPostgresProvider(config vyogotechv1.DatabaseConfig, client client.Client, scheme *runtime.Scheme) Provider {
 	return &PostgresProvider{
+		config:    config,
 		client:    client,
 		scheme:    scheme,
-		shared:    NewSharedPostgresProvider(client, scheme),
-		percona:   NewPerconaPostgresProvider(client, scheme),
-		stackgres: NewStackGresPostgresProvider(client, scheme),
+		shared:    NewSharedPostgresProvider(config, client, scheme),
+		percona:   NewPerconaPostgresProvider(config, client, scheme),
+		stackgres: NewStackGresPostgresProvider(config, client, scheme),
 	}
+}
+
+func (p *PostgresProvider) getDBConfig(site *vyogotechv1.FrappeSite) vyogotechv1.DatabaseConfig {
+	cfg := p.config
+	if site == nil {
+		return cfg
+	}
+	if cfg.Mode == "" {
+		cfg.Mode = site.Spec.DBConfig.Mode
+	}
+	if cfg.PostgresEngine == "" {
+		cfg.PostgresEngine = site.Spec.DBConfig.PostgresEngine
+	}
+	if cfg.Host == "" {
+		cfg.Host = site.Spec.DBConfig.Host
+	}
+	if cfg.Port == "" {
+		cfg.Port = site.Spec.DBConfig.Port
+	}
+	if cfg.StorageSize == nil {
+		cfg.StorageSize = site.Spec.DBConfig.StorageSize
+	}
+	if cfg.Resources == nil {
+		cfg.Resources = site.Spec.DBConfig.Resources
+	}
+	if cfg.PostgresRef == nil {
+		cfg.PostgresRef = site.Spec.DBConfig.PostgresRef
+	}
+	return cfg
 }
 
 // resolvePostgresEngine returns the dedicated-mode engine for site. Explicit
@@ -58,7 +90,8 @@ func NewPostgresProvider(client client.Client, scheme *runtime.Scheme) Provider 
 // genuinely new dedicated-mode site with no existing cluster defaults to the
 // new "stackgres" default.
 func (p *PostgresProvider) resolvePostgresEngine(ctx context.Context, site *vyogotechv1.FrappeSite) (string, error) {
-	if e := site.Spec.DBConfig.PostgresEngine; e != "" {
+	cfg := p.getDBConfig(site)
+	if e := cfg.PostgresEngine; e != "" {
 		return e, nil
 	}
 	if p.client != nil {
@@ -68,21 +101,23 @@ func (p *PostgresProvider) resolvePostgresEngine(ctx context.Context, site *vyog
 		if err == nil {
 			return "percona", nil // grandfather an already-provisioned cluster
 		}
-		if !errors.IsNotFound(err) {
-			return "", err
+		if errors.IsNotFound(err) || meta.IsNoMatchError(err) {
+			return "stackgres", nil // new site or no Percona CRD installed, use default
 		}
+		return "", err
 	}
 	return "stackgres", nil // new site, new default
 }
 
 // getDelegate returns the polymorphic Provider implementation appropriate for this site
 func (p *PostgresProvider) getDelegate(ctx context.Context, site *vyogotechv1.FrappeSite) (Provider, error) {
-	mode := site.Spec.DBConfig.Mode
+	cfg := p.getDBConfig(site)
+	mode := cfg.Mode
 	if mode == "" || mode == "shared" {
 		if p.shared != nil {
 			return p.shared, nil
 		}
-		return NewSharedPostgresProvider(p.client, p.scheme), nil
+		return NewSharedPostgresProvider(cfg, p.client, p.scheme), nil
 	}
 
 	if mode == "dedicated" {
@@ -95,12 +130,12 @@ func (p *PostgresProvider) getDelegate(ctx context.Context, site *vyogotechv1.Fr
 			if p.percona != nil {
 				return p.percona, nil
 			}
-			return NewPerconaPostgresProvider(p.client, p.scheme), nil
+			return NewPerconaPostgresProvider(cfg, p.client, p.scheme), nil
 		case "stackgres":
 			if p.stackgres != nil {
 				return p.stackgres, nil
 			}
-			return NewStackGresPostgresProvider(p.client, p.scheme), nil
+			return NewStackGresPostgresProvider(cfg, p.client, p.scheme), nil
 		default:
 			return nil, fmt.Errorf("unsupported postgres engine: %s", engine)
 		}

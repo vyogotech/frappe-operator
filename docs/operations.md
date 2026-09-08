@@ -483,7 +483,7 @@ kubectl rollout status deployment/prod-bench-gunicorn -n production
 # Update apps
 kubectl patch frappebench prod-bench --type=merge -p '{
   "spec": {
-    "appsJSON": "[\"erpnext\", \"hrms\", \"custom_app@v2.0.0\"]"
+    "apps": ["erpnext", "hrms", "custom_app@v2.0.0"]
   }
 }'
 ```
@@ -584,9 +584,9 @@ spec:
     - name: erpnext
 ```
 
-**Priority:** `spec.security` → Environment Variables → Hardcoded Defaults (1001/0/0)
+**Priority:** `spec.security` → Environment Variables → Dynamic Namespace Allocation (OpenShift restricted-v2)
 
-See [SECURITY_CONTEXT_FIX.md](../SECURITY_CONTEXT_FIX.md) for detailed configuration examples.
+See the [OpenShift Production Guide](INSTALL_OPENSHIFT.md) for detailed configuration and compliance examples.
 
 ### Network Policies
 

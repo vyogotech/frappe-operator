@@ -1,0 +1,31 @@
+// Vyogo Technologies Brand Color Scheme for Just the Docs
+// Derived from official vyogo-color and vyogo-app-branding design tokens
+
+// Base Background & Text
+$body-background-color: #FFFFFF !default;
+$body-text-color: #141917 !default;
+$body-heading-color: #141917 !default;
+
+// Primary Brand Accent (Vyogo Teal / Mint: #00BC86)
+$link-color: #00BC86 !default;
+$btn-primary-color: #00BC86 !default;
+
+// Secondary Accent (Vyogo Royal Blue: #0050A4)
+$base-button-color: #0050A4 !default;
+
+// Dark Sidebar (Vyogo Deep Charcoal / Slate: #0B1411)
+$sidebar-color: #0B1411 !default;
+$sidebar-text-color: #DCE3E1 !default;
+$sidebar-heading-color: #FFFFFF !default;
+$sidebar-active-color: #00BC86 !default;
+$nav-child-link-color: #00BC86 !default;
+
+// Borders, Tables & Search
+$border-color: #DCE3E1 !default;
+$table-header-color: #F4F7F6 !default;
+$search-background-color: #101E1A !default;
+$search-results-color: #0050A4 !default;
+
+// Code & Syntax Styling
+$code-background-color: #F4F7F6 !default;
+$feedback-color: #009A6E !default;

@@ -79,6 +79,18 @@ spec:
             drop:
               - "ALL"
         env:
+        - name: FRAPPE_ENFORCE_HTTPS
+          valueFrom:
+            configMapKeyRef:
+              name: frappe-operator-config
+              key: enforceHTTPS
+              optional: true
+        - name: FRAPPE_DEFAULT_CLUSTER_ISSUER
+          valueFrom:
+            configMapKeyRef:
+              name: frappe-operator-config
+              key: defaultClusterIssuer
+              optional: true
         - name: RELATED_IMAGE_FRAPPE_BENCH_V15
           value: frappe/erpnext:version-15
         - name: RELATED_IMAGE_FRAPPE_BENCH_V14

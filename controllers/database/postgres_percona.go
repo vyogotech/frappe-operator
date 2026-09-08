@@ -48,15 +48,37 @@ const (
 
 // PerconaPostgresProvider implements database.Provider for dedicated Percona PostgreSQL clusters
 type PerconaPostgresProvider struct {
+	config vyogotechv1.DatabaseConfig
 	client client.Client
 	scheme *runtime.Scheme
 }
 
-func NewPerconaPostgresProvider(client client.Client, scheme *runtime.Scheme) *PerconaPostgresProvider {
+func NewPerconaPostgresProvider(config vyogotechv1.DatabaseConfig, client client.Client, scheme *runtime.Scheme) *PerconaPostgresProvider {
 	return &PerconaPostgresProvider{
+		config: config,
 		client: client,
 		scheme: scheme,
 	}
+}
+
+func (p *PerconaPostgresProvider) getDBConfig(site *vyogotechv1.FrappeSite) vyogotechv1.DatabaseConfig {
+	cfg := p.config
+	if site == nil {
+		return cfg
+	}
+	if cfg.StorageSize == nil {
+		cfg.StorageSize = site.Spec.DBConfig.StorageSize
+	}
+	if cfg.Resources == nil {
+		cfg.Resources = site.Spec.DBConfig.Resources
+	}
+	if cfg.Host == "" {
+		cfg.Host = site.Spec.DBConfig.Host
+	}
+	if cfg.Port == "" {
+		cfg.Port = site.Spec.DBConfig.Port
+	}
+	return cfg
 }
 
 func (p *PerconaPostgresProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseInfo, error) {
@@ -65,9 +87,10 @@ func (p *PerconaPostgresProvider) EnsureDatabase(ctx context.Context, site *vyog
 	dbName := generateDBName(site)
 	dbUser := generatePGUserName(site)
 
+	cfg := p.getDBConfig(site)
 	storageSize := defaultDedicatedStorageSize
-	if site.Spec.DBConfig.StorageSize != nil {
-		storageSize = site.Spec.DBConfig.StorageSize.String()
+	if cfg.StorageSize != nil {
+		storageSize = cfg.StorageSize.String()
 	}
 
 	pvcSpec := func(size string) map[string]interface{} {
@@ -147,6 +170,12 @@ func (p *PerconaPostgresProvider) EnsureDatabase(ctx context.Context, site *vyog
 
 	host := fmt.Sprintf("%s-primary.%s.svc.cluster.local", clusterName, site.Namespace)
 	port := "5432"
+	if cfg.Host != "" {
+		host = cfg.Host
+	}
+	if cfg.Port != "" {
+		port = cfg.Port
+	}
 
 	return &DatabaseInfo{
 		Host:     host,

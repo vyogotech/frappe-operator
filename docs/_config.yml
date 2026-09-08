@@ -3,7 +3,7 @@ description: "Production-ready Kubernetes operator for Frappe/ERPNext"
 
 # Use Just the Docs for a wiki-like sidebar + search
 remote_theme: just-the-docs/just-the-docs
-color_scheme: dark
+color_scheme: vyogo
 
 # Base URL for GitHub Pages
 url: https://vyogotech.github.io
@@ -25,7 +25,7 @@ nav_external_links:
     url: https://vyogotech.github.io/frappe-operator/helm-repo
 
 # Footer links
-footer_content: "Built with ❤️ by Vyogo Technologies"
+footer_content: "Built with ❤️ by Vyogo Technologies Private Limited"
 
 # Aux links (top-right)
 aux_links:

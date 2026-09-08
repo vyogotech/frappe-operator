@@ -153,6 +153,13 @@ with open('/tmp/site-secrets/site_name', 'r') as f:
 with open('/tmp/site-secrets/domain', 'r') as f:
     domain = f.read().strip()
 try:
+    with open('/tmp/site-secrets/scheme', 'r') as f:
+        scheme = f.read().strip() or "http"
+except FileNotFoundError:
+    # Older operator versions didn't write this key; keep the previous
+    # behavior (Frappe defaults to http:// when host_name has no scheme).
+    scheme = ""
+try:
     with open('/tmp/site-secrets/redis_cache_address', 'r') as f:
         redis_cache_address = f.read().strip()
 except FileNotFoundError:
@@ -197,7 +204,7 @@ except FileNotFoundError:
 
 # Update with resolved domain and redis configuration
 if domain:
-    config['host_name'] = domain
+    config['host_name'] = f"{scheme}://{domain}" if scheme else domain
 if redis_cache_address:
     config['redis_cache'] = f"redis://{redis_cache_address}"
 if redis_queue_address:
@@ -456,7 +463,7 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]] || [[
 
     # Check bench capabilities
     SUPPORTS_DB_USER=0
-    if bench new-site --help | grep -qE "db-user|mariadb-user"; then
+    if bench new-site --help | grep -qE -- "--db-user[ =]|--mariadb-user[ =]"; then
         SUPPORTS_DB_USER=1
     fi
 
