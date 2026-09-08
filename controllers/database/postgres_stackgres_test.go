@@ -124,7 +124,7 @@ func TestPostgresProvider_StackGresLifecycle(t *testing.T) {
 		},
 		Data: map[string][]byte{
 			"superuser-password": []byte("superpass123"),
-			"superuser-user":     []byte("postgres"),
+			"superuser-username":     []byte("postgres"),
 		},
 	}
 	if err := p.client.Create(ctx, superSecret); err != nil {

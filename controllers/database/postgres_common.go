@@ -165,8 +165,8 @@ elif [ -f /tmp/super/superuser-password ]; then
 fi
 if [ -f /tmp/super/user ]; then
   SUPER="$(cat /tmp/super/user)"
-elif [ -f /tmp/super/superuser-user ]; then
-  SUPER="$(cat /tmp/super/superuser-user)"
+elif [ -f /tmp/super/superuser-username ]; then
+  SUPER="$(cat /tmp/super/superuser-username)"
 else
   SUPER="postgres"
 fi
