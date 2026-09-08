@@ -67,6 +67,7 @@ type FrappeSiteReconciler struct {
 //+kubebuilder:rbac:groups=core,resources=secrets;services;configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs;databases;users;grants,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=pgv2.percona.com,resources=perconapgclusters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=stackgres.io,resources=sgclusters;sginstanceprofiles;sgpostgresconfigs;sgpoolingconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=route.openshift.io,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch

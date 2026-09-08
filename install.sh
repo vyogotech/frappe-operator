@@ -24,6 +24,8 @@ INSTALL_KEDA="${INSTALL_KEDA:-true}"
 # cannot start. Only needed if you provision Postgres-backed sites.
 INSTALL_POSTGRES_SCC="${INSTALL_POSTGRES_SCC:-false}"
 POSTGRES_NAMESPACE="${POSTGRES_NAMESPACE:-frappe-pg}"
+INSTALL_STACKGRES="${INSTALL_STACKGRES:-false}"
+STACKGRES_NAMESPACE="${STACKGRES_NAMESPACE:-stackgres}"
 
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Frappe Operator Installation Script${NC}"
@@ -155,6 +157,48 @@ SCC
             echo -e "${YELLOW}  Put the PostgreSQL cluster in its own namespace instead.${NC}"
         fi
     fi
+    echo ""
+fi
+
+# Step 2c: StackGres PostgreSQL Operator (optional)
+if [ "$INSTALL_STACKGRES" = "true" ]; then
+    echo -e "${YELLOW}Step 2c: Installing StackGres PostgreSQL Operator...${NC}"
+    if kubectl api-resources --api-group=security.openshift.io 2>/dev/null | grep -q securitycontextconstraints; then
+        # OpenShift: OLM Subscription against the community catalog.
+        kubectl create namespace "$STACKGRES_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+        cat <<EOF | kubectl apply -f -
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: stackgres-og
+  namespace: $STACKGRES_NAMESPACE
+spec:
+  targetNamespaces:
+  - $STACKGRES_NAMESPACE
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: stackgres-community
+  namespace: $STACKGRES_NAMESPACE
+spec:
+  channel: stable
+  name: stackgres-community
+  source: community-operators
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+EOF
+        echo "Waiting for StackGres CRDs to be established..."
+        kubectl wait --for condition=established --timeout=120s crd sgclusters.stackgres.io || true
+    else
+        # Non-OpenShift: upstream Helm chart
+        helm repo add stackgres https://stackgres.io/downloads/stackgres-k8s/stackgres/helm
+        helm repo update
+        helm install stackgres-operator stackgres/stackgres-operator \
+            -n "$STACKGRES_NAMESPACE" --create-namespace
+        kubectl wait --for condition=established --timeout=120s crd sgclusters.stackgres.io || true
+    fi
+    echo -e "${GREEN}✓ StackGres PostgreSQL Operator installed${NC}"
     echo ""
 fi
 

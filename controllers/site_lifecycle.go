@@ -321,6 +321,9 @@ func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1.FrappeSite, ben
 	if config.Provider == "" {
 		config.Provider = bench.Spec.DBConfig.Provider
 	}
+	if config.PostgresEngine == "" {
+		config.PostgresEngine = bench.Spec.DBConfig.PostgresEngine
+	}
 	if config.Mode == "" {
 		config.Mode = bench.Spec.DBConfig.Mode
 	}

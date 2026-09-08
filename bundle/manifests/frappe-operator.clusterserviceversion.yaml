@@ -247,7 +247,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime,Database
-    createdAt: "2026-09-07T22:37:33Z"
+    createdAt: "2026-09-08T01:01:13Z"
     features.operators.openshift.io/disconnected-compliant: "true"
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
@@ -563,6 +563,21 @@ spec:
           resources:
           - routes
           - routes/custom-host
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - stackgres.io
+          resources:
+          - sgclusters
+          - sginstanceprofiles
+          - sgpoolingconfigs
+          - sgpostgresconfigs
           verbs:
           - create
           - delete

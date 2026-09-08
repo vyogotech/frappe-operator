@@ -59,6 +59,12 @@ func (r *FrappeSite) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.
 		return nil, err
 	}
 
+	old, ok := oldObj.(*FrappeSite)
+	if ok && old.Spec.DBConfig.Mode == "dedicated" && old.Spec.DBConfig.PostgresEngine != "" &&
+		r.Spec.DBConfig.PostgresEngine != "" && r.Spec.DBConfig.PostgresEngine != old.Spec.DBConfig.PostgresEngine {
+		return nil, fmt.Errorf("dbConfig.postgresEngine cannot be changed after a dedicated cluster has been provisioned")
+	}
+
 	return nil, nil
 }
 
@@ -91,6 +97,18 @@ func (r *FrappeSite) validateSite() error {
 	case "mariadb", "postgres", "sqlite", "external":
 	default:
 		return fmt.Errorf("dbConfig.provider must be one of 'mariadb', 'postgres', 'sqlite', 'external'")
+	}
+
+	// Validate postgresEngine
+	if r.Spec.DBConfig.PostgresEngine != "" {
+		if provider != "postgres" {
+			return fmt.Errorf("dbConfig.postgresEngine is only valid when dbConfig.provider is 'postgres'")
+		}
+		switch r.Spec.DBConfig.PostgresEngine {
+		case "stackgres", "percona":
+		default:
+			return fmt.Errorf("dbConfig.postgresEngine must be one of 'stackgres', 'percona'")
+		}
 	}
 
 	// Validate database mode (empty DBConfig is valid; defaults to shared)
