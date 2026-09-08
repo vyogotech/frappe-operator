@@ -168,7 +168,13 @@ func buildConfigJob(sc *vyogotechv1.SiteConfig, bench *vyogotechv1.FrappeBench, 
 		return nil, nil
 	}
 
-	script := "set -e\n" + strings.Join(cmds, "\n") + "\n"
+	// Same fix as the migrate/cron Jobs: cd into the bench root, then recreate
+	// apps.txt as a symlink to sites/apps.txt from the image's apps/ dir - the
+	// site-init Job's own symlink lives in its container's writable layer and is
+	// gone by the time this Job's pod starts.
+	script := "set -e\ncd /home/frappe/frappe-bench\n" +
+		"if [ -d apps ]; then ls -1 apps > sites/apps.txt; ln -sf sites/apps.txt apps.txt; fi\n" +
+		strings.Join(cmds, "\n") + "\n"
 	jobName := fmt.Sprintf("%s-apply-%d", sc.Name, sc.Generation)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 	backoff := int32(3)

@@ -562,10 +562,27 @@ SQL
 	return false, nil
 }
 
+// getSharedHostPort resolves the PostgreSQL endpoint a shared-mode site provisions
+// against.
+//
+// dbConfig.host wins when set, and is used verbatim: it may name a service outside
+// the cluster, so it must not be suffixed with the cluster-local domain. Without
+// it the only reachable cluster is one publishing a Service called
+// "<postgresRef>-pgbouncer", which is Percona's topology and nobody else's --
+// CloudNativePG publishes its primary as "<cluster>-rw" and StackGres as
+// "<cluster>" with pooling as a sidecar, so both previously needed a dummy
+// Service carrying Percona's name in front of them.
 func (p *PostgresProvider) getSharedHostPort(ctx context.Context, site *vyogotechv1.FrappeSite) (string, string, error) {
-	host := "frappe-postgres-pgbouncer" // Default for Percona shared cluster
 	port := "5432"
+	if site.Spec.DBConfig.Port != "" {
+		port = site.Spec.DBConfig.Port
+	}
 
+	if site.Spec.DBConfig.Host != "" {
+		return site.Spec.DBConfig.Host, port, nil
+	}
+
+	host := "frappe-postgres-pgbouncer" // Default for Percona shared cluster
 	if site.Spec.DBConfig.PostgresRef != nil && site.Spec.DBConfig.PostgresRef.Name != "" {
 		host = site.Spec.DBConfig.PostgresRef.Name + "-pgbouncer"
 	}
