@@ -247,12 +247,10 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime,Database
-    createdAt: "2026-09-08T03:36:39Z"
+    createdAt: "2026-09-08T06:12:01Z"
     features.operators.openshift.io/disconnected-compliant: "true"
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
-    olm.openShiftVersions: 4.12-4.18
-    olm.targetNamespaces: frappe-operator-system
     operatorframework.io/suggested-namespace: frappe-operator-system
     operators.operatorframework.io/builder: operator-sdk-v1.42.3
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -262,156 +260,16 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: FrappeBench manages shared infrastructure, web proxies, workers, and FPM repositories for multi-tenant Frappe sites.
+    - description: FrappeBench is the Schema for the frappebenches API
       displayName: Frappe Bench
       kind: FrappeBench
       name: frappebenches.vyogo.tech
       version: v1
-      specDescriptors:
-      - description: Frappe framework version (e.g. version-15)
-        displayName: Frappe Version
-        path: frappeVersion
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-      - description: Applications to install on the bench
-        displayName: Apps
-        path: apps
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldGroup:Apps
-      - description: Air-gapped FPM (Frappe Package Manager) package repositories
-        displayName: FPM Repositories Configuration
-        path: fpmConfig
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldGroup:FPM
-      - description: List of FPM package repository endpoints
-        displayName: FPM Repositories
-        path: fpmConfig.repositories
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:fieldGroup:FPM
-      - description: Default FPM repository name for package operations
-        displayName: Default FPM Repository
-        path: fpmConfig.defaultRepo
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-      - description: Persistent Volume Claim size for shared bench storage
-        displayName: Storage Size
-        path: storageSize
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-      - description: Custom storage class name for the bench PVC
-        displayName: Storage Class Name
-        path: storageClassName
-        x-descriptors:
-        - urn:alm:descriptor:io.kubernetes:StorageClass
-      - description: Sizing for batch jobs (init, app install, migrations, backups)
-        displayName: Job Resources
-        path: jobResources
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:advanced
-      - description: In-memory cache and message queue broker configuration
-        displayName: Redis / DragonFly Configuration
-        path: redisConfig
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:advanced
-      statusDescriptors:
-      - description: Whether the shared bench platform infrastructure is fully initialized and ready
-        displayName: Bench Ready
-        path: ready
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - description: List of tenant sites hosted on this bench
-        displayName: Active Tenant Sites
-        path: sites
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-    - description: FrappeSite represents an isolated tenant site with polymorphic database, TLS, and OpenShift Route.
+    - description: FrappeSite is the Schema for the frappesites API
       displayName: Frappe Site
       kind: FrappeSite
       name: frappesites.vyogo.tech
       version: v1
-      specDescriptors:
-      - description: Reference to the parent FrappeBench hosting this site
-        displayName: Bench Reference
-        path: benchRef.name
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-      - description: Primary site domain name that receives traffic
-        displayName: Site Name / Hostname
-        path: siteName
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-      - description: Applications to install during site creation
-        displayName: Installed Apps
-        path: apps
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-      - description: Database engine provider (PostgreSQL, MariaDB, SQLite, External)
-        displayName: Database Provider
-        path: dbConfig.provider
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:select:postgres
-        - urn:alm:descriptor:com.tectonic.ui:select:mariadb
-        - urn:alm:descriptor:com.tectonic.ui:select:sqlite
-        - urn:alm:descriptor:com.tectonic.ui:select:external
-      - description: PostgreSQL provisioning engine (StackGres or Percona)
-        displayName: PostgreSQL Engine
-        path: dbConfig.postgresEngine
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:select:stackgres
-        - urn:alm:descriptor:com.tectonic.ui:select:percona
-      - description: Database deployment mode (Dedicated cluster or Shared database)
-        displayName: Database Mode
-        path: dbConfig.mode
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:select:dedicated
-        - urn:alm:descriptor:com.tectonic.ui:select:shared
-      - description: Dedicated database storage volume size
-        displayName: Database Storage Size
-        path: dbConfig.storageSize
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
-      - description: Secret reference containing external database credentials
-        displayName: Database Secret Reference
-        path: dbConfig.connectionSecretRef.name
-        x-descriptors:
-        - urn:alm:descriptor:io.kubernetes:Secret
-      - description: Red Hat OpenShift Route configuration with automated Edge TLS redirection
-        displayName: OpenShift Route
-        path: routeConfig.enabled
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - description: Policy for database retention upon site CR deletion (Retain prevents data loss)
-        displayName: Database Deletion Policy
-        path: deletionPolicy
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:select:Retain
-        - urn:alm:descriptor:com.tectonic.ui:select:Delete
-      - description: Bypass bench new-site initialization if database schema already exists
-        displayName: Skip Initialization
-        path: skipInit
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      statusDescriptors:
-      - description: Current lifecycle phase of the site (Pending, Provisioning, Ready, Failed)
-        displayName: Lifecycle Phase
-        path: phase
-        x-descriptors:
-        - urn:alm:descriptor:io.kubernetes.phase
-      - description: Direct HTTPS accessible URL of the site
-        displayName: Site URL
-        path: siteURL
-        x-descriptors:
-        - urn:alm:descriptor:org.w3:link
-      - description: Status of the underlying database instance
-        displayName: Database Ready
-        path: databaseReady
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
-      - description: Provisioned database name
-        displayName: Database Name
-        path: databaseName
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:text
     - description: FrappeWorkpace is the Schema for the frappeworkpaces API
       displayName: Frappe Workpace
       kind: FrappeWorkpace
@@ -532,8 +390,29 @@ spec:
     * **Automated Replicas**: High Availability web worker routing via Ingress.
     * **GitOps Compliance**: Designed to operate smoothly with ArgoCD.
 
+    ### Prerequisites
+
+    **MariaDB Operator is required** and is resolved automatically as an OLM
+    dependency. MariaDB is the default database provider: a `FrappeSite` that
+    does not set `spec.dbConfig.provider` uses it, so the operator cannot
+    provision a site without it.
+
+    The remaining integrations are **optional** and are not installed for you.
+    Install the one matching the configuration you intend to use:
+
+    | Configuration | Also install |
+    |---|---|
+    | `dbConfig.mode: dedicated`, `postgresEngine: stackgres` | StackGres (`stackgres-community`) |
+    | `dbConfig.mode: dedicated`, `postgresEngine: percona` | Percona Operator for PostgreSQL (`percona-postgresql-operator`) |
+    | `dbConfig.mode: shared`, `provider: postgres` | any reachable PostgreSQL, for example CloudNativePG |
+    | Worker autoscaling | KEDA (`keda`) |
+    | Admission webhooks enabled | cert-manager |
+
+    Shared PostgreSQL mode is engine-agnostic: it only needs a reachable
+    `host:port` and a provisioner Secret, so any PostgreSQL will do.
+
     ### Setup
-    Ensure that you have deployed the prerequisites in your cluster before bootstrapping an ERPNext portal using standard `kubectl apply` commands.
+    Ensure that you have deployed the prerequisites above before bootstrapping an ERPNext portal using standard `kubectl apply` commands.
   displayName: Frappe Operator
   icon:
   - base64data: iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAMAAAD04JH5AAABCFBMVEX69vL39PH28/H18/H18vH08vH08vDz8vHy8fDx8fDx8PDw8PDt7+/s7+/r7e/q7e7p7e7n7O7n7O3m7O3l6+3h6ezg6Ozd5+vb5uvU4unT4enR4enR4ejQ4OjI3ObF2+XE2uXD2uXC2eXB2eTA2OS/2OS+1+S+1+O91uO41OK10+Kz0eGkyt2cxtyXw9uUwtqTwdqRwdmRwNmQwNmPv9mNv9iNvtiMvthwsNFtr9BsrtBrrtBrrdBqrdBqrc9prc9qrNBprM9orM9nrM9nq89mq89hqM1gqM1fp81ep81cpsxbpsxbpcxapcxZpcxZpMxZpMtYpMtWpMtWo8tVo8tWostVostUossFIrsWAAABkUlEQVR42u3ayVLCQBAG4JAYMuICIu5bjBh3UeKGorhjDIiKwvu/icekarrKcbqMWPX/Jw7d8IWaQ0+qjZE/jgEAAAAAEH8UlmpMh/oqvf4YIKb9smL8BUH8vl5/DLD8z5ZielVTBmj2JwDlVlMx7QoF0OsHAAAAAAAAAAAAACA5E3YjxXwckjOhVn9iKp7yXMV4c9RUrNevdS+wmPcCy8HVDAAAAAAAAAAAAOAHgCHmSCZ4gOHC/lEg5XTHlkudpRO5Mjied1gAUXroyK9a++qvaruexQTUQ9bFJHIBAAAAAAAAAAAA/hGAGioz+evnUMrbAQVYf5Urw5dlg7U/sLZ1dl6TcrtHPJbl3siVtcbuKm9/4H1jbELOOPVnjhKFhZn7Dm9/IFrJCDk5CpAjCrOT350hg3uIuIcYAAAAAAAAAAAAQG8iUk62yAZs5kuMFGcvmYDm3UWdk6tH7grHU8jLr+yQcAMAAAAAAAAAAAAwqAC/104p/YACOIvVSkoJtm3yZbWZWmwssQAAAAADBPgCbnRBE1ZmtlgAAAAASUVORK5CYII=
@@ -1017,7 +896,7 @@ spec:
   - email: info@vyogo.tech
     name: varkrish
   maturity: alpha
-  minKubeVersion: 1.23.0
+  minKubeVersion: 1.27.0
   provider:
     name: Vyogo Tech
     url: https://vyogo.tech

@@ -1,0 +1,30 @@
+# OLM dependency declaration for the Frappe Operator bundle.
+#
+# Copied verbatim to bundle/metadata/dependencies.yaml by `make bundle`.
+# It lives here rather than under bundle/ because `operator-sdk generate bundle
+# --overwrite` rewrites that directory.
+#
+# Only a genuinely required operator belongs here: OLM resolves these at install
+# time and FAILS the install if no catalog on the cluster can provide one.
+#
+# mariadb-operator is required because MariaDB is the operator's default
+# database provider -- a FrappeSite with no dbConfig.provider resolves to
+# mariadb (see controllers/database/provider.go), so without it the
+# out-of-the-box install cannot provision a site at all.
+#
+# The other integrations are deliberately NOT declared, because each is optional
+# and only needed for a specific opt-in configuration. Declaring them would
+# force every user to install all of them:
+#
+#   stackgres-community          dbConfig.mode=dedicated, postgresEngine=stackgres
+#   percona-postgresql-operator  dbConfig.mode=dedicated, postgresEngine=percona
+#   keda                         worker autoscaling
+#   cert-manager                 only if admission webhooks are enabled
+#
+# Install those separately when you use the corresponding feature; the CSV
+# description lists them as prerequisites.
+dependencies:
+  - type: olm.package
+    value:
+      packageName: mariadb-operator
+      version: ">=25.8.0"

@@ -264,8 +264,9 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
 	sed -i.bak -e '/namespace: frappe-operator-system/d' bundle/manifests/frappe-operator-config_v1_configmap.yaml && rm bundle/manifests/*.bak || true
-	@grep -q 'com.redhat.delivery.operator.bundle' bundle/metadata/annotations.yaml || printf '  # Red Hat annotations\n  com.redhat.delivery.operator.bundle: "true"\n  com.redhat.openshift.versions: "v4.12-v4.18"\n' >> bundle/metadata/annotations.yaml
-	@grep -q 'com.redhat.delivery.operator.bundle' bundle.Dockerfile || printf '\n# Red Hat bundle delivery labels\nLABEL com.redhat.delivery.operator.bundle=true\nLABEL com.redhat.openshift.versions="v4.12-v4.18"\nCOPY LICENSE /licenses/LICENSE\n' >> bundle.Dockerfile
+	@grep -q 'com.redhat.delivery.operator.bundle' bundle/metadata/annotations.yaml || printf '  # Red Hat annotations\n  com.redhat.delivery.operator.bundle: "true"\n  com.redhat.openshift.versions: "v4.14"\n' >> bundle/metadata/annotations.yaml
+	@grep -q 'com.redhat.delivery.operator.bundle' bundle.Dockerfile || printf '\n# Red Hat bundle delivery labels\nLABEL com.redhat.delivery.operator.bundle=true\nLABEL com.redhat.openshift.versions="v4.14"\nCOPY LICENSE /licenses/LICENSE\n' >> bundle.Dockerfile
+	@cp config/manifests/dependencies.yaml bundle/metadata/dependencies.yaml
 	operator-sdk bundle validate ./bundle
 
 .PHONY: bundle-validate
