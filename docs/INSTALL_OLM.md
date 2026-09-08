@@ -101,19 +101,22 @@ kubectl create -f https://operatorhub.io/install/mariadb-operator.yaml
 
 ## Dependencies and compatibility
 
-**MariaDB Operator is a declared OLM dependency** (`bundle/metadata/dependencies.yaml`),
-so OLM resolves and installs it for you from any catalog on the cluster. It is
-required because MariaDB is the default database provider: a `FrappeSite` that
-does not set `spec.dbConfig.provider` resolves to MariaDB, so without it the
-operator cannot provision a site at all.
+**The bundle declares no OLM dependencies, by design.** You install the database
+provider yourself.
 
-If your cluster has no catalog providing `mariadb-operator`, the install will
-fail during resolution. On OpenShift the `community-operators` catalog is
-present by default and carries it.
+MariaDB is the default provider: a `FrappeSite` that does not set
+`spec.dbConfig.provider` resolves to MariaDB, so install the MariaDB Operator
+unless every site names a different provider.
 
-Everything else is **optional and not installed for you**, because each applies
-only to an opt-in configuration and declaring them would force all of them on
-every user:
+Declaring it as a hard `olm.package` dependency was tried and reverted. OLM
+resolves dependencies eagerly and fails the whole install when it cannot satisfy
+one, which had two unacceptable effects: PostgreSQL-only and SQLite-only users
+were forced to install MariaDB, and the bundle became impossible to install on
+any cluster whose catalogs do not carry the package, including bare kind
+clusters and air-gapped environments. It broke this project's own bundle E2E
+job, where the operator previously installed cleanly.
+
+Install whichever of these matches your configuration:
 
 | Configuration | Also install |
 |---|---|

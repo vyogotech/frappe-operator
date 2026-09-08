@@ -247,7 +247,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime,Database
-    createdAt: "2026-09-08T06:12:01Z"
+    createdAt: "2026-09-08T06:36:06Z"
     features.operators.openshift.io/disconnected-compliant: "true"
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
@@ -392,13 +392,17 @@ spec:
 
     ### Prerequisites
 
-    **MariaDB Operator is required** and is resolved automatically as an OLM
-    dependency. MariaDB is the default database provider: a `FrappeSite` that
-    does not set `spec.dbConfig.provider` uses it, so the operator cannot
-    provision a site without it.
+    **Install a database provider before creating sites.** MariaDB is the
+    default: a `FrappeSite` that does not set `spec.dbConfig.provider` uses it,
+    so install the MariaDB Operator unless every site specifies a different
+    provider.
 
-    The remaining integrations are **optional** and are not installed for you.
-    Install the one matching the configuration you intend to use:
+    These are deliberately not declared as OLM dependencies. The operator
+    supports four database providers, and a hard dependency would both force
+    MariaDB on PostgreSQL-only users and make the bundle impossible to install
+    on any cluster whose catalogs do not carry the required package.
+
+    Install whichever matches your configuration:
 
     | Configuration | Also install |
     |---|---|
