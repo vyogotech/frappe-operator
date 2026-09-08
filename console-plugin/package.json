@@ -44,7 +44,7 @@
       "SiteDatabaseTab": "./src/components/SiteDatabaseTab"
     },
     "dependencies": {
-      "@openshift-console/dynamic-plugin-sdk": ">=1.0.0"
+      "@console/pluginAPI": "*"
     }
   }
 }
