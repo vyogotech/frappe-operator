@@ -68,6 +68,9 @@ jobs:
           
       - name: Validate examples/ (Server Dry Run)
         run: |
+          # Every Kind the cluster serves, gathered once.
+          known_kinds=$(kubectl api-resources --no-headers 2>/dev/null | awk '{print $NF}' | sort -u)
+
           for file in examples/*.yaml; do
             echo "---"
             echo "Validating $file"
@@ -89,9 +92,14 @@ jobs:
             # validation cluster, and requiring them would mean installing every
             # optional operator just to lint YAML. Skip such files instead of
             # failing: this job exists to catch malformed manifests of our own.
+            # Match on the KIND column of api-resources rather than using
+            # `kubectl explain <Kind>`: explain resolves by resource name, not
+            # kind, so a CRD whose plural differs from its kind (StackGres
+            # SGPostgresConfig is served as sgpgconfigs) would look absent even
+            # when installed, and the file would be silently skipped.
             missing=""
             for kind in $(grep -E '^kind:' "$file" | awk '{print $2}' | sort -u); do
-              if ! kubectl explain "$kind" >/dev/null 2>&1; then
+              if ! echo "$known_kinds" | grep -qx "$kind"; then
                 missing="$missing $kind"
               fi
             done
