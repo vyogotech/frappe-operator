@@ -1,52 +1,39 @@
 # Upgrade Guide
 
-This guide covers upgrading the Frappe Operator between versions.
+This guide covers upgrading the Frappe Operator to **v5.2.0**.
+
+---
 
 ## Table of Contents
 
 - [General Upgrade Process](#general-upgrade-process)
-- [Version-Specific Guides](#version-specific-guides)
+- [Upgrading to v5.2.0](#upgrading-to-v520)
 - [Rollback Procedures](#rollback-procedures)
 - [Troubleshooting](#troubleshooting)
+
+---
 
 ## General Upgrade Process
 
 ### Pre-Upgrade Checklist
 
-1. **Backup your data**
+1. **Backup your Custom Resources**
    ```bash
-   # Backup all FrappeSite data
+   # Backup all FrappeSite and FrappeBench definitions
    kubectl get frappesites -A -o yaml > frappesites-backup.yaml
    kubectl get frappebenches -A -o yaml > frappebenches-backup.yaml
-   
-   # Trigger backups for all sites
-   for site in $(kubectl get frappesites -A -o jsonpath='{.items[*].metadata.name}'); do
-     kubectl create -f - <<EOF
-   apiVersion: vyogo.tech/v1
-   kind: SiteBackup
-   metadata:
-     name: pre-upgrade-backup-${site}
-     namespace: frappe
-   spec:
-     siteRef:
-       name: ${site}
-     includeFiles: true
-   EOF
-   done
    ```
 
-2. **Check current version**
+2. **Check current operator version**
    ```bash
    kubectl get deployment frappe-operator-controller-manager -n frappe-operator-system \
      -o jsonpath='{.spec.template.spec.containers[0].image}'
    ```
 
-3. **Review release notes**
-   - Check [releases](https://github.com/vyogotech/frappe-operator/releases) for breaking changes
-   - Review API deprecations
+3. **Review Changelog**
+   - Review [CHANGELOG.md](https://github.com/vyogotech/frappe-operator/blob/main/CHANGELOG.md) for breaking changes and release highlights.
 
-4. **Test in staging**
-   - Always test upgrades in a non-production environment first
+---
 
 ### Upgrade Methods
 
@@ -54,197 +41,97 @@ This guide covers upgrading the Frappe Operator between versions.
 
 ```bash
 # Update Helm repository
-helm repo update vyogotech
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
+helm repo update
 
-# View available versions
-helm search repo vyogotech/frappe-operator --versions
-
-# Dry-run to see changes
-helm upgrade frappe-operator vyogotech/frappe-operator \
+# Dry-run to inspect changes
+helm upgrade frappe-operator frappe-operator/frappe-operator \
   --namespace frappe-operator-system \
-  --version X.Y.Z \
+  --version 5.2.0 \
   --dry-run
 
 # Perform upgrade
-helm upgrade frappe-operator vyogotech/frappe-operator \
+helm upgrade frappe-operator frappe-operator/frappe-operator \
   --namespace frappe-operator-system \
-  --version X.Y.Z \
+  --version 5.2.0 \
   --wait
 ```
 
-#### Method 2: Kustomize
+#### Method 2: Direct Manifest Upgrade
 
 ```bash
-# Update kustomization.yaml with new image tag
-cd config/manager
-kustomize edit set image controller=ghcr.io/vyogotech/frappe-operator:vX.Y.Z
-
-# Apply changes
-kubectl apply -k config/default
+kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/latest/download/install.yaml --server-side --force-conflicts
 ```
 
-#### Method 3: Direct YAML
-
-```bash
-# Download new install manifest
-curl -LO https://github.com/vyogotech/frappe-operator/releases/download/vX.Y.Z/install.yaml
-
-# Apply with replacement
-kubectl apply -f install.yaml --server-side --force-conflicts
-```
+---
 
 ### Post-Upgrade Verification
 
-1. **Check operator health**
+1. **Verify controller manager health**
    ```bash
    kubectl get pods -n frappe-operator-system
-   kubectl logs -n frappe-operator-system deployment/frappe-operator-controller-manager
+   kubectl logs -n frappe-operator-system deployment/frappe-operator-controller-manager --tail=50
    ```
 
-2. **Verify CRD updates**
+2. **Verify CRD registration**
    ```bash
-   kubectl get crd frappebenches.vyogo.tech -o jsonpath='{.spec.versions[*].name}'
-   kubectl get crd frappesites.vyogo.tech -o jsonpath='{.spec.versions[*].name}'
+   kubectl get crd | grep vyogo.tech
    ```
 
-3. **Check resource reconciliation**
+3. **Verify site reconciliation**
    ```bash
-   kubectl get frappebenches -A
    kubectl get frappesites -A
+   kubectl get frappebenches -A
    ```
 
-## Version-Specific Guides
+---
 
-### Upgrading to v2.5.0
+## Upgrading to v5.2.0
 
-**New Features:**
-- Job TTL cleanup (3600s default)
-- Prometheus metrics
-- Validation webhooks
-- Resource builders
+### Key Changes & Migration Notes
 
-**Migration Steps:**
-1. No breaking changes
-2. Existing jobs will have TTL applied on next reconciliation
-3. Enable metrics endpoint for monitoring
+1. **Polymorphic Database Architecture**:
+   - The operator now supports PostgreSQL alongside MariaDB.
+   - For dedicated PostgreSQL sites, the default engine is `stackgres` (`SGCluster`). If you are running existing Percona clusters, the operator automatically detects them and preserves management via Percona.
+   - Once provisioned, `dbConfig.postgresEngine` is immutable.
 
-### Upgrading to v2.4.0
+2. **HTTPS-Only Ingress Enforcement**:
+   - Sites and custom domains now mandate TLS. Ingress resources automatically configure `spec.tls` (defaulting to `<site-name>-tls`) and set `ssl-redirect: "true"`.
+   - On OpenShift, routes are admitted with `tls.termination: edge` and `tls.insecureEdgeTerminationPolicy: Redirect`.
+   - The validating webhook rejects any annotations attempting to disable SSL redirection (`ssl-redirect: "false"` or `"0"`).
 
-**New Features:**
-- OpenShift Route support
-- Enhanced security contexts
+3. **OpenShift `restricted-v2` SCC Compliance**:
+   - Workloads strictly adhere to `restricted-v2` security constraints.
+   - If your bench manifests specify custom security contexts, verify they do not hardcode `fsGroup: 0` or privileged root UIDs.
 
-**Migration Steps:**
-1. Review security context changes
-2. OpenShift Routes auto-created if Route API detected
+4. **Licensing**:
+   - Releases v4.2.0+ are published under the **Elastic License 2.0 (ELv2)** — free for internal production and self-hosting, commercial license required for managed SaaS hosting. See [LICENSING.md](../LICENSING.md).
 
-### Upgrading from v1.x to v2.x
-
-**Breaking Changes:**
-- API version changed from `v1alpha1` to `v1alpha1` (same, but schema changes)
-- `benchName` field renamed to `benchRef` (object reference)
-- Database configuration restructured
-
-**Migration Steps:**
-
-1. **Backup existing resources**
-   ```bash
-   kubectl get frappebenches -A -o yaml > benches-v1.yaml
-   kubectl get frappesites -A -o yaml > sites-v1.yaml
-   ```
-
-2. **Convert resources**
-   ```yaml
-   # Old v1.x FrappeSite
-   spec:
-     benchName: my-bench
-     dbPassword: secret123
-   
-   # New v2.x FrappeSite
-   spec:
-     benchRef:
-       name: my-bench
-       namespace: frappe
-     dbConfig:
-       mode: shared
-       mariadbRef:
-         name: frappe-mariadb
-   ```
-
-3. **Apply conversion tool** (if available)
-   ```bash
-   go run hack/convert-v1-to-v2.go < sites-v1.yaml > sites-v2.yaml
-   ```
+---
 
 ## Rollback Procedures
 
-### Quick Rollback
+### Helm Rollback
 
 ```bash
-# Helm rollback
-helm rollback frappe-operator -n frappe-operator-system
+# View release revision history
+helm history frappe-operator -n frappe-operator-system
 
-# Or specify revision
-helm rollback frappe-operator 1 -n frappe-operator-system
+# Roll back to the previous revision
+helm rollback frappe-operator -n frappe-operator-system
 ```
 
-### Manual Rollback
-
-1. **Identify previous version**
-   ```bash
-   helm history frappe-operator -n frappe-operator-system
-   ```
-
-2. **Apply previous manifests**
-   ```bash
-   kubectl apply -f install-vX.Y.Z.yaml
-   ```
-
-3. **Restore CRDs if needed**
-   ```bash
-   kubectl apply -f crds-vX.Y.Z.yaml
-   ```
+---
 
 ## Troubleshooting
 
-### Common Issues
-
-#### CRD Conflicts
-
-**Symptom:** `metadata.resourceVersion: Invalid value`
-
-**Solution:**
+### CRD Conflicts During Upgrade
+**Symptom:** `metadata.resourceVersion: Invalid value`  
+**Resolution:** Apply CRDs with server-side apply:
 ```bash
-kubectl apply -f install.yaml --server-side --force-conflicts
+kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/latest/download/install.yaml --server-side --force-conflicts
 ```
 
-#### Webhook Errors
-
-**Symptom:** `failed calling webhook`
-
-**Solution:**
-```bash
-# Temporarily disable webhooks
-kubectl delete validatingwebhookconfiguration frappe-operator-validating-webhook-configuration
-
-# Upgrade operator
-helm upgrade frappe-operator vyogotech/frappe-operator ...
-
-# Webhooks will be recreated
-```
-
-#### Stuck Resources
-
-**Symptom:** Resources stuck in terminating state
-
-**Solution:**
-```bash
-# Remove finalizers
-kubectl patch frappesite mysite -p '{"metadata":{"finalizers":[]}}' --type=merge
-```
-
-### Getting Help
-
-- [GitHub Issues](https://github.com/vyogotech/frappe-operator/issues)
-- [Discussions](https://github.com/vyogotech/frappe-operator/discussions)
-- Check operator logs: `kubectl logs -n frappe-operator-system -l control-plane=controller-manager`
+### Webhook Validation Blocking Update
+**Symptom:** `failed calling webhook: ...`  
+**Resolution:** Ensure your updated site manifest has valid `apps` specified and does not attempt to mutate immutable fields such as `dbConfig.postgresEngine`.

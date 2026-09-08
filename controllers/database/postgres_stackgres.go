@@ -76,7 +76,7 @@ metadata:
   name: %s
   namespace: %s
 spec:
-  postgresVersion: "16"
+  postgresVersion: "%s"
   postgresql.conf:
     max_connections: '300'
     shared_buffers: '1GB'
@@ -121,8 +121,8 @@ stringData:
   create-db.sql: |
     CREATE DATABASE "%s" OWNER "%s";
   configure-schema.sql: |
-    \c "%s"
     ALTER SCHEMA public OWNER TO "%s";
+    GRANT ALL ON SCHEMA public TO "%s";
 `
 
 const sgScriptTemplate = `
@@ -161,7 +161,7 @@ metadata:
 spec:
   instances: 1
   postgres:
-    version: "16"
+    version: "%s"
   sgInstanceProfile: %s
   configurations:
     sgPostgresConfig: %s
@@ -176,22 +176,48 @@ spec:
 
 // StackGresPostgresProvider implements database.Provider for dedicated StackGres clusters
 type StackGresPostgresProvider struct {
+	config vyogotechv1.DatabaseConfig
 	client client.Client
 	scheme *runtime.Scheme
 }
 
-func NewStackGresPostgresProvider(client client.Client, scheme *runtime.Scheme) *StackGresPostgresProvider {
+func NewStackGresPostgresProvider(config vyogotechv1.DatabaseConfig, client client.Client, scheme *runtime.Scheme) *StackGresPostgresProvider {
 	return &StackGresPostgresProvider{
+		config: config,
 		client: client,
 		scheme: scheme,
 	}
 }
 
+func (p *StackGresPostgresProvider) getDBConfig(site *vyogotechv1.FrappeSite) vyogotechv1.DatabaseConfig {
+	cfg := p.config
+	if site == nil {
+		return cfg
+	}
+	if cfg.Port == "" {
+		cfg.Port = site.Spec.DBConfig.Port
+	}
+	if cfg.Host == "" {
+		cfg.Host = site.Spec.DBConfig.Host
+	}
+	if cfg.StorageSize == nil {
+		cfg.StorageSize = site.Spec.DBConfig.StorageSize
+	}
+	if cfg.Resources == nil {
+		cfg.Resources = site.Spec.DBConfig.Resources
+	}
+	return cfg
+}
+
+// EnsureDatabase provisions dedicated StackGres database resources (SGCluster, SGScript, SGInstanceProfile, Secret).
+// In v1, resources are created if absent (create-if-absent). Modifications to resource sizing or storage
+// post-creation require manual cluster maintenance or an upgrade migration.
 func (p *StackGresPostgresProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseInfo, error) {
 	logger := log.FromContext(ctx)
 	clusterName := fmt.Sprintf("%s-postgres", site.Name)
 	dbName := generateDBName(site)
-	dbUser := generatePGUserName(site)
+	dbUser := generateDBUser(site)
+	cfg := p.getDBConfig(site)
 
 	// 1. Ensure password secret exists for the site
 	sitePasswordBytes, err := ensurePasswordSecret(ctx, p.client, site)
@@ -199,6 +225,7 @@ func (p *StackGresPostgresProvider) EnsureDatabase(ctx context.Context, site *vy
 		return nil, err
 	}
 	sitePassword := string(sitePasswordBytes)
+	escapedPassword := strings.ReplaceAll(sitePassword, "'", "''")
 
 	// 2. Ensure supporting StackGres configurations (PostgresConfig, PoolingConfig, InstanceProfile)
 	profileName, err := p.ensureConfigurations(ctx, site)
@@ -210,7 +237,7 @@ func (p *StackGresPostgresProvider) EnsureDatabase(ctx context.Context, site *vy
 	scriptName := fmt.Sprintf("%s-script", clusterName)
 	scriptSecretName := fmt.Sprintf("%s-script-secret", clusterName)
 
-	secretYAML := fmt.Sprintf(sgScriptSecretTemplate, scriptSecretName, site.Namespace, dbUser, sitePassword, dbName, dbUser, dbName, dbUser)
+	secretYAML := fmt.Sprintf(sgScriptSecretTemplate, scriptSecretName, site.Namespace, dbUser, escapedPassword, dbName, dbUser, dbUser, dbUser)
 	scriptSecret := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(secretYAML), scriptSecret); err != nil {
 		return nil, fmt.Errorf("failed to parse SGScript secret template: %w", err)
@@ -230,11 +257,11 @@ func (p *StackGresPostgresProvider) EnsureDatabase(ctx context.Context, site *vy
 
 	// 4. Create or update SGCluster CR
 	storageSize := defaultDedicatedStorageSize
-	if site.Spec.DBConfig.StorageSize != nil {
-		storageSize = site.Spec.DBConfig.StorageSize.String()
+	if cfg.StorageSize != nil {
+		storageSize = cfg.StorageSize.String()
 	}
 
-	clusterYAML := fmt.Sprintf(sgClusterTemplate, clusterName, site.Namespace, profileName, defaultStackGresConfigName, defaultStackGresPoolingName, storageSize, scriptName)
+	clusterYAML := fmt.Sprintf(sgClusterTemplate, clusterName, site.Namespace, defaultStackGresPostgresVersion, profileName, defaultStackGresConfigName, defaultStackGresPoolingName, storageSize, scriptName)
 	cluster := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(clusterYAML), cluster); err != nil {
 		return nil, fmt.Errorf("failed to parse SGCluster template: %w", err)
@@ -253,12 +280,12 @@ func (p *StackGresPostgresProvider) EnsureDatabase(ctx context.Context, site *vy
 	}
 
 	port := "5432"
-	if site.Spec.DBConfig.Port != "" {
-		port = site.Spec.DBConfig.Port
+	if cfg.Port != "" {
+		port = cfg.Port
 	}
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", clusterName, site.Namespace)
-	if site.Spec.DBConfig.Host != "" {
-		host = site.Spec.DBConfig.Host
+	if cfg.Host != "" {
+		host = cfg.Host
 	}
 
 	return &DatabaseInfo{
@@ -270,8 +297,10 @@ func (p *StackGresPostgresProvider) EnsureDatabase(ctx context.Context, site *vy
 }
 
 func (p *StackGresPostgresProvider) ensureConfigurations(ctx context.Context, site *vyogotechv1.FrappeSite) (string, error) {
+	cfg := p.getDBConfig(site)
+
 	// Shared postgres configuration
-	pgConfigYAML := fmt.Sprintf(sgPostgresConfigTemplate, defaultStackGresConfigName, site.Namespace)
+	pgConfigYAML := fmt.Sprintf(sgPostgresConfigTemplate, defaultStackGresConfigName, site.Namespace, defaultStackGresPostgresVersion)
 	pgConfig := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(pgConfigYAML), pgConfig); err != nil {
 		return "", fmt.Errorf("failed to parse SGPostgresConfig template: %w", err)
@@ -294,16 +323,16 @@ func (p *StackGresPostgresProvider) ensureConfigurations(ctx context.Context, si
 	profileName := defaultStackGresProfileName
 	cpu := "2"
 	memory := "4Gi"
-	if site.Spec.DBConfig.Resources != nil {
+	if cfg.Resources != nil {
 		profileName = fmt.Sprintf("%s-postgres-profile", site.Name)
-		if cpuQty, ok := site.Spec.DBConfig.Resources.Requests[corev1.ResourceCPU]; ok {
+		if cpuQty, ok := cfg.Resources.Requests[corev1.ResourceCPU]; ok {
 			cpu = cpuQty.String()
-		} else if cpuQty, ok := site.Spec.DBConfig.Resources.Limits[corev1.ResourceCPU]; ok {
+		} else if cpuQty, ok := cfg.Resources.Limits[corev1.ResourceCPU]; ok {
 			cpu = cpuQty.String()
 		}
-		if memQty, ok := site.Spec.DBConfig.Resources.Requests[corev1.ResourceMemory]; ok {
+		if memQty, ok := cfg.Resources.Requests[corev1.ResourceMemory]; ok {
 			memory = memQty.String()
-		} else if memQty, ok := site.Spec.DBConfig.Resources.Limits[corev1.ResourceMemory]; ok {
+		} else if memQty, ok := cfg.Resources.Limits[corev1.ResourceMemory]; ok {
 			memory = memQty.String()
 		}
 	}
@@ -337,7 +366,11 @@ func (p *StackGresPostgresProvider) IsReady(ctx context.Context, site *vyogotech
 		return false, nil
 	}
 
-	if !p.isScriptReady(cluster) {
+	scriptReady, err := p.isScriptReady(cluster)
+	if err != nil {
+		return false, err
+	}
+	if !scriptReady {
 		logger.Info("Dedicated StackGres cluster ready; waiting on managedSql scripts")
 		return false, nil
 	}
@@ -354,7 +387,9 @@ func (p *StackGresPostgresProvider) isClusterReady(cluster *unstructured.Unstruc
 			if !ok {
 				continue
 			}
-			if condMap["type"] == "Ready" && condMap["status"] == "True" {
+			t, _ := condMap["type"].(string)
+			s, _ := condMap["status"].(string)
+			if (t == "Ready" || t == "Bootstrapped") && strings.EqualFold(s, "True") {
 				return true
 			}
 		}
@@ -367,31 +402,65 @@ func (p *StackGresPostgresProvider) isClusterReady(cluster *unstructured.Unstruc
 	if strings.EqualFold(state, "Running") || strings.EqualFold(state, "Ready") {
 		return true
 	}
+
+	podStatuses, found, err := unstructured.NestedSlice(cluster.Object, "status", "podStatuses")
+	if err == nil && found && len(podStatuses) > 0 {
+		for _, pod := range podStatuses {
+			if podMap, ok := pod.(map[string]interface{}); ok {
+				if isPrimary, ok := podMap["primary"].(bool); ok && isPrimary {
+					return true
+				}
+			}
+		}
+	}
+
 	return false
 }
 
-func (p *StackGresPostgresProvider) isScriptReady(cluster *unstructured.Unstructured) bool {
+func (p *StackGresPostgresProvider) isScriptReady(cluster *unstructured.Unstructured) (bool, error) {
 	scripts, found, err := unstructured.NestedSlice(cluster.Object, "status", "managedSql", "scripts")
 	if err != nil || !found || len(scripts) == 0 {
-		return false
+		return false, nil
 	}
 
-	// Assume the first script config in managedSql is our provision script
-	scriptState, ok := scripts[0].(map[string]interface{})
-	if !ok {
-		return false
+	specScripts, specFound, _ := unstructured.NestedSlice(cluster.Object, "spec", "managedSql", "scripts")
+	if specFound && len(specScripts) > 0 && len(scripts) < len(specScripts) {
+		return false, nil
 	}
 
-	if failedAt, found := scriptState["failedAt"]; found && failedAt != nil {
-		// Script failed!
-		return false
+	for i, sc := range scripts {
+		scriptState, ok := sc.(map[string]interface{})
+		if !ok {
+			return false, nil
+		}
+		if failedAt, found := scriptState["failedAt"]; found && failedAt != nil {
+			failureMsg := fmt.Sprintf("managedSql script entry %d failed at %v", i, failedAt)
+			if innerScripts, found, _ := unstructured.NestedSlice(scriptState, "scripts"); found {
+				for _, inner := range innerScripts {
+					if innerMap, ok := inner.(map[string]interface{}); ok {
+						if fail, hasFail := innerMap["failure"].(string); hasFail && fail != "" {
+							failureMsg = fmt.Sprintf("%s: %s", failureMsg, fail)
+						}
+					}
+				}
+			}
+			return false, fmt.Errorf("%s", failureMsg)
+		}
+		if innerScripts, found, _ := unstructured.NestedSlice(scriptState, "scripts"); found {
+			for _, inner := range innerScripts {
+				if innerMap, ok := inner.(map[string]interface{}); ok {
+					if fail, hasFail := innerMap["failure"].(string); hasFail && fail != "" {
+						return false, fmt.Errorf("managedSql script execution failed: %s", fail)
+					}
+				}
+			}
+		}
+		if completedAt, found := scriptState["completedAt"]; !found || completedAt == nil {
+			return false, nil
+		}
 	}
 
-	if completedAt, found := scriptState["completedAt"]; found && completedAt != nil {
-		return true
-	}
-
-	return false
+	return true, nil
 }
 
 func (p *StackGresPostgresProvider) GetCredentials(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseCredentials, error) {
@@ -412,7 +481,7 @@ func (p *StackGresPostgresProvider) GetCredentials(ctx context.Context, site *vy
 	}
 
 	return &DatabaseCredentials{
-		Username:   generatePGUserName(site),
+		Username:   generateDBUser(site),
 		Password:   string(password),
 		SecretName: secret.Name,
 	}, nil
@@ -423,13 +492,16 @@ func (p *StackGresPostgresProvider) Cleanup(ctx context.Context, site *vyogotech
 		return nil
 	}
 
+	logger := log.FromContext(ctx)
+	var errs []error
+
 	clusterName := fmt.Sprintf("%s-postgres", site.Name)
 	cluster := &unstructured.Unstructured{}
 	cluster.SetGroupVersionKind(SGClusterGVK)
 	cluster.SetName(clusterName)
 	cluster.SetNamespace(site.Namespace)
 	if err := p.client.Delete(ctx, cluster); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete dedicated StackGres cluster: %w", err)
+		errs = append(errs, fmt.Errorf("failed to delete SGCluster %s: %w", clusterName, err))
 	}
 
 	// Delete SGScript and Secret
@@ -438,7 +510,10 @@ func (p *StackGresPostgresProvider) Cleanup(ctx context.Context, site *vyogotech
 	sgScript.SetGroupVersionKind(SGScriptGVK)
 	sgScript.SetName(scriptName)
 	sgScript.SetNamespace(site.Namespace)
-	_ = p.client.Delete(ctx, sgScript)
+	if err := p.client.Delete(ctx, sgScript); err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, "Failed to delete SGScript", "name", scriptName)
+		errs = append(errs, fmt.Errorf("failed to delete SGScript %s: %w", scriptName, err))
+	}
 
 	scriptSecretName := fmt.Sprintf("%s-script-secret", clusterName)
 	scriptSecret := &corev1.Secret{
@@ -447,15 +522,22 @@ func (p *StackGresPostgresProvider) Cleanup(ctx context.Context, site *vyogotech
 			Namespace: site.Namespace,
 		},
 	}
-	_ = p.client.Delete(ctx, scriptSecret)
+	if err := p.client.Delete(ctx, scriptSecret); err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, "Failed to delete SGScript secret", "name", scriptSecretName)
+		errs = append(errs, fmt.Errorf("failed to delete SGScript secret %s: %w", scriptSecretName, err))
+	}
 
 	// Delete custom profile if created
-	if site.Spec.DBConfig.Resources != nil {
+	cfg := p.getDBConfig(site)
+	if cfg.Resources != nil {
 		profile := &unstructured.Unstructured{}
 		profile.SetGroupVersionKind(SGInstanceProfileGVK)
 		profile.SetName(fmt.Sprintf("%s-postgres-profile", site.Name))
 		profile.SetNamespace(site.Namespace)
-		_ = p.client.Delete(ctx, profile)
+		if err := p.client.Delete(ctx, profile); err != nil && !errors.IsNotFound(err) {
+			logger.Error(err, "Failed to delete SGInstanceProfile", "name", profile.GetName())
+			errs = append(errs, fmt.Errorf("failed to delete SGInstanceProfile %s: %w", profile.GetName(), err))
+		}
 	}
 
 	// Delete password secret
@@ -465,7 +547,13 @@ func (p *StackGresPostgresProvider) Cleanup(ctx context.Context, site *vyogotech
 			Namespace: site.Namespace,
 		},
 	}
-	_ = p.client.Delete(ctx, secret)
+	if err := p.client.Delete(ctx, secret); err != nil && !errors.IsNotFound(err) {
+		logger.Error(err, "Failed to delete password secret", "name", secret.Name)
+		errs = append(errs, fmt.Errorf("failed to delete password secret %s: %w", secret.Name, err))
+	}
 
+	if len(errs) > 0 {
+		return fmt.Errorf("cleanup errors for %s: %v", site.Name, errs)
+	}
 	return nil
 }

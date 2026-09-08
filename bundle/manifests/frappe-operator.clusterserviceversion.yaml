@@ -247,7 +247,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime,Database
-    createdAt: "2026-09-08T01:01:13Z"
+    createdAt: "2026-09-08T03:36:39Z"
     features.operators.openshift.io/disconnected-compliant: "true"
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
@@ -576,8 +576,9 @@ spec:
           resources:
           - sgclusters
           - sginstanceprofiles
-          - sgpoolingconfigs
-          - sgpostgresconfigs
+          - sgpgconfigs
+          - sgpoolconfigs
+          - sgscripts
           verbs:
           - create
           - delete
@@ -766,6 +767,18 @@ spec:
                 command:
                 - /manager
                 env:
+                - name: FRAPPE_ENFORCE_HTTPS
+                  valueFrom:
+                    configMapKeyRef:
+                      key: enforceHTTPS
+                      name: frappe-operator-frappe-operator-config
+                      optional: true
+                - name: FRAPPE_DEFAULT_CLUSTER_ISSUER
+                  valueFrom:
+                    configMapKeyRef:
+                      key: defaultClusterIssuer
+                      name: frappe-operator-frappe-operator-config
+                      optional: true
                 - name: RELATED_IMAGE_FRAPPE_BENCH_V15
                   value: frappe/erpnext:version-15
                 - name: RELATED_IMAGE_FRAPPE_BENCH_V14

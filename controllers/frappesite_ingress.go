@@ -23,6 +23,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	"github.com/vyogotech/frappe-operator/pkg/resources"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,29 +72,43 @@ func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotec
 	nginxSvcName := fmt.Sprintf("%s-nginx", bench.Name)
 	pathType := networkingv1.PathTypePrefix
 
+	// TLS is per-site opt-in (spec.tls.enabled) unless the operator-wide
+	// FRAPPE_ENFORCE_HTTPS policy is on, in which case every site is HTTPS-only.
+	// See controllers/tls_policy.go.
+	tls := effectiveTLS(r.EnforceHTTPS, site)
+
+	annotations := map[string]string{
+		"nginx.ingress.kubernetes.io/proxy-body-size": "100m",
+	}
+	if tls {
+		annotations["nginx.ingress.kubernetes.io/ssl-redirect"] = "true"
+		annotations["nginx.ingress.kubernetes.io/force-ssl-redirect"] = "true"
+	}
+
 	builder := resources.NewIngressBuilder(ingressName, site.Namespace).
 		WithLabels(map[string]string{
 			"app":  "frappe",
 			"site": site.Name,
 		}).
-		WithAnnotations(map[string]string{
-			"nginx.ingress.kubernetes.io/proxy-body-size": "100m",
-		}).
+		WithAnnotations(annotations).
 		WithClassName(ingressClassName).
 		WithRule(domain, "/", pathType, nginxSvcName, 8080).
 		WithOwner(site, r.Scheme)
 
-	// Add TLS if enabled
-	if site.Spec.TLS.Enabled {
+	if tls {
 		tlsSecretName := site.Spec.TLS.SecretName
 		if tlsSecretName == "" {
 			tlsSecretName = fmt.Sprintf("%s-tls", site.Name)
 		}
 		builder.WithTLS([]string{domain}, tlsSecretName)
 
-		if site.Spec.TLS.Issuer != "" {
+		issuer := site.Spec.TLS.Issuer
+		if issuer == "" {
+			issuer = r.DefaultClusterIssuer
+		}
+		if issuer != "" {
 			builder.WithAnnotations(map[string]string{
-				"cert-manager.io/cluster-issuer": site.Spec.TLS.Issuer,
+				"cert-manager.io/cluster-issuer": issuer,
 			})
 		}
 	}
@@ -106,6 +121,16 @@ func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotec
 	ingress, err = builder.Build()
 	if err != nil {
 		return err
+	}
+
+	// Under an enforced HTTPS policy, a site must not be able to opt back out
+	// of the mandatory redirect via its own ingress annotations.
+	if r.EnforceHTTPS {
+		if stripped := stripInsecureOverrides(ingress.Annotations); len(stripped) > 0 {
+			logger.Info("Stripped insecure ingress annotation overrides under enforced HTTPS policy", "annotations", stripped)
+			r.Recorder.Eventf(site, corev1.EventTypeWarning, "TLSPolicyEnforced",
+				"HTTPS is enforced operator-wide; ignoring annotations: %v", stripped)
+		}
 	}
 
 	if err := r.Create(ctx, ingress); err != nil {

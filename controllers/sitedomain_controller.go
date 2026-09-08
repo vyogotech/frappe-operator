@@ -53,6 +53,12 @@ type SiteDomainReconciler struct {
 	// Optional injected DNS lookup function for testing
 	DNSLookupFunc func(host string) ([]string, error)
 	IsOpenShift   bool
+
+	// EnforceHTTPS and DefaultClusterIssuer mirror FrappeSiteReconciler's
+	// fields of the same name (see controllers/tls_policy.go) so custom
+	// domains follow the same operator-wide HTTPS policy as the primary site.
+	EnforceHTTPS         bool
+	DefaultClusterIssuer string
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitedomains,verbs=get;list;watch;create;update;patch;delete
@@ -171,14 +177,21 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	pathTypePrefix := networkingv1.PathTypePrefix
 	// Mirror the primary-site ingress (frappesite_ingress.go): a sane default,
-	// then whatever the site's ingress config specifies. Do NOT hardcode
-	// ssl-redirect here — that belongs to the cluster/site. Forcing it "true"
-	// 308-loops on proxy-fronted clusters (e.g. Cloudflare Flexible SSL, where
-	// the edge speaks HTTP to the origin), which is why the platform ingresses
-	// set ssl-redirect "false". Inheriting the site annotations lets that flow
-	// through to custom domains too.
+	// then whatever the site's ingress config specifies. The HTTPS redirect is
+	// only forced when the operator-wide HTTPS policy is enforced (FRAPPE_ENFORCE_HTTPS,
+	// see controllers/tls_policy.go) or this domain has its own TLS config —
+	// otherwise it stays off. Forcing it unconditionally 308-loops on proxy-fronted
+	// clusters (e.g. Cloudflare Flexible SSL, where the edge speaks HTTP to the
+	// origin). Inheriting the site annotations after these defaults lets a site
+	// opt in per-domain too, and stripInsecureOverrides below prevents opting back
+	// out when the policy is enforced.
+	forceHTTPS := effectiveTLS(r.EnforceHTTPS, site) || siteDomain.Spec.TLS != nil
 	annotations := map[string]string{
 		"nginx.ingress.kubernetes.io/proxy-body-size": "100m",
+	}
+	if forceHTTPS {
+		annotations["nginx.ingress.kubernetes.io/ssl-redirect"] = "true"
+		annotations["nginx.ingress.kubernetes.io/force-ssl-redirect"] = "true"
 	}
 	if site.Spec.Ingress != nil && site.Spec.Ingress.Annotations != nil {
 		for k, v := range site.Spec.Ingress.Annotations {
@@ -186,11 +199,26 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	if r.EnforceHTTPS {
+		if stripped := stripInsecureOverrides(annotations); len(stripped) > 0 {
+			r.Recorder.Eventf(site, corev1.EventTypeWarning, "TLSPolicyEnforced",
+				"HTTPS is enforced operator-wide; ignoring annotations on domain %s: %v", siteDomain.Spec.Domain, stripped)
+		}
+	}
+
+	issuerName, issuerKind := "", ""
 	if siteDomain.Spec.TLS != nil && siteDomain.Spec.TLS.IssuerRef != nil && siteDomain.Spec.TLS.IssuerRef.Name != "" {
-		if siteDomain.Spec.TLS.IssuerRef.Kind == "ClusterIssuer" {
-			annotations["cert-manager.io/cluster-issuer"] = siteDomain.Spec.TLS.IssuerRef.Name
+		issuerName = siteDomain.Spec.TLS.IssuerRef.Name
+		issuerKind = siteDomain.Spec.TLS.IssuerRef.Kind
+	} else if r.DefaultClusterIssuer != "" {
+		issuerName = r.DefaultClusterIssuer
+		issuerKind = "ClusterIssuer"
+	}
+	if issuerName != "" {
+		if issuerKind == "ClusterIssuer" {
+			annotations["cert-manager.io/cluster-issuer"] = issuerName
 		} else {
-			annotations["cert-manager.io/issuer"] = siteDomain.Spec.TLS.IssuerRef.Name
+			annotations["cert-manager.io/issuer"] = issuerName
 		}
 	}
 

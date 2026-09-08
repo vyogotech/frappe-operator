@@ -1,27 +1,55 @@
-Engineering Gaps & Architectural Vulnerabilities
-While the operator successfully implements advanced Kubernetes patterns, a deep-dive analysis highlights five missing features or engineering limitations that must be accounted for before a large-scale SaaS roll-out.
+# <i data-lucide="map"></i> Product Roadmap & Architecture Vision
 
-Gap 1: Database Coupling (Lack of Polymorphism)
-The Issue: The automated provisioning framework is explicitly coupled with the MariaDB Operator API ecosystem.
+This document tracks completed milestones, architectural capabilities, and the future engineering roadmap for **Frappe Operator** by **Vyogo Technologies**.
 
-The Impact: Though the operator added standard configuration variables for external databases (like AWS RDS or Google Cloud SQL), the automatic, zero-touch tenant instantiation mechanism is completely lost if you choose to deploy Frappe over its other officially supported engine, PostgreSQL. Incorporating a cross-database manager adapter into the internal Go controllers remains a critical next step.
+---
 
-Gap 2: Storage Layer I/O Bottlenecks (ReadWriteMany Burden)
-The Issue: Frappe expects assets and site-specific user files to live on a shared local directory across all web and background pods (/sites/site_name/public/files). The operator delegates this requirement entirely to the cluster layer using a ReadWriteMany (RWX) Persistent Volume Claim.
+## <i data-lucide="check-circle-2"></i> Delivered in v5.2.0
 
-The Impact: In managed public cloud environments (such as AWS EKS or GCP GKE), setting up an enterprise-grade RWX layer using AWS EFS, GCP Filestore, or Longhorn introduces severe I/O latency. This bottleneck can slow down background file processing and asset compilation during bench builds. The system lacks native, object-store-backed caching abstraction or sidecar configurations (e.g., using MinIO or AWS S3 API protocols directly) to eliminate the RWX dependency.
+### <i data-lucide="database"></i> Polymorphic Database Architecture
+- **Status**: **Completed** <i data-lucide="check" style="color: #00BC86;"></i>
+- **Implementation**: Decoupled the controller reconciliation loops from MariaDB by introducing the `DatabaseProvider` Go interface. Native support for:
+  - **StackGres PostgreSQL**: Automated `SGCluster` and `SGScript` provisioning over JDBC without CLI dependencies.
+  - **Percona PostgreSQL**: Declarative `PerconaPGCluster` management.
+  - **MariaDB Operator**: Isolated databases and dedicated grants.
+  - **External Cloud Databases**: Seamless connectivity to AWS RDS, Google Cloud SQL, and Azure PostgreSQL.
 
-Gap 3: Destructive Upgrade Lifecycles & Lack of Canary Controls
-The Issue: Updating a Frappe deployment forces a schema migration execution (bench migrate) which irreversibly alters SQL structures.
+### <i data-lucide="shield-check"></i> Red Hat OpenShift `restricted-v2` Compliance
+- **Status**: **Completed** <i data-lucide="check" style="color: #00BC86;"></i>
+- **Implementation**: Full compatibility with OpenShift's strictest Security Context Constraints:
+  - Eliminated hardcoded UIDs and disallowed `fsGroup: 0` privilege escalation.
+  - Runtime pods drop all Linux capabilities (`drop: ["ALL"]`).
+  - Automatic OpenShift Route generation with enforced Edge TLS redirection.
 
-The Impact: The operator lacks an automated blueprint for Canary Deployments or Pre-Migration Handshakes embedded inside the upgrade loop. If a FrappeSite image upgrade executes a corrupted patch or encounters a faulty database migration, the operator does not automatically isolate the tenant, pause the roll-out, or restore the pre-migration state. Restoring data requires manual coordination using the SiteRestore CRD.
+---
 
-Gap 4: Ingress Proliferation vs. Dynamic Gateway Engines
-The Issue: The operator handles custom edge networking by creating standalone Kubernetes Ingress or OpenShift Route configurations for every unique FrappeSite.
+## <i data-lucide="compass"></i> Future Engineering Roadmap
 
-The Impact: In a high-density environment featuring thousands of custom domains (e.g., erp.clientcompany.com routing to tenant1.platform.io), generating thousands of separate Ingress resources causes cluster control plane bloat and forces frequent proxy reloads. The operator lacks native support for dynamic routing structures like Envoy, Traefik, or the Kubernetes Gateway API, which map host headers dynamically via lookups rather than resource-heavy ingress changes.
+### <i data-lucide="hard-drive"></i> 1. Storage Optimization & Object Storage Offload
+- **Target**: v5.3.0
+- **Problem**: Frappe stores static assets and user files under `/sites/<site>/public/files` and `/private/files`, requiring ReadWriteMany (RWX) volumes (e.g., AWS EFS, GCP Filestore, CephFS). High tenant volume can cause I/O latency.
+- **Planned Solution**:
+  - Native S3-compatible object storage provider abstraction (AWS S3, Cloudflare R2, MinIO).
+  - Background asset sync and offloading sidecar to eliminate heavy RWX dependency for media and attachments.
 
-Gap 5: Specialized Application Observability (APM)
-The Issue: Performance metrics are limited to surface-level cluster instrumentation (such as pod resource limits, container metrics, and RQ queue lengths).
+### <i data-lucide="git-merge"></i> 2. Automated Canary & Pre-Migration Rollback
+- **Target**: v5.4.0
+- **Problem**: In-place `bench migrate` modifies database schemas irreversibly if an upgrade patch fails.
+- **Planned Solution**:
+  - Pre-migration snapshot hooks integrated with VolumeSnapshots and StackGres/Percona backup engines.
+  - Automated canary deployment pattern for multi-replica benches before promoting new image tags.
+  - Automatic traffic shifting and rollback reconciliation if migration jobs exit with non-zero status.
 
-The Impact: The operator does not provide pre-configured sidecar patterns or open-telemetry collectors configured to capture internal Frappe operational metrics. Vital operational diagnostics—including database connection pool exhaustion, slow Frappe ORM queries, long-running Python process deadlocks, and scheduler task delays—require heavy custom work to export to a unified Grafana dashboard.
+### <i data-lucide="network"></i> 3. Kubernetes Gateway API & Dynamic Host Routing
+- **Target**: v5.5.0
+- **Problem**: High-density multi-tenant clusters running thousands of custom domains generate thousands of individual Ingress or Route resources, causing control plane bloat.
+- **Planned Solution**:
+  - Implement Gateway API HTTPRoute controllers.
+  - Integrate dynamic host-header lookup via Envoy Gateway or Traefik, eliminating the need for separate Ingress objects per tenant site.
+
+### <i data-lucide="activity"></i> 4. Native OpenTelemetry APM & Frappe ORM Observability
+- **Target**: v5.6.0
+- **Problem**: Standard Kubernetes monitoring metrics capture container CPU/Memory and RQ lengths, but lack deep Frappe application insights.
+- **Planned Solution**:
+  - Automated OpenTelemetry sidecar injection for Gunicorn and RQ workers.
+  - Export distributed traces for slow Frappe ORM queries, database connection pool exhaustion, and background job deadlocks to Prometheus and Grafana.

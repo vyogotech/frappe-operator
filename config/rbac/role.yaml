@@ -178,8 +178,9 @@ rules:
   resources:
   - sgclusters
   - sginstanceprofiles
-  - sgpoolingconfigs
-  - sgpostgresconfigs
+  - sgpgconfigs
+  - sgpoolconfigs
+  - sgscripts
   verbs:
   - create
   - delete

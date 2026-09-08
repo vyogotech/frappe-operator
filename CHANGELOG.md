@@ -5,33 +5,58 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.2.0] - 2026-09-08
 
 ### Added
-- **Provider-Agnostic Autoscaling**: Deep refactor of the autoscaling system to support multiple scaling backends (KEDA and HPA) through a unified `componentAutoscaling` API.
-- **HPA Scaling Provider**: Support for standard Kubernetes Horizontal Pod Autoscaler for CPU and Memory metrics.
-- **Enhanced KEDA Provider**: Improved Scaling-to-Zero support and Redis queue length triggers for background workers.
-- **Autoscaling Test Suite**: Comprehensive unit and E2E testing framework for autoscaling components, including provider-switching and graceful fallback scenarios.
-- **Scaling Status Observability**: Added `componentScaling` status map to `FrappeBench` for real-time visibility into scaling modes and replica counts.
+- **Polymorphic Database Architecture**: First-class PostgreSQL integration alongside MariaDB with automatic engine selection (`dbConfig.provider: postgres`, `dbConfig.postgresEngine`).
+- **StackGres Operator Integration**: Declarative per-site `SGCluster` and `SGScript` templates for dedicated PostgreSQL with automated JDBC-compatible schema initialization.
+- **Percona PostgreSQL Toggle**: Dedicated `PerconaPGCluster` option with backward-compatibility preservation for existing clusters.
+- **HTTPS-Only Ingress & Route Enforcement**: Sites automatically configure TLS certificates and enforce HTTPS edge redirection (`tls.insecureEdgeTerminationPolicy: Redirect` on OpenShift Routes, `ssl-redirect: "true"` on Kubernetes Ingress).
+- **Webhook Immutability Guard**: Validating webhook strictly prevents changing `dbConfig.postgresEngine` post-creation.
 
-### Changed
-- **API: Unified Autoscaling**: Replaced legacy `workerAutoscaling`, `nginxAutoscaling`, and `componentReplicas` with a unified `componentAutoscaling` map in `FrappeBenchSpec`.
-- **Default Scaling Provider**: Default autoscaling provider is now `hpa` for improved out-of-the-box compatibility on all platforms (including OpenShift).
-- **FrappeSite stability tests**: Fixed fake client not finding shared MariaDB CR by creating the MariaDB via `fakeClient.Create()` in test setup (matching `frappesite_jobs_test.go`), so reconciliation tests no longer fail with "shared MariaDB instance 'frappe-mariadb' not found".
-- **Security context test (non-OpenShift)**: Made the test deterministic by using explicit `bench.Spec.Security` overrides instead of env vars (`FRAPPE_DEFAULT_UID`/`FRAPPE_DEFAULT_GID`), avoiding flakiness from test order or environment.
-- **Integration Test Tags**: Corrected `FrappeVersion` tags from `v15` to `version-15` in integration tests to match official Docker images.
-- **Webhook Validation in Tests**: Added required `Apps` to `FrappeBench` and `FrappeSite` resources in integration tests to satisfy newer webhook validation rules.
+### Security
+- **OpenShift `restricted-v2` SCC Compliance**: Verified end-to-end compatibility across all operator workloads, bench pods, site initialization jobs, and database instances.
+
+---
+
+## [5.1.4] - 2026-08-28
 
 ### Added
-- **Advanced Pod Configuration**: Added support for custom labels, node selectors, affinity, and tolerations via `podConfig` in `FrappeBench` and `FrappeSite` CRDs. 
-- **Geo-tagging Support**: Added `geoTag` configuration (under `podConfig`) to easily set region/zone labels and node affinity for geographic placement.
-- **Dynamic `envtest` Detection**: Improved test suites to automatically search for `etcd` and `kube-apiserver` in the project-local `bin/k8s` directory. This enables `TestAPIs` and E2E tests to run without manual `KUBEBUILDER_ASSETS` configuration.
-- **E2E Bootstrap Configuration**: Enabled E2E tests to attempt execution even when local `envtest` binaries are missing, provided an existing cluster is available.
+- **Job Sizing Defaults**: Configurable `spec.jobResources` with built-in default requests and limits across all operator-run jobs.
+- **Dynamic Image Versioning**: Dynamic version build argument passing in Dockerfile and CI workflows.
+
+### Fixed
+- **Site Hash Zero-Padding**: Zero-padded site hash in `generateDBName` ensuring slice operations never exceed string length bounds.
+- **Site Lifecycle Re-Creation**: Handled same-name site re-creation cleanly and ensured child resources (`SiteApps`, `SiteDomains`) cleanly terminate with their parent site.
+- **Clean Uninstall**: Added `uninstall.sh` script for clean teardown of operator and CRDs.
+
+---
+
+## [5.0.0] - 2026-07-15
+
+### Added
+- **Red Hat OperatorHub Certification**: Updated ClusterServiceVersion (CSV) and packaging for Red Hat OpenShift certification.
+- **Multi-Platform Container Builds**: Automated ARM64 and AMD64 release images.
+
+---
+
+## [4.2.0] - 2026-06-01
 
 ### Changed
-- **CI**: Unit test job runs on push/PR to `main`, `master`, `develop`, and `feature/**`; Docker build depends on test job. Go version in workflows aligned to 1.22.
-- **E2E workflow**: Added "Run Integration Tests" step that runs `./test/integration/...` with `INTEGRATION_TEST=true` in the Kind cluster after installing the operator. Go version set to 1.22.
-- **CONTRIBUTING.md**: Updated Testing section to match Makefile targets (`make test`, `make coverage`, `make integration-test`), Go prerequisite (1.22+), and described CI/E2E test integration.
+- **License Transition**: Shifted project license to Elastic License 2.0 (ELv2) for sustainable open ecosystem stewardship.
+- **Multi-Tenant Guardrails**: Enhanced tenant isolation and namespace security enforcement.
+
+---
+
+## [3.0.0] - 2026-03-15
+
+### Added
+- **Provider-Agnostic Autoscaling**: Refactored autoscaling to support HPA and KEDA via unified `componentAutoscaling` API in `FrappeBench`.
+- **Advanced Pod Configuration**: Custom labels, node selectors, affinity, tolerations, and `geoTag` configuration via `podConfig`.
+- **Scaling Observability**: Added `componentScaling` status map to `FrappeBench` for real-time visibility into scaling modes and replica counts.
+
+### Changed
+- **Default Scaling Provider**: Default autoscaling provider set to `hpa` for standard Kubernetes and OpenShift out-of-the-box compatibility.
 
 ---
 

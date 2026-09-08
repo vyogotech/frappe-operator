@@ -34,15 +34,34 @@ import (
 
 // SharedPostgresProvider implements database.Provider for shared PostgreSQL instances
 type SharedPostgresProvider struct {
+	config vyogotechv1.DatabaseConfig
 	client client.Client
 	scheme *runtime.Scheme
 }
 
-func NewSharedPostgresProvider(client client.Client, scheme *runtime.Scheme) *SharedPostgresProvider {
+func NewSharedPostgresProvider(config vyogotechv1.DatabaseConfig, client client.Client, scheme *runtime.Scheme) *SharedPostgresProvider {
 	return &SharedPostgresProvider{
+		config: config,
 		client: client,
 		scheme: scheme,
 	}
+}
+
+func (p *SharedPostgresProvider) getDBConfig(site *vyogotechv1.FrappeSite) vyogotechv1.DatabaseConfig {
+	cfg := p.config
+	if site == nil {
+		return cfg
+	}
+	if cfg.Host == "" {
+		cfg.Host = site.Spec.DBConfig.Host
+	}
+	if cfg.Port == "" {
+		cfg.Port = site.Spec.DBConfig.Port
+	}
+	if cfg.PostgresRef == nil {
+		cfg.PostgresRef = site.Spec.DBConfig.PostgresRef
+	}
+	return cfg
 }
 
 func (p *SharedPostgresProvider) EnsureDatabase(ctx context.Context, site *vyogotechv1.FrappeSite) (*DatabaseInfo, error) {
@@ -57,7 +76,8 @@ func (p *SharedPostgresProvider) EnsureDatabase(ctx context.Context, site *vyogo
 	}
 
 	// 2. Resolve Postgres Host
-	host, port, err := getSharedHostPort(site)
+	cfg := p.getDBConfig(site)
+	host, port, err := getSharedHostPortWithConfig(cfg, site)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +88,8 @@ func (p *SharedPostgresProvider) EnsureDatabase(ctx context.Context, site *vyogo
 	err = p.client.Get(ctx, types.NamespacedName{Name: jobName, Namespace: site.Namespace}, job)
 	if errors.IsNotFound(err) {
 		provisionerSecretName := "frappe-postgres-provisioner"
-		if site.Spec.DBConfig.PostgresRef != nil && site.Spec.DBConfig.PostgresRef.Name != "" {
-			provisionerSecretName = site.Spec.DBConfig.PostgresRef.Name
+		if cfg.PostgresRef != nil && cfg.PostgresRef.Name != "" {
+			provisionerSecretName = cfg.PostgresRef.Name
 		}
 
 		script := fmt.Sprintf(`
@@ -161,15 +181,16 @@ func (p *SharedPostgresProvider) Cleanup(ctx context.Context, site *vyogotechv1.
 
 	dbName := generateDBName(site)
 	dbUser := generateDBUser(site)
-	host, port, err := getSharedHostPort(site)
+	cfg := p.getDBConfig(site)
+	host, port, err := getSharedHostPortWithConfig(cfg, site)
 	if err != nil {
 		return err
 	}
 
 	jobName := fmt.Sprintf("%s-db-delete", site.Name)
 	provisionerSecretName := "frappe-postgres-provisioner"
-	if site.Spec.DBConfig.PostgresRef != nil && site.Spec.DBConfig.PostgresRef.Name != "" {
-		provisionerSecretName = site.Spec.DBConfig.PostgresRef.Name
+	if cfg.PostgresRef != nil && cfg.PostgresRef.Name != "" {
+		provisionerSecretName = cfg.PostgresRef.Name
 	}
 
 	script := fmt.Sprintf(`

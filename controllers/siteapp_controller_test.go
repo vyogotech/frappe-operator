@@ -539,4 +539,3 @@ func TestSiteAppReconciler_SecurityContext_OpenShift(t *testing.T) {
 		t.Errorf("expected AllowPrivilegeEscalation to be false on OpenShift, got %v", jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
 	}
 }
-

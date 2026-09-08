@@ -66,7 +66,7 @@ func generateDBUser(site *vyogotechv1.FrappeSite) string {
 // The Percona and StackGres CRDs and Secrets work best with a DNS-label
 // (^[a-z0-9]([-a-z0-9]*[a-z0-9])?$) user name.
 func generatePGUserName(site *vyogotechv1.FrappeSite) string {
-	return "u" + hashString(site.Namespace+"/"+site.Name)[:8]
+	return "u" + hashString(site.Namespace + "/" + site.Name)[:8]
 }
 
 // hashString is a stable 8-hex-character digest of s. It MUST be zero-padded:
@@ -197,23 +197,36 @@ SQL
 }
 
 func getSharedHostPort(site *vyogotechv1.FrappeSite) (string, string, error) {
+	return getSharedHostPortWithConfig(site.Spec.DBConfig, site)
+}
+
+func getSharedHostPortWithConfig(cfg vyogotechv1.DatabaseConfig, site *vyogotechv1.FrappeSite) (string, string, error) {
 	port := "5432"
-	if site.Spec.DBConfig.Port != "" {
+	if cfg.Port != "" {
+		port = cfg.Port
+	} else if site.Spec.DBConfig.Port != "" {
 		port = site.Spec.DBConfig.Port
 	}
 
+	if cfg.Host != "" {
+		return cfg.Host, port, nil
+	}
 	if site.Spec.DBConfig.Host != "" {
 		return site.Spec.DBConfig.Host, port, nil
 	}
 
 	host := "frappe-postgres-pgbouncer" // Default for Percona shared cluster
-	if site.Spec.DBConfig.PostgresRef != nil && site.Spec.DBConfig.PostgresRef.Name != "" {
-		host = site.Spec.DBConfig.PostgresRef.Name + "-pgbouncer"
+	ref := cfg.PostgresRef
+	if ref == nil {
+		ref = site.Spec.DBConfig.PostgresRef
+	}
+	if ref != nil && ref.Name != "" {
+		host = ref.Name + "-pgbouncer"
 	}
 
 	ns := site.Namespace
-	if site.Spec.DBConfig.PostgresRef != nil && site.Spec.DBConfig.PostgresRef.Namespace != "" {
-		ns = site.Spec.DBConfig.PostgresRef.Namespace
+	if ref != nil && ref.Namespace != "" {
+		ns = ref.Namespace
 	}
 
 	return fmt.Sprintf("%s.%s.svc.cluster.local", host, ns), port, nil

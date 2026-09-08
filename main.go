@@ -208,6 +208,19 @@ func main() {
 		setupLog.Info("Standard Kubernetes platform detected")
 	}
 
+	// HTTPS policy: off by default so existing non-OpenShift installs (no
+	// cert-manager, no pre-created TLS secrets) don't break. When enforced,
+	// every site gets TLS + a mandatory HTTPS redirect regardless of its own
+	// spec.tls.enabled setting or ingress annotations. OpenShift Routes are
+	// already HTTPS-only via edge termination and are unaffected either way.
+	enforceHTTPS := os.Getenv("FRAPPE_ENFORCE_HTTPS") == "true"
+	defaultClusterIssuer := os.Getenv("FRAPPE_DEFAULT_CLUSTER_ISSUER")
+	if enforceHTTPS {
+		setupLog.Info("HTTPS policy: enforced (all sites forced to HTTPS)", "defaultClusterIssuer", defaultClusterIssuer)
+	} else {
+		setupLog.Info("HTTPS policy: per-site (spec.tls.enabled controls each site)")
+	}
+
 	if err = (&controllers.FrappeBenchReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
@@ -226,6 +239,8 @@ func main() {
 		Recorder:                mgr.GetEventRecorderFor("frappesite-controller"),
 		IsOpenShift:             isOpenShift,
 		MaxConcurrentReconciles: maxSiteReconciles,
+		EnforceHTTPS:            enforceHTTPS,
+		DefaultClusterIssuer:    defaultClusterIssuer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FrappeSite")
 		os.Exit(1)
@@ -264,10 +279,12 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteDomainReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		Recorder:    mgr.GetEventRecorderFor("sitedomain-controller"),
-		IsOpenShift: isOpenShift,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Recorder:             mgr.GetEventRecorderFor("sitedomain-controller"),
+		IsOpenShift:          isOpenShift,
+		EnforceHTTPS:         enforceHTTPS,
+		DefaultClusterIssuer: defaultClusterIssuer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteDomain")
 		os.Exit(1)

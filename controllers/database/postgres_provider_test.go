@@ -24,12 +24,15 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
@@ -40,7 +43,7 @@ func pgTestSetup() (*PostgresProvider, *runtime.Scheme) {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&batchv1.Job{}).Build()
-	return &PostgresProvider{client: cl, scheme: scheme}, scheme
+	return NewPostgresProvider(vyogotechv1.DatabaseConfig{}, cl, scheme).(*PostgresProvider), scheme
 }
 
 func pgSite() *vyogotechv1.FrappeSite {
@@ -344,5 +347,70 @@ func TestPostgresProvider_GenerateDBName(t *testing.T) {
 	// Deterministic per site.
 	if name != p.generateDBName(site) {
 		t.Error("generateDBName must be deterministic")
+	}
+}
+
+func TestPostgresProvider_BenchInheritance(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&batchv1.Job{}).Build()
+
+	// Provider constructed with bench-level config
+	benchConfig := vyogotechv1.DatabaseConfig{
+		Provider:       "postgres",
+		Mode:           "dedicated",
+		PostgresEngine: "percona",
+	}
+	p := NewPostgresProvider(benchConfig, cl, scheme).(*PostgresProvider)
+
+	// Site has empty dbConfig
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "inherited-site", Namespace: "default"},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			SiteName: "inherited.example.com",
+		},
+	}
+
+	delegate, err := p.getDelegate(context.Background(), site)
+	if err != nil {
+		t.Fatalf("getDelegate failed: %v", err)
+	}
+
+	if _, ok := delegate.(*PerconaPostgresProvider); !ok {
+		t.Errorf("expected PerconaPostgresProvider via bench inheritance, got: %T", delegate)
+	}
+}
+
+type mockNoKindMatchClient struct {
+	client.Client
+}
+
+func (m *mockNoKindMatchClient) Get(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) error {
+	return &meta.NoKindMatchError{GroupKind: schema.GroupKind{Group: "pgv2.percona.com", Kind: "PerconaPGCluster"}}
+}
+
+func TestPostgresProvider_NoKindMatchFallback(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	mockCl := &mockNoKindMatchClient{}
+	p := NewPostgresProvider(vyogotechv1.DatabaseConfig{Mode: "dedicated"}, mockCl, scheme).(*PostgresProvider)
+
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "new-site", Namespace: "default"},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			SiteName: "new.example.com",
+			DBConfig: vyogotechv1.DatabaseConfig{Mode: "dedicated"},
+		},
+	}
+
+	engine, err := p.resolvePostgresEngine(context.Background(), site)
+	if err != nil {
+		t.Fatalf("expected fallback to stackgres on NoKindMatchError, got err: %v", err)
+	}
+	if engine != "stackgres" {
+		t.Errorf("expected engine 'stackgres', got: %q", engine)
 	}
 }
