@@ -4,7 +4,7 @@
   "displayName": "Frappe & ERPNext Platform",
   "description": "Enterprise management console for Frappe Benches, Tenant Sites, and Air-Gapped FPM Package Repositories by Vyogo Technologies.",
   "dependencies": {
-    "@openshift-console/dynamic-plugin-sdk": ">=1.0.0"
+    "@console/pluginAPI": "*"
   },
   "extensions": [
     {
