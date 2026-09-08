@@ -8,7 +8,7 @@ USER 0
 COPY nginx-http.conf /etc/nginx/nginx-http.conf
 COPY nginx-ssl.conf /etc/nginx/nginx-ssl.conf
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY plugin-manifest.json /usr/share/nginx/html/plugin-manifest.json
+COPY dist /usr/share/nginx/html
 COPY public/index.html /usr/share/nginx/html/index.html
 
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
