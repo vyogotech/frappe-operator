@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -412,5 +413,109 @@ func TestPostgresProvider_NoKindMatchFallback(t *testing.T) {
 	}
 	if engine != "stackgres" {
 		t.Errorf("expected engine 'stackgres', got: %q", engine)
+	}
+}
+
+// TestPerconaProvider_StalledClusterSurfacesError covers the failure mode where
+// the Percona operator never reconciles a cluster we created (e.g. it runs in
+// single-namespace mode and is not watching this namespace). Previously IsReady
+// returned (false, nil) forever and the site sat in Provisioning with no
+// explanation.
+func TestPerconaProvider_StalledClusterSurfacesError(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	site := pgSite()
+	site.Spec.DBConfig.Mode = "dedicated"
+	site.Spec.DBConfig.PostgresEngine = "percona"
+
+	newCluster := func(age time.Duration, state string) *unstructured.Unstructured {
+		obj := map[string]interface{}{
+			"apiVersion": "pgv2.percona.com/v2",
+			"kind":       "PerconaPGCluster",
+			"metadata": map[string]interface{}{
+				"name":              "pgsite-postgres",
+				"namespace":         "default",
+				"creationTimestamp": metav1.NewTime(time.Now().Add(-age)).UTC().Format(time.RFC3339),
+			},
+		}
+		if state != "" {
+			obj["status"] = map[string]interface{}{"state": state}
+		}
+		u := &unstructured.Unstructured{Object: obj}
+		return u
+	}
+
+	tests := []struct {
+		name      string
+		age       time.Duration
+		state     string
+		wantErr   bool
+		errSubstr string
+	}{
+		{name: "fresh cluster with no status is still starting", age: 30 * time.Second, state: "", wantErr: false},
+		{name: "long-blank status reports the operator is not reconciling", age: 30 * time.Minute, state: "", wantErr: true, errSubstr: "no status"},
+		{name: "explicit error state is surfaced", age: time.Minute, state: "error", wantErr: true, errSubstr: "reported state"},
+		{name: "initializing is normal progress", age: time.Minute, state: "initializing", wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cl := fake.NewClientBuilder().WithScheme(scheme).
+				WithRuntimeObjects(newCluster(tt.age, tt.state)).Build()
+			p := NewPerconaPostgresProvider(vyogotechv1.DatabaseConfig{}, cl, scheme)
+
+			ready, err := p.IsReady(context.Background(), site)
+			if ready {
+				t.Error("expected IsReady=false")
+			}
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected an error, got nil")
+				}
+				if !strings.Contains(err.Error(), tt.errSubstr) {
+					t.Errorf("expected error containing %q, got: %v", tt.errSubstr, err)
+				}
+			} else if err != nil {
+				t.Errorf("expected no error, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestPostgresProvider_RejectsEngineSwitch verifies the controller-side backstop
+// that stops an explicit postgresEngine change from provisioning a second empty
+// cluster and orphaning the live one. This runs even where the admission
+// webhook is not deployed.
+func TestPostgresProvider_RejectsEngineSwitch(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	existingSG := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "stackgres.io/v1",
+		"kind":       "SGCluster",
+		"metadata":   map[string]interface{}{"name": "pgsite-postgres", "namespace": "default"},
+	}}
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(existingSG).Build()
+	p := NewPostgresProvider(vyogotechv1.DatabaseConfig{}, cl, scheme).(*PostgresProvider)
+
+	site := pgSite()
+	site.Spec.DBConfig.Mode = "dedicated"
+	site.Spec.DBConfig.PostgresEngine = "percona" // switching away from the live StackGres cluster
+
+	_, err := p.resolvePostgresEngine(context.Background(), site)
+	if err == nil {
+		t.Fatal("expected an error when switching engine on a site that already has an SGCluster")
+	}
+	if !strings.Contains(err.Error(), "SGCluster") {
+		t.Errorf("error should name the existing cluster kind, got: %v", err)
+	}
+
+	// Keeping the engine that matches the existing cluster must still work.
+	site.Spec.DBConfig.PostgresEngine = "stackgres"
+	if engine, err := p.resolvePostgresEngine(context.Background(), site); err != nil || engine != "stackgres" {
+		t.Errorf("expected stackgres with no error, got %q err=%v", engine, err)
 	}
 }

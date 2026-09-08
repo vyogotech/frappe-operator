@@ -362,6 +362,13 @@ func (p *StackGresPostgresProvider) IsReady(ctx context.Context, site *vyogotech
 		return false, err
 	}
 
+	// A cluster StackGres has marked Failed will never become ready on its own;
+	// surface it instead of requeueing silently (mirrors the managedSql script
+	// failure handling below).
+	if msg, failed := stackGresFailure(cluster); failed {
+		return false, fmt.Errorf("SGCluster %s/%s reported Failed: %s", site.Namespace, clusterName, msg)
+	}
+
 	if !p.isClusterReady(cluster) {
 		return false, nil
 	}
@@ -556,4 +563,35 @@ func (p *StackGresPostgresProvider) Cleanup(ctx context.Context, site *vyogotech
 		return fmt.Errorf("cleanup errors for %s: %v", site.Name, errs)
 	}
 	return nil
+}
+
+// stackGresFailure reports whether the SGCluster carries a Failed=True
+// condition, along with its message. StackGres sets this for configuration and
+// bootstrap errors that will not clear without intervention.
+func stackGresFailure(cluster *unstructured.Unstructured) (string, bool) {
+	conditions, found, err := unstructured.NestedSlice(cluster.Object, "status", "conditions")
+	if err != nil || !found {
+		return "", false
+	}
+	for _, c := range conditions {
+		condMap, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		t, _ := condMap["type"].(string)
+		st, _ := condMap["status"].(string)
+		if t == "Failed" && strings.EqualFold(st, "True") {
+			msg, _ := condMap["message"].(string)
+			if msg == "" {
+				if reason, ok := condMap["reason"].(string); ok {
+					msg = reason
+				}
+			}
+			if msg == "" {
+				msg = "no message reported"
+			}
+			return msg, true
+		}
+	}
+	return "", false
 }

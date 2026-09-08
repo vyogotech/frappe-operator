@@ -239,3 +239,47 @@ func TestPostgresProvider_StackGresScriptFailure(t *testing.T) {
 		t.Errorf("expected error containing %q, got: %v", want, err)
 	}
 }
+
+// TestPostgresProvider_StackGresClusterFailed verifies that a cluster StackGres
+// has marked Failed surfaces as an error rather than requeueing silently. A
+// Failed cluster will not recover on its own, so the site should report why.
+func TestPostgresProvider_StackGresClusterFailed(t *testing.T) {
+	p, _ := pgTestSetup()
+	ctx := context.Background()
+	site := pgSite()
+	site.Spec.DBConfig.Mode = "dedicated"
+	site.Spec.DBConfig.PostgresEngine = "stackgres"
+
+	if _, err := p.EnsureDatabase(ctx, site); err != nil {
+		t.Fatalf("EnsureDatabase: %v", err)
+	}
+
+	cluster := &unstructured.Unstructured{}
+	cluster.SetGroupVersionKind(SGClusterGVK)
+	if err := p.client.Get(ctx, types.NamespacedName{Name: "pgsite-postgres", Namespace: "default"}, cluster); err != nil {
+		t.Fatalf("get cluster: %v", err)
+	}
+	cluster.Object["status"] = map[string]interface{}{
+		"conditions": []interface{}{
+			map[string]interface{}{
+				"type":    "Failed",
+				"status":  "True",
+				"message": "instance profile not found",
+			},
+		},
+	}
+	if err := p.client.Update(ctx, cluster); err != nil {
+		t.Fatalf("update cluster: %v", err)
+	}
+
+	ready, err := p.IsReady(ctx, site)
+	if ready {
+		t.Error("expected IsReady=false for a Failed cluster")
+	}
+	if err == nil {
+		t.Fatal("expected an error for a Failed cluster, got nil")
+	}
+	if !strings.Contains(err.Error(), "instance profile not found") {
+		t.Errorf("error should carry the StackGres message, got: %v", err)
+	}
+}

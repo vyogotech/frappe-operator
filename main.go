@@ -430,6 +430,37 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
+	// Admission webhooks. These enforce rules that cannot be expressed in the
+	// CRD schema, most importantly that dbConfig.postgresEngine is immutable
+	// once a dedicated cluster has been provisioned.
+	//
+	// Opt-in, and deliberately defaulted OFF: the webhooks are declared with
+	// failurePolicy=fail, so once their ValidatingWebhookConfiguration exists
+	// every FrappeSite and FrappeBench write is rejected unless the operator is
+	// serving them with a valid certificate. Enabling this therefore requires
+	// the serving certificate to be in place (cert-manager for Helm/kustomize
+	// installs, or OLM-managed certificates via the CSV's webhookdefinitions).
+	// Turning it on without that would take the API surface down, so existing
+	// installs are left untouched until the operator is explicitly configured
+	// for it.
+	//
+	// Note the FrappeSite controller independently refuses to switch the engine
+	// of a site that already has a cluster (see resolvePostgresEngine), so that
+	// protection holds whether or not these webhooks are enabled.
+	if os.Getenv("ENABLE_WEBHOOKS") == "true" {
+		if err := (&vyogotechv1.FrappeSite{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "FrappeSite")
+			os.Exit(1)
+		}
+		if err := (&vyogotechv1.FrappeBench{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "FrappeBench")
+			os.Exit(1)
+		}
+		setupLog.Info("admission webhooks enabled", "port", 9443)
+	} else {
+		setupLog.Info("admission webhooks disabled (set ENABLE_WEBHOOKS=true once serving certificates are configured)")
+	}
+
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
