@@ -70,6 +70,15 @@ type DatabaseConfig struct {
 	// +optional
 	Provider string `json:"provider,omitempty"`
 
+	// PostgresEngine selects which operator provisions dedicated-mode PostgreSQL
+	// clusters. Only meaningful when Provider is "postgres"; shared mode is
+	// already engine-agnostic (it just needs a reachable host:port; see
+	// dbConfig.host). Empty is resolved dynamically at reconcile time rather than
+	// defaulted in the CRD schema — see the backward-compatibility note in docs.
+	// +kubebuilder:validation:Enum=stackgres;percona
+	// +optional
+	PostgresEngine string `json:"postgresEngine,omitempty"`
+
 	// Mode: shared (one DB instance, multiple site databases) or dedicated (one DB instance per site)
 	// +kubebuilder:validation:Enum=shared;dedicated
 	// +kubebuilder:default=shared

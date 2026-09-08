@@ -9,37 +9,61 @@ alongside MariaDB. Choose per-site with `spec.dbConfig.provider: postgres`.
 > bench image on any bench whose sites use `provider: postgres`. See
 > [Building a Postgres bench image](#building-a-postgres-bench-image).
 
-## Modes
+## Modes & Engines
 
-| Mode | What the operator does | Backing service |
-|------|------------------------|-----------------|
-| `shared` (default) | Runs a `pg-provision` Job that `CREATE ROLE` + `CREATE DATABASE` on an **existing** PostgreSQL server | Any Postgres (a shared Percona cluster, a managed RDS/CloudSQL, etc.) |
-| `dedicated` | Provisions a **per-site** `PerconaPGCluster` (one Postgres instance per site) | [Percona PostgreSQL Operator](https://docs.percona.com/percona-operator-for-postgresql/2.0/) v2 |
+| Mode | Engine | What the operator does | Backing operator |
+|------|--------|------------------------|------------------|
+| `shared` (default) | *Agnostic* | Runs a `pg-provision` Job that `CREATE ROLE` + `CREATE DATABASE` on an **existing** PostgreSQL server | Any Postgres (StackGres, Percona, CloudNativePG, RDS, CloudSQL, etc.) |
+| `dedicated` | `stackgres` (**default**) | Provisions a **per-site** `SGCluster` with shared configuration and sizing profiles | [StackGres Operator](https://stackgres.io) |
+| `dedicated` | `percona` (toggle) | Provisions a **per-site** `PerconaPGCluster` (one Postgres instance per site) | [Percona PostgreSQL Operator](https://docs.percona.com/percona-operator-for-postgresql/2.0/) v2 |
 
 Both modes honour `spec.deletionPolicy`:
 
 - **`Retain`** (default): the database, role, and credential Secret (shared) or
-  the whole `PerconaPGCluster` (dedicated) are **kept** when the `FrappeSite` is
+  the whole database cluster (dedicated) are **kept** when the `FrappeSite` is
   deleted. GitOps-safe — an accidental CR delete or an ArgoCD prune never drops
   tenant data.
 - **`Delete`**: the operator runs a `pg-delete` Job (shared, `DROP DATABASE` /
-  `DROP ROLE`) or deletes the `PerconaPGCluster` (dedicated).
+  `DROP ROLE`) or deletes the cluster CR (`SGCluster` or `PerconaPGCluster`).
+
+### Dedicated Engine Toggle (`postgresEngine`)
+
+Choose the dedicated PostgreSQL operator via `spec.dbConfig.postgresEngine`:
+- `stackgres` (**default for new dedicated sites**): provisions via StackGres (`SGCluster`). Certified on OpenShift.
+- `percona`: provisions via Percona (`PerconaPGCluster`).
+
+```yaml
+spec:
+  dbConfig:
+    provider: postgres
+    mode: dedicated
+    postgresEngine: stackgres  # "stackgres" (default) or "percona"
+```
+
+> **Backward Compatibility Guarantee**: Existing dedicated-mode sites created before `postgresEngine` existed
+> probe for `<site>-postgres` `PerconaPGCluster`. If found, they continue managing the Percona cluster indefinitely.
+> Only new dedicated sites default to StackGres.
+> Once provisioned, `dbConfig.postgresEngine` is immutable.
 
 ## Prerequisites
 
-Install the Percona PostgreSQL Operator (needed for dedicated mode, and for the
-shared-cluster example below):
+### Option A: StackGres (Default)
+Install StackGres via OpenShift OperatorHub (`stackgres-community` package from `community-operators`) or upstream Helm chart:
+
+```bash
+helm repo add stackgres https://stackgres.io/downloads/stackgres-k8s/stackgres/helm
+helm repo update
+helm install stackgres-operator stackgres/stackgres-operator -n stackgres --create-namespace
+```
+
+Or enable `INSTALL_STACKGRES=true ./install.sh`.
+
+### Option B: Percona (Optional)
+Install the Percona PostgreSQL Operator:
 
 ```bash
 kubectl apply --server-side \
   -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/v2.3.1/deploy/bundle.yaml
-```
-
-CRDs only (e.g. for manifest validation without running the operator):
-
-```bash
-kubectl apply --server-side \
-  -f https://raw.githubusercontent.com/percona/percona-postgresql-operator/v2.3.1/deploy/crd.yaml
 ```
 
 ## Shared mode
@@ -87,7 +111,11 @@ reference, so `Retain` survives site deletion).
 
 ## Dedicated mode
 
-The operator creates a complete, per-site `PerconaPGCluster`:
+Dedicated mode provisions a full, isolated PostgreSQL cluster per site.
+
+### StackGres (Default)
+
+The operator creates a per-site `SGCluster` alongside shared configuration profiles:
 
 ```yaml
 apiVersion: vyogo.tech/v1
@@ -100,27 +128,52 @@ spec:
   dbConfig:
     provider: postgres
     mode: dedicated
-    storageSize: 5Gi        # data + pgBackRest repo volume size (default 2Gi)
+    postgresEngine: stackgres  # default for new sites; can be omitted
+    storageSize: 5Gi           # persistent volume size (default 2Gi)
+    resources:                 # optional: generates bespoke <site>-postgres-profile
+      requests:
+        cpu: "1"
+        memory: 2Gi
   deletionPolicy: Delete
 ```
 
-On PostgreSQL 15+, the `public` schema is locked to the database owner, and
-Percona seeds a per-user schema that would otherwise shadow `public`. Frappe
-requires `public`, so the operator exposes the Percona `postgres` superuser and
-runs a one-time, idempotent **configure Job** that hands the database to the app
-user (giving it `public` ownership) and sets its `search_path` to `public`. The
-site only reports `Ready` once both the cluster is `ready` and that Job succeeds.
+The generated StackGres resources:
+- `SGCluster/<site>-postgres`: runs PostgreSQL 16 with PgBouncer sidecar pooling.
+- `SGPostgresConfig/frappe-postgres-dedicated-defaults`: shared namespace configuration (`postgresql.conf`).
+- `SGPoolingConfig/frappe-postgres-dedicated-pooling`: shared namespace configuration (`pgbouncer.ini` in transaction pooling mode).
+- `SGInstanceProfile/frappe-postgres-dedicated-default` (or `<site>-postgres-profile` if custom resources are set).
+- Credentials stored in `Secret/<site>-db-password`.
+- Note: Site-level backups via `SiteBackup` (`bench backup`) are fully supported. Cluster-level continuous PITR via `SGObjectStorage` is an optional upcoming enhancement.
+
+### Percona (Toggle)
+
+To provision via Percona Operator instead:
+
+```yaml
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: my-site
+spec:
+  benchRef: { name: pg-bench }
+  siteName: my-site.example.com
+  dbConfig:
+    provider: postgres
+    mode: dedicated
+    postgresEngine: percona
+    storageSize: 5Gi
+  deletionPolicy: Delete
+```
 
 The generated cluster is `PerconaPGCluster/<site>-postgres` with:
-
 - `postgresVersion: 16`, one instance (`instance1`)
-- a pgBouncer proxy (deployed for general use). **Frappe itself connects to the
-  direct `<site>-postgres-primary` service**, not pgBouncer: Percona's pgBouncer
-  defaults to transaction pooling, which breaks `bench new-site`/`bench migrate`
-  (session-level DDL and prepared statements)
-- a PVC-backed pgBackRest repo (`repo1`) so backups work out of the box
-- a role whose credentials the Percona operator writes to
-  `Secret/<site>-postgres-pguser-<user>`
+- Frappe connects to the direct `<site>-postgres-primary` service
+- a PVC-backed pgBackRest repo (`repo1`) for cluster-level PITR
+- credentials stored in `Secret/<site>-postgres-pguser-<user>`
+
+### Schema Ownership Fix (Both Engines)
+
+On PostgreSQL 15+, the `public` schema is locked to the database owner. Frappe requires `public`, so the operator connects as the cluster superuser and runs a one-time, idempotent **configure Job** that hands the database to the app user (giving it `public` ownership) and sets its `search_path` to `public`. The site only reports `Ready` once both the database cluster and that configure Job succeed.
 
 > The Percona CRD constrains the role name to a DNS label, so the operator uses
 > a stable label-safe name (`u<hash>`) derived from the site — distinct from the

@@ -149,6 +149,7 @@ func TestPostgresProvider_DedicatedClusterShape(t *testing.T) {
 	ctx := context.Background()
 	site := pgSite()
 	site.Spec.DBConfig.Mode = "dedicated"
+	site.Spec.DBConfig.PostgresEngine = "percona"
 
 	info, err := p.EnsureDatabase(ctx, site)
 	if err != nil {
@@ -207,6 +208,118 @@ func TestPostgresProvider_DedicatedClusterShape(t *testing.T) {
 	}
 	if !sawApp {
 		t.Errorf("cluster spec.users must include the app user %q", wantUser)
+	}
+}
+
+func TestPostgresProvider_DedicatedDefaultsToStackGres(t *testing.T) {
+	p, _ := pgTestSetup()
+	ctx := context.Background()
+	site := pgSite()
+	site.Spec.DBConfig.Mode = "dedicated"
+	// No PostgresEngine set, and no pre-existing cluster -> must default to StackGres
+
+	info, err := p.EnsureDatabase(ctx, site)
+	if err != nil {
+		t.Fatalf("EnsureDatabase(dedicated default): %v", err)
+	}
+	if info.Host == "" || info.Port != "5432" {
+		t.Fatalf("unexpected DatabaseInfo: %+v", info)
+	}
+
+	sgCluster := &unstructured.Unstructured{}
+	sgCluster.SetGroupVersionKind(SGClusterGVK)
+	if err := p.client.Get(ctx, types.NamespacedName{Name: "pgsite-postgres", Namespace: "default"}, sgCluster); err != nil {
+		t.Fatalf("expected SGCluster to be created by default for new site: %v", err)
+	}
+
+	perconaCluster := &unstructured.Unstructured{}
+	perconaCluster.SetGroupVersionKind(PerconaPGClusterGVK)
+	if err := p.client.Get(ctx, types.NamespacedName{Name: "pgsite-postgres", Namespace: "default"}, perconaCluster); err == nil {
+		t.Error("PerconaPGCluster must NOT be created when defaulting to StackGres")
+	}
+}
+
+func TestPostgresProvider_DedicatedGrandfathersExistingPercona(t *testing.T) {
+	p, _ := pgTestSetup()
+	ctx := context.Background()
+	site := pgSite()
+	site.Spec.DBConfig.Mode = "dedicated"
+	// No PostgresEngine set, but Percona cluster already exists in cluster
+	existingPercona := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "pgv2.percona.com/v2",
+			"kind":       "PerconaPGCluster",
+			"metadata": map[string]interface{}{
+				"name":      "pgsite-postgres",
+				"namespace": "default",
+			},
+		},
+	}
+	if err := p.client.Create(ctx, existingPercona); err != nil {
+		t.Fatalf("failed to seed existing Percona cluster: %v", err)
+	}
+
+	_, err := p.EnsureDatabase(ctx, site)
+	if err != nil {
+		t.Fatalf("EnsureDatabase with grandfathered cluster: %v", err)
+	}
+
+	// Should not have created SGCluster
+	sgCluster := &unstructured.Unstructured{}
+	sgCluster.SetGroupVersionKind(SGClusterGVK)
+	if err := p.client.Get(ctx, types.NamespacedName{Name: "pgsite-postgres", Namespace: "default"}, sgCluster); err == nil {
+		t.Error("SGCluster must NOT be created when a pre-existing Percona cluster is grandfathered")
+	}
+}
+
+func TestPostgresProvider_StackGresClusterShape(t *testing.T) {
+	p, _ := pgTestSetup()
+	ctx := context.Background()
+	site := pgSite()
+	site.Spec.DBConfig.Mode = "dedicated"
+	site.Spec.DBConfig.PostgresEngine = "stackgres"
+
+	info, err := p.EnsureDatabase(ctx, site)
+	if err != nil {
+		t.Fatalf("EnsureDatabase(stackgres): %v", err)
+	}
+	if info.Host != "pgsite-postgres.default.svc.cluster.local" || info.Port != "5432" {
+		t.Fatalf("unexpected DatabaseInfo: %+v", info)
+	}
+
+	// 1. Assert SGCluster exists with correct shape
+	cluster := &unstructured.Unstructured{}
+	cluster.SetGroupVersionKind(SGClusterGVK)
+	if err := p.client.Get(ctx, types.NamespacedName{Name: "pgsite-postgres", Namespace: "default"}, cluster); err != nil {
+		t.Fatalf("expected SGCluster: %v", err)
+	}
+
+	version, found, _ := unstructured.NestedString(cluster.Object, "spec", "postgres", "version")
+	if !found || version != "16" {
+		t.Errorf("expected spec.postgres.version='16', got %v", version)
+	}
+	profile, found, _ := unstructured.NestedString(cluster.Object, "spec", "sgInstanceProfile")
+	if !found || profile != "frappe-postgres-dedicated-default" {
+		t.Errorf("expected default instance profile, got %v", profile)
+	}
+
+	// 2. Assert supporting configs exist
+	pgConfig := &unstructured.Unstructured{}
+	pgConfig.SetGroupVersionKind(SGPostgresConfigGVK)
+	if err := p.client.Get(ctx, types.NamespacedName{Name: "frappe-postgres-dedicated-defaults", Namespace: "default"}, pgConfig); err != nil {
+		t.Fatalf("expected SGPostgresConfig: %v", err)
+	}
+
+	poolingConfig := &unstructured.Unstructured{}
+	poolingConfig.SetGroupVersionKind(SGPoolingConfigGVK)
+	if err := p.client.Get(ctx, types.NamespacedName{Name: "frappe-postgres-dedicated-pooling", Namespace: "default"}, poolingConfig); err != nil {
+		t.Fatalf("expected SGPoolingConfig: %v", err)
+	}
+
+	instProfile := &unstructured.Unstructured{}
+	instProfile.SetGroupVersionKind(SGInstanceProfileGVK)
+	if err := p.client.Get(ctx, types.NamespacedName{Name: "frappe-postgres-dedicated-default", Namespace: "default"}, instProfile); err != nil {
+		t.Fatalf("expected SGInstanceProfile: %v", err)
 	}
 }
 

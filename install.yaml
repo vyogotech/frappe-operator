@@ -442,6 +442,17 @@ spec:
                   port:
                     description: Port is the database port for external connections
                     type: string
+                  postgresEngine:
+                    description: |-
+                      PostgresEngine selects which operator provisions dedicated-mode PostgreSQL
+                      clusters. Only meaningful when Provider is "postgres"; shared mode is
+                      already engine-agnostic (it just needs a reachable host:port; see
+                      dbConfig.host). Empty is resolved dynamically at reconcile time rather than
+                      defaulted in the CRD schema — see the backward-compatibility note in docs.
+                    enum:
+                    - stackgres
+                    - percona
+                    type: string
                   postgresRef:
                     description: PostgresRef references an existing PostgreSQL cluster (future)
                     properties:
@@ -2586,6 +2597,17 @@ spec:
                     type: string
                   port:
                     description: Port is the database port for external connections
+                    type: string
+                  postgresEngine:
+                    description: |-
+                      PostgresEngine selects which operator provisions dedicated-mode PostgreSQL
+                      clusters. Only meaningful when Provider is "postgres"; shared mode is
+                      already engine-agnostic (it just needs a reachable host:port; see
+                      dbConfig.host). Empty is resolved dynamically at reconcile time rather than
+                      defaulted in the CRD schema — see the backward-compatibility note in docs.
+                    enum:
+                    - stackgres
+                    - percona
                     type: string
                   postgresRef:
                     description: PostgresRef references an existing PostgreSQL cluster (future)
@@ -7513,6 +7535,21 @@ rules:
   resources:
   - routes
   - routes/custom-host
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - stackgres.io
+  resources:
+  - sgclusters
+  - sginstanceprofiles
+  - sgpoolingconfigs
+  - sgpostgresconfigs
   verbs:
   - create
   - delete
