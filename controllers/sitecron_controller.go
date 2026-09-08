@@ -122,7 +122,13 @@ func (r *SiteCronReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		timeoutSec = 3600
 	}
 
-	cmdStr := fmt.Sprintf("bench --site %s execute %s", site.Status.ResolvedDomain, siteCron.Spec.Method)
+	// Same fix as the migrate Job: bench root's apps.txt is only ever a symlink
+	// the site-init Job created in its own now-gone container layer, so recreate
+	// it from the image's apps/ dir before invoking bench.
+	cmdStr := fmt.Sprintf(
+		"cd /home/frappe/frappe-bench && { [ -d apps ] && ls -1 apps > sites/apps.txt && ln -sf sites/apps.txt apps.txt; }; bench --site %s execute %s",
+		site.Status.ResolvedDomain, siteCron.Spec.Method,
+	)
 
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -154,7 +160,7 @@ func (r *SiteCronReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 										{
 											Name:      "sites",
 											MountPath: "/home/frappe/frappe-bench/sites",
-											SubPath:   "sites",
+											SubPath:   "frappe-sites", // same fix as the migrate Job: "frappe-sites" is the correct subPath every other component uses
 										},
 									},
 								},
