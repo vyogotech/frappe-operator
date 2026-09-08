@@ -1,4 +1,5 @@
 import React from 'react';
+import '../patternfly-theme.css';
 import { Card, CardBody, CardTitle, Label, Title } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { Package, ShieldCheck } from 'lucide-react';

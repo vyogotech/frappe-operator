@@ -1,22 +1,14 @@
 import React, { useState } from 'react';
+import '../patternfly-theme.css';
 import {
   PageSection,
   Title,
   Card,
   CardBody,
-  CardTitle,
-  Label,
-  Button,
-  Toolbar,
-  ToolbarContent,
-  ToolbarItem,
   SearchInput,
-  EmptyState,
-  EmptyStateIcon,
-  EmptyStateBody,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { Server, Database, Layers, Plus, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Server, Layers, Plus, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export interface FrappeBenchResource {
   name: string;
@@ -63,77 +55,74 @@ export const BenchesDashboard: React.FC = () => {
   );
 
   return (
-    <PageSection>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+    <PageSection className="frappe-plugin-page">
+      {/* Header Container */}
+      <div className="frappe-header-container">
         <div>
-          <Title headingLevel="h1" size="2xl" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Server color="#00BC86" size={28} />
+          <Title headingLevel="h1" size="2xl" className="frappe-header-title">
+            <Server color="#0066CC" size={30} />
             Frappe Benches
           </Title>
-          <p style={{ color: '#6A6E73', marginTop: 4 }}>
-            Shared multi-tenant platform infrastructure, runtime worker pools, and storage management.
-          </p>
+          <div className="frappe-header-subtitle">
+            Enterprise multi-tenant infrastructure, runtime worker pools, and automated bench lifecycle management for OpenShift.
+          </div>
         </div>
-        <Button
-          variant="primary"
-          icon={<Plus size={16} />}
-          style={{ backgroundColor: '#0050A4', borderColor: '#0050A4' }}
+        <a
+          href="/k8s/all-namespaces/vyogo.tech~v1~FrappeBench/~new"
+          className="frappe-btn-primary"
         >
-          Create Bench
-        </Button>
+          <Plus size={16} />
+          Create FrappeBench
+        </a>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <Card>
-          <CardTitle style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Layers size={18} color="#0050A4" />
+      {/* KPI Cards Grid */}
+      <div className="frappe-metrics-grid">
+        <Card className="frappe-stat-card">
+          <div className="frappe-stat-title">
+            <Layers size={18} color="#0066CC" />
             Total Benches
-          </CardTitle>
-          <CardBody>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#141917' }}>{benches.length}</div>
-          </CardBody>
+          </div>
+          <div className="frappe-stat-number primary">{benches.length}</div>
         </Card>
 
-        <Card>
-          <CardTitle style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Server size={18} color="#00BC86" />
+        <Card className="frappe-stat-card">
+          <div className="frappe-stat-title">
+            <Server size={18} color="#3E8635" />
             Active Tenant Sites
-          </CardTitle>
-          <CardBody>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#00BC86' }}>
-              {benches.reduce((acc, b) => acc + b.activeSites, 0)}
-            </div>
-          </CardBody>
+          </div>
+          <div className="frappe-stat-number success">
+            {benches.reduce((acc, b) => acc + b.activeSites, 0)}
+          </div>
         </Card>
 
-        <Card>
-          <CardTitle style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ShieldCheck size={18} color="#0050A4" />
+        <Card className="frappe-stat-card">
+          <div className="frappe-stat-title">
+            <ShieldCheck size={18} color="#6A27B8" />
             FPM Air-Gapped Repos
-          </CardTitle>
-          <CardBody>
-            <div style={{ fontSize: 28, fontWeight: 700, color: '#141917' }}>
-              {benches.reduce((acc, b) => acc + b.fpmReposCount, 0)}
-            </div>
-          </CardBody>
+          </div>
+          <div className="frappe-stat-number purple">
+            {benches.reduce((acc, b) => acc + b.fpmReposCount, 0)}
+          </div>
         </Card>
       </div>
 
-      <Card>
-        <CardBody>
-          <Toolbar>
-            <ToolbarContent>
-              <ToolbarItem>
-                <SearchInput
-                  placeholder="Filter benches by name or namespace..."
-                  value={filter}
-                  onChange={(_e, val) => setFilter(val)}
-                  onClear={() => setFilter('')}
-                />
-              </ToolbarItem>
-            </ToolbarContent>
-          </Toolbar>
+      {/* Table Card */}
+      <Card className="frappe-table-card">
+        <div className="frappe-toolbar-bar">
+          <SearchInput
+            placeholder="Filter benches by name or namespace..."
+            value={filter}
+            onChange={(_e, val) => setFilter(val)}
+            onClear={() => setFilter('')}
+            style={{ minWidth: 340 }}
+          />
+          <div style={{ fontSize: 13, color: '#6A6E73' }}>
+            Showing {filtered.length} of {benches.length} benches
+          </div>
+        </div>
 
+        <CardBody style={{ padding: 0 }}>
           <Table aria-label="Frappe Benches Table" variant="compact">
             <Thead>
               <Tr>
@@ -151,37 +140,54 @@ export const BenchesDashboard: React.FC = () => {
               {filtered.map((bench) => (
                 <Tr key={bench.name}>
                   <Td dataLabel="Name" style={{ fontWeight: 600 }}>
-                    <a href={`/k8s/ns/${bench.namespace}/vyogo.tech~v1~FrappeBench/${bench.name}`}>
+                    <a
+                      href={`/k8s/ns/${bench.namespace}/vyogo.tech~v1~FrappeBench/${bench.name}`}
+                      style={{ color: '#0066CC', textDecoration: 'none', fontWeight: 600 }}
+                    >
                       {bench.name}
                     </a>
                   </Td>
                   <Td dataLabel="Namespace">
-                    <Label color="blue">{bench.namespace}</Label>
+                    <span className="frappe-tag frappe-tag-blue">{bench.namespace}</span>
                   </Td>
                   <Td dataLabel="Version">
-                    <code>{bench.frappeVersion}</code>
+                    <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>
+                      {bench.frappeVersion}
+                    </code>
                   </Td>
                   <Td dataLabel="Status">
-                    <Label color={bench.ready ? 'green' : 'orange'}>
-                      {bench.ready ? 'Ready' : 'Configuring'}
-                    </Label>
+                    {bench.ready ? (
+                      <span className="frappe-tag frappe-tag-green">
+                        <CheckCircle2 size={13} />
+                        Ready
+                      </span>
+                    ) : (
+                      <span className="frappe-tag frappe-tag-orange">
+                        <AlertCircle size={13} />
+                        Configuring
+                      </span>
+                    )}
                   </Td>
                   <Td dataLabel="Apps">
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {bench.apps.map((app) => (
-                        <Label key={app} color="grey" isCompact>
+                        <span key={app} className="frappe-tag frappe-tag-gray">
                           {app}
-                        </Label>
+                        </span>
                       ))}
                     </div>
                   </Td>
-                  <Td dataLabel="Tenant Sites">{bench.activeSites} sites</Td>
-                  <Td dataLabel="FPM Repos">
-                    <Label color="purple" isCompact>
-                      {bench.fpmReposCount} Repos
-                    </Label>
+                  <Td dataLabel="Tenant Sites" style={{ fontWeight: 600 }}>
+                    {bench.activeSites} sites
                   </Td>
-                  <Td dataLabel="Storage">{bench.storageSize}</Td>
+                  <Td dataLabel="FPM Repos">
+                    <span className="frappe-tag frappe-tag-purple">
+                      {bench.fpmReposCount} Repos
+                    </span>
+                  </Td>
+                  <Td dataLabel="Storage" style={{ color: '#6A6E73' }}>
+                    {bench.storageSize}
+                  </Td>
                 </Tr>
               ))}
             </Tbody>

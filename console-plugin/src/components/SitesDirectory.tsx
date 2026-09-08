@@ -1,18 +1,14 @@
 import React, { useState } from 'react';
+import '../patternfly-theme.css';
 import {
   PageSection,
   Title,
   Card,
   CardBody,
-  Label,
-  Button,
-  Toolbar,
-  ToolbarContent,
-  ToolbarItem,
   SearchInput,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { Globe, Database, ExternalLink, Plus, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Globe, Database, ExternalLink, Plus, CheckCircle2, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export interface FrappeSiteResource {
   name: string;
@@ -59,10 +55,11 @@ export const SitesDirectory: React.FC = () => {
       name: 'staging-tenant',
       namespace: 'frappe-staging',
       benchName: 'staging-bench',
-      domain: 'staging.testsite.local',
-      siteURL: 'https://staging.testsite.local',
+      domain: 'stage.myplatform.com',
+      siteURL: 'https://stage.myplatform.com',
       phase: 'Provisioning',
-      dbProvider: 'mariadb',
+      dbProvider: 'postgres',
+      dbEngine: 'stackgres',
       dbMode: 'shared',
       tlsEnabled: true,
     },
@@ -72,138 +69,163 @@ export const SitesDirectory: React.FC = () => {
     (s) =>
       s.name.toLowerCase().includes(filter.toLowerCase()) ||
       s.domain.toLowerCase().includes(filter.toLowerCase()) ||
-      s.namespace.toLowerCase().includes(filter.toLowerCase())
+      s.benchName.toLowerCase().includes(filter.toLowerCase())
   );
 
-  const renderStatus = (phase: string) => {
-    switch (phase) {
-      case 'Ready':
-        return (
-          <Label color="green" icon={<CheckCircle size={14} />}>
-            Ready
-          </Label>
-        );
-      case 'Provisioning':
-        return (
-          <Label color="blue" icon={<Clock size={14} />}>
-            Provisioning
-          </Label>
-        );
-      default:
-        return (
-          <Label color="red" icon={<AlertTriangle size={14} />}>
-            Failed
-          </Label>
-        );
-    }
-  };
-
-  const renderDbBadge = (site: FrappeSiteResource) => {
-    if (site.dbProvider === 'postgres') {
-      return (
-        <Label color="teal" isCompact>
-          PG ({site.dbEngine || 'stackgres'}) - {site.dbMode}
-        </Label>
-      );
-    }
-    if (site.dbProvider === 'mariadb') {
-      return (
-        <Label color="blue" isCompact>
-          MariaDB - {site.dbMode}
-        </Label>
-      );
-    }
-    return (
-      <Label color="orange" isCompact>
-        External DB
-      </Label>
-    );
-  };
-
   return (
-    <PageSection>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+    <PageSection className="frappe-plugin-page">
+      {/* Header Container */}
+      <div className="frappe-header-container">
         <div>
-          <Title headingLevel="h1" size="2xl" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Globe color="#0050A4" size={28} />
+          <Title headingLevel="h1" size="2xl" className="frappe-header-title">
+            <Globe color="#0066CC" size={30} />
             Tenant Sites Directory
           </Title>
-          <p style={{ color: '#6A6E73', marginTop: 4 }}>
-            Multi-tenant FrappeSites provisioned with isolated databases, automatic Edge TLS Routes, and declarative life-cycles.
-          </p>
+          <div className="frappe-header-subtitle">
+            Enterprise multi-tenant Frappe & ERPNext tenant sites with automated database provisioning and TLS routing.
+          </div>
         </div>
-        <Button
-          variant="primary"
-          icon={<Plus size={16} />}
-          style={{ backgroundColor: '#00BC86', borderColor: '#00BC86', color: '#0B1411', fontWeight: 600 }}
+        <a
+          href="/k8s/all-namespaces/vyogo.tech~v1~FrappeSite/~new"
+          className="frappe-btn-primary"
         >
-          New Tenant Site
-        </Button>
+          <Plus size={16} />
+          Create FrappeSite
+        </a>
       </div>
 
-      <Card>
-        <CardBody>
-          <Toolbar>
-            <ToolbarContent>
-              <ToolbarItem>
-                <SearchInput
-                  placeholder="Filter sites by name, domain, or namespace..."
-                  value={filter}
-                  onChange={(_e, val) => setFilter(val)}
-                  onClear={() => setFilter('')}
-                />
-              </ToolbarItem>
-            </ToolbarContent>
-          </Toolbar>
+      {/* KPI Cards Grid */}
+      <div className="frappe-metrics-grid">
+        <Card className="frappe-stat-card">
+          <div className="frappe-stat-title">
+            <Globe size={18} color="#0066CC" />
+            Total Tenant Sites
+          </div>
+          <div className="frappe-stat-number primary">{sites.length}</div>
+        </Card>
 
-          <Table aria-label="Tenant Sites Table" variant="compact">
+        <Card className="frappe-stat-card">
+          <div className="frappe-stat-title">
+            <Database size={18} color="#3E8635" />
+            Dedicated Postgres
+          </div>
+          <div className="frappe-stat-number success">
+            {sites.filter((s) => s.dbMode === 'dedicated').length}
+          </div>
+        </Card>
+
+        <Card className="frappe-stat-card">
+          <div className="frappe-stat-title">
+            <ShieldCheck size={18} color="#6A27B8" />
+            TLS Encrypted Routes
+          </div>
+          <div className="frappe-stat-number purple">
+            {sites.filter((s) => s.tlsEnabled).length}
+          </div>
+        </Card>
+      </div>
+
+      {/* Table Card */}
+      <Card className="frappe-table-card">
+        <div className="frappe-toolbar-bar">
+          <SearchInput
+            placeholder="Filter sites by name, domain, or bench..."
+            value={filter}
+            onChange={(_e, val) => setFilter(val)}
+            onClear={() => setFilter('')}
+            style={{ minWidth: 340 }}
+          />
+          <div style={{ fontSize: 13, color: '#6A6E73' }}>
+            Showing {filtered.length} of {sites.length} sites
+          </div>
+        </div>
+
+        <CardBody style={{ padding: 0 }}>
+          <Table aria-label="Frappe Sites Table" variant="compact">
             <Thead>
               <Tr>
                 <Th>Site Name</Th>
-                <Th>Domain / OpenShift Route</Th>
-                <Th>Parent Bench</Th>
-                <Th>Status</Th>
-                <Th>Database Engine</Th>
                 <Th>Namespace</Th>
-                <Th>Actions</Th>
+                <Th>Parent Bench</Th>
+                <Th>Domain & Ingress</Th>
+                <Th>Phase</Th>
+                <Th>Database Engine</Th>
+                <Th>DB Mode</Th>
+                <Th>TLS</Th>
               </Tr>
             </Thead>
             <Tbody>
               {filtered.map((site) => (
                 <Tr key={site.name}>
                   <Td dataLabel="Site Name" style={{ fontWeight: 600 }}>
-                    <a href={`/k8s/ns/${site.namespace}/vyogo.tech~v1~FrappeSite/${site.name}`}>
+                    <a
+                      href={`/k8s/ns/${site.namespace}/vyogo.tech~v1~FrappeSite/${site.name}`}
+                      style={{ color: '#0066CC', textDecoration: 'none', fontWeight: 600 }}
+                    >
                       {site.name}
                     </a>
                   </Td>
-                  <Td dataLabel="Domain / OpenShift Route">
+                  <Td dataLabel="Namespace">
+                    <span className="frappe-tag frappe-tag-blue">{site.namespace}</span>
+                  </Td>
+                  <Td dataLabel="Parent Bench">
+                    <a
+                      href={`/k8s/ns/${site.namespace}/vyogo.tech~v1~FrappeBench/${site.benchName}`}
+                      style={{ color: '#0066CC', textDecoration: 'none' }}
+                    >
+                      {site.benchName}
+                    </a>
+                  </Td>
+                  <Td dataLabel="Domain & Ingress">
                     <a
                       href={site.siteURL}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0050A4' }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0066CC', textDecoration: 'none' }}
                     >
                       {site.domain}
-                      <ExternalLink size={14} />
+                      <ExternalLink size={12} />
                     </a>
                   </Td>
-                  <Td dataLabel="Parent Bench">
-                    <code>{site.benchName}</code>
+                  <Td dataLabel="Phase">
+                    {site.phase === 'Ready' && (
+                      <span className="frappe-tag frappe-tag-green">
+                        <CheckCircle2 size={13} />
+                        Ready
+                      </span>
+                    )}
+                    {site.phase === 'Provisioning' && (
+                      <span className="frappe-tag frappe-tag-orange">
+                        <Clock size={13} />
+                        Provisioning
+                      </span>
+                    )}
+                    {site.phase === 'Failed' && (
+                      <span className="frappe-tag" style={{ background: '#fdf2f2', color: '#c9190b', border: '1px solid #f9c6c6' }}>
+                        <AlertTriangle size={13} />
+                        Failed
+                      </span>
+                    )}
                   </Td>
-                  <Td dataLabel="Status">{renderStatus(site.phase)}</Td>
-                  <Td dataLabel="Database Engine">{renderDbBadge(site)}</Td>
-                  <Td dataLabel="Namespace">
-                    <Label color="grey">{site.namespace}</Label>
+                  <Td dataLabel="Database Engine">
+                    <span className="frappe-tag frappe-tag-gray">
+                      {site.dbProvider} ({site.dbEngine})
+                    </span>
                   </Td>
-                  <Td dataLabel="Actions">
-                    <Button
-                      variant="link"
-                      isInline
-                      onClick={() => window.open(site.siteURL, '_blank')}
-                      style={{ color: '#00BC86' }}
-                    >
-                      Launch Desk
-                    </Button>
+                  <Td dataLabel="DB Mode">
+                    <span className={site.dbMode === 'dedicated' ? 'frappe-tag frappe-tag-blue' : 'frappe-tag frappe-tag-gray'}>
+                      {site.dbMode}
+                    </span>
+                  </Td>
+                  <Td dataLabel="TLS">
+                    {site.tlsEnabled ? (
+                      <span className="frappe-tag frappe-tag-green">
+                        <ShieldCheck size={13} />
+                        Active
+                      </span>
+                    ) : (
+                      <span className="frappe-tag frappe-tag-gray">Disabled</span>
+                    )}
                   </Td>
                 </Tr>
               ))}

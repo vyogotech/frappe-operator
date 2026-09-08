@@ -1,4 +1,5 @@
 import React from 'react';
+import '../patternfly-theme.css';
 import { Card, CardBody, CardTitle, Label, Title, DescriptionList, DescriptionListGroup, DescriptionListTerm, DescriptionListDescription } from '@patternfly/react-core';
 import { Database, ShieldCheck, Globe, ExternalLink } from 'lucide-react';
 
