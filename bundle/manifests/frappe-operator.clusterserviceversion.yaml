@@ -247,7 +247,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime,Database
-    createdAt: "2026-09-08T06:36:06Z"
+    createdAt: "2026-09-08T07:25:54Z"
     features.operators.openshift.io/disconnected-compliant: "true"
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
@@ -404,13 +404,11 @@ spec:
 
     Install whichever matches your configuration:
 
-    | Configuration | Also install |
-    |---|---|
-    | `dbConfig.mode: dedicated`, `postgresEngine: stackgres` | StackGres (`stackgres-community`) |
-    | `dbConfig.mode: dedicated`, `postgresEngine: percona` | Percona Operator for PostgreSQL (`percona-postgresql-operator`) |
-    | `dbConfig.mode: shared`, `provider: postgres` | any reachable PostgreSQL, for example CloudNativePG |
-    | Worker autoscaling | KEDA (`keda`) |
-    | Admission webhooks enabled | cert-manager |
+    * Dedicated PostgreSQL with `postgresEngine: stackgres` needs StackGres (`stackgres-community`).
+    * Dedicated PostgreSQL with `postgresEngine: percona` needs the Percona Operator for PostgreSQL (`percona-postgresql-operator`).
+    * Shared PostgreSQL needs any reachable PostgreSQL, for example CloudNativePG.
+    * Worker autoscaling needs KEDA (`keda`).
+    * Admission webhooks, when enabled, need cert-manager.
 
     Shared PostgreSQL mode is engine-agnostic: it only needs a reachable
     `host:port` and a provisioner Secret, so any PostgreSQL will do.
