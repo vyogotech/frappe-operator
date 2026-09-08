@@ -4,8 +4,10 @@ metadata:
   name: frappe-console-plugin
 spec:
   displayName: 'Frappe & ERPNext Platform'
-  service:
-    name: frappe-console-plugin
-    namespace: frappe-operator-system
-    port: 9443
-    basePath: '/'
+  backend:
+    type: Service
+    service:
+      name: frappe-console-plugin
+      namespace: frappe-operator-system
+      port: 9443
+      basePath: '/'
