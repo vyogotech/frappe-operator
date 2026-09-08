@@ -21,5 +21,5 @@ COPY bundle/tests/scorecard /tests/scorecard/
 
 # Red Hat bundle delivery labels
 LABEL com.redhat.delivery.operator.bundle=true
-LABEL com.redhat.openshift.versions="v4.12-v4.18"
+LABEL com.redhat.openshift.versions="v4.14"
 COPY LICENSE /licenses/LICENSE

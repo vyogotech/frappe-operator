@@ -99,11 +99,43 @@ bundle does not declare it as a dependency:
 kubectl create -f https://operatorhub.io/install/mariadb-operator.yaml
 ```
 
-## Known gaps
+## Dependencies and compatibility
 
-- The bundle is labelled `com.redhat.openshift.versions: "v4.12-v4.18"`. That
-  label is only enforced when Red Hat builds the community catalog, so it does
-  not block a self-managed `CatalogSource` on a newer cluster, but it should be
-  widened before any catalog submission.
-- The bundle declares no dependency on the MariaDB, StackGres, Percona or KEDA
-  operators, so OLM will not pull them in for you.
+**MariaDB Operator is a declared OLM dependency** (`bundle/metadata/dependencies.yaml`),
+so OLM resolves and installs it for you from any catalog on the cluster. It is
+required because MariaDB is the default database provider: a `FrappeSite` that
+does not set `spec.dbConfig.provider` resolves to MariaDB, so without it the
+operator cannot provision a site at all.
+
+If your cluster has no catalog providing `mariadb-operator`, the install will
+fail during resolution. On OpenShift the `community-operators` catalog is
+present by default and carries it.
+
+Everything else is **optional and not installed for you**, because each applies
+only to an opt-in configuration and declaring them would force all of them on
+every user:
+
+| Configuration | Also install |
+|---|---|
+| dedicated PostgreSQL, `postgresEngine: stackgres` | `stackgres-community` |
+| dedicated PostgreSQL, `postgresEngine: percona` | `percona-postgresql-operator` |
+| shared PostgreSQL | any reachable PostgreSQL, e.g. CloudNativePG |
+| worker autoscaling | `keda` |
+| admission webhooks enabled | cert-manager |
+
+**Compatibility** is declared as OpenShift `v4.14` and later
+(`com.redhat.openshift.versions`, open-ended) with `minKubeVersion: 1.27.0`,
+which is the Kubernetes version shipped by OpenShift 4.14.
+
+To change the supported floor, edit the version in the `bundle` target of the
+`Makefile` and in `config/manifests/bases/frappe-operator.clusterserviceversion.yaml`,
+then re-run `make bundle`.
+
+### A validator warning you can ignore
+
+`operator-sdk bundle validate --select-optional suite=operatorframework` reports
+that the bundle "is using APIs which were deprecated and removed in v1.25" for
+`cronjobs` and `horizontalpodautoscalers`. This is a false positive. RBAC rules
+name API groups and resources but never versions, so the validator flags the
+resource names on sight. The operator only ever uses the stable `batch/v1` and
+`autoscaling/v2` APIs; there are no beta API references in the code.
