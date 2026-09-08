@@ -84,6 +84,22 @@ jobs:
               kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - || true
             fi
             
+            # Some examples reference CRDs owned by optional third-party operators
+            # (StackGres, Percona, KEDA). Those are not installed on this
+            # validation cluster, and requiring them would mean installing every
+            # optional operator just to lint YAML. Skip such files instead of
+            # failing: this job exists to catch malformed manifests of our own.
+            missing=""
+            for kind in $(grep -E '^kind:' "$file" | awk '{print $2}' | sort -u); do
+              if ! kubectl explain "$kind" >/dev/null 2>&1; then
+                missing="$missing $kind"
+              fi
+            done
+            if [ -n "$missing" ]; then
+              echo "Skipping $file - no CRD on this cluster for:$missing"
+              continue
+            fi
+
             # Perform structurally bounded dry-run compilation against the active API server
             kubectl apply -f "$file" --dry-run=server || exit 1
           done
