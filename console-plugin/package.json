@@ -4,24 +4,23 @@
   "private": true,
   "repository": "https://github.com/vyogotech/frappe-operator",
   "scripts": {
-    "build": "webpack --mode=production",
-    "build:dev": "webpack --mode=development",
+    "build": "NODE_ENV=production webpack",
+    "build:dev": "webpack",
     "start": "webpack serve --mode=development",
     "lint": "eslint ./src --ext .ts,.tsx"
   },
   "dependencies": {
-    "@openshift-console/dynamic-plugin-sdk": "^1.4.0",
-    "@patternfly/patternfly": "^5.4.0",
-    "@patternfly/react-core": "^5.3.0",
-    "@patternfly/react-icons": "^5.3.0",
-    "@patternfly/react-table": "^5.3.0",
     "lucide-react": "^0.475.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0"
   },
   "devDependencies": {
-    "@openshift-console/dynamic-plugin-sdk-webpack": "^1.2.0",
+    "@openshift-console/dynamic-plugin-sdk": "^4.19.1",
+    "@openshift-console/dynamic-plugin-sdk-webpack": "^4.19.0",
+    "@patternfly/react-core": "^6.6.1",
+    "@patternfly/react-icons": "^6.6.1",
+    "@patternfly/react-table": "^6.6.1",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "css-loader": "^6.10.0",
@@ -36,13 +35,20 @@
     "name": "frappe-console-plugin",
     "version": "5.2.0",
     "displayName": "Frappe & ERPNext Platform",
-    "description": "Enterprise UI for Frappe Benches, Tenant Sites, and Air-Gapped FPM Package Store by Vyogo Technologies",
+    "description": "Frappe-native management for Benches and Tenant Sites: form-based provisioning, migrate/backup/restore/app-install actions, external database and Redis support, and an air-gapped FPM package store. By Vyogo Technologies",
     "exposedModules": {
-      "BenchesDashboard": "./src/components/BenchesDashboard",
-      "SitesDirectory": "./src/components/SitesDirectory",
-      "FPMStore": "./src/components/FPMStore",
-      "BenchFPMTab": "./src/components/BenchFPMTab",
-      "SiteDatabaseTab": "./src/components/SiteDatabaseTab"
+      "BenchesDashboard": "./components/BenchesDashboard",
+      "SitesDirectory": "./components/SitesDirectory",
+      "FPMStore": "./components/FPMStore",
+      "BenchFPMTab": "./components/BenchFPMTab",
+      "BenchSitesTab": "./components/BenchSitesTab",
+      "BenchMetricsTab": "./components/BenchMetricsTab",
+      "BenchDataServicesTab": "./components/BenchDataServicesTab",
+      "SiteDatabaseTab": "./components/SiteDatabaseTab",
+      "SiteOperationsTab": "./components/SiteOperationsTab",
+      "BenchCreateForm": "./components/forms/BenchCreateForm",
+      "SiteCreateForm": "./components/forms/SiteCreateForm",
+      "frappeActions": "./actions/frappeActions"
     },
     "dependencies": {
       "@console/pluginAPI": "*"

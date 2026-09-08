@@ -669,7 +669,7 @@ type FPMConfig struct {
 
 // FPMRepository defines an FPM package repository
 type FPMRepository struct {
-	// Name of the repository (e.g., "company-private", "frappe-community")
+	// Name of the repository (e.g., "company-private", "vyogo-official")
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 

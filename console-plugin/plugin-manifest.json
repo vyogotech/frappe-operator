@@ -2,7 +2,7 @@
   "name": "frappe-console-plugin",
   "version": "5.2.0",
   "displayName": "Frappe & ERPNext Platform",
-  "description": "Enterprise management console for Frappe Benches, Tenant Sites, and Air-Gapped FPM Package Repositories by Vyogo Technologies.",
+  "description": "Frappe-native management for Benches and Tenant Sites: form-based provisioning, migrate/backup/restore/app-install actions, external database and Redis support, and an air-gapped FPM package store. By Vyogo Technologies",
   "dependencies": {
     "@console/pluginAPI": "*"
   },
@@ -47,7 +47,9 @@
       "properties": {
         "exact": true,
         "path": "/frappe/benches",
-        "component": { "$codeRef": "BenchesDashboard" }
+        "component": {
+          "$codeRef": "BenchesDashboard"
+        }
       }
     },
     {
@@ -55,7 +57,9 @@
       "properties": {
         "exact": true,
         "path": "/frappe/sites",
-        "component": { "$codeRef": "SitesDirectory" }
+        "component": {
+          "$codeRef": "SitesDirectory"
+        }
       }
     },
     {
@@ -63,7 +67,9 @@
       "properties": {
         "exact": true,
         "path": "/frappe/fpm-store",
-        "component": { "$codeRef": "FPMStore" }
+        "component": {
+          "$codeRef": "FPMStore"
+        }
       }
     },
     {
@@ -78,7 +84,43 @@
           "name": "FPM Packages",
           "href": "fpm-packages"
         },
-        "component": { "$codeRef": "BenchFPMTab" }
+        "component": {
+          "$codeRef": "BenchFPMTab"
+        }
+      }
+    },
+    {
+      "type": "console.tab/horizontalNav",
+      "properties": {
+        "model": {
+          "group": "vyogo.tech",
+          "version": "v1",
+          "kind": "FrappeBench"
+        },
+        "page": {
+          "name": "Tenant Sites",
+          "href": "tenant-sites"
+        },
+        "component": {
+          "$codeRef": "BenchSitesTab"
+        }
+      }
+    },
+    {
+      "type": "console.tab/horizontalNav",
+      "properties": {
+        "model": {
+          "group": "vyogo.tech",
+          "version": "v1",
+          "kind": "FrappeBench"
+        },
+        "page": {
+          "name": "Resource Metrics",
+          "href": "resource-metrics"
+        },
+        "component": {
+          "$codeRef": "BenchMetricsTab"
+        }
       }
     },
     {
@@ -90,10 +132,92 @@
           "kind": "FrappeSite"
         },
         "page": {
-          "name": "Database & Route",
-          "href": "db-route"
+          "name": "Database & Redis",
+          "href": "data-services"
         },
-        "component": { "$codeRef": "SiteDatabaseTab" }
+        "component": {
+          "$codeRef": "SiteDatabaseTab"
+        }
+      }
+    },
+    {
+      "type": "console.page/route",
+      "properties": {
+        "exact": true,
+        "path": "/frappe/benches/~new",
+        "component": {
+          "$codeRef": "BenchCreateForm"
+        }
+      }
+    },
+    {
+      "type": "console.page/route",
+      "properties": {
+        "exact": true,
+        "path": "/frappe/sites/~new",
+        "component": {
+          "$codeRef": "SiteCreateForm"
+        }
+      }
+    },
+    {
+      "type": "console.tab/horizontalNav",
+      "properties": {
+        "model": {
+          "group": "vyogo.tech",
+          "version": "v1",
+          "kind": "FrappeBench"
+        },
+        "page": {
+          "name": "Data Services",
+          "href": "data-services"
+        },
+        "component": {
+          "$codeRef": "BenchDataServicesTab"
+        }
+      }
+    },
+    {
+      "type": "console.tab/horizontalNav",
+      "properties": {
+        "model": {
+          "group": "vyogo.tech",
+          "version": "v1",
+          "kind": "FrappeSite"
+        },
+        "page": {
+          "name": "Operations",
+          "href": "operations"
+        },
+        "component": {
+          "$codeRef": "SiteOperationsTab"
+        }
+      }
+    },
+    {
+      "type": "console.action/resource-provider",
+      "properties": {
+        "model": {
+          "group": "vyogo.tech",
+          "version": "v1",
+          "kind": "FrappeSite"
+        },
+        "provider": {
+          "$codeRef": "frappeActions.useFrappeSiteActions"
+        }
+      }
+    },
+    {
+      "type": "console.action/resource-provider",
+      "properties": {
+        "model": {
+          "group": "vyogo.tech",
+          "version": "v1",
+          "kind": "FrappeBench"
+        },
+        "provider": {
+          "$codeRef": "frappeActions.useFrappeBenchActions"
+        }
       }
     }
   ]

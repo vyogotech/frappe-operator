@@ -19,15 +19,15 @@ import { Server, Globe, Package, ShieldCheck, Layers, Terminal } from 'lucide-re
 import BenchesDashboard from './components/BenchesDashboard';
 import SitesDirectory from './components/SitesDirectory';
 import FPMStore from './components/FPMStore';
+import PluginRoot from './components/PluginRoot';
 
 export const StandaloneApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string | number>('benches');
 
   return (
     <Page
-      header={
+      masthead={
         <Masthead
-          backgroundColor="dark"
           style={{
             background: '#0B1411',
             borderBottom: '2px solid #00BC86',
@@ -64,7 +64,7 @@ export const StandaloneApp: React.FC = () => {
           <MastheadContent>
             <Toolbar id="toolbar" isFullHeight isStatic>
               <ToolbarContent>
-                <ToolbarItem alignment={{ default: 'alignRight' }}>
+                <ToolbarItem align={{ default: 'alignEnd' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <Label color="teal" icon={<ShieldCheck size={14} />}>
                       Air-Gapped Ready
@@ -132,4 +132,10 @@ export const StandaloneApp: React.FC = () => {
   );
 };
 
-export default StandaloneApp;
+const StandaloneAppRoot: React.FC = () => (
+  <PluginRoot>
+    <StandaloneApp />
+  </PluginRoot>
+);
+
+export default StandaloneAppRoot;

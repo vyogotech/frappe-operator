@@ -1,0 +1,86 @@
+# Lets namespace admins and editors drive Frappe resources from the OpenShift
+# console. Without this, only cluster-admins can create a SiteMigration,
+# SiteBackup, SiteRestore or SiteApp, so the console plugin's Migrate, Back up,
+# Restore and Install app actions are greyed out for everyone else.
+#
+# Aggregating into the built-in admin and edit roles means anyone who can already
+# manage workloads in a namespace can manage the Frappe resources in it too.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: frappe-aggregated-edit-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+  name: frappe-operator-aggregated-edit
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches
+  - frappesites
+  - frappeworkpaces
+  - siteapikeys
+  - siteapps
+  - sitebackups
+  - siteclientscripts
+  - siteconfigs
+  - sitecrons
+  - sitecustomfields
+  - sitedashboardcharts
+  - sitedashboards
+  - sitedomains
+  - sitejobs
+  - sitemigrations
+  - sitepropertysetters
+  - sitequotas
+  - siterestores
+  - siteroles
+  - siteserverscripts
+  - siteuserpermissions
+  - siteusers
+  - sitewebhooks
+  - siteworkspaces
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches/status
+  - frappesites/status
+  - frappeworkpaces/status
+  - siteapikeys/status
+  - siteapps/status
+  - sitebackups/status
+  - siteclientscripts/status
+  - siteconfigs/status
+  - sitecrons/status
+  - sitecustomfields/status
+  - sitedashboardcharts/status
+  - sitedashboards/status
+  - sitedomains/status
+  - sitejobs/status
+  - sitemigrations/status
+  - sitepropertysetters/status
+  - sitequotas/status
+  - siterestores/status
+  - siteroles/status
+  - siteserverscripts/status
+  - siteuserpermissions/status
+  - siteusers/status
+  - sitewebhooks/status
+  - siteworkspaces/status
+  verbs:
+  - get
