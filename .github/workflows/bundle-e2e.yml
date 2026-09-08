@@ -116,6 +116,26 @@ jobs:
           kubectl get pods -A || true
           echo "=== CSV / Subscription info ==="
           kubectl get csv,subscriptions,installplan,catalogsource -n frappe-operator-system || true
+          echo "=== Subscription / CatalogSource detail (why no InstallPlan) ==="
+          kubectl describe subscriptions -n frappe-operator-system || true
+          kubectl describe catalogsource -n frappe-operator-system || true
+          # `operator-sdk run bundle` serves the bundle from a registry pod. If
+          # that pod never becomes ready the CatalogSource stays down and OLM
+          # never creates an InstallPlan, which surfaces only as an opaque
+          # "install plan is not available ... context deadline exceeded".
+          # Its logs and events are the actual diagnosis, so capture them.
+          echo "=== Registry / catalog pods in the operator namespace ==="
+          kubectl get pods -n frappe-operator-system -o wide || true
+          for p in $(kubectl get pods -n frappe-operator-system -o name 2>/dev/null); do
+            echo "--- describe $p ---"
+            kubectl describe "$p" -n frappe-operator-system || true
+            echo "--- logs $p (current) ---"
+            kubectl logs "$p" -n frappe-operator-system --all-containers --tail=100 || true
+            echo "--- logs $p (previous crash) ---"
+            kubectl logs "$p" -n frappe-operator-system --all-containers --previous --tail=100 || true
+          done
+          echo "=== OLM catalog-operator logs ==="
+          kubectl logs -n olm -l app=catalog-operator --tail=100 || true
           echo "=== Events in e2e-test ==="
           kubectl get events -n e2e-test --sort-by='.metadata.creationTimestamp' || true
           echo "=== Describe Pods in e2e-test ==="
