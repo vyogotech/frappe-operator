@@ -19,6 +19,8 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,6 +40,16 @@ var (
 		Kind:    "PerconaPGCluster",
 	}
 )
+
+// perconaStatusGracePeriod is how long a PerconaPGCluster may exist without the
+// Percona operator ever writing a status before we treat it as stalled and
+// surface an error. The operator normally sets status within seconds, so a
+// cluster still blank after this window almost always means the Percona
+// operator is not reconciling it at all - most commonly because it is deployed
+// in single-namespace mode (WATCH_NAMESPACE) and is not watching this
+// namespace, or is missing RBAC for it. Without this check the site would sit
+// in Provisioning forever with no explanation.
+const perconaStatusGracePeriod = 5 * time.Minute
 
 const (
 	defaultPerconaPGVersion       = 16
@@ -199,10 +211,24 @@ func (p *PerconaPostgresProvider) IsReady(ctx context.Context, site *vyogotechv1
 	}
 
 	status, found, err := unstructured.NestedString(cluster.Object, "status", "state")
-	if err != nil || !found {
+	if err != nil || !found || status == "" {
+		// No status yet. Normal right after creation, but if it stays blank the
+		// Percona operator is not reconciling this cluster at all - report that
+		// rather than requeueing silently forever.
+		if age := time.Since(cluster.GetCreationTimestamp().Time); age > perconaStatusGracePeriod {
+			return false, fmt.Errorf(
+				"PerconaPGCluster %s/%s has had no status for %s: the Percona operator does not appear to be reconciling it "+
+					"(check that its WATCH_NAMESPACE covers namespace %q and that it has RBAC for perconapgclusters there)",
+				site.Namespace, clusterName, age.Round(time.Second), site.Namespace)
+		}
+		logger.Info("Dedicated Percona Postgres cluster has no status yet; waiting", "cluster", clusterName)
 		return false, nil
 	}
+	if isPerconaFailureState(status) {
+		return false, fmt.Errorf("PerconaPGCluster %s/%s reported state %q", site.Namespace, clusterName, status)
+	}
 	if status != "ready" {
+		logger.Info("Dedicated Percona Postgres cluster not ready yet", "cluster", clusterName, "state", status)
 		return false, nil
 	}
 
@@ -261,4 +287,16 @@ func (p *PerconaPostgresProvider) Cleanup(ctx context.Context, site *vyogotechv1
 		return fmt.Errorf("failed to delete dedicated postgres cluster: %w", err)
 	}
 	return nil
+}
+
+// isPerconaFailureState reports whether a PerconaPGCluster status.state value
+// represents a terminal or error condition rather than normal progress. Percona
+// reports free-form states, so match conservatively on the error-ish ones and
+// treat anything else as "still working".
+func isPerconaFailureState(state string) bool {
+	switch strings.ToLower(strings.TrimSpace(state)) {
+	case "error", "failed", "failing", "unhealthy":
+		return true
+	}
+	return false
 }

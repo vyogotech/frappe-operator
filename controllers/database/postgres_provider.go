@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -92,6 +93,24 @@ func (p *PostgresProvider) getDBConfig(site *vyogotechv1.FrappeSite) vyogotechv1
 func (p *PostgresProvider) resolvePostgresEngine(ctx context.Context, site *vyogotechv1.FrappeSite) (string, error) {
 	cfg := p.getDBConfig(site)
 	if e := cfg.PostgresEngine; e != "" {
+		// An explicit engine must not silently switch a site that already has a
+		// cluster from the other engine: doing so provisions a second, empty
+		// cluster and orphans the live one holding the tenant's data. The
+		// admission webhook enforces immutability too, but it is not deployed in
+		// every install, so this is the backstop that always runs.
+		if otherGVK, otherName, ok := otherDedicatedEngine(e); ok {
+			exists, err := p.dedicatedClusterExists(ctx, site, otherGVK)
+			if err != nil {
+				return "", err
+			}
+			if exists {
+				return "", fmt.Errorf(
+					"dbConfig.postgresEngine is %q but a %s already exists for site %s/%s; "+
+						"changing the engine of a provisioned site is not supported - "+
+						"revert the field to %q, or delete the existing cluster manually first",
+					e, otherGVK.Kind, site.Namespace, site.Name, otherName)
+			}
+		}
 		return e, nil
 	}
 	if p.client != nil {
@@ -191,4 +210,40 @@ func (p *PostgresProvider) generatePGUserName(site *vyogotechv1.FrappeSite) stri
 
 func (p *PostgresProvider) getSharedHostPort(ctx context.Context, site *vyogotechv1.FrappeSite) (string, string, error) {
 	return getSharedHostPort(site)
+}
+
+// otherDedicatedEngine maps a dedicated engine name to the CR kind of the
+// *other* supported engine, so we can detect an attempted engine switch. The
+// second return value is the engine name that the existing cluster implies.
+func otherDedicatedEngine(engine string) (schema.GroupVersionKind, string, bool) {
+	switch engine {
+	case "stackgres":
+		return PerconaPGClusterGVK, "percona", true
+	case "percona":
+		return SGClusterGVK, "stackgres", true
+	}
+	return schema.GroupVersionKind{}, "", false
+}
+
+// dedicatedClusterExists reports whether a dedicated database cluster of the
+// given kind already exists for this site. A missing CRD counts as "does not
+// exist" rather than an error, so a cluster without one engine installed still
+// works with the other.
+func (p *PostgresProvider) dedicatedClusterExists(ctx context.Context, site *vyogotechv1.FrappeSite, gvk schema.GroupVersionKind) (bool, error) {
+	if p.client == nil {
+		return false, nil
+	}
+	existing := &unstructured.Unstructured{}
+	existing.SetGroupVersionKind(gvk)
+	err := p.client.Get(ctx, types.NamespacedName{
+		Name:      fmt.Sprintf("%s-postgres", site.Name),
+		Namespace: site.Namespace,
+	}, existing)
+	if err == nil {
+		return true, nil
+	}
+	if errors.IsNotFound(err) || meta.IsNoMatchError(err) {
+		return false, nil
+	}
+	return false, err
 }

@@ -23,8 +23,29 @@ Both modes honour `spec.deletionPolicy`:
   the whole database cluster (dedicated) are **kept** when the `FrappeSite` is
   deleted. GitOps-safe — an accidental CR delete or an ArgoCD prune never drops
   tenant data.
-- **`Delete`**: the operator runs a `pg-delete` Job (shared, `DROP DATABASE` /
-  `DROP ROLE`) or deletes the cluster CR (`SGCluster` or `PerconaPGCluster`).
+- **`Delete`**: in **shared** mode the operator runs a `pg-delete` Job
+  (`DROP DATABASE` / `DROP ROLE`) and the site's database is removed.
+
+> **Dedicated clusters are never deleted automatically, in either policy.** For
+> safety, deleting a `FrappeSite` does not tear down its `SGCluster` or
+> `PerconaPGCluster`, the generated database Secrets, or the underlying PVCs —
+> `deletionPolicy: Delete` does not change this. The dedicated cluster CRs are
+> created without an `ownerReference` precisely so that nothing garbage-collects
+> them. Removing a dedicated database is a deliberate manual step:
+>
+> ```bash
+> # StackGres
+> kubectl delete sgcluster <site>-postgres -n <namespace>
+> kubectl delete sgscript <site>-postgres-script -n <namespace>
+> kubectl delete secret <site>-postgres-script-secret <site>-db-password -n <namespace>
+>
+> # Percona
+> kubectl delete perconapgcluster <site>-postgres -n <namespace>
+> kubectl delete secret <site>-db-password -n <namespace>
+> ```
+>
+> Check for leftover PVCs afterwards (`kubectl get pvc -n <namespace>`); they are
+> retained too and are what actually holds the data.
 
 ### Dedicated Engine Toggle (`postgresEngine`)
 
