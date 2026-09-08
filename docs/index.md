@@ -32,6 +32,7 @@ Frappe Operator brings cloud-native Kubernetes orchestration to Frappe deploymen
 
 ### <i data-lucide="server"></i> Platform & Installation
 - **[OpenShift Production Guide](INSTALL_OPENSHIFT.md)** - Complete OpenShift guide & `restricted-v2` SCC compliance
+- **[OpenShift Console Plugin & FPM Store](CONSOLE_PLUGIN.md)** - Dynamic web bundle, dashboards, and air-gapped FPM package catalog
 - **[Helm Installation Guide](INSTALLATION_HELM.md)** - Deploy via official Vyogo Helm chart
 - **[Upgrade Guide](upgrade-guide.md)** - Seamlessly upgrade to v5.2.0
 

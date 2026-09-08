@@ -185,10 +185,6 @@ func (p *PostgresProvider) generateDBName(site *vyogotechv1.FrappeSite) string {
 	return generateDBName(site)
 }
 
-func (p *PostgresProvider) generateDBUser(site *vyogotechv1.FrappeSite) string {
-	return generateDBUser(site)
-}
-
 func (p *PostgresProvider) generatePGUserName(site *vyogotechv1.FrappeSite) string {
 	return generatePGUserName(site)
 }

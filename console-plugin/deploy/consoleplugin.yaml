@@ -1,0 +1,11 @@
+apiVersion: console.openshift.io/v1
+kind: ConsolePlugin
+metadata:
+  name: frappe-console-plugin
+spec:
+  displayName: 'Frappe & ERPNext Platform'
+  service:
+    name: frappe-console-plugin
+    namespace: frappe-operator-system
+    port: 9443
+    basePath: '/'

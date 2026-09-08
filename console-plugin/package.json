@@ -1,0 +1,50 @@
+{
+  "name": "frappe-console-plugin",
+  "version": "5.2.0",
+  "private": true,
+  "repository": "https://github.com/vyogotech/frappe-operator",
+  "scripts": {
+    "build": "webpack --mode=production",
+    "build:dev": "webpack --mode=development",
+    "start": "webpack serve --mode=development",
+    "lint": "eslint ./src --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "@openshift-console/dynamic-plugin-sdk": "^1.4.0",
+    "@patternfly/react-core": "^5.3.0",
+    "@patternfly/react-icons": "^5.3.0",
+    "@patternfly/react-table": "^5.3.0",
+    "lucide-react": "^0.475.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.0"
+  },
+  "devDependencies": {
+    "@openshift-console/dynamic-plugin-sdk-webpack": "^1.2.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "css-loader": "^6.10.0",
+    "style-loader": "^3.3.4",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.90.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.0.0"
+  },
+  "consolePlugin": {
+    "name": "frappe-console-plugin",
+    "version": "5.2.0",
+    "displayName": "Frappe & ERPNext Platform",
+    "description": "Enterprise UI for Frappe Benches, Tenant Sites, and Air-Gapped FPM Package Store by Vyogo Technologies",
+    "exposedModules": {
+      "BenchesDashboard": "./src/components/BenchesDashboard",
+      "SitesDirectory": "./src/components/SitesDirectory",
+      "FPMStore": "./src/components/FPMStore",
+      "BenchFPMTab": "./src/components/BenchFPMTab",
+      "SiteDatabaseTab": "./src/components/SiteDatabaseTab"
+    },
+    "dependencies": {
+      "@openshift-console/dynamic-plugin-sdk": ">=1.0.0"
+    }
+  }
+}
