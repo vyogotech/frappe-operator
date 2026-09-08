@@ -1,0 +1,91 @@
+[
+  {
+    "type": "console.navigation/section",
+    "properties": {
+      "id": "frappe-nav-section",
+      "name": "Frappe Platform",
+      "insertAfter": "workloads"
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "frappe-benches-nav",
+      "section": "frappe-nav-section",
+      "name": "Frappe Benches",
+      "href": "/frappe/benches"
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "frappe-sites-nav",
+      "section": "frappe-nav-section",
+      "name": "Tenant Sites",
+      "href": "/frappe/sites"
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "frappe-fpm-store-nav",
+      "section": "frappe-nav-section",
+      "name": "FPM Package Store",
+      "href": "/frappe/fpm-store"
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/frappe/benches",
+      "component": { "$codeRef": "BenchesDashboard" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/frappe/sites",
+      "component": { "$codeRef": "SitesDirectory" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/frappe/fpm-store",
+      "component": { "$codeRef": "FPMStore" }
+    }
+  },
+  {
+    "type": "console.tab/horizontalNav",
+    "properties": {
+      "model": {
+        "group": "vyogo.tech",
+        "version": "v1",
+        "kind": "FrappeBench"
+      },
+      "page": {
+        "name": "FPM Packages",
+        "href": "fpm-packages"
+      },
+      "component": { "$codeRef": "BenchFPMTab" }
+    }
+  },
+  {
+    "type": "console.tab/horizontalNav",
+    "properties": {
+      "model": {
+        "group": "vyogo.tech",
+        "version": "v1",
+        "kind": "FrappeSite"
+      },
+      "page": {
+        "name": "Database & Route",
+        "href": "db-route"
+      },
+      "component": { "$codeRef": "SiteDatabaseTab" }
+    }
+  }
+]

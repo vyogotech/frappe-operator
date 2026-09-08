@@ -33,7 +33,11 @@ module.exports = {
       },
     ],
   },
-  plugins: [new ConsoleRemotePlugin()],
+  plugins: [
+    new ConsoleRemotePlugin({
+      validateSharedModules: false,
+    }),
+  ],
   devServer: {
     port: 9001,
     headers: {
