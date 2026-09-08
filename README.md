@@ -146,6 +146,7 @@ For detailed guides, visit **[vyogotech.github.io/frappe-operator](https://vyogo
 - **[Examples](docs/examples.md)** - Production-ready deployment patterns
 - **[Operations Guide](docs/operations.md)** - Scaling, backups, updates, monitoring
 - **[OpenShift Production Guide](docs/INSTALL_OPENSHIFT.md)** - Deep dive into OpenShift & `restricted-v2` SCCs
+- **[OLM Installation Guide](docs/INSTALL_OLM.md)** - Install through OperatorHub/OLM (shows up under *Installed Operators*)
 - **[OpenShift Web Console Plugin](docs/CONSOLE_PLUGIN.md)** - Dynamic web bundle, visual dashboards, and FPM store
 - **[PostgreSQL Integration Guide](docs/POSTGRESQL_INTEGRATION.md)** - Dedicated (StackGres & Percona) & shared PostgreSQL
 - **[MariaDB Integration Guide](docs/MARIADB_INTEGRATION.md)** - Database isolation & credentials
