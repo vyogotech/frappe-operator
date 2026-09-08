@@ -262,16 +262,156 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: FrappeBench is the Schema for the frappebenches API
+    - description: FrappeBench manages shared infrastructure, web proxies, workers, and FPM repositories for multi-tenant Frappe sites.
       displayName: Frappe Bench
       kind: FrappeBench
       name: frappebenches.vyogo.tech
       version: v1
-    - description: FrappeSite is the Schema for the frappesites API
+      specDescriptors:
+      - description: Frappe framework version (e.g. version-15)
+        displayName: Frappe Version
+        path: frappeVersion
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Applications to install on the bench
+        displayName: Apps
+        path: apps
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldGroup:Apps
+      - description: Air-gapped FPM (Frappe Package Manager) package repositories
+        displayName: FPM Repositories Configuration
+        path: fpmConfig
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldGroup:FPM
+      - description: List of FPM package repository endpoints
+        displayName: FPM Repositories
+        path: fpmConfig.repositories
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:fieldGroup:FPM
+      - description: Default FPM repository name for package operations
+        displayName: Default FPM Repository
+        path: fpmConfig.defaultRepo
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Persistent Volume Claim size for shared bench storage
+        displayName: Storage Size
+        path: storageSize
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Custom storage class name for the bench PVC
+        displayName: Storage Class Name
+        path: storageClassName
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:StorageClass
+      - description: Sizing for batch jobs (init, app install, migrations, backups)
+        displayName: Job Resources
+        path: jobResources
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      - description: In-memory cache and message queue broker configuration
+        displayName: Redis / DragonFly Configuration
+        path: redisConfig
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:advanced
+      statusDescriptors:
+      - description: Whether the shared bench platform infrastructure is fully initialized and ready
+        displayName: Bench Ready
+        path: ready
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: List of tenant sites hosted on this bench
+        displayName: Active Tenant Sites
+        path: sites
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+    - description: FrappeSite represents an isolated tenant site with polymorphic database, TLS, and OpenShift Route.
       displayName: Frappe Site
       kind: FrappeSite
       name: frappesites.vyogo.tech
       version: v1
+      specDescriptors:
+      - description: Reference to the parent FrappeBench hosting this site
+        displayName: Bench Reference
+        path: benchRef.name
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Primary site domain name that receives traffic
+        displayName: Site Name / Hostname
+        path: siteName
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Applications to install during site creation
+        displayName: Installed Apps
+        path: apps
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Database engine provider (PostgreSQL, MariaDB, SQLite, External)
+        displayName: Database Provider
+        path: dbConfig.provider
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:select:postgres
+        - urn:alm:descriptor:com.tectonic.ui:select:mariadb
+        - urn:alm:descriptor:com.tectonic.ui:select:sqlite
+        - urn:alm:descriptor:com.tectonic.ui:select:external
+      - description: PostgreSQL provisioning engine (StackGres or Percona)
+        displayName: PostgreSQL Engine
+        path: dbConfig.postgresEngine
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:select:stackgres
+        - urn:alm:descriptor:com.tectonic.ui:select:percona
+      - description: Database deployment mode (Dedicated cluster or Shared database)
+        displayName: Database Mode
+        path: dbConfig.mode
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:select:dedicated
+        - urn:alm:descriptor:com.tectonic.ui:select:shared
+      - description: Dedicated database storage volume size
+        displayName: Database Storage Size
+        path: dbConfig.storageSize
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Secret reference containing external database credentials
+        displayName: Database Secret Reference
+        path: dbConfig.connectionSecretRef.name
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes:Secret
+      - description: Red Hat OpenShift Route configuration with automated Edge TLS redirection
+        displayName: OpenShift Route
+        path: routeConfig.enabled
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: Policy for database retention upon site CR deletion (Retain prevents data loss)
+        displayName: Database Deletion Policy
+        path: deletionPolicy
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:select:Retain
+        - urn:alm:descriptor:com.tectonic.ui:select:Delete
+      - description: Bypass bench new-site initialization if database schema already exists
+        displayName: Skip Initialization
+        path: skipInit
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      statusDescriptors:
+      - description: Current lifecycle phase of the site (Pending, Provisioning, Ready, Failed)
+        displayName: Lifecycle Phase
+        path: phase
+        x-descriptors:
+        - urn:alm:descriptor:io.kubernetes.phase
+      - description: Direct HTTPS accessible URL of the site
+        displayName: Site URL
+        path: siteURL
+        x-descriptors:
+        - urn:alm:descriptor:org.w3:link
+      - description: Status of the underlying database instance
+        displayName: Database Ready
+        path: databaseReady
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: Provisioned database name
+        displayName: Database Name
+        path: databaseName
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
     - description: FrappeWorkpace is the Schema for the frappeworkpaces API
       displayName: Frappe Workpace
       kind: FrappeWorkpace
