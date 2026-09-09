@@ -208,6 +208,19 @@ func main() {
 		setupLog.Info("Standard Kubernetes platform detected")
 	}
 
+	// HTTPS policy: off by default so existing non-OpenShift installs (no
+	// cert-manager, no pre-created TLS secrets) don't break. When enforced,
+	// every site gets TLS + a mandatory HTTPS redirect regardless of its own
+	// spec.tls.enabled setting or ingress annotations. OpenShift Routes are
+	// already HTTPS-only via edge termination and are unaffected either way.
+	enforceHTTPS := os.Getenv("FRAPPE_ENFORCE_HTTPS") == "true"
+	defaultClusterIssuer := os.Getenv("FRAPPE_DEFAULT_CLUSTER_ISSUER")
+	if enforceHTTPS {
+		setupLog.Info("HTTPS policy: enforced (all sites forced to HTTPS)", "defaultClusterIssuer", defaultClusterIssuer)
+	} else {
+		setupLog.Info("HTTPS policy: per-site (spec.tls.enabled controls each site)")
+	}
+
 	if err = (&controllers.FrappeBenchReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
@@ -226,6 +239,8 @@ func main() {
 		Recorder:                mgr.GetEventRecorderFor("frappesite-controller"),
 		IsOpenShift:             isOpenShift,
 		MaxConcurrentReconciles: maxSiteReconciles,
+		EnforceHTTPS:            enforceHTTPS,
+		DefaultClusterIssuer:    defaultClusterIssuer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FrappeSite")
 		os.Exit(1)
@@ -247,9 +262,10 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteAppReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("siteapp-controller"),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Recorder:    mgr.GetEventRecorderFor("siteapp-controller"),
+		IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteApp")
 		os.Exit(1)
@@ -263,9 +279,12 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteDomainReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("sitedomain-controller"),
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Recorder:             mgr.GetEventRecorderFor("sitedomain-controller"),
+		IsOpenShift:          isOpenShift,
+		EnforceHTTPS:         enforceHTTPS,
+		DefaultClusterIssuer: defaultClusterIssuer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteDomain")
 		os.Exit(1)
@@ -303,12 +322,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteMigration")
 		os.Exit(1)
 	}
-	if err = (&controllers.FrappeWorkpaceReconciler{
+	if err = (&controllers.FrappeWorkspaceReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("frappeworkpace-controller"),
+		Recorder: mgr.GetEventRecorderFor("frappeworkspace-controller"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "FrappeWorkpace")
+		setupLog.Error(err, "unable to create controller", "controller", "FrappeWorkspace")
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteWorkspaceReconciler{
@@ -410,6 +429,37 @@ func main() {
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
+
+	// Admission webhooks. These enforce rules that cannot be expressed in the
+	// CRD schema, most importantly that dbConfig.postgresEngine is immutable
+	// once a dedicated cluster has been provisioned.
+	//
+	// Opt-in, and deliberately defaulted OFF: the webhooks are declared with
+	// failurePolicy=fail, so once their ValidatingWebhookConfiguration exists
+	// every FrappeSite and FrappeBench write is rejected unless the operator is
+	// serving them with a valid certificate. Enabling this therefore requires
+	// the serving certificate to be in place (cert-manager for Helm/kustomize
+	// installs, or OLM-managed certificates via the CSV's webhookdefinitions).
+	// Turning it on without that would take the API surface down, so existing
+	// installs are left untouched until the operator is explicitly configured
+	// for it.
+	//
+	// Note the FrappeSite controller independently refuses to switch the engine
+	// of a site that already has a cluster (see resolvePostgresEngine), so that
+	// protection holds whether or not these webhooks are enabled.
+	if os.Getenv("ENABLE_WEBHOOKS") == "true" {
+		if err := (&vyogotechv1.FrappeSite{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "FrappeSite")
+			os.Exit(1)
+		}
+		if err := (&vyogotechv1.FrappeBench{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "FrappeBench")
+			os.Exit(1)
+		}
+		setupLog.Info("admission webhooks enabled", "port", 9443)
+	} else {
+		setupLog.Info("admission webhooks disabled (set ENABLE_WEBHOOKS=true once serving certificates are configured)")
+	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

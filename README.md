@@ -1,9 +1,10 @@
 # Frappe Operator
 
-[![Release](https://img.shields.io/github/v/release/vyogotech/frappe-operator)](https://github.com/vyogotech/frappe-operator/releases)
-[![License](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
-[![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](https://vyogotech.github.io/frappe-operator/)
+[![Release](https://img.shields.io/github/v/release/vyogotech/frappe-operator?color=00BC86)](https://github.com/vyogotech/frappe-operator/releases)
+[![License](https://img.shields.io/badge/License-Elastic%202.0-0050A4.svg)](LICENSE)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.22+-00BC86.svg)](https://kubernetes.io/)
+[![OpenShift](https://img.shields.io/badge/OpenShift-restricted--v2-0050A4.svg)](docs/INSTALL_OPENSHIFT.md)
+[![Production Ready](https://img.shields.io/badge/Production-Ready-00BC86.svg)](https://vyogotech.github.io/frappe-operator/)
 
 > [!IMPORTANT]
 > **⚡ Now licensed under the Elastic License 2.0**
@@ -139,16 +140,19 @@ kubectl delete -f https://github.com/vyogotech/frappe-operator/releases/latest/d
 
 For detailed guides, visit **[vyogotech.github.io/frappe-operator](https://vyogotech.github.io/frappe-operator/)**:
 
-- **[Getting Started](https://vyogotech.github.io/frappe-operator/getting-started)** - Comprehensive installation guide
-- **[Concepts](https://vyogotech.github.io/frappe-operator/concepts)** - Understand benches, sites, and architecture
-- **[Examples](https://vyogotech.github.io/frappe-operator/examples)** - Production-ready deployment patterns
-- **[Operations Guide](https://vyogotech.github.io/frappe-operator/operations)** - Scaling, backups, updates, monitoring
-- **[API Reference](https://vyogotech.github.io/frappe-operator/api-reference)** - Complete CRD specifications
-- **[Troubleshooting](https://vyogotech.github.io/frappe-operator/troubleshooting)** - Common issues and solutions
-- **[Site App Installation](docs/SITE_APP_INSTALLATION.md)** - Install specific apps per site
-- **[OpenShift Installation](docs/INSTALL_OPENSHIFT.md)** - Step-by-step OpenShift guide
-- **[OpenShift Technical Guide](docs/openshift.md)** - Deep dive into compatibility & SCCs
+- **[Getting Started](docs/getting-started.md)** - Comprehensive installation guide & quickstart
+- **[Concepts](docs/concepts.md)** - Understand benches, sites, and architecture
+- **[Comprehensive Guide](docs/COMPREHENSIVE_GUIDE.md)** - Complete reference guide
+- **[Examples](docs/examples.md)** - Production-ready deployment patterns
+- **[Operations Guide](docs/operations.md)** - Scaling, backups, updates, monitoring
+- **[OpenShift Production Guide](docs/INSTALL_OPENSHIFT.md)** - Deep dive into OpenShift & `restricted-v2` SCCs
+- **[OLM Installation Guide](docs/INSTALL_OLM.md)** - Install through OperatorHub/OLM (shows up under *Installed Operators*)
+- **[OpenShift Web Console Plugin](docs/CONSOLE_PLUGIN.md)** - Dynamic web bundle, visual dashboards, and FPM store
+- **[PostgreSQL Integration Guide](docs/POSTGRESQL_INTEGRATION.md)** - Dedicated (StackGres & Percona) & shared PostgreSQL
 - **[MariaDB Integration Guide](docs/MARIADB_INTEGRATION.md)** - Database isolation & credentials
+- **[Site App Installation](docs/SITE_APP_INSTALLATION.md)** - Install specific apps per site
+- **[API Reference](docs/api-reference.md)** - Complete CRD specifications
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 
 ## Examples
 
@@ -156,27 +160,27 @@ Check the [`examples/`](examples/) directory for ready-to-use configurations:
 
 - **[basic-bench.yaml](examples/basic-bench.yaml)** - Simple development setup
 - **[basic-site.yaml](examples/basic-site.yaml)** - Basic site configuration
+- **[stackgres-postgres.yaml](examples/stackgres-postgres.yaml)** - Dedicated PostgreSQL (StackGres) setup
 - **[site-with-apps.yaml](examples/site-with-apps.yaml)** - Site with specific apps installed
 - **[hybrid-bench.yaml](examples/hybrid-bench.yaml)** - FPM + Git + Image sources
-- **[worker-autoscaling.yaml](examples/worker-autoscaling.yaml)** - KEDA-based autoscaling
+- **[worker-autoscaling.yaml](examples/worker-autoscaling.yaml)** - KEDA/HPA autoscaling
 - **[scheduled-sitebackup.yaml](examples/scheduled-sitebackup.yaml)** - Automated backups
-- **[advanced-pod-config.yaml](examples/advanced-pod-config.yaml)** - Custom labels, geo-tagging, and affinity
-- **[test-keda-bench.yaml](examples/test-keda-bench.yaml)** - Generated KEDA test manifest
-- **[test-hpa-bench.yaml](examples/test-hpa-bench.yaml)** - Generated HPA test manifest
+- **[ocp-restricted-bench.yaml](examples/ocp-restricted-bench.yaml)** - OpenShift `restricted-v2` bench
+- **[ocp-restricted-site.yaml](examples/ocp-restricted-site.yaml)** - OpenShift `restricted-v2` site
 - And [many more](examples/)...
-
-> **Note**: Test manifests are generated from configuration. See [CONFIGURATION.md](CONFIGURATION.md) for customization.
 
 ## Custom Resources
 
 | Resource | Purpose | Documentation |
-|----------|---------|---------------|
-| **FrappeBench** | Shared infrastructure for sites | [API Docs](https://vyogotech.github.io/frappe-operator/api-reference#frappebench) |
-| **FrappeSite** | Individual Frappe site | [API Docs](https://vyogotech.github.io/frappe-operator/api-reference#frappesite) |
-| **SiteBackup** | Automated backups | [API Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitebackup) |
-| **SiteJob** | Run bench commands | [API Docs](https://vyogotech.github.io/frappe-operator/api-reference#sitejob) |
+|---|---|---|
+| **FrappeBench** | Shared infrastructure for sites (Nginx, Gunicorn, Redis, Workers) | [API Docs](docs/api-reference.md#frappebench) |
+| **FrappeSite** | Individual Frappe tenant site with dedicated/shared DB & HTTPS route | [API Docs](docs/api-reference.md#frappesite) |
+| **SiteBackup** | Automated scheduled and on-demand backups | [API Docs](docs/api-reference.md#sitebackup) |
+| **SiteJob** | Execute arbitrary bench commands safely | [API Docs](docs/api-reference.md#sitejob) |
+| **SiteDomain** | Manage primary and secondary custom domains with automatic TLS | [API Docs](docs/api-reference.md#sitedomain) |
+| **SiteApp** | Declarative per-site app lifecycle and installation | [API Docs](docs/api-reference.md#siteapp) |
 
-[See all resources →](https://vyogotech.github.io/frappe-operator/api-reference)
+[See all resources →](docs/api-reference.md)
 
 ## Requirements
 

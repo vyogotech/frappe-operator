@@ -170,6 +170,38 @@ rules:
   verbs:
   - get
 
+# PostgreSQL Operator CRDs (Percona)
+- apiGroups:
+  - pgv2.percona.com
+  resources:
+  - perconapgclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+# PostgreSQL Operator CRDs (StackGres)
+- apiGroups:
+  - stackgres.io
+  resources:
+  - sgclusters
+  - sginstanceprofiles
+  - sgpgconfigs
+  - sgpoolconfigs
+  - sgscripts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
 # KEDA ScaledObjects for worker autoscaling
 - apiGroups:
   - keda.sh

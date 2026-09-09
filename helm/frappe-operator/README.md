@@ -214,7 +214,7 @@ kubectl delete namespace frappe-operator-system
 # Delete them manually if needed:
 kubectl delete crd frappebenchs.vyogo.tech
 kubectl delete crd frappesites.vyogo.tech
-kubectl delete crd frappeworkpaces.vyogo.tech
+kubectl delete crd frappeworkspaces.vyogo.tech
 kubectl delete crd sitebackups.vyogo.tech
 kubectl delete crd sitedashboards.vyogo.tech
 kubectl delete crd sitedashboardcharts.vyogo.tech

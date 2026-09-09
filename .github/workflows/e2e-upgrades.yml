@@ -24,6 +24,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free disk space
+        # These jobs load the multi-gigabyte Frappe bench image into kind, and
+        # `kind load docker-image` stages it through `docker save` into /tmp,
+        # needing roughly twice the image size free. A stock ubuntu-latest
+        # runner does not have that, so every job here failed with "no space
+        # left on device" before reaching any actual test. Reclaim the
+        # preinstalled toolchains this repository never uses.
+        run: |
+          echo "Before:"; df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost /opt/hostedtoolcache/CodeQL \
+                      /usr/local/share/powershell /usr/share/swift || true
+          sudo docker image prune --all --force || true
+          echo "After:"; df -h /
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -67,6 +82,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free disk space
+        # These jobs load the multi-gigabyte Frappe bench image into kind, and
+        # `kind load docker-image` stages it through `docker save` into /tmp,
+        # needing roughly twice the image size free. A stock ubuntu-latest
+        # runner does not have that, so every job here failed with "no space
+        # left on device" before reaching any actual test. Reclaim the
+        # preinstalled toolchains this repository never uses.
+        run: |
+          echo "Before:"; df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost /opt/hostedtoolcache/CodeQL \
+                      /usr/local/share/powershell /usr/share/swift || true
+          sudo docker image prune --all --force || true
+          echo "After:"; df -h /
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -108,6 +138,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Free disk space
+        # These jobs load the multi-gigabyte Frappe bench image into kind, and
+        # `kind load docker-image` stages it through `docker save` into /tmp,
+        # needing roughly twice the image size free. A stock ubuntu-latest
+        # runner does not have that, so every job here failed with "no space
+        # left on device" before reaching any actual test. Reclaim the
+        # preinstalled toolchains this repository never uses.
+        run: |
+          echo "Before:"; df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost /opt/hostedtoolcache/CodeQL \
+                      /usr/local/share/powershell /usr/share/swift || true
+          sudo docker image prune --all --force || true
+          echo "After:"; df -h /
 
       - name: Install dependencies
         run: |

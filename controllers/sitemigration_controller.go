@@ -105,7 +105,7 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	jobName := fmt.Sprintf("%s-migrate-%s", site.Name, siteMigration.Name)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
-	benchImage := "frappe/erpnext:latest"
+	benchImage := "docker.io/frappe/erpnext:latest"
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
 		benchImage = bench.Spec.ImageConfig.Repository
 		if bench.Spec.ImageConfig.Tag != "" {

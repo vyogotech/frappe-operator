@@ -1,0 +1,13 @@
+apiVersion: vyogo.tech/v1
+kind: SiteBackup
+metadata:
+  labels:
+    app.kubernetes.io/name: sitebackup
+    app.kubernetes.io/instance: sitebackup-sample
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: frappe-operator
+  name: sitebackup-sample
+spec:
+  site: site1.example.com
+  withFiles: true

@@ -19,6 +19,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: github.repository == 'vyogotech/frappe-operator'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

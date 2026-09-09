@@ -109,7 +109,7 @@ func (r *SiteCronReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	cronJobName := fmt.Sprintf("%s-cron-%s", site.Name, siteCron.Name)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
-	benchImage := "frappe/erpnext:latest"
+	benchImage := "docker.io/frappe/erpnext:latest"
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
 		benchImage = bench.Spec.ImageConfig.Repository
 		if bench.Spec.ImageConfig.Tag != "" {

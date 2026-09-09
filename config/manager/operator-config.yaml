@@ -25,8 +25,8 @@ data:
   fpmRepositories: |
     [
       {
-        "name": "frappe-community",
-        "url": "https://fpm.frappe.io",
+        "name": "vyogo-official",
+        "url": "https://fpm.vyogo.tech",
         "priority": 100
       }
     ]
@@ -47,4 +47,20 @@ data:
   defaultPostgresImage: "docker.io/library/postgres:15-alpine"
   defaultRedisImage: "docker.io/library/redis:7-alpine"
   defaultNginxImage: "docker.io/library/nginx:1.25-alpine"
+
+  # HTTPS policy. Default "false" preserves per-site opt-in TLS (spec.tls.enabled).
+  # Set to "true" to make every site's Ingress HTTPS-only regardless of its own
+  # spec.tls.enabled or ingress annotations (OpenShift Routes are unaffected;
+  # they are already HTTPS-only via edge termination). On non-OpenShift clusters,
+  # enforcing this requires cert-manager (see defaultClusterIssuer below) or a
+  # pre-created <site>-tls secret per site, and is incompatible with proxies that
+  # speak plain HTTP to the origin (e.g. Cloudflare in Flexible SSL mode - use
+  # Full or Full (strict) instead).
+  enforceHTTPS: "false"
+
+  # cert-manager ClusterIssuer used for a site's TLS certificate when the site
+  # does not set spec.tls.issuer. Only relevant when TLS is in effect (either
+  # spec.tls.enabled or enforceHTTPS above). Leave empty to require every site
+  # to set its own issuer or pre-create its TLS secret.
+  defaultClusterIssuer: ""
 

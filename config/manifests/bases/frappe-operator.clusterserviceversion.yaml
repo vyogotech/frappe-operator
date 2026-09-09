@@ -28,10 +28,10 @@ metadata:
       "siteuser", "app.kubernetes.io/instance": "siteuser-sample", "app.kubernetes.io/part-of":
       "frappe-operator", "app.kubernetes.io/managed-by": "kustomize", "app.kubernetes.io/created-by":
       "frappe-operator"}, "name": "siteuser-sample"}, "spec": null}, {"apiVersion":
-      "vyogo.tech/v1", "kind": "FrappeWorkpace", "metadata": {"labels": {"app.kubernetes.io/name":
-      "frappeworkpace", "app.kubernetes.io/instance": "frappeworkpace-sample", "app.kubernetes.io/part-of":
+      "vyogo.tech/v1", "kind": "FrappeWorkspace", "metadata": {"labels": {"app.kubernetes.io/name":
+      "frappeworkspace", "app.kubernetes.io/instance": "frappeworkspace-sample", "app.kubernetes.io/part-of":
       "frappe-operator", "app.kubernetes.io/managed-by": "kustomize", "app.kubernetes.io/created-by":
-      "frappe-operator"}, "name": "frappeworkpace-sample"}, "spec": null}, {"apiVersion":
+      "frappe-operator"}, "name": "frappeworkspace-sample"}, "spec": null}, {"apiVersion":
       "vyogo.tech/v1", "kind": "SiteDashboard", "metadata": {"labels": {"app.kubernetes.io/name":
       "sitedashboard", "app.kubernetes.io/instance": "sitedashboard-sample", "app.kubernetes.io/part-of":
       "frappe-operator", "app.kubernetes.io/managed-by": "kustomize", "app.kubernetes.io/created-by":
@@ -46,21 +46,91 @@ metadata:
       "frappe-operator"}, "name": "siteworkspace-sample"}, "spec": null}]'
     capabilities: Basic Install
     categories: Application Runtime,Database
+    features.operators.openshift.io/disconnected-compliant: "true"
+    features.operators.openshift.io/fips-compliant: "false"
+    features.operators.openshift.io/proxy-aware: "false"
+    operatorframework.io/suggested-namespace: frappe-operator-system
   name: frappe-operator.v0.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: Manages Frappe site API keys and secrets for programmatic access.
+      displayName: Site API Key
+      kind: SiteAPIKey
+      name: siteapikeys.vyogo.tech
+      version: v1
+    - description: Manages custom client-side JavaScript extensions in Frappe Desk.
+      displayName: Site Client Script
+      kind: SiteClientScript
+      name: siteclientscripts.vyogo.tech
+      version: v1
+    - description: Manages Frappe site configuration variables and maintenance modes.
+      displayName: Site Config
+      kind: SiteConfig
+      name: siteconfigs.vyogo.tech
+      version: v1
+    - description: Manages scheduled cron jobs and periodic bench method execution.
+      displayName: Site Cron
+      kind: SiteCron
+      name: sitecrons.vyogo.tech
+      version: v1
+    - description: Manages Frappe DocType custom fields declaratively.
+      displayName: Site Custom Field
+      kind: SiteCustomField
+      name: sitecustomfields.vyogo.tech
+      version: v1
+    - description: Manages Frappe DocType property overrides declaratively.
+      displayName: Site Property Setter
+      kind: SitePropertySetter
+      name: sitepropertysetters.vyogo.tech
+      version: v1
+    - description: Enforces storage, site, and resource quotas across Frappe sites.
+      displayName: Site Quota
+      kind: SiteQuota
+      name: sitequotas.vyogo.tech
+      version: v1
+    - description: Manages Frappe user roles and permission sets.
+      displayName: Site Role
+      kind: SiteRole
+      name: siteroles.vyogo.tech
+      version: v1
+    - description: Manages server-side Python scripts executed on DocType events or
+        API calls.
+      displayName: Site Server Script
+      kind: SiteServerScript
+      name: siteserverscripts.vyogo.tech
+      version: v1
+    - description: Manages Frappe user data-level document permissions.
+      displayName: Site User Permission
+      kind: SiteUserPermission
+      name: siteuserpermissions.vyogo.tech
+      version: v1
+    - description: Manages outgoing webhooks triggered by Frappe DocType events.
+      displayName: Site Webhook
+      kind: SiteWebhook
+      name: sitewebhooks.vyogo.tech
+      version: v1
+    - description: FrappeBench is the Schema for the frappebenches API
+      displayName: Frappe Bench
+      kind: FrappeBench
+      name: frappebenches.vyogo.tech
+      version: v1
     - description: FrappeSite is the Schema for the frappesites API
       displayName: Frappe Site
       kind: FrappeSite
       name: frappesites.vyogo.tech
       version: v1
-    - description: FrappeWorkpace is the Schema for the frappeworkpaces API
-      displayName: Frappe Workpace
-      kind: FrappeWorkpace
-      name: frappeworkpaces.vyogo.tech
+    - description: FrappeWorkspace is the Schema for the frappeworkspaces API
+      displayName: Frappe Workspace
+      kind: FrappeWorkspace
+      name: frappeworkspaces.vyogo.tech
+      version: v1
+    - description: SiteApp is the Schema for the siteapps API
+      displayName: Site App
+      kind: SiteApp
+      name: siteapps.vyogo.tech
       version: v1
     - description: SiteBackup is the Schema for the sitebackups API
       displayName: Site Backup
@@ -77,10 +147,25 @@ spec:
       kind: SiteDashboard
       name: sitedashboards.vyogo.tech
       version: v1
+    - description: SiteDomain is the Schema for the sitedomains API
+      displayName: Site Domain
+      kind: SiteDomain
+      name: sitedomains.vyogo.tech
+      version: v1
     - description: SiteJob is the Schema for the sitejobs API
       displayName: Site Job
       kind: SiteJob
       name: sitejobs.vyogo.tech
+      version: v1
+    - description: SiteMigration is the Schema for the sitemigrations API
+      displayName: Site Migration
+      kind: SiteMigration
+      name: sitemigrations.vyogo.tech
+      version: v1
+    - description: SiteRestore is the Schema for the siterestores API
+      displayName: Site Restore
+      kind: SiteRestore
+      name: siterestores.vyogo.tech
       version: v1
     - description: SiteUser is the Schema for the siteusers API
       displayName: Site User
@@ -101,8 +186,31 @@ spec:
     * **Automated Replicas**: High Availability web worker routing via Ingress.
     * **GitOps Compliance**: Designed to operate smoothly with ArgoCD.
 
+    ### Prerequisites
+
+    **Install a database provider before creating sites.** MariaDB is the
+    default: a `FrappeSite` that does not set `spec.dbConfig.provider` uses it,
+    so install the MariaDB Operator unless every site specifies a different
+    provider.
+
+    These are deliberately not declared as OLM dependencies. The operator
+    supports four database providers, and a hard dependency would both force
+    MariaDB on PostgreSQL-only users and make the bundle impossible to install
+    on any cluster whose catalogs do not carry the required package.
+
+    Install whichever matches your configuration:
+
+    * Dedicated PostgreSQL with `postgresEngine: stackgres` needs StackGres (`stackgres-community`).
+    * Dedicated PostgreSQL with `postgresEngine: percona` needs the Percona Operator for PostgreSQL (`percona-postgresql-operator`).
+    * Shared PostgreSQL needs any reachable PostgreSQL, for example CloudNativePG.
+    * Worker autoscaling needs KEDA (`keda`).
+    * Admission webhooks, when enabled, need cert-manager.
+
+    Shared PostgreSQL mode is engine-agnostic: it only needs a reachable
+    `host:port` and a provisioner Secret, so any PostgreSQL will do.
+
     ### Setup
-    Ensure that you have deployed the prerequisites in your cluster before bootstrapping an ERPNext portal using standard `kubectl apply` commands.
+    Ensure that you have deployed the prerequisites above before bootstrapping an ERPNext portal using standard `kubectl apply` commands.
   displayName: Frappe Operator
   icon:
   - base64data: iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAMAAAD04JH5AAABCFBMVEX69vL39PH28/H18/H18vH08vH08vDz8vHy8fDx8fDx8PDw8PDt7+/s7+/r7e/q7e7p7e7n7O7n7O3m7O3l6+3h6ezg6Ozd5+vb5uvU4unT4enR4enR4ejQ4OjI3ObF2+XE2uXD2uXC2eXB2eTA2OS/2OS+1+S+1+O91uO41OK10+Kz0eGkyt2cxtyXw9uUwtqTwdqRwdmRwNmQwNmPv9mNv9iNvtiMvthwsNFtr9BsrtBrrtBrrdBqrdBqrc9prc9qrNBprM9orM9nrM9nq89mq89hqM1gqM1fp81ep81cpsxbpsxbpcxapcxZpcxZpMxZpMtYpMtWpMtWo8tVo8tWostVostUossFIrsWAAABkUlEQVR42u3ayVLCQBAG4JAYMuICIu5bjBh3UeKGorhjDIiKwvu/icekarrKcbqMWPX/Jw7d8IWaQ0+qjZE/jgEAAAAAEH8UlmpMh/oqvf4YIKb9smL8BUH8vl5/DLD8z5ZielVTBmj2JwDlVlMx7QoF0OsHAAAAAAAAAAAAACA5E3YjxXwckjOhVn9iKp7yXMV4c9RUrNevdS+wmPcCy8HVDAAAAAAAAAAAAOAHgCHmSCZ4gOHC/lEg5XTHlkudpRO5Mjied1gAUXroyK9a++qvaruexQTUQ9bFJHIBAAAAAAAAAAAA/hGAGioz+evnUMrbAQVYf5Urw5dlg7U/sLZ1dl6TcrtHPJbl3siVtcbuKm9/4H1jbELOOPVnjhKFhZn7Dm9/IFrJCDk5CpAjCrOT350hg3uIuIcYAAAAAAAAAAAAQG8iUk62yAZs5kuMFGcvmYDm3UWdk6tH7grHU8jLr+yQcAMAAAAAAAAAAAAwqAC/104p/YACOIvVSkoJtm3yZbWZWmwssQAAAAADBPgCbnRBE1ZmtlgAAAAASUVORK5CYII=
@@ -133,8 +241,21 @@ spec:
   - email: info@vyogo.tech
     name: varkrish
   maturity: alpha
-  minKubeVersion: 1.23.0
+  minKubeVersion: 1.27.0
   provider:
     name: Vyogo Tech
     url: https://vyogo.tech
+  relatedImages:
+  - image: ghcr.io/vyogotech/frappe-operator:v5.2.0
+    name: frappe-operator
+  - image: frappe/erpnext:version-15
+    name: frappe-bench-v15
+  - image: frappe/erpnext:version-14
+    name: frappe-bench-v14
+  - image: mariadb:10.6
+    name: mariadb
+  - image: redis:7.0-alpine
+    name: redis
+  - image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    name: utility-ubi
   version: 0.0.0

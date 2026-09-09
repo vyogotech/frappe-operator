@@ -110,7 +110,7 @@ func (r *SiteConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.Get(ctx, types.NamespacedName{Name: site.Spec.BenchRef.Name, Namespace: site.Namespace}, bench); err != nil {
 		return r.failReconciliation(ctx, siteConfig, fmt.Sprintf("Referenced FrappeBench %s not found: %v", site.Spec.BenchRef.Name, err), "BenchNotFound")
 	}
-	benchImage := "frappe/erpnext:latest"
+	benchImage := "docker.io/frappe/erpnext:latest"
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
 		benchImage = bench.Spec.ImageConfig.Repository
 		if bench.Spec.ImageConfig.Tag != "" {

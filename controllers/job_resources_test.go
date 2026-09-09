@@ -67,10 +67,10 @@ func TestJobBuilders_AlwaysSetResources(t *testing.T) {
 	t.Run("app install", func(t *testing.T) {
 		r := &SiteAppReconciler{Scheme: scheme}
 		sa := &vyogotechv1.SiteApp{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "default"}}
-		job := r.buildAppJob(sa, "a-install", "app-installer", "img", "bench-sites", "true", nil,
+		job := r.buildAppJob(context.Background(), sa, plain, "a-install", "app-installer", "img", "bench-sites", "true", nil,
 			vyogotechv1.ResolveJobResources(plain, vyogotechv1.JobKindAppInstall), 1, nil)
 		assertResources(t, "appInstall/built-in", job.Spec.Template.Spec.Containers[0].Resources, vyogotechv1.DefaultJobResources(vyogotechv1.JobKindAppInstall))
-		job = r.buildAppJob(sa, "a-install", "app-installer", "img", "bench-sites", "true", nil,
+		job = r.buildAppJob(context.Background(), sa, sized, "a-install", "app-installer", "img", "bench-sites", "true", nil,
 			vyogotechv1.ResolveJobResources(sized, vyogotechv1.JobKindAppInstall), 1, nil)
 		assertResources(t, "appInstall/custom", job.Spec.Template.Spec.Containers[0].Resources, wantCustom)
 	})

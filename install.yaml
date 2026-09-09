@@ -442,6 +442,17 @@ spec:
                   port:
                     description: Port is the database port for external connections
                     type: string
+                  postgresEngine:
+                    description: |-
+                      PostgresEngine selects which operator provisions dedicated-mode PostgreSQL
+                      clusters. Only meaningful when Provider is "postgres"; shared mode is
+                      already engine-agnostic (it just needs a reachable host:port; see
+                      dbConfig.host). Empty is resolved dynamically at reconcile time rather than
+                      defaulted in the CRD schema — see the backward-compatibility note in docs.
+                    enum:
+                    - stackgres
+                    - percona
+                    type: string
                   postgresRef:
                     description: PostgresRef references an existing PostgreSQL cluster (future)
                     properties:
@@ -545,7 +556,7 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         name:
-                          description: Name of the repository (e.g., "company-private", "frappe-community")
+                          description: Name of the repository (e.g., "company-private", "vyogo-official")
                           type: string
                         priority:
                           default: 50
@@ -612,6 +623,214 @@ spec:
                   tag:
                     description: Tag is the image tag
                     type: string
+                type: object
+              jobResources:
+                description: |-
+                  JobResources sizes the one-off Jobs the operator runs for this bench and
+                  its sites (init, app install, backup, restore, migration, cron,
+                  maintenance). Unset entries fall back to the operator's built-in sizing;
+                  no Job ever runs without requests and limits.
+                properties:
+                  appInstall:
+                    description: AppInstall sizes SiteApp install and uninstall Jobs (pip/fpm install + migrate).
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute resources required
+                        type: object
+                    type: object
+                  backup:
+                    description: Backup sizes one-time and scheduled backup Jobs.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute resources required
+                        type: object
+                    type: object
+                  benchInit:
+                    description: BenchInit sizes the bench initialisation Job (assets/apps bootstrap).
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute resources required
+                        type: object
+                    type: object
+                  cron:
+                    description: Cron sizes SiteCron Jobs.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute resources required
+                        type: object
+                    type: object
+                  default:
+                    description: Default applies to every Job for which no more specific entry is set.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute resources required
+                        type: object
+                    type: object
+                  maintenance:
+                    description: |-
+                      Maintenance sizes the small helpers: site delete, domain alias, config
+                      apply and database provisioning/cleanup Jobs.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute resources required
+                        type: object
+                    type: object
+                  migration:
+                    description: Migration sizes SiteMigration Jobs (bench migrate).
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute resources required
+                        type: object
+                    type: object
+                  restore:
+                    description: Restore sizes restore Jobs.
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute resources required
+                        type: object
+                    type: object
+                  siteInit:
+                    description: SiteInit sizes site creation (bench new-site, optional app installs, migrate).
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Limits describes the maximum amount of compute resources allowed
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Requests describes the minimum amount of compute resources required
+                        type: object
+                    type: object
                 type: object
               namespacePolicy:
                 description: |-
@@ -2379,6 +2598,17 @@ spec:
                   port:
                     description: Port is the database port for external connections
                     type: string
+                  postgresEngine:
+                    description: |-
+                      PostgresEngine selects which operator provisions dedicated-mode PostgreSQL
+                      clusters. Only meaningful when Provider is "postgres"; shared mode is
+                      already engine-agnostic (it just needs a reachable host:port; see
+                      dbConfig.host). Empty is resolved dynamically at reconcile time rather than
+                      defaulted in the CRD schema — see the backward-compatibility note in docs.
+                    enum:
+                    - stackgres
+                    - percona
+                    type: string
                   postgresRef:
                     description: PostgresRef references an existing PostgreSQL cluster (future)
                     properties:
@@ -2489,7 +2719,16 @@ spec:
                     description: TLS configuration
                     properties:
                       enabled:
-                        description: Enabled controls whether TLS is enabled
+                        description: |-
+                          Enabled requests TLS for this site's Ingress: a TLS block and an HTTPS
+                          redirect are added, using SecretName (or Issuer, if set) to obtain the
+                          certificate. This field is a per-site opt-in and has no effect on
+                          OpenShift Routes, which are always HTTPS via edge termination.
+
+                          If the operator is running with its enforceHTTPS setting on (see the
+                          frappe-operator-config ConfigMap / FRAPPE_ENFORCE_HTTPS), every site's
+                          Ingress is TLS-only regardless of this field, and any ingress
+                          annotation that tries to disable the HTTPS redirect is ignored.
                         type: boolean
                       issuer:
                         description: Issuer for cert-manager integration
@@ -3489,7 +3728,16 @@ spec:
                 description: TLS configuration
                 properties:
                   enabled:
-                    description: Enabled controls whether TLS is enabled
+                    description: |-
+                      Enabled requests TLS for this site's Ingress: a TLS block and an HTTPS
+                      redirect are added, using SecretName (or Issuer, if set) to obtain the
+                      certificate. This field is a per-site opt-in and has no effect on
+                      OpenShift Routes, which are always HTTPS via edge termination.
+
+                      If the operator is running with its enforceHTTPS setting on (see the
+                      frappe-operator-config ConfigMap / FRAPPE_ENFORCE_HTTPS), every site's
+                      Ingress is TLS-only regardless of this field, and any ingress
+                      annotation that tries to disable the HTTPS redirect is ignored.
                     type: boolean
                   issuer:
                     description: Issuer for cert-manager integration
@@ -3624,20 +3872,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: frappeworkpaces.vyogo.tech
+  name: frappeworkspaces.vyogo.tech
 spec:
   group: vyogo.tech
   names:
-    kind: FrappeWorkpace
-    listKind: FrappeWorkpaceList
-    plural: frappeworkpaces
-    singular: frappeworkpace
+    kind: FrappeWorkspace
+    listKind: FrappeWorkspaceList
+    plural: frappeworkspaces
+    singular: frappeworkspace
   scope: Namespaced
   versions:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: FrappeWorkpace is the Schema for the frappeworkpaces API
+        description: FrappeWorkspace is the Schema for the frappeworkspaces API
         properties:
           apiVersion:
             description: |-
@@ -3657,14 +3905,14 @@ spec:
           metadata:
             type: object
           spec:
-            description: FrappeWorkpaceSpec defines the desired state of FrappeWorkpace
+            description: FrappeWorkspaceSpec defines the desired state of FrappeWorkspace
             properties:
               description:
-                description: Description provides a human-readable explanation of the FrappeWorkpace.
+                description: Description provides a human-readable explanation of the FrappeWorkspace.
                 type: string
             type: object
           status:
-            description: FrappeWorkpaceStatus defines the observed state of FrappeWorkpace
+            description: FrappeWorkspaceStatus defines the observed state of FrappeWorkspace
             type: object
         type: object
     served: true
@@ -7142,6 +7390,160 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/instance: frappe-aggregated-edit-role
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/part-of: frappe-operator
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+  name: frappe-operator-aggregated-edit
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches
+  - frappesites
+  - frappeworkspaces
+  - siteapikeys
+  - siteapps
+  - sitebackups
+  - siteclientscripts
+  - siteconfigs
+  - sitecrons
+  - sitecustomfields
+  - sitedashboardcharts
+  - sitedashboards
+  - sitedomains
+  - sitejobs
+  - sitemigrations
+  - sitepropertysetters
+  - sitequotas
+  - siterestores
+  - siteroles
+  - siteserverscripts
+  - siteuserpermissions
+  - siteusers
+  - sitewebhooks
+  - siteworkspaces
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches/status
+  - frappesites/status
+  - frappeworkspaces/status
+  - siteapikeys/status
+  - siteapps/status
+  - sitebackups/status
+  - siteclientscripts/status
+  - siteconfigs/status
+  - sitecrons/status
+  - sitecustomfields/status
+  - sitedashboardcharts/status
+  - sitedashboards/status
+  - sitedomains/status
+  - sitejobs/status
+  - sitemigrations/status
+  - sitepropertysetters/status
+  - sitequotas/status
+  - siterestores/status
+  - siteroles/status
+  - siteserverscripts/status
+  - siteuserpermissions/status
+  - siteusers/status
+  - sitewebhooks/status
+  - siteworkspaces/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: frappe-operator
+    app.kubernetes.io/instance: frappe-aggregated-view-role
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/part-of: frappe-operator
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+  name: frappe-operator-aggregated-view
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches
+  - frappesites
+  - frappeworkspaces
+  - siteapikeys
+  - siteapps
+  - sitebackups
+  - siteclientscripts
+  - siteconfigs
+  - sitecrons
+  - sitecustomfields
+  - sitedashboardcharts
+  - sitedashboards
+  - sitedomains
+  - sitejobs
+  - sitemigrations
+  - sitepropertysetters
+  - sitequotas
+  - siterestores
+  - siteroles
+  - siteserverscripts
+  - siteuserpermissions
+  - siteusers
+  - sitewebhooks
+  - siteworkspaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  - frappebenches/status
+  - frappesites/status
+  - frappeworkspaces/status
+  - siteapikeys/status
+  - siteapps/status
+  - sitebackups/status
+  - siteclientscripts/status
+  - siteconfigs/status
+  - sitecrons/status
+  - sitecustomfields/status
+  - sitedashboardcharts/status
+  - sitedashboards/status
+  - sitedomains/status
+  - sitejobs/status
+  - sitemigrations/status
+  - sitepropertysetters/status
+  - sitequotas/status
+  - siterestores/status
+  - siteroles/status
+  - siteserverscripts/status
+  - siteuserpermissions/status
+  - siteusers/status
+  - sitewebhooks/status
+  - siteworkspaces/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
   name: frappe-operator-manager-role
 rules:
 - apiGroups:
@@ -7314,6 +7716,22 @@ rules:
   - update
   - watch
 - apiGroups:
+  - stackgres.io
+  resources:
+  - sgclusters
+  - sginstanceprofiles
+  - sgpgconfigs
+  - sgpoolconfigs
+  - sgscripts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - storage.k8s.io
   resources:
   - storageclasses
@@ -7326,7 +7744,7 @@ rules:
   resources:
   - frappebenches
   - frappesites
-  - frappeworkpaces
+  - frappeworkspaces
   - siteapikeys
   - siteapps
   - sitebackups
@@ -7361,7 +7779,7 @@ rules:
   resources:
   - frappebenches/finalizers
   - frappesites/finalizers
-  - frappeworkpaces/finalizers
+  - frappeworkspaces/finalizers
   - siteapikeys/finalizers
   - siteapps/finalizers
   - sitebackups/finalizers
@@ -7384,7 +7802,7 @@ rules:
   resources:
   - frappebenches/status
   - frappesites/status
-  - frappeworkpaces/status
+  - frappeworkspaces/status
   - siteapikeys/status
   - siteapps/status
   - sitebackups/status
@@ -7516,18 +7934,20 @@ subjects:
 ---
 apiVersion: v1
 data:
+  defaultClusterIssuer: ""
   defaultDomainSuffix: .myplatform.com
   defaultFrappeImage: ghcr.io/vyogotech/erpnext-for-operator:version-16
   defaultMariaDBImage: docker.io/library/mariadb:10.6
   defaultNginxImage: docker.io/library/nginx:1.25-alpine
   defaultPostgresImage: docker.io/library/postgres:15-alpine
   defaultRedisImage: docker.io/library/redis:7-alpine
+  enforceHTTPS: "false"
   fpmCliPath: /usr/local/bin/fpm
   fpmRepositories: |
     [
       {
-        "name": "frappe-community",
-        "url": "https://fpm.frappe.io",
+        "name": "vyogo-official",
+        "url": "https://fpm.vyogo.tech",
         "priority": 100
       }
     ]
@@ -7634,6 +8054,29 @@ spec:
         - --leader-elect
         command:
         - /manager
+        env:
+        - name: FRAPPE_ENFORCE_HTTPS
+          valueFrom:
+            configMapKeyRef:
+              key: enforceHTTPS
+              name: frappe-operator-frappe-operator-config
+              optional: true
+        - name: FRAPPE_DEFAULT_CLUSTER_ISSUER
+          valueFrom:
+            configMapKeyRef:
+              key: defaultClusterIssuer
+              name: frappe-operator-frappe-operator-config
+              optional: true
+        - name: RELATED_IMAGE_FRAPPE_BENCH_V15
+          value: frappe/erpnext:version-15
+        - name: RELATED_IMAGE_FRAPPE_BENCH_V14
+          value: frappe/erpnext:version-14
+        - name: RELATED_IMAGE_MARIADB
+          value: mariadb:10.6
+        - name: RELATED_IMAGE_REDIS
+          value: redis:7.0-alpine
+        - name: RELATED_IMAGE_UTILITY_UBI
+          value: registry.access.redhat.com/ubi9/ubi-minimal:latest
         image: ghcr.io/vyogotech/frappe-operator:v5.2.0
         imagePullPolicy: IfNotPresent
         livenessProbe:

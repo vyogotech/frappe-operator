@@ -454,6 +454,17 @@ spec:
                   port:
                     description: Port is the database port for external connections
                     type: string
+                  postgresEngine:
+                    description: |-
+                      PostgresEngine selects which operator provisions dedicated-mode PostgreSQL
+                      clusters. Only meaningful when Provider is "postgres"; shared mode is
+                      already engine-agnostic (it just needs a reachable host:port; see
+                      dbConfig.host). Empty is resolved dynamically at reconcile time rather than
+                      defaulted in the CRD schema — see the backward-compatibility note in docs.
+                    enum:
+                    - stackgres
+                    - percona
+                    type: string
                   postgresRef:
                     description: PostgresRef references an existing PostgreSQL cluster
                       (future)
@@ -566,7 +577,7 @@ spec:
                           x-kubernetes-map-type: atomic
                         name:
                           description: Name of the repository (e.g., "company-private",
-                            "frappe-community")
+                            "vyogo-official")
                           type: string
                         priority:
                           default: 50

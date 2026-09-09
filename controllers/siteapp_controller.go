@@ -53,6 +53,7 @@ type SiteAppReconciler struct {
 	Scheme       *runtime.Scheme
 	Recorder     record.EventRecorder
 	FrappeClient *FrappeClient // Optional injected client for testing
+	IsOpenShift  bool
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=siteapps,verbs=get;list;watch;create;update;patch;delete
@@ -584,7 +585,7 @@ bench --site "$SITE_NAME" execute frappe.get_installed_apps
 			)
 		}
 
-		newJob := r.buildAppJob(siteApp, jobName, "app-installer", image, pvcName, script, env, vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindAppInstall), int32(1), nil)
+		newJob := r.buildAppJob(ctx, siteApp, bench, jobName, "app-installer", image, pvcName, script, env, vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindAppInstall), int32(1), nil)
 
 		// The install job is owned by the SiteApp so it is garbage-collected with
 		// it. (The uninstall job cannot be — see reconcileAppUninstallJob.)
@@ -658,7 +659,23 @@ func resolveBenchImage(bench *vyogotechv1.FrappeBench) string {
 // shape (image, sites PVC mount at frappe-sites subPath, security context,
 // RestartPolicy Never) shared by the install and uninstall paths. The caller
 // sets the owner reference (or deliberately does not — see the uninstall path).
-func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, containerName, image, pvcName, script string, env []corev1.EnvVar, resources corev1.ResourceRequirements, backoffLimit int32, ttlSecondsAfterFinished *int32) *batchv1.Job {
+func (r *SiteAppReconciler) buildAppJob(ctx context.Context, siteApp *vyogotechv1.SiteApp, bench *vyogotechv1.FrappeBench, jobName, containerName, image, pvcName, script string, env []corev1.EnvVar, resources corev1.ResourceRequirements, backoffLimit int32, ttlSecondsAfterFinished *int32) *batchv1.Job {
+	var secConfig *vyogotechv1.SecurityConfig
+	if bench != nil {
+		secConfig = bench.Spec.Security
+	}
+
+	podSec := PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, siteApp.Namespace, secConfig)
+	if !r.IsOpenShift && (podSec.RunAsGroup == nil || *podSec.RunAsGroup != 0) {
+		// Group 0 (not 1000) to match the serving pods: the bench
+		// image's apps/ and env/ dirs are root-group-writable
+		// (mode 775), so a job running as gid 1000 cannot write the
+		// apps/<name> symlink that `fpm install` requires — the git
+		// path only survived because its symlink is `|| true`.
+		podSec.RunAsGroup = ptr.To(int64(0))
+	}
+	containerSec := ContainerSecurityContextForBench(r.IsOpenShift, secConfig)
+
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -679,17 +696,8 @@ func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, c
 					},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: ptr.To(int64(1000)),
-						// Group 0 (not 1000) to match the serving pods: the bench
-						// image's apps/ and env/ dirs are root-group-writable
-						// (mode 775), so a job running as gid 1000 cannot write the
-						// apps/<name> symlink that `fpm install` requires — the git
-						// path only survived because its symlink is `|| true`.
-						RunAsGroup: ptr.To(int64(0)),
-						FSGroup:    ptr.To(int64(1000)),
-					},
+					RestartPolicy:   corev1.RestartPolicyNever,
+					SecurityContext: podSec,
 					Containers: []corev1.Container{
 						{
 							Name:            containerName,
@@ -698,6 +706,7 @@ func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, c
 							Command:         []string{"bash", "-c", script},
 							Env:             env,
 							Resources:       resources,
+							SecurityContext: containerSec,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",
@@ -820,7 +829,7 @@ bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
 		// set), and the API server rejects creating a child with a
 		// blockOwnerDeletion owner reference to an object being deleted. Instead the
 		// Job self-cleans via TTLSecondsAfterFinished once it finishes.
-		newJob := r.buildAppJob(siteApp, jobName, "app-uninstaller", image, pvcName, script, env, vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindAppInstall), int32(2), ptr.To(int32(300)))
+		newJob := r.buildAppJob(ctx, siteApp, bench, jobName, "app-uninstaller", image, pvcName, script, env, vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindAppInstall), int32(2), ptr.To(int32(300)))
 
 		if err := r.Create(ctx, newJob); err != nil {
 			return ctrl.Result{}, false, fmt.Errorf("failed to create uninstall job: %w", err)
