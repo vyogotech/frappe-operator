@@ -23,6 +23,7 @@ import (
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -95,6 +96,112 @@ func TestSiteDomainReconciler_Reconcile_Success(t *testing.T) {
 	}
 	if ingress.Spec.Rules[0].Host != "erp.acmecorp.com" {
 		t.Errorf("expected host erp.acmecorp.com, got %s", ingress.Spec.Rules[0].Host)
+	}
+}
+
+// TestSiteDomainReconciler_HTTPSPolicy covers the same three-row policy table
+// as TestFrappeSiteReconciler_ensureIngress (controllers/tls_policy.go): a
+// custom domain with no TLS config gets no redirect annotation unless the
+// operator-wide policy is enforced, in which case any insecure override in
+// the site's ingress annotations is reset rather than honored.
+func TestSiteDomainReconciler_HTTPSPolicy(t *testing.T) {
+	tests := []struct {
+		name              string
+		enforceHTTPS      bool
+		domainTLS         *vyogotechv1.SiteDomainTLSSpec
+		siteAnnotations   map[string]string
+		wantRedirect      string // "" means the annotation must be absent
+		wantStrippedEvent bool
+	}{
+		{
+			name:         "no domain TLS, policy off: no forced redirect",
+			enforceHTTPS: false,
+			wantRedirect: "",
+		},
+		{
+			name:         "domain has its own TLS: redirect added regardless of policy",
+			enforceHTTPS: false,
+			domainTLS:    &vyogotechv1.SiteDomainTLSSpec{Enabled: true, SecretName: "acme-tls"},
+			wantRedirect: "true",
+		},
+		{
+			name:              "policy enforced: redirect mandatory, insecure override reset",
+			enforceHTTPS:      true,
+			siteAnnotations:   map[string]string{"nginx.ingress.kubernetes.io/ssl-redirect": "false"},
+			wantRedirect:      "true",
+			wantStrippedEvent: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+			utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+			siteDomain := &vyogotechv1.SiteDomain{
+				ObjectMeta: metav1.ObjectMeta{Name: "acme-domain", Namespace: "default"},
+				Spec: vyogotechv1.SiteDomainSpec{
+					SiteRef: &vyogotechv1.NamespacedName{Name: "site1"},
+					Domain:  "erp.acmecorp.com",
+					TLS:     tt.domainTLS,
+				},
+			}
+			site := &vyogotechv1.FrappeSite{
+				ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
+				Spec: vyogotechv1.FrappeSiteSpec{
+					BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"},
+				},
+				Status: vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+			}
+			if tt.siteAnnotations != nil {
+				site.Spec.Ingress = &vyogotechv1.IngressConfig{Annotations: tt.siteAnnotations}
+			}
+
+			client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteDomain, site).WithStatusSubresource(siteDomain).Build()
+			recorder := record.NewFakeRecorder(5)
+			r := &SiteDomainReconciler{
+				Client:       client,
+				Scheme:       scheme,
+				Recorder:     recorder,
+				EnforceHTTPS: tt.enforceHTTPS,
+				DNSLookupFunc: func(host string) ([]string, error) {
+					return []string{"203.0.113.50"}, nil
+				},
+			}
+
+			ctx := context.Background()
+			if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "acme-domain", Namespace: "default"}}); err != nil {
+				t.Fatalf("Reconcile failed: %v", err)
+			}
+
+			updatedDomain := &vyogotechv1.SiteDomain{}
+			if err := client.Get(ctx, types.NamespacedName{Name: "acme-domain", Namespace: "default"}, updatedDomain); err != nil {
+				t.Fatalf("failed to fetch updated site domain: %v", err)
+			}
+			ingress := &networkingv1.Ingress{}
+			if err := client.Get(ctx, types.NamespacedName{Name: updatedDomain.Status.IngressName, Namespace: "default"}, ingress); err != nil {
+				t.Fatalf("failed to fetch created Ingress: %v", err)
+			}
+
+			got, present := ingress.Annotations["nginx.ingress.kubernetes.io/ssl-redirect"]
+			if tt.wantRedirect == "" && present {
+				t.Errorf("expected no ssl-redirect annotation, got %q", got)
+			} else if tt.wantRedirect != "" && got != tt.wantRedirect {
+				t.Errorf("expected ssl-redirect %q, got %q", tt.wantRedirect, got)
+			}
+
+			select {
+			case ev := <-recorder.Events:
+				if !tt.wantStrippedEvent {
+					t.Errorf("unexpected event: %s", ev)
+				}
+			default:
+				if tt.wantStrippedEvent {
+					t.Error("expected a TLSPolicyEnforced warning event, got none")
+				}
+			}
+		})
 	}
 }
 
@@ -205,5 +312,59 @@ func TestSiteDomainReconciler_BackendNameAndFrappeAlias(t *testing.T) {
 	}
 	if sp := job.Spec.Template.Spec.Containers[0].VolumeMounts[0].SubPath; sp != "frappe-sites" {
 		t.Errorf("alias Job mount subPath = %q, want frappe-sites", sp)
+	}
+}
+
+func TestSiteDomainReconciler_SecurityContext_OpenShift(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(batchv1.AddToScheme(scheme))
+	utilruntime.Must(networkingv1.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "tenant"},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			SiteName: "primary.domain.local",
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"},
+		},
+	}
+	sd := &vyogotechv1.SiteDomain{
+		ObjectMeta: metav1.ObjectMeta{Name: "sd1", Namespace: "tenant"},
+		Spec: vyogotechv1.SiteDomainSpec{
+			Domain:  "alias.domain.local",
+			SiteRef: &vyogotechv1.NamespacedName{Name: "site1"},
+		},
+	}
+
+	// Standard Kubernetes
+	rStd := &SiteDomainReconciler{
+		Client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme:      scheme,
+		IsOpenShift: false,
+	}
+	jobStd := rStd.domainAliasJob(context.Background(), sd, site, "test-alias-std", false)
+	if jobStd.Spec.Template.Spec.Containers[0].Image != "busybox:1.36" {
+		t.Errorf("expected busybox:1.36 for standard k8s, got %s", jobStd.Spec.Template.Spec.Containers[0].Image)
+	}
+	if jobStd.Spec.Template.Spec.SecurityContext.RunAsUser == nil || *jobStd.Spec.Template.Spec.SecurityContext.RunAsUser != 1000 {
+		t.Errorf("expected RunAsUser 1000 in standard k8s, got %v", jobStd.Spec.Template.Spec.SecurityContext.RunAsUser)
+	}
+
+	// OpenShift
+	rOcp := &SiteDomainReconciler{
+		Client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme:      scheme,
+		IsOpenShift: true,
+	}
+	jobOcp := rOcp.domainAliasJob(context.Background(), sd, site, "test-alias-ocp", false)
+	if jobOcp.Spec.Template.Spec.Containers[0].Image != "registry.access.redhat.com/ubi9/ubi-minimal:latest" {
+		t.Errorf("expected ubi-minimal for OpenShift, got %s", jobOcp.Spec.Template.Spec.Containers[0].Image)
+	}
+	if jobOcp.Spec.Template.Spec.SecurityContext.RunAsUser != nil {
+		t.Errorf("expected RunAsUser to be nil on OpenShift, got %v", *jobOcp.Spec.Template.Spec.SecurityContext.RunAsUser)
+	}
+	if jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser != nil {
+		t.Errorf("expected container RunAsUser to be nil on OpenShift, got %v", *jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser)
 	}
 }

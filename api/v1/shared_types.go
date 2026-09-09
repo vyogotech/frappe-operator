@@ -70,6 +70,15 @@ type DatabaseConfig struct {
 	// +optional
 	Provider string `json:"provider,omitempty"`
 
+	// PostgresEngine selects which operator provisions dedicated-mode PostgreSQL
+	// clusters. Only meaningful when Provider is "postgres"; shared mode is
+	// already engine-agnostic (it just needs a reachable host:port; see
+	// dbConfig.host). Empty is resolved dynamically at reconcile time rather than
+	// defaulted in the CRD schema — see the backward-compatibility note in docs.
+	// +kubebuilder:validation:Enum=stackgres;percona
+	// +optional
+	PostgresEngine string `json:"postgresEngine,omitempty"`
+
 	// Mode: shared (one DB instance, multiple site databases) or dedicated (one DB instance per site)
 	// +kubebuilder:validation:Enum=shared;dedicated
 	// +kubebuilder:default=shared
@@ -165,7 +174,15 @@ type IngressConfig struct {
 
 // TLSConfig defines TLS/SSL configuration
 type TLSConfig struct {
-	// Enabled controls whether TLS is enabled
+	// Enabled requests TLS for this site's Ingress: a TLS block and an HTTPS
+	// redirect are added, using SecretName (or Issuer, if set) to obtain the
+	// certificate. This field is a per-site opt-in and has no effect on
+	// OpenShift Routes, which are always HTTPS via edge termination.
+	//
+	// If the operator is running with its enforceHTTPS setting on (see the
+	// frappe-operator-config ConfigMap / FRAPPE_ENFORCE_HTTPS), every site's
+	// Ingress is TLS-only regardless of this field, and any ingress
+	// annotation that tries to disable the HTTPS redirect is ignored.
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
 
@@ -652,7 +669,7 @@ type FPMConfig struct {
 
 // FPMRepository defines an FPM package repository
 type FPMRepository struct {
-	// Name of the repository (e.g., "company-private", "frappe-community")
+	// Name of the repository (e.g., "company-private", "vyogo-official")
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 

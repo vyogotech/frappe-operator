@@ -1,229 +1,115 @@
-# Frappe Operator Examples
+# <i data-lucide="folder-code"></i> Frappe Operator Deployment Manifests
 
-This directory contains example manifests for deploying Frappe using the operator with MariaDB Operator integration.
+This directory contains production-ready and development example manifests for deploying Frappe and ERPNext using the **Frappe Operator** by **Vyogo Technologies**.
 
-## Prerequisites
+---
 
-### 1. Install MariaDB Operator
+## <i data-lucide="layers"></i> Architecture & Database Options
 
-The Frappe Operator uses MariaDB Operator for secure database provisioning:
+Frappe Operator v5.2.0 supports polymorphic database backends and strict enterprise security constraints:
 
-```bash
-# Install MariaDB Operator CRDs
-kubectl apply -f https://github.com/mariadb-operator/mariadb-operator/releases/latest/download/crds.yaml
+1. **PostgreSQL**: Declaratively managed via the StackGres Operator or Percona Operator.
+2. **MariaDB**: Automated database and user provisioning via the MariaDB Operator.
+3. **External Databases**: Direct connectivity to AWS RDS, Google Cloud SQL, or managed PostgreSQL/MySQL instances.
+4. **OpenShift `restricted-v2`**: Compliant with hardened enterprise OpenShift clusters using dynamic UIDs and automatic Edge TLS Routes.
 
-# Install MariaDB Operator
-kubectl apply -f https://github.com/mariadb-operator/mariadb-operator/releases/latest/download/mariadb-operator.yaml
-```
+---
 
-### 2. Install Frappe Operator
+## <i data-lucide="play-circle"></i> Quick Starts
 
-```bash
-kubectl apply -f https://github.com/vyogotech/frappe-operator/releases/latest/download/install.yaml
-```
-
-## Quick Start
-
-### 1. Shared MariaDB Setup (Recommended for Multiple Sites)
+### 1. PostgreSQL with StackGres (Recommended for Enterprise)
 
 ```bash
-# Step 1: Create shared MariaDB instance (one time)
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/mariadb-shared-instance.yaml
+# Deploy PostgreSQL cluster and schema using StackGres
+kubectl apply -f stackgres-postgres.yaml
 
-# Wait for MariaDB to be ready
-kubectl wait --for=condition=Ready mariadb/frappe-mariadb --timeout=300s
+# Create the FrappeBench
+kubectl apply -f basic-bench.yaml
 
-# Step 2: Create a bench
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-bench.yaml
-
-# Wait for bench to be ready
+# Wait for bench initialization to complete
 kubectl wait --for=condition=Ready frappebench/dev-bench --timeout=300s
 
-# Step 3: Create a site
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-site.yaml
-
-# Wait for site database to be provisioned
-kubectl wait --for=condition=Ready database/dev-site-db --timeout=120s
-
-# Wait for site to be ready
-kubectl wait --for=condition=Ready frappesite/dev-site --timeout=300s
-
-# Get auto-generated admin password
-kubectl get secret dev-site-admin -o jsonpath='{.data.password}' | base64 -d
+# Create the FrappeSite with dedicated StackGres PostgreSQL
+kubectl apply -f kind-e2e-postgres-manifests.yaml
 ```
 
-### 2. Dedicated MariaDB per Site (Enterprise/Isolated)
+### 2. Shared MariaDB Setup (High-Density Multi-Tenancy)
 
 ```bash
-# Create bench (if not already created)
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/basic-bench.yaml
-
-# Create site with dedicated MariaDB
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/release/examples/site-dedicated-mariadb.yaml
-
-# The operator automatically creates:
-# - Dedicated MariaDB instance
-# - Database and user
-# - All necessary credentials
-```
-
-### 3. Production Deployment
-
-```bash
-# Step 1: Deploy shared MariaDB with HA
+# Deploy shared MariaDB instance
 kubectl apply -f mariadb-shared-instance.yaml
 
-# Step 2: Deploy sites with TLS
+# Wait for MariaDB cluster readiness
+kubectl wait --for=condition=Ready mariadb/frappe-mariadb --timeout=300s
+
+# Deploy Bench and Site
+kubectl apply -f basic-bench.yaml
 kubectl apply -f site-shared-mariadb.yaml
 ```
 
-## Examples
+### 3. OpenShift Enterprise Deployment (`restricted-v2`)
 
-### Infrastructure
-- `mariadb-shared-instance.yaml` - Shared MariaDB for multiple sites (cost-effective)
-
-### Basic Examples
-- `basic-bench.yaml` - Simple bench with default settings
-- `basic-site.yaml` - Site using shared MariaDB (development)
-- `site-with-apps.yaml` - **NEW**: Site with specific apps (erpnext, hrms)
-
-### Database Modes
-- `site-shared-mariadb.yaml` - Site with shared MariaDB (production)
-- `site-dedicated-mariadb.yaml` - Site with dedicated MariaDB (enterprise)
-
-### Advanced Examples  
-- `autoscaling-bench.yaml` - **NEW**: Bench with provider-agnostic autoscaling (KEDA for workers, HPA for nginx)
-- `advanced-pod-config.yaml` - **NEW**: Advanced Pod Configuration (Labels, Geo-tagging, Affinity)
-- `hybrid-bench.yaml` - Bench with hybrid app installation
-- `fpm-bench.yaml` - Bench using FPM packages
-
-### Legacy Examples (for reference)
-- `mariadb-connection-secret.yaml` - Legacy secret-based DB connection
-
-## Configuration Options
-
-### FrappeBench
-
-Key configuration options:
-- `frappeVersion` - Frappe version (e.g., "version-15", "version-14")
-- `imageConfig` - Custom container images
-- `apps` - List of apps to install
-- `componentAutoscaling` - **NEW**: Provider-agnostic autoscaling for all components
-  - `nginx`, `gunicorn`, `socketio`, `worker-short`, `worker-long`, `worker-default`
-  - `enabled`, `provider` (keda/hpa), `minReplicas`, `maxReplicas`, `staticReplicas`
-  - `keda` - KEDA specific config (trigger, targetValue, metadata)
-  - `hpa` - HPA specific config (metric, targetUtilization)
-- `podConfig` - **NEW**: Advanced pod configuration
-  - `labels` - Custom labels for all pods
-  - `geoTag` - Simplified region/zone configuration (sets topology labels and affinity)
-  - `affinity` - Custom pod affinity/anti-affinity
-  - `nodeSelector` - Node selection constraints
-  - `tolerations` - Pod tolerations
-- `componentResources` - CPU/memory for each component
-- `storageSize` - PVC size (default: 10Gi)
-- `storageClassName` - Storage class to use
-- `domainConfig` - Domain resolution settings
-
-### FrappeSite
-
-Key configuration options:
-- `benchRef` - Reference to FrappeBench
-- `siteName` - Site domain name
-- `apps` - **NEW**: List of apps to install (checked against container filesystem, missing apps skipped gracefully)
-- `adminPasswordSecretRef` - Admin password secret (optional, auto-generates if not provided)
-- `dbConfig` - Database configuration
-- `domain` - External domain
-- `tls` - TLS configuration
-- `ingress` - Ingress settings
-
-For details on app installation, see [Site App Installation Guide](../docs/SITE_APP_INSTALLATION.md).
-
-## Best Practices
-
-### Development
-- Use `.localhost` or `.local` domains
-- Use auto-generated passwords
-- Use default resource limits
-- Use local storage (RWO)
-- Enable worker autoscaling to save resources
-
-### Production
-- Use proper domain names
-- Store credentials in Secrets
-- Configure appropriate resource limits
-- Use RWX storage (NFS, EFS, etc.)
-- Enable TLS with cert-manager
-- Configure worker autoscaling for cost optimization
-  - Set appropriate `queueLength` based on workload
-  - Use `minReplicas: 0` for scale-to-zero on bursty workloads
-  - Use `minReplicas: 1+` for consistent background processing
-
-## Troubleshooting
-
-### Check Bench Status
 ```bash
-kubectl get frappebench -A
-kubectl describe frappebench <name>
+# Apply OpenShift-compliant bench with dynamic UID allocation
+oc apply -f ocp-restricted-bench.yaml
+
+# Apply OpenShift-compliant site with automatic Edge TLS Route
+oc apply -f ocp-restricted-site.yaml
 ```
 
-### Check Site Status
+---
+
+## <i data-lucide="list"></i> Manifest Catalog
+
+### <i data-lucide="server"></i> Infrastructure & Benches
+- `basic-bench.yaml`: Simple bench running Frappe v15 with default resource sizing.
+- `autoscaling-bench.yaml`: Bench configured with KEDA (Redis queue triggers) and HPA (CPU/Memory).
+- `ocp-restricted-bench.yaml`: Certified for OpenShift `restricted-v2` SCC (no `fsGroup: 0`, dynamic UIDs).
+- `advanced-pod-config.yaml`: Bench with custom node affinity, tolerations, and `geoTag` scheduling.
+- `hybrid-bench.yaml`: Bench combining pre-compiled images, Git repos, and FPM packages.
+
+### <i data-lucide="globe"></i> Sites & Database Engines
+- `stackgres-postgres.yaml`: Enterprise PostgreSQL provisioning via StackGres CRDs.
+- `site-dedicated-mariadb.yaml`: Site with dedicated, auto-provisioned MariaDB instance.
+- `site-shared-mariadb.yaml`: Site running against a shared MariaDB cluster.
+- `site-external-db.yaml`: Site connected to an external cloud database (AWS RDS / Cloud SQL).
+- `site-with-apps.yaml`: Site pre-configured with ERPNext and HRMS applications.
+- `ocp-restricted-site.yaml`: Site configured with OpenShift Route Edge TLS redirection.
+
+### <i data-lucide="cpu"></i> Operational & Management CRDs
+- `basic-sitebackup.yaml`: Manual backup manifest for site databases and files.
+- `scheduled-sitebackup.yaml`: Cron-based scheduled automated backup.
+- `siteuser.yaml`: Declarative Frappe user and role management.
+- `sitedomain.yaml`: Custom secondary domains and host header routing.
+- `sitemigration.yaml`: Automated schema migration execution job.
+
+---
+
+## <i data-lucide="activity"></i> Diagnostics & Verification
+
+### Check Cluster Status
 ```bash
-kubectl get frappesite -A
-kubectl describe frappesite <name>
+# Verify all Benches and Sites
+kubectl get frappebench,frappesite -A
+
+# Check detailed status and conditions
+kubectl describe frappesite <site-name>
 ```
 
-### Check Logs
+### Stream Initialization Logs
 ```bash
-# Operator logs
-kubectl logs -n frappe-operator-system deployment/frappe-operator-controller-manager -c manager
+# Inspect bench initialization
+kubectl logs job/<bench-name>-init -f
 
-# Site init job logs
-kubectl logs job/<site-name>-init
-
-# Application logs
-kubectl logs deployment/<bench-name>-gunicorn
-
-# Worker autoscaling logs
-kubectl logs deployment/<bench-name>-worker-short
-kubectl logs deployment/<bench-name>-worker-long
+# Inspect site creation and database migration
+kubectl logs job/<site-name>-init -f
 ```
 
-### Check Worker Autoscaling
-```bash
-# Check ScaledObjects (KEDA)
-kubectl get scaledobjects
+---
 
-# Check component scaling status
-kubectl get frappebench <bench-name> -o jsonpath='{.status.componentScaling}' | jq
+## <i data-lucide="arrow-right-circle"></i> Related Documentation
 
-# Check HPA created by KEDA
-kubectl get hpa
-
-# Check queue length
-kubectl exec deployment/<bench-name>-redis-queue -- redis-cli LLEN "rq:queue:short"
-```
-
-### Common Issues
-
-1. **Site stuck in Provisioning**
-   - Check init job: `kubectl get job <site-name>-init`
-   - Check job logs: `kubectl logs job/<site-name>-init`
-
-2. **Database connection errors**
-   - Verify database secret exists
-   - Check credentials in secret
-   - Verify database is accessible
-
-3. **Storage issues**
-   - Check PVC status: `kubectl get pvc`
-   - Verify storage class supports required access mode
-   - Check storage class: `kubectl get storageclass`
-
-## More Information
-
-- [Main Documentation](../README.md)
-- [Operations Guide](../operations.md)
-- [Troubleshooting Guide](../troubleshooting.md)
-- [API Reference](../api-reference.md)
-
-
+- **[Architecture Guide](../docs/ARCHITECTURE.md)** - Operator control loops and lifecycle
+- **[PostgreSQL Integration](../docs/POSTGRESQL_INTEGRATION.md)** - StackGres & Percona setup guide
+- **[OpenShift Enterprise Guide](../docs/INSTALL_OPENSHIFT.md)** - Hardened security and SCC compliance
+- **[API Reference](../docs/api-reference.md)** - Complete CRD schema definitions

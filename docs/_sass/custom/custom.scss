@@ -1,0 +1,86 @@
+// Vyogo Technologies Custom Typography & Component Overrides
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap');
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #141917;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #141917;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+code, kbd, samp, pre {
+  font-family: 'Geist Mono', 'SF Mono', 'Fira Code', Menlo, monospace;
+}
+
+// Lucide Icons Styling
+.lucide {
+  width: 18px;
+  height: 18px;
+  stroke: #00BC86; // Vyogo Teal default
+  stroke-width: 2;
+  vertical-align: -3px;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.lucide-secondary, .lucide-blue {
+  stroke: #0050A4; // Vyogo Royal Blue
+}
+
+.lucide-muted {
+  stroke: #6B7B75;
+}
+
+// Vyogo Custom Callout / Alert Enhancements
+.callout-note {
+  border-left-color: #0050A4 !important;
+  background-color: #EBF4FC !important;
+}
+
+.callout-tip, .callout-success {
+  border-left-color: #00BC86 !important;
+  background-color: #E6F8F3 !important;
+}
+
+.callout-warning {
+  border-left-color: #F59E0B !important;
+  background-color: #FEF3C7 !important;
+}
+
+.callout-danger, .callout-caution {
+  border-left-color: #EF4444 !important;
+  background-color: #FEE2E2 !important;
+}
+
+// Sidebar active styling
+.nav-list-item.active > .nav-list-link {
+  color: #00BC86 !important;
+  font-weight: 600;
+}
+
+// Table styling with subtle borders and Vyogo slate text
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+  
+  th {
+    background-color: #F4F7F6;
+    color: #141917;
+    font-weight: 600;
+    border: 1px solid #DCE3E1;
+    padding: 0.75rem 1rem;
+  }
+
+  td {
+    border: 1px solid #DCE3E1;
+    padding: 0.75rem 1rem;
+    color: #37413D;
+  }
+}

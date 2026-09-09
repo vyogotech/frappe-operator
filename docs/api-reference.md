@@ -1,13 +1,15 @@
-# API Reference
+# <i data-lucide="file-code-2"></i> API Reference
 
-Complete specification of Frappe Operator Custom Resource Definitions (CRDs).
+Complete specification of Frappe Operator Custom Resource Definitions (CRDs) by **Vyogo Technologies**.
 
-## FrappeBench
+---
+
+## <i data-lucide="server"></i> FrappeBench
 
 **API Group:** `vyogo.tech/v1`  
 **Kind:** `FrappeBench`
 
-A FrappeBench represents a Frappe bench environment with shared infrastructure.
+A `FrappeBench` represents a shared Frappe bench runtime environment hosting web proxies, worker processes, and common storage.
 
 ### Spec
 
@@ -18,10 +20,14 @@ metadata:
   name: <bench-name>
   namespace: <namespace>
 spec:
-  # Required: Frappe version
+  # Required: Frappe framework version
   frappeVersion: string
   
-  # Optional: Apps to install as JSON array
+  # Optional: Apps to install on this bench
+  apps:
+    - string
+  
+  # Optional (Deprecated): Apps to install as JSON array
   appsJSON: string
   
   # Optional: Container image configuration
@@ -34,7 +40,6 @@ spec:
   
   # Optional: Autoscaling and replica configuration for components
   # Map keys: nginx, gunicorn, socketio, scheduler, worker-default, worker-long, worker-short
-  # +optional
   componentAutoscaling:
     <component-name>:
       enabled: bool
@@ -73,6 +78,19 @@ spec:
       requests: {cpu: string, memory: string}
       limits: {cpu: string, memory: string}
   
+  # Optional: Sizing for batch jobs (benchInit, siteInit, appInstall, backup, migration)
+  jobResources:
+    default:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+    siteInit:
+      requests: {cpu: string, memory: string}
+      limits: {cpu: string, memory: string}
+  
+  # Optional: Shared bench storage size and storage class
+  storageSize: string            # default: "10Gi"
+  storageClassName: string
+  
   # Optional: Domain configuration
   domainConfig:
     suffix: string
@@ -91,9 +109,7 @@ spec:
       limits: {cpu: string, memory: string}
     storageSize: string
   
-  # Optional: Suggests max concurrent site reconciles for sites on this bench.
-  # Operator uses max(operatorConfig.maxConcurrentSiteReconciles, max across all benches).
-  # Only applied at operator startup; change requires operator restart.
+  # Optional: Suggests max concurrent site reconciles for sites on this bench
   siteReconcileConcurrency: int32
 ```
 
@@ -116,11 +132,15 @@ status:
 - **Description:** Frappe framework version
 - **Example:** `"version-15"`, `"v15.0.0"`
 
-#### `appsJSON` (optional)
+#### `apps` (optional)
+- **Type:** `[]string`
+- **Description:** List of Frappe applications to install and enable on the bench
+- **Example:** `["erpnext", "hrms"]`
+
+#### `appsJSON` (deprecated)
 - **Type:** `string`
-- **Description:** JSON array of apps to install
+- **Description:** Deprecated JSON array string. Prefer `apps: []string` instead.
 - **Example:** `'["erpnext", "hrms"]'`
-- **Default:** `'["frappe"]'`
 
 #### `imageConfig` (optional)
 Container image configuration.
@@ -185,12 +205,12 @@ Redis or DragonFly configuration.
 
 ---
 
-## FrappeSite
+## <i data-lucide="globe"></i> FrappeSite
 
 **API Group:** `vyogo.tech/v1`  
 **Kind:** `FrappeSite`
 
-A FrappeSite represents an individual Frappe site.
+A `FrappeSite` represents an individual tenant site within a `FrappeBench`.
 
 ### Spec
 
@@ -206,47 +226,57 @@ spec:
     name: string
     namespace: string  # optional, defaults to same namespace
   
-  # Required: Site name (must match domain)
+  # Required: Site name (must match domain that will receive traffic)
   siteName: string
   
-  # Optional: Apps to install on this site
-  # Apps are checked against container filesystem
-  # Missing apps are gracefully skipped with warnings
+  # Optional: Apps to install on this site during creation
   apps:
     - string
   
-  # Optional: Admin password secret
+  # Optional: Admin password secret reference
   adminPasswordSecretRef:
     name: string
     namespace: string
   
-  # Optional: Database configuration
+  # Optional: External encryption key secret reference
+  encryptionKeySecretRef:
+    name: string
+    key: string        # must be "encryption_key"
+  
+  # Optional: Polymorphic database configuration
   dbConfig:
-    mode: string  # shared, dedicated, or external
+    provider: string         # postgres, mariadb, sqlite, external (default: mariadb)
+    postgresEngine: string   # stackgres, percona (when provider: postgres)
+    mode: string             # shared or dedicated (default: shared)
     mariadbRef:
       name: string
       namespace: string
-    storageSize: string
+    postgresRef:
+      name: string
+      namespace: string
+    storageSize: string      # e.g., "20Gi"
     resources:
       requests: {cpu: string, memory: string}
       limits: {cpu: string, memory: string}
+    host: string             # for external or remote databases
+    port: string             # e.g., "5432" or "3306"
     connectionSecretRef:
       name: string
       namespace: string
+    maxStatementTimeSeconds: int64
+  
+  # Optional: Deletion policy for database resources upon CR deletion
+  # Retain (default): keeps database and credentials safe from accidental deletion
+  # Delete: purges the database and user
+  deletionPolicy: string     # Retain or Delete (default: Retain)
+  
+  # Optional: Skip bench new-site initialization if database already contains valid schema
+  skipInit: bool
   
   # Optional: External domain (defaults to siteName)
   domain: string
   
-  # Optional: TLS configuration
-  tls:
-    enabled: bool
-    certManagerIssuer: string
-    secretName: string
-  
-  # Optional: Ingress class name
-  ingressClassName: string
-  
-  # Optional: Ingress configuration
+  # Optional: Kubernetes Ingress configuration
   ingress:
     enabled: bool
     className: string
@@ -256,119 +286,101 @@ spec:
       enabled: bool
       certManagerIssuer: string
       secretName: string
+  
+  # Optional: Red Hat OpenShift Route configuration
+  routeConfig:
+    enabled: bool
+    tls:
+      termination: string                   # edge, reencrypt, passthrough (default: edge)
+      insecureEdgeTerminationPolicy: string # Redirect, Allow, None (default: Redirect)
+  
+  # Optional: Advanced pod scheduling for site jobs
+  podConfig:
+    labels:
+      key: value
+    annotations:
+      key: value
+    geoTag: string
 ```
 
 ### Status
 
 ```yaml
 status:
-  # Current phase of the site
-  phase: string  # Pending, Provisioning, Ready, Failed
+  # Current lifecycle phase: Pending, Provisioning, Ready, Failed
+  phase: string
   
   # Indicates if the referenced bench is ready
   benchReady: bool
   
+  # Indicates if the database is provisioned and ready
+  databaseReady: bool
+  
+  # Name of the actual database created
+  databaseName: string
+  
+  # Secret containing site-specific DB credentials
+  databaseCredentialsSecret: string
+  
   # Accessible URL for the site
   siteURL: string
   
-  # Database connection secret name
-  dbConnectionSecret: string
-  
-  # Resolved domain after configuration
+  # Final resolved domain
   resolvedDomain: string
   
-  # How domain was determined
-  domainSource: string  # explicit, bench-suffix, auto-detected, sitename-default
+  # How domain was determined: explicit, bench-suffix, auto-detected, sitename-default
+  domainSource: string
   
-  # Apps that were requested for installation on this site
+  # Apps requested and installed
   installedApps:
     - string
   
   # Status of app installation
   appInstallationStatus: string
+  
+  # Detailed error map for failed apps
+  failedApps:
+    appName: "error message"
 ```
 
 ### Field Details
 
 #### `benchRef` (required)
-Reference to the FrappeBench this site belongs to.
+Reference to the `FrappeBench` this site belongs to.
 
 ```yaml
 benchRef:
   name: "production-bench"
-  namespace: "default"  # optional
+  namespace: "frappe-system"  # optional, defaults to site's namespace
 ```
 
 #### `siteName` (required)
 - **Type:** `string`
-- **Description:** Site name - MUST match the domain that will receive traffic
-- **Validation:** Must be a valid DNS name
-- **Example:** `"customer1.example.com"`, `"mysite.local"`
-
-**Important:** This is what Frappe uses to route requests based on the HTTP Host header.
+- **Description:** Site name - MUST match the hostname/domain that will receive traffic
+- **Validation:** Must be a valid RFC 1123 DNS name
+- **Example:** `"customer1.example.com"`
 
 #### `apps` (optional)
 - **Type:** `[]string`
-- **Description:** List of apps to install on this site during creation
-- **Validation:** App names must contain only alphanumeric characters, underscores, and hyphens
-- **Behavior:** Apps are checked against the actual container filesystem; missing apps are gracefully skipped with warnings
-
-**Example:**
+- **Description:** List of apps to install on this site during initial creation
+- **Behavior:** Apps are validated against the container filesystem. Missing apps are gracefully skipped with warnings. Immutable after initial site creation.
+- **Example:**
 ```yaml
 apps:
   - erpnext
   - hrms
-  - custom_app
-```
-
-**Key Features:**
-- **Filesystem Verification**: Apps are validated against the actual `apps/` directory in the container
-- **Graceful Degradation**: Missing apps generate warnings but don't fail site creation
-- **Immutable After Creation**: Apps can only be installed during initial site creation
-- **Status Tracking**: View installation status via `status.appInstallationStatus` and `status.installedApps`
-
-**Important Notes:**
-- Apps must exist in the container before installation
-- Check job logs to see which apps were installed vs skipped: `kubectl logs job/<site-name>-init`
-- To add apps after creation, use bench commands directly
-
-For complete details, see the [Site App Installation Guide](SITE_APP_INSTALLATION.md).
-
-#### `adminPasswordSecretRef` (optional)
-Reference to a Secret containing the admin password.
-
-```yaml
-adminPasswordSecretRef:
-  name: "site-admin-password"
-```
-
-Secret format:
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: site-admin-password
-stringData:
-  password: "your-secure-password"
 ```
 
 #### `dbConfig` (optional)
-Database configuration for the site.
+Polymorphic database configuration supporting PostgreSQL, MariaDB, and external providers.
 
-##### Shared Mode
+##### 1. PostgreSQL with StackGres (`stackgres`)
 ```yaml
 dbConfig:
-  mode: shared
-  mariadbRef:
-    name: shared-mariadb
-    namespace: databases
-```
-
-##### Dedicated Mode
-```yaml
-dbConfig:
+  provider: postgres
+  postgresEngine: stackgres
   mode: dedicated
-  storageSize: "50Gi"
+  storageSize: "20Gi"
   resources:
     requests:
       cpu: "500m"
@@ -378,59 +390,77 @@ dbConfig:
       memory: "4Gi"
 ```
 
-##### External Mode
+##### 2. PostgreSQL with Percona (`percona`)
 ```yaml
 dbConfig:
+  provider: postgres
+  postgresEngine: percona
+  mode: dedicated
+  storageSize: "50Gi"
+```
+
+##### 3. Shared MariaDB Mode
+```yaml
+dbConfig:
+  provider: mariadb
+  mode: shared
+  mariadbRef:
+    name: shared-mariadb
+    namespace: databases
+```
+
+##### 4. External Database Mode
+```yaml
+dbConfig:
+  provider: external
   mode: external
   connectionSecretRef:
     name: external-db-credentials
 ```
 
-External secret format:
+Secret format:
 ```yaml
 apiVersion: v1
 kind: Secret
 metadata:
   name: external-db-credentials
 stringData:
-  host: "mysql.example.com"
-  port: "3306"
+  host: "postgres.example.com"
+  port: "5432"
   database: "site_db"
   username: "site_user"
   password: "db_password"
 ```
 
-#### `domain` (optional)
-- **Type:** `string`
-- **Description:** External domain for ingress
-- **Default:** Uses `siteName` if not specified
-- **Example:** `"customer1.example.com"`
+#### `deletionPolicy` (optional)
+- **Type:** `string` (`Retain` | `Delete`)
+- **Default:** `Retain`
+- **Description:** Controls whether database resources and credentials are retained or hard-deleted when the `FrappeSite` is deleted. `Retain` prevents accidental data loss from GitOps / ArgoCD pruning.
 
-#### `tls` (optional)
-TLS configuration for the site.
+#### `skipInit` (optional)
+- **Type:** `bool`
+- **Default:** `false`
+- **Description:** Bypasses `bench new-site` initialization if the database already contains a valid Frappe schema, running only migrations and configuration updates.
 
+#### `routeConfig` (optional)
+OpenShift Route configuration with automatic edge TLS redirection:
 ```yaml
-tls:
+routeConfig:
   enabled: true
-  certManagerIssuer: "letsencrypt-prod"  # cert-manager ClusterIssuer
-  secretName: "site-tls-cert"  # optional, auto-generated if not specified
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
 ```
 
-#### `ingressClassName` (optional)
-- **Type:** `string`
-- **Description:** Ingress class to use
-- **Example:** `"nginx"`, `"traefik"`
-
 #### `ingress` (optional)
-Complete ingress configuration.
-
+Standard Kubernetes Ingress configuration with automatic HTTPS termination:
 ```yaml
 ingress:
   enabled: true
   className: "nginx"
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
   tls:
     enabled: true
     certManagerIssuer: "letsencrypt-prod"
@@ -774,41 +804,50 @@ secretName: string         # TLS secret name (optional)
 
 ---
 
-## Examples
+## <i data-lucide="sparkles"></i> Examples
 
-### Minimal Bench and Site
+### Minimal Bench and Site (PostgreSQL StackGres)
 
 ```yaml
 apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: dev-bench
+  namespace: frappe-system
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext"]'
+  apps:
+    - "erpnext"
 ---
 apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: mysite
+  namespace: frappe-system
 spec:
   benchRef:
     name: dev-bench
   siteName: "mysite.local"
   dbConfig:
-    mode: shared
+    provider: postgres
+    postgresEngine: stackgres
+    mode: dedicated
+    storageSize: "20Gi"
 ```
 
-### Production Setup
+### Production Setup (Enterprise HA with Ingress TLS)
 
 ```yaml
 apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: prod-bench
+  namespace: frappe-system
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext", "hrms"]'
+  apps:
+    - "erpnext"
+    - "hrms"
   componentAutoscaling:
     gunicorn:
       enabled: true
@@ -829,17 +868,28 @@ apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: prod-site
+  namespace: frappe-system
 spec:
   benchRef:
     name: prod-bench
   siteName: "erp.example.com"
-  domain: "erp.example.com"
+  apps:
+    - "erpnext"
+    - "hrms"
   dbConfig:
+    provider: postgres
+    postgresEngine: stackgres
     mode: dedicated
-    storageSize: "100Gi"
+    storageSize: "50Gi"
+    resources:
+      requests: {cpu: "1", memory: "2Gi"}
+      limits: {cpu: "2", memory: "4Gi"}
   ingress:
     enabled: true
     className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
     tls:
       enabled: true
       certManagerIssuer: "letsencrypt-prod"
@@ -847,26 +897,28 @@ spec:
 
 ---
 
-## Validation
+## <i data-lucide="shield-alert"></i> Validation Rules
 
 ### FrappeBench Validations
 
 - `frappeVersion` must be specified
+- `storageSize` must be a valid Kubernetes resource quantity (e.g. `10Gi`)
 - Replica counts must be >= minimum values
 - Resource values must be valid Kubernetes quantities
 
 ### FrappeSite Validations
 
 - `benchRef.name` must be specified
-- `siteName` must be a valid DNS name (RFC 1123)
+- `siteName` must be a valid DNS-1123 subdomain
+- `dbConfig.provider` must be one of: `postgres`, `mariadb`, `sqlite`, `external`
 - `dbConfig.mode` must be one of: `shared`, `dedicated`, `external`
 - If `dbConfig.mode` is `external`, `connectionSecretRef` is required
 
 ---
 
-## Status Conditions
+## <i data-lucide="check-square"></i> Status Conditions
 
-Resources report their status through the `status` field. Common patterns:
+Resources report their status through the `status` field.
 
 ### FrappeBench Status
 
@@ -884,17 +936,19 @@ status:
 status:
   phase: "Ready"  # Pending, Provisioning, Ready, Failed
   benchReady: true
-  siteURL: "https://mysite.example.com"
-  dbConnectionSecret: "mysite-db-connection"
-  resolvedDomain: "mysite.example.com"
+  databaseReady: true
+  databaseName: "site_prod_db"
+  siteURL: "https://erp.example.com"
+  databaseCredentialsSecret: "prod-site-db-credentials"
+  resolvedDomain: "erp.example.com"
   domainSource: "explicit"
 ```
 
 ---
 
-## Next Steps
+## <i data-lucide="arrow-right-circle"></i> Next Steps
 
-- **[Examples](examples.md)** - Real-world configuration examples
-- **[Operations](operations.md)** - Managing resources in production
-- **[Troubleshooting](troubleshooting.md)** - Debugging issues
+- **[Examples Directory](../examples/README.md)** - Real-world YAML deployment manifests
+- **[Operations Guide](operations.md)** - Managing resources in production
+- **[Troubleshooting Guide](troubleshooting.md)** - Resolving common issues and diagnostics
 

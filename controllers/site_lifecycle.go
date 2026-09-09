@@ -167,6 +167,16 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		isUpgrade = "true"
 	}
 
+	// Scheme Frappe should use for its own host_name (and therefore every
+	// absolute URL it generates: password-reset/notification emails, OAuth
+	// callbacks, PDF asset fetches). Follows the same effective TLS decision
+	// as the Ingress/Route and the status SiteURL (see ensureIngress,
+	// FrappeSiteReconciler.Reconcile, and controllers/tls_policy.go).
+	scheme := "http"
+	if r.IsOpenShift || effectiveTLS(r.EnforceHTTPS, site) {
+		scheme = "https"
+	}
+
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
 		// The site directory keeps spec.SiteName: every other controller addresses
@@ -175,6 +185,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		// on it with a sites/<domain> alias rather than by renaming the site.
 		"site_name":           []byte(site.Spec.SiteName),
 		"domain":              []byte(domain),
+		"scheme":              []byte(scheme),
 		"admin_password":      []byte(adminPassword),
 		"bench_name":          []byte(bench.Name),
 		"db_provider":         []byte(dbProvider),
@@ -320,6 +331,9 @@ func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1.FrappeSite, ben
 
 	if config.Provider == "" {
 		config.Provider = bench.Spec.DBConfig.Provider
+	}
+	if config.PostgresEngine == "" {
+		config.PostgresEngine = bench.Spec.DBConfig.PostgresEngine
 	}
 	if config.Mode == "" {
 		config.Mode = bench.Spec.DBConfig.Mode

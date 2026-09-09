@@ -40,8 +40,8 @@ spec:
           name: fpm-credentials
       
       # Frappe community repository (fallback)
-      - name: frappe-community
-        url: https://fpm.frappe.io
+      - name: vyogo-official
+        url: https://fpm.vyogo.tech
         priority: 50
     
     # Default repository for publishing

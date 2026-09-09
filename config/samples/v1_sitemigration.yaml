@@ -1,0 +1,10 @@
+apiVersion: vyogo.tech/v1
+kind: SiteMigration
+metadata:
+  name: sitemigration-sample
+  labels:
+    app.kubernetes.io/name: sitemigration
+    app.kubernetes.io/instance: sitemigration-sample
+    app.kubernetes.io/part-of: frappe-operator
+spec:
+  site: site1.example.com

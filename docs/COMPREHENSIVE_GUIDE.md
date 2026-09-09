@@ -139,8 +139,8 @@ helm install frappe-operator frappe-operator/frappe-operator \
 
 ```bash
 helm install frappe-operator frappe-operator/frappe-operator \
-  --set operator.image.repository=myregistry.com/frappe-operator \
-  --set operator.image.tag=v2.5.0
+  --set operator.image.repository=ghcr.io/vyogotech/frappe-operator \
+  --set operator.image.tag=v5.2.0
 ```
 
 ---
@@ -177,8 +177,8 @@ data:
   fpmRepositories: |
     [
       {
-        "name": "frappe-community",
-        "url": "https://fpm.frappe.io",
+        "name": "vyogo-official",
+        "url": "https://fpm.vyogo.tech",
         "priority": 100
       }
     ]
@@ -189,7 +189,29 @@ data:
   defaultPostgresImage: "docker.io/library/postgres:15-alpine"
   defaultRedisImage: "docker.io/library/redis:7-alpine"
   defaultNginxImage: "docker.io/library/nginx:1.25-alpine"
+
+  # HTTPS policy (default: false). See "HTTPS Policy" below.
+  enforceHTTPS: "false"
+  defaultClusterIssuer: ""
 ```
+
+#### HTTPS Policy
+
+`enforceHTTPS` controls whether TLS is per-site opt-in or mandatory cluster-wide:
+
+| `enforceHTTPS` | `FrappeSite.spec.tls.enabled` | Result |
+|---|---|---|
+| `"false"` (default) | `false` (default) | Plain HTTP Ingress. Matches every release before this setting existed. |
+| `"false"` | `true` | That site's Ingress gets a TLS block and an HTTPS redirect. |
+| `"true"` | either | **Every** site's Ingress gets a TLS block and a forced HTTPS redirect. Any ingress annotation that tries to disable the redirect (`nginx.ingress.kubernetes.io/ssl-redirect` or `force-ssl-redirect` set to `"false"`) is overridden back to `"true"`, and a `TLSPolicyEnforced` warning Event is recorded on the site. |
+
+OpenShift Routes are unaffected either way — they are always HTTPS via edge termination, so `enforceHTTPS` is redundant (but harmless) on OpenShift.
+
+`defaultClusterIssuer` names a cert-manager `ClusterIssuer` applied to a site's Ingress (`cert-manager.io/cluster-issuer`) whenever that site does not set its own `spec.tls.issuer`. Without cert-manager or a pre-created `<site>-tls` / custom-domain TLS secret, a TLS-enabled Ingress falls back to ingress-nginx's default self-signed certificate and browsers will show a warning — this is expected on a cluster with no certificate issuer configured.
+
+Before setting `enforceHTTPS: "true"` on a non-OpenShift cluster:
+- Install cert-manager and set `defaultClusterIssuer`, or ensure every site provides its own TLS secret.
+- If sites sit behind a proxy that speaks plain HTTP to the ingress controller (for example, Cloudflare in **Flexible** SSL mode), switch that proxy to **Full** or **Full (strict)** mode first — otherwise the forced redirect creates a redirect loop.
 
 #### Updating Configuration
 
@@ -384,9 +406,51 @@ data:
 
 ## Database Configuration
 
-### Shared Database Mode
+Frappe Operator features a polymorphic database architecture supporting **PostgreSQL** and **MariaDB** across shared, dedicated, and external topologies.
 
-Multiple sites share one MariaDB instance:
+### PostgreSQL Database (Default for Cloud-Native Deployments)
+
+#### Dedicated Mode with StackGres (Default)
+Provisions an automated, high-availability `SGCluster` and declarative `SGScript` per site:
+
+```yaml
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: postgres-site
+spec:
+  siteName: postgres.example.com
+  benchRef:
+    name: production-bench
+  dbConfig:
+    provider: postgres
+    mode: dedicated
+    postgresEngine: stackgres  # "stackgres" (default) or "percona"
+```
+
+#### Shared PostgreSQL Mode
+Connects to an existing PostgreSQL cluster, automatically executing isolated tenant schema provisioning:
+
+```yaml
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  name: shared-pg-site
+spec:
+  siteName: shared.example.com
+  benchRef:
+    name: production-bench
+  dbConfig:
+    provider: postgres
+    mode: shared
+    host: postgres-cluster.database.svc.cluster.local
+    port: "5432"
+```
+
+### MariaDB Database Mode
+
+#### Shared MariaDB Mode
+Multiple sites share one MariaDB instance managed by MariaDB Operator:
 
 ```yaml
 apiVersion: vyogo.tech/v1
@@ -394,19 +458,17 @@ kind: FrappeBench
 metadata:
   name: shared-bench
 spec:
-  frappeVersion: "15"
+  frappeVersion: "version-15"
   dbConfig:
     provider: mariadb
     mode: shared
-    # Optional: reference existing MariaDB
     mariadbRef:
       name: shared-mariadb
       namespace: default
 ```
 
-### Dedicated Database Mode
-
-Each site gets its own MariaDB instance:
+#### Dedicated MariaDB Mode
+Each site gets its own isolated MariaDB instance:
 
 ```yaml
 apiVersion: vyogo.tech/v1
@@ -1385,11 +1447,11 @@ spec:
 ## Additional Resources
 
 - **GitHub Repository**: [vyogotech/frappe-operator](https://github.com/vyogotech/frappe-operator)
-- **Release Notes**: See `docs/RELEASE_NOTES_*.md`
+- **Changelog**: [CHANGELOG.md](https://github.com/vyogotech/frappe-operator/blob/main/CHANGELOG.md)
 - **Examples**: See `examples/` directory
 - **Issues**: [GitHub Issues](https://github.com/vyogotech/frappe-operator/issues)
 
 ---
 
-**Last Updated**: 2024-01-15  
-**Operator Version**: v2.5.0
+**Last Updated**: 2026-09-08  
+**Operator Version**: v5.2.0

@@ -71,7 +71,7 @@ func NewProvider(config vyogotechv1.DatabaseConfig, client client.Client, scheme
 	case "mariadb":
 		return NewMariaDBProvider(config, client, scheme), nil
 	case "postgres":
-		return NewPostgresProvider(client, scheme), nil
+		return NewPostgresProvider(config, client, scheme), nil
 	case "sqlite":
 		return NewSQLiteProvider(client, scheme), nil
 	case "external":

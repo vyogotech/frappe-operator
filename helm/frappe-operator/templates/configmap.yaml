@@ -40,3 +40,7 @@ data:
   maxConcurrentSiteReconciles: {{ .Values.operatorConfig.maxConcurrentSiteReconciles | default "10" | quote }}
   # Max concurrent reconciles for the bench + site-child controllers (default 5).
   maxConcurrentReconciles: {{ .Values.operatorConfig.maxConcurrentReconciles | default "5" | quote }}
+  # HTTPS policy (default false = per-site opt-in via spec.tls.enabled).
+  enforceHTTPS: {{ .Values.operatorConfig.enforceHTTPS | default "false" | quote }}
+  # cert-manager ClusterIssuer used when a site sets no spec.tls.issuer.
+  defaultClusterIssuer: {{ .Values.operatorConfig.defaultClusterIssuer | default "" | quote }}
