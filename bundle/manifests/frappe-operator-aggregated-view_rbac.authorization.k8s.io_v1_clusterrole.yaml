@@ -10,14 +10,14 @@ metadata:
     app.kubernetes.io/name: clusterrole
     app.kubernetes.io/part-of: frappe-operator
     rbac.authorization.k8s.io/aggregate-to-view: "true"
-  name: frappe-operator-frappe-operator-aggregated-view
+  name: frappe-operator-aggregated-view
 rules:
 - apiGroups:
   - vyogo.tech
   resources:
   - frappebenches
   - frappesites
-  - frappeworkpaces
+  - frappeworkspaces
   - siteapikeys
   - siteapps
   - sitebackups
@@ -48,7 +48,7 @@ rules:
   resources:
   - frappebenches/status
   - frappesites/status
-  - frappeworkpaces/status
+  - frappeworkspaces/status
   - siteapikeys/status
   - siteapps/status
   - sitebackups/status

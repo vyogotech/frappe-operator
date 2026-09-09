@@ -28,27 +28,27 @@ import (
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
-// FrappeWorkpaceReconciler reconciles a FrappeWorkpace object
-type FrappeWorkpaceReconciler struct {
+// FrappeWorkspaceReconciler reconciles a FrappeWorkspace object
+type FrappeWorkspaceReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=vyogo.tech,resources=frappeworkpaces,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=vyogo.tech,resources=frappeworkpaces/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=vyogo.tech,resources=frappeworkpaces/finalizers,verbs=update
+//+kubebuilder:rbac:groups=vyogo.tech,resources=frappeworkspaces,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=vyogo.tech,resources=frappeworkspaces/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=vyogo.tech,resources=frappeworkspaces/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the FrappeWorkpace object against the actual cluster state, and then
+// the FrappeWorkspace object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *FrappeWorkpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *FrappeWorkspaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
 	// TODO(user): your logic here
@@ -57,8 +57,8 @@ func (r *FrappeWorkpaceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *FrappeWorkpaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *FrappeWorkspaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&vyogotechv1.FrappeWorkpace{}).
+		For(&vyogotechv1.FrappeWorkspace{}).
 		Complete(r)
 }

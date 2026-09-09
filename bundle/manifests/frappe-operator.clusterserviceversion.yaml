@@ -51,16 +51,16 @@ metadata:
         },
         {
           "apiVersion": "vyogo.tech/v1",
-          "kind": "FrappeWorkpace",
+          "kind": "FrappeWorkspace",
           "metadata": {
             "labels": {
               "app.kubernetes.io/created-by": "frappe-operator",
-              "app.kubernetes.io/instance": "frappeworkpace-sample",
+              "app.kubernetes.io/instance": "frappeworkspace-sample",
               "app.kubernetes.io/managed-by": "kustomize",
-              "app.kubernetes.io/name": "frappeworkpace",
+              "app.kubernetes.io/name": "frappeworkspace",
               "app.kubernetes.io/part-of": "frappe-operator"
             },
-            "name": "frappeworkpace-sample"
+            "name": "frappeworkspace-sample"
           },
           "spec": {
             "description": "Frappe standard workspace"
@@ -247,7 +247,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime,Database
-    createdAt: "2026-09-08T07:25:54Z"
+    createdAt: "2026-09-09T00:22:30Z"
     features.operators.openshift.io/disconnected-compliant: "true"
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
@@ -270,10 +270,10 @@ spec:
       kind: FrappeSite
       name: frappesites.vyogo.tech
       version: v1
-    - description: FrappeWorkpace is the Schema for the frappeworkpaces API
-      displayName: Frappe Workpace
-      kind: FrappeWorkpace
-      name: frappeworkpaces.vyogo.tech
+    - description: FrappeWorkspace is the Schema for the frappeworkspaces API
+      displayName: Frappe Workspace
+      kind: FrappeWorkspace
+      name: frappeworkspaces.vyogo.tech
       version: v1
     - description: Manages Frappe site API keys and secrets for programmatic access.
       displayName: Site API Key
@@ -621,7 +621,7 @@ spec:
           resources:
           - frappebenches
           - frappesites
-          - frappeworkpaces
+          - frappeworkspaces
           - siteapikeys
           - siteapps
           - sitebackups
@@ -656,7 +656,7 @@ spec:
           resources:
           - frappebenches/finalizers
           - frappesites/finalizers
-          - frappeworkpaces/finalizers
+          - frappeworkspaces/finalizers
           - siteapikeys/finalizers
           - siteapps/finalizers
           - sitebackups/finalizers
@@ -679,7 +679,7 @@ spec:
           resources:
           - frappebenches/status
           - frappesites/status
-          - frappeworkpaces/status
+          - frappeworkspaces/status
           - siteapikeys/status
           - siteapps/status
           - sitebackups/status

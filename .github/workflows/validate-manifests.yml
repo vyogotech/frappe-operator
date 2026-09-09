@@ -12,6 +12,11 @@ on:
       - 'config/**'
       - 'install.yaml'
       - 'Makefile'
+      # The RBAC parity step renders the chart, so a Helm-only change must run
+      # this job -- otherwise RBAC can drift out of the chart unnoticed, which
+      # is exactly how the aggregated roles went missing from it.
+      - 'helm/**'
+      - 'scripts/verify-rbac-parity.py'
       - '.github/workflows/validate-manifests.yml'
   pull_request:
     paths:
@@ -24,6 +29,11 @@ on:
       - 'config/**'
       - 'install.yaml'
       - 'Makefile'
+      # The RBAC parity step renders the chart, so a Helm-only change must run
+      # this job -- otherwise RBAC can drift out of the chart unnoticed, which
+      # is exactly how the aggregated roles went missing from it.
+      - 'helm/**'
+      - 'scripts/verify-rbac-parity.py'
       - '.github/workflows/validate-manifests.yml'
 
 jobs:
@@ -45,6 +55,14 @@ jobs:
           make kustomize
           ./bin/kustomize build config/default > temp-install.yaml
           diff -u install.yaml temp-install.yaml
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Verify Helm and kustomize grant the same RBAC
+        run: |
+          pip install pyyaml
+          python3 scripts/verify-rbac-parity.py
 
       - name: Setup Kind
         uses: helm/kind-action@v1.10.0

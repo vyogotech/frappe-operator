@@ -8,7 +8,7 @@ resources:
 - v1_siterestore.yaml
 - v1_sitemigration.yaml
 - v1_siteuser.yaml
-- v1_frappeworkpace.yaml
+- v1_frappeworkspace.yaml
 - v1_siteworkspace.yaml
 - v1_sitedashboardchart.yaml
 - v1_sitedashboard.yaml

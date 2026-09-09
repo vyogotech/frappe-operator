@@ -72,7 +72,7 @@ resources:
     namespaced: true
   controller: true
   domain: vyogo.tech
-  kind: FrappeWorkpace
+  kind: FrappeWorkspace
   path: github.com/vyogotech/frappe-operator/api/v1
   version: v1
 - api:

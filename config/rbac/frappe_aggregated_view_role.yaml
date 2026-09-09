@@ -12,14 +12,14 @@ metadata:
     app.kubernetes.io/part-of: frappe-operator
     app.kubernetes.io/managed-by: kustomize
     rbac.authorization.k8s.io/aggregate-to-view: "true"
-  name: frappe-operator-aggregated-view
+  name: aggregated-view
 rules:
 - apiGroups:
   - vyogo.tech
   resources:
   - frappebenches
   - frappesites
-  - frappeworkpaces
+  - frappeworkspaces
   - siteapikeys
   - siteapps
   - sitebackups
@@ -50,7 +50,7 @@ rules:
   resources:
   - frappebenches/status
   - frappesites/status
-  - frappeworkpaces/status
+  - frappeworkspaces/status
   - siteapikeys/status
   - siteapps/status
   - sitebackups/status

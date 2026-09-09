@@ -322,12 +322,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteMigration")
 		os.Exit(1)
 	}
-	if err = (&controllers.FrappeWorkpaceReconciler{
+	if err = (&controllers.FrappeWorkspaceReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("frappeworkpace-controller"),
+		Recorder: mgr.GetEventRecorderFor("frappeworkspace-controller"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "FrappeWorkpace")
+		setupLog.Error(err, "unable to create controller", "controller", "FrappeWorkspace")
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteWorkspaceReconciler{

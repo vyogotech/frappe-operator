@@ -202,7 +202,7 @@ rules:
   resources:
   - frappebenches
   - frappesites
-  - frappeworkpaces
+  - frappeworkspaces
   - siteapikeys
   - siteapps
   - sitebackups
@@ -237,7 +237,7 @@ rules:
   resources:
   - frappebenches/finalizers
   - frappesites/finalizers
-  - frappeworkpaces/finalizers
+  - frappeworkspaces/finalizers
   - siteapikeys/finalizers
   - siteapps/finalizers
   - sitebackups/finalizers
@@ -260,7 +260,7 @@ rules:
   resources:
   - frappebenches/status
   - frappesites/status
-  - frappeworkpaces/status
+  - frappeworkspaces/status
   - siteapikeys/status
   - siteapps/status
   - sitebackups/status

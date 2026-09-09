@@ -23,17 +23,17 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// FrappeWorkpaceSpec defines the desired state of FrappeWorkpace
-type FrappeWorkpaceSpec struct {
+// FrappeWorkspaceSpec defines the desired state of FrappeWorkspace
+type FrappeWorkspaceSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Description provides a human-readable explanation of the FrappeWorkpace.
+	// Description provides a human-readable explanation of the FrappeWorkspace.
 	Description string `json:"description,omitempty"`
 }
 
-// FrappeWorkpaceStatus defines the observed state of FrappeWorkpace
-type FrappeWorkpaceStatus struct {
+// FrappeWorkspaceStatus defines the observed state of FrappeWorkspace
+type FrappeWorkspaceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -41,24 +41,24 @@ type FrappeWorkpaceStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// FrappeWorkpace is the Schema for the frappeworkpaces API
-type FrappeWorkpace struct {
+// FrappeWorkspace is the Schema for the frappeworkspaces API
+type FrappeWorkspace struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   FrappeWorkpaceSpec   `json:"spec,omitempty"`
-	Status FrappeWorkpaceStatus `json:"status,omitempty"`
+	Spec   FrappeWorkspaceSpec   `json:"spec,omitempty"`
+	Status FrappeWorkspaceStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// FrappeWorkpaceList contains a list of FrappeWorkpace
-type FrappeWorkpaceList struct {
+// FrappeWorkspaceList contains a list of FrappeWorkspace
+type FrappeWorkspaceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []FrappeWorkpace `json:"items"`
+	Items           []FrappeWorkspace `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&FrappeWorkpace{}, &FrappeWorkpaceList{})
+	SchemeBuilder.Register(&FrappeWorkspace{}, &FrappeWorkspaceList{})
 }
