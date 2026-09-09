@@ -28,10 +28,10 @@ metadata:
       "siteuser", "app.kubernetes.io/instance": "siteuser-sample", "app.kubernetes.io/part-of":
       "frappe-operator", "app.kubernetes.io/managed-by": "kustomize", "app.kubernetes.io/created-by":
       "frappe-operator"}, "name": "siteuser-sample"}, "spec": null}, {"apiVersion":
-      "vyogo.tech/v1", "kind": "FrappeWorkpace", "metadata": {"labels": {"app.kubernetes.io/name":
-      "frappeworkpace", "app.kubernetes.io/instance": "frappeworkpace-sample", "app.kubernetes.io/part-of":
+      "vyogo.tech/v1", "kind": "FrappeWorkspace", "metadata": {"labels": {"app.kubernetes.io/name":
+      "frappeworkspace", "app.kubernetes.io/instance": "frappeworkspace-sample", "app.kubernetes.io/part-of":
       "frappe-operator", "app.kubernetes.io/managed-by": "kustomize", "app.kubernetes.io/created-by":
-      "frappe-operator"}, "name": "frappeworkpace-sample"}, "spec": null}, {"apiVersion":
+      "frappe-operator"}, "name": "frappeworkspace-sample"}, "spec": null}, {"apiVersion":
       "vyogo.tech/v1", "kind": "SiteDashboard", "metadata": {"labels": {"app.kubernetes.io/name":
       "sitedashboard", "app.kubernetes.io/instance": "sitedashboard-sample", "app.kubernetes.io/part-of":
       "frappe-operator", "app.kubernetes.io/managed-by": "kustomize", "app.kubernetes.io/created-by":
@@ -122,10 +122,10 @@ spec:
       kind: FrappeSite
       name: frappesites.vyogo.tech
       version: v1
-    - description: FrappeWorkpace is the Schema for the frappeworkpaces API
-      displayName: Frappe Workpace
-      kind: FrappeWorkpace
-      name: frappeworkpaces.vyogo.tech
+    - description: FrappeWorkspace is the Schema for the frappeworkspaces API
+      displayName: Frappe Workspace
+      kind: FrappeWorkspace
+      name: frappeworkspaces.vyogo.tech
       version: v1
     - description: SiteApp is the Schema for the siteapps API
       displayName: Site App

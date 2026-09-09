@@ -17,14 +17,14 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     rbac.authorization.k8s.io/aggregate-to-admin: "true"
     rbac.authorization.k8s.io/aggregate-to-edit: "true"
-  name: frappe-operator-aggregated-edit
+  name: aggregated-edit
 rules:
 - apiGroups:
   - vyogo.tech
   resources:
   - frappebenches
   - frappesites
-  - frappeworkpaces
+  - frappeworkspaces
   - siteapikeys
   - siteapps
   - sitebackups
@@ -60,7 +60,7 @@ rules:
   resources:
   - frappebenches/status
   - frappesites/status
-  - frappeworkpaces/status
+  - frappeworkspaces/status
   - siteapikeys/status
   - siteapps/status
   - sitebackups/status

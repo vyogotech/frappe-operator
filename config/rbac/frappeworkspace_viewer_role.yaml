@@ -1,20 +1,20 @@
-# permissions for end users to view frappeworkpaces.
+# permissions for end users to view frappeworkspaces.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: frappeworkpace-viewer-role
+    app.kubernetes.io/instance: frappeworkspace-viewer-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: frappe-operator
     app.kubernetes.io/part-of: frappe-operator
     app.kubernetes.io/managed-by: kustomize
-  name: frappeworkpace-viewer-role
+  name: frappeworkspace-viewer-role
 rules:
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappeworkpaces
+  - frappeworkspaces
   verbs:
   - get
   - list
@@ -22,6 +22,6 @@ rules:
 - apiGroups:
   - vyogo.tech
   resources:
-  - frappeworkpaces/status
+  - frappeworkspaces/status
   verbs:
   - get
