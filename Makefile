@@ -47,8 +47,15 @@ ifeq ($(USE_IMAGE_DIGESTS), true)
 	BUNDLE_GEN_FLAGS += --use-image-digests
 endif
 
-# Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+# Image URL to use all building/pushing image targets.
+# Defaults to the published coordinates rather than a bare controller:latest,
+# because `make deploy` and `make bundle` both run `kustomize edit set image
+# controller=$(IMG)`, which rewrites config/manager/kustomization.yaml in place.
+# With a placeholder default, running either without IMG silently reverted the
+# fully-qualified image and left install.yaml and the CSV pointing at a tag no
+# cluster can pull. Local builds still work: imagePullPolicy is IfNotPresent, so
+# an image built and loaded under this tag is used without reaching a registry.
+IMG ?= ghcr.io/vyogotech/frappe-operator:v$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.26.0
 
