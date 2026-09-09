@@ -2,7 +2,7 @@
 
 This document guides cluster administrators on deploying, enabling, and using the **Frappe Web Console** by **Vyogo Technologies**, supporting both **Red Hat OpenShift 4.12+ (Dynamic Console Plugin)** and **Standard Kubernetes (AWS EKS, GCP GKE, AKS, Kind)**.
 
-> **Source:** the web console lives in its own repository, [vyogotech/frappe-operator-ui](https://github.com/vyogotech/frappe-operator-ui). This page covers deploying and enabling it; build and development instructions are in that repo.
+> **Source:** the web console lives in its own repository, `vyogotech/frappe-operator-ui`, which is access-controlled — contact Vyogo Technologies for access. This page covers deploying and enabling it; build and development instructions ship with that repository. The `deploy/` paths below are relative to a checkout of it.
 
 ---
 
@@ -44,8 +44,8 @@ On vanilla Kubernetes clusters, the console runs as a standalone web portal.
 
 ```bash
 # 1. Deploy the console workload and service
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator-ui/main/deploy/deployment.yaml
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator-ui/main/deploy/service.yaml
+kubectl apply -f deploy/deployment.yaml
+kubectl apply -f deploy/service.yaml
 
 # 2. Port-forward the HTTP service to your local machine
 kubectl port-forward -n frappe-operator-system svc/frappe-console-plugin 8080:8080
@@ -60,7 +60,7 @@ Expose the dashboard on your cluster's domain using standard Kubernetes Ingress:
 
 ```bash
 # Apply production ingress with automatic cert-manager TLS
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator-ui/main/deploy/ingress.yaml
+kubectl apply -f deploy/ingress.yaml
 ```
 
 The manifest configures:
@@ -76,17 +76,17 @@ On OpenShift 4.12+, the console automatically detects OpenShift serving certific
 
 ### Step 1: Deploy Console Plugin Workloads
 
-The deployment manifests live in the UI repo, [`vyogotech/frappe-operator-ui`](https://github.com/vyogotech/frappe-operator-ui), under [`deploy/`](https://github.com/vyogotech/frappe-operator-ui/tree/main/deploy):
+Run these from a checkout of the console repository (see **Source** above); the paths are relative to its root:
 
 ```bash
 # 1. Deploy the non-root Nginx web bundle
-oc apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator-ui/main/deploy/deployment.yaml
+oc apply -f deploy/deployment.yaml
 
 # 2. Deploy the Service with OpenShift automatic TLS cert injection
-oc apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator-ui/main/deploy/service.yaml
+oc apply -f deploy/service.yaml
 
 # 3. Register the ConsolePlugin resource with OpenShift
-oc apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator-ui/main/deploy/consoleplugin.yaml
+oc apply -f deploy/consoleplugin.yaml
 ```
 
 ### Step 2: Enable Plugin in OpenShift Console Operator
