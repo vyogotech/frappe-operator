@@ -1,53 +1,74 @@
 # Frappe Operator Installation Guide (Helm)
 
-This guide describes how to install the Frappe Operator using Helm, which is the recommended approach for production and streamlined deployments.
+This guide describes how to install the **Frappe Operator** using Helm, the recommended approach for production environments.
+
+---
 
 ## Prerequisites
 
-- Kubernetes cluster (v1.23+) or OpenShift (v4.10+)
-- Helm 3.x installed
-- `kubectl` configured to your cluster
+- **Kubernetes Cluster** (v1.22+) or **OpenShift** (v4.10+)
+- **Helm 3.x** installed
+- `kubectl` or `oc` configured to your cluster
+
+---
 
 ## Installation Steps
 
-### 1. (Optional) Dependencies
+### 1. Add the Helm Repository
 
-If you haven't already installed the required dependencies (cert-manager and MariaDB operator), you can do so manually or let the Helm chart handle it.
-
-To install dependencies manually:
+Add the official Vyogo Technologies Helm repository:
 
 ```bash
-# Install cert-manager
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.2/cert-manager.yaml
-
-# Install MariaDB Operator
-helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
 helm repo update
-helm install mariadb-operator mariadb-operator/mariadb-operator -n mariadb-operator-system --create-namespace --wait
 ```
 
-### 2. Install Frappe Operator
+---
 
-From the root of the `frappe-operator` repository:
+### 2. (Optional) Database Dependencies
+
+If you plan to use operator-managed databases:
+
+- **PostgreSQL via StackGres (Recommended)**:
+  ```bash
+  helm repo add stackgres https://stackgres.io/downloads/stackgres-k8s/stackgres/helm
+  helm repo update
+  helm install stackgres-operator stackgres/stackgres-operator -n stackgres --create-namespace
+  ```
+- **MariaDB Operator**:
+  ```bash
+  helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
+  helm repo update
+  helm install mariadb-operator mariadb-operator/mariadb-operator -n mariadb-operator-system --create-namespace --wait
+  ```
+
+---
+
+### 3. Install Frappe Operator
+
+Install the operator chart:
 
 ```bash
-helm install frappe-operator ./helm/frappe-operator \
+helm upgrade --install frappe-operator frappe-operator/frappe-operator \
   --namespace frappe-operator-system \
   --create-namespace \
-  --set operator.image.repository=ghcr.io/rmallam/frappe-operator \
-  --set operator.image.tag=latest \
+  --set operator.image.repository=ghcr.io/vyogotech/frappe-operator \
+  --set operator.image.tag=v5.2.0 \
   --set operator.image.pullPolicy=IfNotPresent \
-  --set mariadb-operator.enabled=false \
-  --set keda.enabled=false \
-  --set cert-manager.enabled=false
+  --set operatorConfig.enforceHTTPS=true \
+  --wait
 ```
 
-#### Key Parameters:
-- `mariadb-operator.enabled`: Set to `false` if already installed.
-- `cert-manager.enabled`: Set to `false` if already installed.
-- `keda.enabled`: Set to `true` if you want automatic worker pod autoscaling.
+#### Key Chart Values:
+- `operator.image.repository`: Container image repository (`ghcr.io/vyogotech/frappe-operator`).
+- `operator.image.tag`: Operator release tag (`v5.2.0`).
+- `operatorConfig.enforceHTTPS`: Enforce HTTPS and automatic TLS redirects across all sites (`true` recommended).
+- `keda.enabled`: Set to `true` if you wish to bundle KEDA for worker queue autoscaling (or leave `false` to use standard Kubernetes HPA).
+- `mariadb-operator.enabled`: Set to `false` when managing databases independently.
 
-### 3. Verify Installation
+---
+
+### 4. Verify Installation
 
 ```bash
 kubectl get pods -n frappe-operator-system
@@ -55,10 +76,13 @@ kubectl get pods -n frappe-operator-system
 
 You should see the `frappe-operator-controller-manager` pod in a `Running` state.
 
+---
+
 ## Configuration Options
 
-Refer to the [values.yaml](file:///Users/rakeshkumarmallam/Rakesh-work/frappe-operator/helm/frappe-operator/values.yaml) for a full list of configuration options, including:
-- Resource limits/requests
-- Image pull secrets
-- Default domain suffixes
-- External database configurations
+Refer to the official [values.yaml](../helm/frappe-operator/values.yaml) for a full list of configuration options, including:
+- Resource limits and requests
+- Platform overrides (Kubernetes vs. OpenShift)
+- Global ImageConfig defaults (custom container registries)
+- Autoscaling provider defaults (`hpa` or `keda`)
+- Webhook certificate configurations

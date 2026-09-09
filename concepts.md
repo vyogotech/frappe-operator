@@ -1,527 +1,235 @@
-# Concepts
+# <i data-lucide="book-open"></i> Concepts
 
-Understanding the key concepts and architecture of Frappe Operator.
+Understanding the core concepts, multi-tenancy model, and architecture of **Frappe Operator** by **Vyogo Technologies**.
 
-## Overview
+---
 
-Frappe Operator manages Frappe deployments using two primary resources:
-- **FrappeBench**: Shared infrastructure serving multiple sites
-- **FrappeSite**: Individual Frappe sites
+## <i data-lucide="network"></i> Overview
 
-This architecture enables efficient multi-tenancy while maintaining isolation where needed.
+Frappe Operator orchestrates Frappe and ERPNext deployments using a clean separation of concerns between shared infrastructure and isolated tenant workloads:
 
-## Core Concepts
+- **`FrappeBench`**: Shared platform infrastructure hosting web proxies, message brokers, shared storage, and worker pools.
+- **`FrappeSite`**: Individual tenant sites encapsulating isolated databases, site configurations, file storage, and TLS-terminated routing.
 
-### FrappeBench
+This decoupled architecture enables high tenant density, rapid provisioning, and strict resource isolation.
 
-A **FrappeBench** represents a Frappe bench environment with shared infrastructure components:
+---
+
+## <i data-lucide="layers"></i> Core Resource Architecture
+
+### <i data-lucide="server"></i> FrappeBench (Shared Platform)
+
+A **`FrappeBench`** represents the underlying application platform shared across multiple sites:
 
 ```yaml
 apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
   name: production-bench
+  namespace: frappe-system
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext", "hrms"]'
+  apps:
+    - "erpnext"
+    - "hrms"
+  storage:
+    size: 50Gi
+    storageClassName: "standard-rwx"
 ```
 
-**Components Created:**
-- **NGINX**: Reverse proxy and static file serving
-- **Redis/DragonFly**: Cache and queue backend
-- **Shared Storage**: Common configuration and apps
+**Components Managed by FrappeBench:**
+- **NGINX Reverse Proxy**: In-cluster reverse proxy routing requests by HTTP `Host` header to WSGI processes on port 8080.
+- **Redis StatefulSets**: Dedicated in-memory caching and Redis Queue (RQ) brokers.
+- **Shared Persistent Volume (RWX)**: Shared bench volume hosting `apps/`, assets, and common configurations.
+- **Bench Init Job**: Syncs container assets and verifies app compatibility prior to runtime startup.
+- **Background Workers & Web Servers**: Scalable Gunicorn WSGI servers and RQ workers (`default`, `short`, `long`).
 
-**Purpose:**
-- Serve multiple sites efficiently
-- Share common apps and configuration
-- Reduce resource overhead
-- Simplify app management
+---
 
-**When to Use Multiple Benches:**
-- Different Frappe versions
-- Different app sets
-- Environment separation (dev/staging/prod)
-- Tenant isolation requirements
+### <i data-lucide="globe"></i> FrappeSite (Tenant Isolation)
 
-### FrappeSite
-
-A **FrappeSite** represents an individual Frappe site with its own:
+A **`FrappeSite`** represents an individual tenant site provisioned inside a parent `FrappeBench`:
 
 ```yaml
 apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
   name: customer1-site
+  namespace: frappe-system
 spec:
   benchRef:
     name: production-bench
   siteName: "customer1.example.com"
   dbConfig:
+    provider: postgres
+    postgresEngine: stackgres
     mode: dedicated
+    storageSize: 20Gi
 ```
 
-**Components Created:**
-- **Gunicorn**: Web application servers
-- **Socketio**: Real-time communication
-- **Scheduler**: Background task scheduler
-- **Workers**: Background job processors (default, long, short)
-- **Database**: Per-site database
-- **Storage**: Site-specific files
+**Components Managed by FrappeSite:**
+- **Polymorphic Database**: Automated provisioning of isolated databases and user credentials via StackGres, Percona, MariaDB, or external providers.
+- **Site Lifecycle Job**: Batch Job (`<site-name>-init` or `<site-name>-migrate`) executing `bench new-site` or `bench --site <name> migrate`.
+- **Tenant Storage**: Site-specific subdirectories on the shared PVC (`sites/<site-name>/public` and `sites/<site-name>/private`).
+- **HTTPS Routing**: Kubernetes Ingress or OpenShift Route configured with enforced HTTPS edge TLS termination.
 
-**Site Lifecycle:**
-1. **Pending**: Site resource created
-2. **Provisioning**: Database and storage being set up
-3. **Ready**: Site is accessible
-4. **Failed**: Error occurred (check events)
+---
 
-## Architecture
+## <i data-lucide="database"></i> Polymorphic Database Architecture
 
-### Component Architecture
+Frappe Operator v5.2.0 features a polymorphic database routing layer, allowing you to run PostgreSQL or MariaDB across shared, dedicated, or external topologies.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         FrappeBench                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌──────────┐         ┌───────────┐        ┌─────────────┐     │
-│  │  NGINX   │◄────────┤  Redis/   │        │   Common    │     │
-│  │  (Proxy) │         │ DragonFly │        │   Storage   │     │
-│  └─────┬────┘         └───────────┘        └─────────────┘     │
-│        │                                                         │
-└────────┼─────────────────────────────────────────────────────────┘
-         │
-         │ Route based on Host header
-         ├──────────┬──────────┬──────────┐
-         │          │          │          │
-    ┌────▼────┐ ┌──▼─────┐ ┌──▼─────┐ ┌──▼─────┐
-    │ Site 1  │ │ Site 2 │ │ Site 3 │ │ Site N │
-    │─────────│ │────────│ │────────│ │────────│
-    │Gunicorn │ │Gunicorn│ │Gunicorn│ │Gunicorn│
-    │Socketio │ │Socketio│ │Socketio│ │Socketio│
-    │Scheduler│ │Scheduler│ │Scheduler│ │Scheduler│
-    │Workers  │ │Workers │ │Workers │ │Workers │
-    │         │ │        │ │        │ │        │
-    │  ┌──┐   │ │  ┌──┐  │ │  ┌──┐  │ │  ┌──┐  │
-    │  │DB│   │ │  │DB│  │ │  │DB│  │ │  │DB│  │
-    │  └──┘   │ │  └──┘  │ │  └──┘  │ │  └──┘  │
-    └─────────┘ └────────┘ └────────┘ └────────┘
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#0F1C18', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#00BC86', 'lineColor': '#00BC86', 'secondaryColor': '#0050A4', 'tertiaryColor': '#141917' }}}%%
+graph LR
+    Site["FrappeSite CR"] --> Router{"Database Router"}
+    Router -->|Postgres: StackGres| SG["StackGres Operator<br/>(SGCluster & SGScript)"]
+    Router -->|Postgres: Percona| Percona["Percona Operator<br/>(PerconaPGCluster)"]
+    Router -->|MariaDB| MDB["MariaDB Operator<br/>(Database & User)"]
+    Router -->|External| Ext["External Managed DB<br/>(RDS / Cloud SQL)"]
 ```
 
-### Request Flow
+### 1. PostgreSQL with StackGres (`stackgres`)
 
-1. **External Request** → Ingress Controller
-2. **Ingress** → NGINX Service (bench-level)
-3. **NGINX** → Routes to correct site based on Host header
-4. **Gunicorn** → Processes request
-5. **Database** → Site-specific data
-6. **Redis** → Shared cache/queue
-
-### Storage Architecture
-
-```
-FrappeBench
-└── Common Storage (RWX)
-    └── /home/frappe/frappe-bench
-        ├── apps/          # Frappe apps
-        ├── config/        # Common config
-        └── sites/
-            ├── site1.com/
-            │   ├── private/
-            │   └── public/
-            ├── site2.com/
-            │   ├── private/
-            │   └── public/
-            └── common_site_config.json
-```
-
-## Database Configurations
-
-### Shared Database Mode
-
-Multiple sites share a MariaDB instance but have separate databases:
+Deploys enterprise PostgreSQL clusters using StackGres with automated schema initialization over JDBC:
 
 ```yaml
 dbConfig:
+  provider: postgres
+  postgresEngine: stackgres
+  mode: dedicated
+  storageSize: 30Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+```
+
+### 2. PostgreSQL with Percona (`percona`)
+
+Provisions cloud-native PostgreSQL clusters via the Percona Operator for PostgreSQL:
+
+```yaml
+dbConfig:
+  provider: postgres
+  postgresEngine: percona
+  mode: dedicated
+  storageSize: 50Gi
+```
+
+### 3. Shared MariaDB Mode
+
+Multiple sites share a centrally managed MariaDB instance with isolated database names and separate user credentials:
+
+```yaml
+dbConfig:
+  provider: mariadb
   mode: shared
   mariadbRef:
     name: shared-mariadb
     namespace: databases
 ```
 
-**Pros:**
-- Cost-effective for many small sites
-- Simplified management
-- Quick provisioning
+### 4. External Database Mode
 
-**Cons:**
-- Resource contention
-- No per-site tuning
-- Shared failure domain
-
-**Use Cases:**
-- Development environments
-- Small customer sites
-- Cost-sensitive deployments
-
-### Dedicated Database Mode
-
-Each site gets its own MariaDB instance:
+Connects to pre-existing managed database services (e.g., AWS Aurora, Google Cloud SQL, Crunchy Data) using Kubernetes Secrets:
 
 ```yaml
 dbConfig:
-  mode: dedicated
-  storageSize: 50Gi
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 2Gi
-```
-
-**Pros:**
-- Isolated performance
-- Per-site scaling
-- Independent backups
-- Better security isolation
-
-**Cons:**
-- Higher resource usage
-- More management overhead
-
-**Use Cases:**
-- Enterprise customers
-- High-traffic sites
-- Compliance requirements
-
-### External Database Mode
-
-Use an existing database (RDS, Cloud SQL, etc.):
-
-```yaml
-dbConfig:
+  provider: external
   mode: external
   connectionSecretRef:
-    name: site1-db-credentials
+    name: customer1-external-db
 ```
 
-Secret format:
+The Secret must contain:
 ```yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: site1-db-credentials
+  name: customer1-external-db
 stringData:
-  host: "mysql.example.com"
-  port: "3306"
-  database: "site1_db"
-  username: "site1_user"
-  password: "secure_password"
+  host: "db.production.example.com"
+  port: "5432"
+  database: "customer1_db"
+  username: "customer1_user"
+  password: "supersecretpassword"
 ```
 
-**Pros:**
-- Use managed services
-- Leverage existing infrastructure
-- Advanced features (read replicas, etc.)
+---
 
-**Cons:**
-- External dependency
-- Network latency
-- Cost varies
+## <i data-lucide="shield-check"></i> Enterprise Security & Compliance
 
-**Use Cases:**
-- Cloud deployments
-- Existing database infrastructure
-- Managed service preference
+Frappe Operator is certified for hardened OpenShift clusters and strictly adheres to `restricted-v2` Security Context Constraints (SCC):
 
-## Component Roles
+- **Dynamic Non-Root UIDs**: No hardcoded UIDs (`runAsUser: nil`). Containers run with the UID dynamically assigned by the platform namespace.
+- **Root Group Escalation Prohibited**: `fsGroup: 0` is strictly avoided; storage group IDs are assigned by the cluster.
+- **Complete Capability Drop**: Pods explicitly drop all Linux capabilities (`drop: ["ALL"]`) with `allowPrivilegeEscalation: false`.
+- **Enforced HTTPS Ingress**: HTTP traffic is automatically redirected to HTTPS at the ingress/route layer.
 
-### NGINX (Bench-Level)
-- **Role**: Reverse proxy, static file serving
-- **Scope**: Shared across all sites on bench
-- **Scaling**: Typically 1-2 replicas
-- **Resource**: Moderate CPU, low memory
+---
 
-### Gunicorn (Site-Level)
-- **Role**: WSGI application server
-- **Scope**: Per-site
-- **Scaling**: Horizontal (2-10+ replicas)
-- **Resource**: High CPU and memory
+## <i data-lucide="cpu"></i> Resource Management & QoS
 
-### Socketio (Site-Level)
-- **Role**: Real-time WebSocket connections
-- **Scope**: Per-site
-- **Scaling**: Horizontal (1-5 replicas)
-- **Resource**: Moderate CPU, low memory
+### Long-Running Pod Resources (`componentResources`)
 
-### Scheduler (Site-Level)
-- **Role**: Cron job scheduler
-- **Scope**: Per-site
-- **Scaling**: Single instance (no scaling)
-- **Resource**: Low CPU and memory
+Long-running bench components (Nginx, Gunicorn, Workers) are sized via `componentResources`:
 
-### Workers (Site-Level)
-
-Three worker types with different queue priorities:
-
-#### Worker Default
-- **Queue**: `default`, `short`, `long`
-- **Use**: General background tasks
-- **Timeout**: Medium
-- **Scaling**: 1-5+ replicas
-
-#### Worker Long
-- **Queue**: `long`
-- **Use**: Long-running tasks (reports, imports)
-- **Timeout**: Long (30+ minutes)
-- **Scaling**: 1-3 replicas
-
-#### Worker Short
-- **Queue**: `short`
-- **Use**: Quick tasks (emails, notifications)
-- **Timeout**: Short (5 minutes)
-- **Scaling**: 1-3 replicas
-
-### Redis/DragonFly (Bench-Level)
-- **Role**: Cache, queue, session storage
-- **Scope**: Shared across sites
-- **Scaling**: Typically single instance
-- **Resource**: High memory, moderate CPU
-
-**DragonFly vs Redis:**
-- DragonFly: Better performance, lower memory
-- Redis: More mature, wider compatibility
-
-## Domain Resolution
-
-Frappe uses the HTTP Host header to determine which site to serve. The operator provides multiple ways to configure domains:
-
-### 1. Explicit Domain
-
-```yaml
-spec:
-  siteName: "mysite"
-  domain: "mysite.example.com"
-```
-
-### 2. Bench-Level Suffix
-
-```yaml
-# In FrappeBench
-spec:
-  domainConfig:
-    suffix: ".platform.com"
-
-# In FrappeSite
-spec:
-  siteName: "customer1"
-  # Results in: customer1.platform.com
-```
-
-### 3. Auto-Detection
-
-```yaml
-spec:
-  domainConfig:
-    autoDetect: true
-    ingressControllerRef:
-      name: ingress-nginx-controller
-      namespace: ingress-nginx
-```
-
-The operator detects the Load Balancer IP/hostname and uses it.
-
-### 4. SiteName Default
-
-If no domain is specified, `siteName` is used as the domain.
-
-**Best Practices:**
-- Production: Use explicit domains
-- SaaS: Use bench-level suffix
-- Development: Use auto-detection or .local
-
-## Resource Management
-
-### Resource Tiers
-
-**Small (Development):**
 ```yaml
 componentResources:
   gunicorn:
-    requests: {cpu: "200m", memory: "256Mi"}
-    limits: {cpu: "500m", memory: "512Mi"}
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
   workerDefault:
-    requests: {cpu: "100m", memory: "128Mi"}
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
 ```
 
-**Medium (Small Production):**
-```yaml
-componentResources:
-  gunicorn:
-    requests: {cpu: "500m", memory: "512Mi"}
-    limits: {cpu: "1", memory: "1Gi"}
-  workerDefault:
-    requests: {cpu: "200m", memory: "256Mi"}
-```
+### Batch Job Resources (`jobResources`)
 
-**Large (Production):**
-```yaml
-componentResources:
-  gunicorn:
-    requests: {cpu: "1", memory: "2Gi"}
-    limits: {cpu: "2", memory: "4Gi"}
-  workerDefault:
-    requests: {cpu: "500m", memory: "1Gi"}
-```
-
-### Job Resources
-
-`componentResources` sizes the long-running pods. The one-off Jobs the
-operator runs against the bench volume (bench/site init, app install and
-uninstall, backup, restore, migration, cron runs, and the small maintenance
-helpers such as domain aliases, config apply, site delete and database
-provisioning) are sized by `jobResources`. Every Job always gets requests and
-limits: an entry you set wins, then `default`, then the operator's built-in
-sizing. That keeps Jobs out of the BestEffort QoS class, where they would be
-the first thing evicted under node pressure and invisible to the scheduler.
+Transient operational batch Jobs (site init, migrations, app installations, backups) are sized via `jobResources` to guarantee **Burstable QoS** and prevent eviction under node pressure:
 
 ```yaml
 jobResources:
-  default:                      # any kind not listed below
-    requests: {cpu: "100m", memory: "256Mi"}
-    limits:   {cpu: "1",    memory: "1Gi"}
-  appInstall:                   # bench install-app + migrate on large apps
-    requests: {cpu: "500m", memory: "1Gi"}
-    limits:   {cpu: "2",    memory: "4Gi"}
+  default:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  siteInit:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+  appInstall:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
 ```
 
-Kinds: `benchInit`, `siteInit`, `appInstall`, `backup`, `restore`,
-`migration`, `cron`, `maintenance`. Built-in sizing when nothing is set:
+---
 
-| Kind | Requests | Limits |
-|---|---|---|
-| `siteInit`, `appInstall`, `migration`, `restore` | 250m / 512Mi | 2 CPU / 3Gi |
-| `benchInit` | 100m / 512Mi | 1 CPU / 2Gi |
-| `backup`, `cron` | 100m / 256Mi | 1 CPU / 1Gi |
-| `maintenance` | 50m / 128Mi | 500m / 512Mi |
+## <i data-lucide="arrow-right-circle"></i> Next Steps
 
-A block you supply is used verbatim (not merged with the built-in), so set
-both requests and limits.
-
-### Autoscaling
-
-Enable Horizontal Pod Autoscaling:
-
-```yaml
-componentHPA:
-  gunicorn:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 10
-    targetCPUUtilization: 70
-```
-
-## Multi-Tenancy Models
-
-### Model 1: Shared Bench, Shared Database
-- **Setup**: One bench, one MariaDB, many sites
-- **Cost**: Lowest
-- **Isolation**: Minimal
-- **Use**: Small startups, development
-
-### Model 2: Shared Bench, Dedicated Databases
-- **Setup**: One bench, MariaDB per site
-- **Cost**: Medium
-- **Isolation**: Database-level
-- **Use**: SaaS platforms, mid-size customers
-
-### Model 3: Dedicated Bench per Tenant
-- **Setup**: Bench per customer, dedicated resources
-- **Cost**: Highest
-- **Isolation**: Complete
-- **Use**: Enterprise, compliance requirements
-
-### Model 4: Bench per Environment
-- **Setup**: Separate benches for dev/staging/prod
-- **Cost**: Medium
-- **Isolation**: Environment-level
-- **Use**: Standard enterprise setup
-
-## Secrets Management
-
-The operator manages several types of secrets:
-
-### Admin Password
-```yaml
-spec:
-  adminPasswordSecretRef:
-    name: site-admin-pwd
-```
-
-### Database Credentials
-Auto-generated or external:
-```yaml
-# Auto-generated (dedicated mode)
-status:
-  dbConnectionSecret: site1-db-connection
-
-# External mode
-spec:
-  dbConfig:
-    connectionSecretRef:
-      name: custom-db-credentials
-```
-
-### Image Pull Secrets
-For private registries:
-```yaml
-spec:
-  imageConfig:
-    pullSecrets:
-      - name: docker-registry-secret
-```
-
-## Storage Classes
-
-### Site Storage (RWO)
-- **Type**: ReadWriteOnce
-- **Content**: Site files (private, public)
-- **Size**: 5-100Gi per site
-- **Backup**: Critical
-
-### Logs Storage (RWO)
-- **Type**: ReadWriteOnce
-- **Content**: Application logs
-- **Size**: 1-10Gi per site
-- **Backup**: Optional
-
-### Bench Storage (RWX)
-- **Type**: ReadWriteMany (if available)
-- **Content**: Frappe apps, common config
-- **Size**: 10-50Gi per bench
-- **Backup**: Important
-
-## High Availability
-
-### Application HA
-- Multiple gunicorn replicas
-- Multiple worker replicas
-- Load balancing via Services
-
-### Database HA
-- Use MariaDB Operator with Galera cluster
-- Or external managed databases with HA
-
-### Redis HA
-- Redis Sentinel (Redis mode)
-- DragonFly replication
-- Or external managed Redis
-
-### Ingress HA
-- Multiple ingress controller replicas
-- Cloud load balancers
-
-## Next Steps
-
-- **[API Reference](api-reference.md)** - Detailed field specifications
-- **[Examples](examples.md)** - Real-world deployment patterns
-- **[Operations](operations.md)** - Production best practices
-
+- **[Architecture Guide](ARCHITECTURE.md)**: Technical breakdown of operator reconciliation loops and design patterns.
+- **[API Reference](api-reference.md)**: Full schema specifications for `FrappeBench`, `FrappeSite`, and CRDs.
+- **[PostgreSQL Integration Guide](POSTGRESQL_INTEGRATION.md)**: Setup and tuning guide for StackGres and Percona engines.
+- **[OpenShift Enterprise Guide](INSTALL_OPENSHIFT.md)**: Deploying on Red Hat OpenShift under `restricted-v2` SCC.
