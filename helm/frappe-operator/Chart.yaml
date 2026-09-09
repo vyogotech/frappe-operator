@@ -17,7 +17,7 @@ maintainers:
   - name: Vyogo Technologies
     email: support@vyogo.tech
     url: https://vyogo.tech
-icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/main/docs/assets/icon.png
+icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/release/docs/assets/icon.png
 
 # Dependencies
 dependencies:
