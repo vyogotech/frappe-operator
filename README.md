@@ -1,11 +1,12 @@
 # Frappe Operator
 
 [![Release](https://img.shields.io/github/v/release/vyogotech/frappe-operator)](https://github.com/vyogotech/frappe-operator/releases)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-blue.svg)](https://kubernetes.io/)
+[![OpenShift](https://img.shields.io/badge/OpenShift-restricted--v2-blue.svg)](docs/INSTALL_OPENSHIFT.md)
 [![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](https://vyogotech.github.io/frappe-operator/)
 
-A production-ready Kubernetes operator that automates deployment, scaling, and management of [Frappe Framework](https://frappeframework.com/) applications (including ERPNext) on Kubernetes.
+A production-ready Kubernetes operator that automates deployment, scaling, and management of [Frappe Framework](https://frappeframework.com/) applications (including ERPNext) on Kubernetes and OpenShift — built for hybrid cloud and multi-cluster environments.
 
 **📚 [Complete Documentation](https://vyogotech.github.io/frappe-operator/)** | **🚀 [Examples](examples/)** | **💬 [Discussions](https://github.com/vyogotech/frappe-operator/discussions)**
 
@@ -208,12 +209,40 @@ The project uses a flexible configuration system for testing that eliminates har
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+> [!NOTE]
+> Frappe Operator is licensed under the Elastic License 2.0. Contributions are accepted under the same license, and contributors may be asked to sign a Contributor License Agreement (CLA). See [LICENSING.md](LICENSING.md).
+
 ## License
 
-Apache License 2.0 - see [LICENSE](LICENSE) for details.
+Frappe Operator is licensed under the **Elastic License 2.0 (ELv2)** — a
+**source-available** license. See [LICENSE](LICENSE) for the full text and
+[LICENSING.md](LICENSING.md) for a plain-English breakdown.
+
+Free to use, self-host, modify, and redistribute — including in production for your own organization and for your own dedicated customer instances.
+
+💼 A commercial license is required only to offer Frappe Operator to third parties as a hosted or managed service (e.g. a Frappe/ERPNext cloud, managed hosting, or multi-tenant SaaS built on its functionality).
+
+Every release before `v4.2.0` (v4.1.x and earlier) was published under the Apache License 2.0
+and remain available under those terms; this change applies going forward.
+
+Frappe Operator orchestrates Frappe (MIT) and ERPNext (GPLv3) at arm's length as
+separate processes/containers — see [LICENSING.md](LICENSING.md#relationship-to-frappe-and-erpnext).
+
+📬 **Commercial / managed-hosting inquiries:** [dev@vyogo.tech](mailto:dev@vyogo.tech) · 🌐 [vyogo.tech](https://vyogo.tech)
+
+## Trademarks
+
+**Vyogo™** and **Vyogo Cloud™** are trademarks of Vyogo. The Elastic License 2.0
+grants rights to the **software**, not to the **marks** — you may refer to the
+project by name, but you may not use the Vyogo marks to brand your own product
+or a managed service, or to imply endorsement. See **[TRADEMARK.md](TRADEMARK.md)**
+for the full policy. "Frappe" and "ERPNext" are trademarks of Frappe Technologies
+Pvt. Ltd.; this project is not affiliated with or endorsed by them.
 
 ---
 
 **Built with ❤️ by [Vyogo Technologies](https://vyogo.tech)**
 
 ⭐ **[Star this project](https://github.com/vyogotech/frappe-operator)** if you find it useful!
+
+Free to use, self-host, modify, and redistribute in production — a commercial license is only needed to resell it as a multi-tenant hosted service. [Details →](LICENSING.md)
