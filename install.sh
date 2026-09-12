@@ -1,116 +1,110 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# ─────────────────────────────────────────────────────────────────────────────
+# Frappe Operator installer.
+#
+# This is the one place installation logic lives. Every other entry point --
+# the DigitalOcean 1-Click deploy.sh, an Ansible task, a future marketplace
+# wrapper -- sets a few environment variables and runs this script.
+#
+# WHAT gets installed is declared by the Helm chart: the operator plus optional
+# subcharts (mariadb-operator, keda, ingress-nginx, cert-manager). This script
+# only decides WHICH of those to switch on for the cluster it finds itself on,
+# and handles the handful of things a chart cannot express: OpenShift
+# SecurityContextConstraints, and StackGres via OLM where Helm is not the path.
+#
+# POSIX sh on purpose. It is curl-piped into environments whose only proven
+# shell is /bin/sh, so no bashisms: no arrays, no [[ ]], no &>, no echo -e.
+#
+# Environment (all optional):
+#   NAMESPACE              target namespace                 frappe-operator-system
+#   CHART_VERSION          pin the chart version            unset = latest
+#   VALUES_FILE            extra values file, path or URL   unset
+#   IMAGE_REPO, IMAGE_TAG  override the operator image      unset = chart default
+#   INSTALL_MARIADB_CRDS   MariaDB CRDs outside Helm        true
+#   INSTALL_KEDA           KEDA subchart                    true
+#   INSTALL_INGRESS        ingress-nginx subchart           false
+#   INSTALL_CERT_MANAGER   cert-manager subchart            false
+#   INSTALL_STACKGRES      StackGres PostgreSQL operator    false
+#   INSTALL_POSTGRES_SCC   Percona SCC (OpenShift only)     false
+#   POSTGRES_NAMESPACE     for the Percona SCC bindings     frappe-pg
+#   STACKGRES_NAMESPACE                                     stackgres
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Default values
 NAMESPACE="${NAMESPACE:-frappe-operator-system}"
+CHART_VERSION="${CHART_VERSION:-}"
+VALUES_FILE="${VALUES_FILE:-}"
 # Unset by default: the chart's own values.yaml carries the version that matches
 # this checkout, and scripts/bump-version.sh keeps it current. Hardcoding a
-# default here meant the script pinned a stale tag (v1.0.0, long gone from the
-# registry) over the correct one on every install. Export these only to override.
+# default here meant the script pinned a stale tag over the correct one on
+# every install. Export these only to override.
 IMAGE_REPO="${IMAGE_REPO:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
 INSTALL_MARIADB_CRDS="${INSTALL_MARIADB_CRDS:-true}"
-INSTALL_INGRESS="${INSTALL_INGRESS:-false}"
 INSTALL_KEDA="${INSTALL_KEDA:-true}"
+INSTALL_INGRESS="${INSTALL_INGRESS:-false}"
+INSTALL_CERT_MANAGER="${INSTALL_CERT_MANAGER:-false}"
+INSTALL_STACKGRES="${INSTALL_STACKGRES:-false}"
+STACKGRES_NAMESPACE="${STACKGRES_NAMESPACE:-stackgres}"
 # Percona's PostgreSQL runs as uid/gid 26 and never sets an fsGroup - its
 # "openshift: true" mode only sets fsGroupChangePolicy, assuming SCC admission
 # will supply one. Where it does not, /pgdata stays root-owned and postgres
 # cannot start. Only needed if you provision Postgres-backed sites.
 INSTALL_POSTGRES_SCC="${INSTALL_POSTGRES_SCC:-false}"
 POSTGRES_NAMESPACE="${POSTGRES_NAMESPACE:-frappe-pg}"
-INSTALL_STACKGRES="${INSTALL_STACKGRES:-false}"
-STACKGRES_NAMESPACE="${STACKGRES_NAMESPACE:-stackgres}"
 
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}  Frappe Operator Installation Script${NC}"
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+say()  { printf '%b\n' "$1"; }
+ok()   { say "${GREEN}✓ $1${NC}"; }
+warn() { say "${YELLOW}⚠ $1${NC}"; }
+step() { say "${YELLOW}$1${NC}"; }
+fail() { say "${RED}✗ $1${NC}"; exit 1; }
+is_openshift() {
+    kubectl api-resources --api-group=security.openshift.io 2>/dev/null | grep -q securitycontextconstraints
+}
+
+say "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+say "${GREEN}  Frappe Operator Installation Script${NC}"
+say "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Check prerequisites
-echo -e "${YELLOW}Checking prerequisites...${NC}"
-
-if ! command -v kubectl &> /dev/null; then
-    echo -e "${RED}✗ kubectl is not installed${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ kubectl found${NC}"
-
-if ! command -v helm &> /dev/null; then
-    echo -e "${RED}✗ helm is not installed${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ helm found${NC}"
-
-# Check Kubernetes connection
-if ! kubectl cluster-info &> /dev/null; then
-    echo -e "${RED}✗ Cannot connect to Kubernetes cluster${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ Connected to Kubernetes cluster${NC}"
+step "Checking prerequisites..."
+command -v kubectl >/dev/null 2>&1 || fail "kubectl is not installed"
+ok "kubectl found"
+command -v helm >/dev/null 2>&1 || fail "helm is not installed"
+ok "helm found"
+kubectl cluster-info >/dev/null 2>&1 || fail "Cannot connect to Kubernetes cluster"
+ok "Connected to Kubernetes cluster"
 echo ""
 
-# Step 1: Install MariaDB Operator CRDs
+# ── Step 1: MariaDB Operator CRDs, outside Helm ─────────────────────────────
+# Installed with kubectl rather than by the mariadb-operator subchart, so they
+# carry no Helm ownership and survive `helm uninstall`. The subchart's own CRD
+# install is switched off below; Helm refuses to adopt resources it did not
+# create, which failed every clean install with "invalid ownership metadata".
 if [ "$INSTALL_MARIADB_CRDS" = "true" ]; then
-    echo -e "${YELLOW}Step 1: Installing MariaDB Operator CRDs...${NC}"
-    
-    if kubectl apply --server-side -k "github.com/mariadb-operator/mariadb-operator/config/crd?ref=v0.34.0" 2>/dev/null; then
-        echo -e "${GREEN}✓ MariaDB Operator CRDs installed${NC}"
+    step "Step 1: Installing MariaDB Operator CRDs..."
+    if kubectl apply --server-side -k "github.com/mariadb-operator/mariadb-operator/config/crd?ref=v0.34.0" >/dev/null 2>&1; then
+        ok "MariaDB Operator CRDs installed"
     else
-        echo -e "${YELLOW}⚠ Failed to install via kustomize, trying direct URLs...${NC}"
-        
-        # Fallback: install individual CRDs
-        CRDS=(
-            "https://raw.githubusercontent.com/mariadb-operator/mariadb-operator/v0.34.0/config/crd/bases/k8s.mariadb.com_mariadbs.yaml"
-            "https://raw.githubusercontent.com/mariadb-operator/mariadb-operator/v0.34.0/config/crd/bases/k8s.mariadb.com_databases.yaml"
-            "https://raw.githubusercontent.com/mariadb-operator/mariadb-operator/v0.34.0/config/crd/bases/k8s.mariadb.com_users.yaml"
-            "https://raw.githubusercontent.com/mariadb-operator/mariadb-operator/v0.34.0/config/crd/bases/k8s.mariadb.com_grants.yaml"
-        )
-        
-        for crd in "${CRDS[@]}"; do
-            kubectl apply --server-side -f "$crd" 2>/dev/null || true
+        warn "kustomize fetch failed, applying CRDs individually..."
+        for crd in mariadbs databases users grants; do
+            kubectl apply --server-side \
+                -f "https://raw.githubusercontent.com/mariadb-operator/mariadb-operator/v0.34.0/config/crd/bases/k8s.mariadb.com_${crd}.yaml" \
+                >/dev/null 2>&1 || true
         done
-        
-        echo -e "${GREEN}✓ MariaDB Operator CRDs installed (fallback method)${NC}"
+        ok "MariaDB Operator CRDs installed (fallback method)"
     fi
-    
-    # Wait for CRDs to be established
-    echo "Waiting for CRDs to be established..."
-    sleep 5
-    kubectl wait --for condition=established --timeout=60s crd mariadbs.k8s.mariadb.com || true
+    kubectl wait --for condition=established --timeout=60s crd mariadbs.k8s.mariadb.com >/dev/null 2>&1 || true
     echo ""
 fi
 
-# Step 2: Install NGINX Ingress Controller (optional)
-if [ "$INSTALL_INGRESS" = "true" ]; then
-    echo -e "${YELLOW}Step 2: Installing NGINX Ingress Controller...${NC}"
-    
-    if kubectl get namespace ingress-nginx &> /dev/null; then
-        echo -e "${YELLOW}⚠ Ingress controller namespace already exists, skipping...${NC}"
-    else
-        kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
-        
-        echo "Waiting for Ingress controller to be ready..."
-        kubectl wait --namespace ingress-nginx \
-            --for=condition=ready pod \
-            --selector=app.kubernetes.io/component=controller \
-            --timeout=300s || echo -e "${YELLOW}⚠ Ingress controller may still be starting...${NC}"
-        
-        echo -e "${GREEN}✓ NGINX Ingress Controller installed${NC}"
-    fi
-    echo ""
-fi
-
-# Step 2b: SecurityContextConstraints for Percona PostgreSQL (OpenShift only)
+# ── Step 2: SecurityContextConstraints for Percona PostgreSQL (OpenShift) ───
 if [ "$INSTALL_POSTGRES_SCC" = "true" ]; then
-    echo -e "${YELLOW}Step 2b: Installing the PostgreSQL SecurityContextConstraints...${NC}"
-    if ! kubectl api-resources --api-group=security.openshift.io 2>/dev/null | grep -q securitycontextconstraints; then
-        echo -e "${YELLOW}⚠ Not an OpenShift cluster (no SCC API), skipping${NC}"
+    step "Step 2: Installing the PostgreSQL SecurityContextConstraints..."
+    if ! is_openshift; then
+        warn "Not an OpenShift cluster (no SCC API), skipping"
     else
         kubectl create namespace "$POSTGRES_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
@@ -148,22 +142,24 @@ SCC
                 --dry-run=client -o yaml 2>/dev/null | kubectl apply -f - >/dev/null || true
         done
 
-        echo -e "${GREEN}✓ PostgreSQL SCC installed and bound in $POSTGRES_NAMESPACE${NC}"
+        ok "PostgreSQL SCC installed and bound in $POSTGRES_NAMESPACE"
         # Pods in OpenShift's own system namespaces (default, kube-*, openshift-*)
         # are not annotated by SCC admission, so a Percona cluster placed there
         # never picks this up. Keep it in a namespace of your own.
         if [ "$POSTGRES_NAMESPACE" = "default" ]; then
-            echo -e "${YELLOW}⚠ 'default' is a system namespace - SCCs are not applied to pods there.${NC}"
-            echo -e "${YELLOW}  Put the PostgreSQL cluster in its own namespace instead.${NC}"
+            warn "'default' is a system namespace - SCCs are not applied to pods there."
+            warn "  Put the PostgreSQL cluster in its own namespace instead."
         fi
     fi
     echo ""
 fi
 
-# Step 2c: StackGres PostgreSQL Operator (optional)
+# ── Step 3: StackGres PostgreSQL Operator ───────────────────────────────────
+# Not a chart dependency: on OpenShift it ships through OLM, which Helm cannot
+# express, and it is an alternative to Percona that most installs never enable.
 if [ "$INSTALL_STACKGRES" = "true" ]; then
-    echo -e "${YELLOW}Step 2c: Installing StackGres PostgreSQL Operator...${NC}"
-    if kubectl api-resources --api-group=security.openshift.io 2>/dev/null | grep -q securitycontextconstraints; then
+    step "Step 3: Installing StackGres PostgreSQL Operator..."
+    if is_openshift; then
         # OpenShift: OLM Subscription against the community catalog.
         kubectl create namespace "$STACKGRES_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
         cat <<EOF | kubectl apply -f -
@@ -188,182 +184,141 @@ spec:
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
 EOF
-        echo "Waiting for StackGres CRDs to be established..."
-        kubectl wait --for condition=established --timeout=120s crd sgclusters.stackgres.io || true
     else
         # Non-OpenShift: upstream Helm chart
-        helm repo add stackgres https://stackgres.io/downloads/stackgres-k8s/stackgres/helm
-        helm repo update
-        helm install stackgres-operator stackgres/stackgres-operator \
+        helm repo add stackgres https://stackgres.io/downloads/stackgres-k8s/stackgres/helm >/dev/null
+        helm repo update >/dev/null
+        helm upgrade --install stackgres-operator stackgres/stackgres-operator \
             -n "$STACKGRES_NAMESPACE" --create-namespace
-        kubectl wait --for condition=established --timeout=120s crd sgclusters.stackgres.io || true
     fi
-    echo -e "${GREEN}✓ StackGres PostgreSQL Operator installed${NC}"
+    echo "Waiting for StackGres CRDs to be established..."
+    kubectl wait --for condition=established --timeout=120s crd sgclusters.stackgres.io || true
+    ok "StackGres PostgreSQL Operator installed"
     echo ""
 fi
 
-# Step 3: Install KEDA (optional but recommended for worker autoscaling)
-if [ "$INSTALL_KEDA" = "true" ]; then
-    echo -e "${YELLOW}Step 3: Installing KEDA (Kubernetes Event Driven Autoscaler)...${NC}"
-    
-    if kubectl get namespace keda &> /dev/null; then
-        echo -e "${YELLOW}⚠ KEDA namespace already exists, checking installation...${NC}"
-        if kubectl get deployment keda-operator -n keda &> /dev/null; then
-            echo -e "${GREEN}✓ KEDA is already installed${NC}"
-        else
-            echo -e "${YELLOW}⚠ KEDA namespace exists but operator not found, reinstalling...${NC}"
-            kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
-        fi
-    else
-        echo "Installing KEDA v2.16.1..."
-        kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.16.1/keda-2.16.1.yaml
-        
-        echo "Waiting for KEDA operator to be ready..."
-        kubectl wait --namespace keda \
-            --for=condition=ready pod \
-            --selector=app=keda-operator \
-            --timeout=300s || echo -e "${YELLOW}⚠ KEDA operator may still be starting...${NC}"
-        
-        echo -e "${GREEN}✓ KEDA installed${NC}"
-        echo -e "${GREEN}  Workers can now use autoscaling with scale-to-zero capability${NC}"
-    fi
-    echo ""
-else
-    echo -e "${YELLOW}Step 3: KEDA installation skipped${NC}"
-    echo -e "${YELLOW}  Note: Workers will use static replica counts without KEDA${NC}"
-    echo ""
-fi
+# ── Step 4: Frappe Operator via Helm ────────────────────────────────────────
+# Everything else -- KEDA, ingress-nginx, cert-manager, the MariaDB operator --
+# is a subchart, switched on or off here. One Helm release owns all of it, so
+# `helm uninstall frappe-operator` removes it all.
+step "Step 4: Installing Frappe Operator..."
 
-# Step 4: Install Frappe Operator via Helm
-echo -e "${YELLOW}Step 3: Installing Frappe Operator...${NC}"
-
-# Check if chart directory exists (for local install)
 if [ -d "./helm/frappe-operator" ]; then
-    CHART_PATH="./helm/frappe-operator"
-    echo "Using local Helm chart from ./helm/frappe-operator"
-
+    CHART="./helm/frappe-operator"
+    echo "Using local Helm chart from $CHART"
     # charts/*.tgz is covered by the *.tgz rule in .gitignore, so a fresh clone
     # has Chart.yaml and Chart.lock but none of the subchart archives, and Helm
     # refuses to install: "found in Chart.yaml, but missing in charts/".
     # `build` (not `update`) fetches exactly the versions Chart.lock pins.
-    if ! ls "$CHART_PATH"/charts/*.tgz >/dev/null 2>&1; then
+    if ! ls "$CHART"/charts/*.tgz >/dev/null 2>&1; then
         echo "Fetching chart dependencies (charts/ is not checked in)..."
-        if ! helm dependency build "$CHART_PATH"; then
-            echo -e "${RED}✗ Failed to fetch chart dependencies${NC}"
-            exit 1
-        fi
+        # `helm dependency build` needs every dependency's repository registered
+        # first, and a fresh machine has none -- it fails with "no repository
+        # definition for <url>". Read the URLs from Chart.yaml so this list can
+        # never drift from the declared dependencies. Helm matches by URL, so the
+        # alias name is irrelevant; --force-update makes re-runs idempotent.
+        i=0
+        for url in $(grep -E '^[[:space:]]+repository:' "$CHART/Chart.yaml" | awk '{print $2}' | sort -u); do
+            i=$((i + 1))
+            helm repo add "frappe-dep-$i" "$url" --force-update >/dev/null
+        done
+        helm repo update >/dev/null
+        helm dependency build "$CHART" || fail "Failed to fetch chart dependencies"
     fi
 else
-    # Try to use GitHub Pages Helm repository
     echo "Adding Helm repository..."
-    helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
-    helm repo update
-    CHART_PATH="frappe-operator/frappe-operator"
+    helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo >/dev/null
+    helm repo update >/dev/null
+    CHART="frappe-operator/frappe-operator"
     echo "Using Helm chart from repository"
 fi
 
-# Install or upgrade the chart (upgrade --install handles both cases)
-# Use --create-namespace to let Helm manage the namespace
-echo "Installing Helm chart..."
+# Build the Helm argument list in the positional parameters -- POSIX sh has no
+# arrays. This script takes no arguments of its own, so nothing is lost.
+set -- --namespace "$NAMESPACE" --create-namespace --timeout 10m \
+       --set mariadb-operator.enabled=true \
+       --set mariadb.enabled=false
 
-HELM_ARGS=(
-    --namespace "$NAMESPACE"
-    --create-namespace
-    --set mariadb-operator.enabled=true
-    --set mariadb.enabled=false
-    --set keda.enabled=false
-    --timeout=10m
-)
+# Step 1 owns the MariaDB CRDs; see the note there.
+[ "$INSTALL_MARIADB_CRDS" = "true" ] && set -- "$@" --set mariadb-operator.crds.enabled=false
 
-# Step 1 installed the MariaDB CRDs with kubectl, so they carry no Helm
-# ownership metadata. The mariadb-operator subchart defaults to installing them
-# too, and Helm refuses to adopt resources it does not own - which failed every
-# clean install with "invalid ownership metadata". Leave them to Step 1.
-if [ "$INSTALL_MARIADB_CRDS" = "true" ]; then
-    HELM_ARGS+=(--set mariadb-operator.crds.enabled=false)
+if [ "$INSTALL_KEDA" = "true" ]; then
+    set -- "$@" --set keda.enabled=true
+else
+    set -- "$@" --set keda.enabled=false
 fi
+[ "$INSTALL_INGRESS" = "true" ]      && set -- "$@" --set ingress-nginx.enabled=true
+[ "$INSTALL_CERT_MANAGER" = "true" ] && set -- "$@" --set cert-manager.enabled=true
 
+[ -n "$CHART_VERSION" ] && set -- "$@" --version "$CHART_VERSION"
+[ -n "$VALUES_FILE" ]   && set -- "$@" --values "$VALUES_FILE"
 # Only override the chart's image when asked; see IMAGE_REPO/IMAGE_TAG above.
-[ -n "$IMAGE_REPO" ] && HELM_ARGS+=(--set operator.image.repository="$IMAGE_REPO")
-[ -n "$IMAGE_TAG" ] && HELM_ARGS+=(--set operator.image.tag="$IMAGE_TAG")
+[ -n "$IMAGE_REPO" ]    && set -- "$@" --set operator.image.repository="$IMAGE_REPO"
+[ -n "$IMAGE_TAG" ]     && set -- "$@" --set operator.image.tag="$IMAGE_TAG"
 
+echo "Installing Helm chart..."
 # Keep stderr: hiding it turned every failure into "may have warnings" and left
 # the real reason - usually one line from Helm - entirely undiscoverable.
-if helm upgrade --install frappe-operator "$CHART_PATH" "${HELM_ARGS[@]}"; then
-    echo -e "${GREEN}✓ Frappe Operator chart installed/upgraded${NC}"
+helm upgrade --install frappe-operator "$CHART" "$@" \
+    || fail "Helm installation failed (see the error above)"
+ok "Frappe Operator chart installed/upgraded"
+echo ""
+
+# ── Step 5: Wait and verify ─────────────────────────────────────────────────
+step "Step 5: Waiting for operator to be ready..."
+if kubectl wait --namespace "$NAMESPACE" --for=condition=ready pod \
+        --selector=control-plane=controller-manager --timeout=180s >/dev/null 2>&1; then
+    ok "Operator pod is ready"
 else
-    echo -e "${RED}✗ Helm installation failed (see the error above)${NC}"
-    exit 1
+    warn "Operator pod may still be starting..."
 fi
 echo ""
 
-# Step 5: Wait for operator to be ready
-echo -e "${YELLOW}Step 5: Waiting for operator to be ready...${NC}"
-
-# Wait for operator pod
-if kubectl wait --namespace "$NAMESPACE" \
-    --for=condition=ready pod \
-    --selector=control-plane=controller-manager \
-    --timeout=180s 2>/dev/null; then
-    echo -e "${GREEN}✓ Operator pod is ready${NC}"
+step "Step 6: Verifying installation..."
+if kubectl get crd frappebenches.vyogo.tech >/dev/null 2>&1; then
+    ok "Frappe CRDs installed"
 else
-    echo -e "${YELLOW}⚠ Operator pod may still be starting...${NC}"
+    say "${RED}✗ Frappe CRDs not found${NC}"
 fi
-
-# Wait a bit for other components
-sleep 5
-echo ""
-
-# Step 6: Verify installation
-echo -e "${YELLOW}Step 6: Verifying installation...${NC}"
-
-# Check CRDs
-if kubectl get crd frappebenches.vyogo.tech &> /dev/null; then
-    echo -e "${GREEN}✓ Frappe CRDs installed${NC}"
+if kubectl get pod -n "$NAMESPACE" -l control-plane=controller-manager 2>/dev/null | grep -q Running; then
+    ok "Operator pod is running"
 else
-    echo -e "${RED}✗ Frappe CRDs not found${NC}"
+    say "${RED}✗ Operator pod not running${NC}"
 fi
-
-# Check operator pod
-if kubectl get pod -n "$NAMESPACE" -l control-plane=controller-manager | grep -q Running; then
-    echo -e "${GREEN}✓ Operator pod is running${NC}"
-else
-    echo -e "${RED}✗ Operator pod not running${NC}"
-fi
-
-# Check MariaDB Operator (if enabled)
-if kubectl get crd mariadbs.k8s.mariadb.com &> /dev/null; then
-    echo -e "${GREEN}✓ MariaDB Operator CRDs installed${NC}"
-    
-    if kubectl get pod -n "$NAMESPACE" -l app.kubernetes.io/name=mariadb-operator | grep -q Running; then
-        echo -e "${GREEN}✓ MariaDB Operator is running${NC}"
+if kubectl get crd mariadbs.k8s.mariadb.com >/dev/null 2>&1; then
+    ok "MariaDB Operator CRDs installed"
+    if kubectl get pod -n "$NAMESPACE" -l app.kubernetes.io/name=mariadb-operator 2>/dev/null | grep -q Running; then
+        ok "MariaDB Operator is running"
     else
-        echo -e "${YELLOW}⚠ MariaDB Operator pods may still be starting...${NC}"
+        warn "MariaDB Operator pods may still be starting..."
     fi
 else
-    echo -e "${YELLOW}⚠ MariaDB Operator CRDs not found${NC}"
+    warn "MariaDB Operator CRDs not found"
 fi
-
-# Check KEDA (if enabled)
 if [ "$INSTALL_KEDA" = "true" ]; then
-    if kubectl get crd scaledobjects.keda.sh &> /dev/null; then
-        echo -e "${GREEN}✓ KEDA CRDs installed${NC}"
-        
-        if kubectl get pod -n keda -l app=keda-operator | grep -q Running; then
-            echo -e "${GREEN}✓ KEDA Operator is running${NC}"
-            echo -e "${GREEN}  Workers can use autoscaling features${NC}"
+    if kubectl get crd scaledobjects.keda.sh >/dev/null 2>&1; then
+        ok "KEDA CRDs installed"
+        if kubectl get pod -n "$NAMESPACE" -l app=keda-operator 2>/dev/null | grep -q Running; then
+            ok "KEDA Operator is running"
         else
-            echo -e "${YELLOW}⚠ KEDA Operator pods may still be starting...${NC}"
+            warn "KEDA Operator pods may still be starting..."
         fi
     else
-        echo -e "${YELLOW}⚠ KEDA CRDs not found${NC}"
+        warn "KEDA CRDs not found"
+    fi
+fi
+if [ "$INSTALL_INGRESS" = "true" ]; then
+    if kubectl get pod -n "$NAMESPACE" -l app.kubernetes.io/component=controller 2>/dev/null | grep -q Running; then
+        ok "NGINX Ingress Controller is running"
+    else
+        warn "NGINX Ingress Controller pods may still be starting..."
     fi
 fi
 
 echo ""
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}  Installation Complete!${NC}"
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+say "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+say "${GREEN}  Installation Complete!${NC}"
+say "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo "Next steps:"
 echo ""
