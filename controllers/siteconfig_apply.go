@@ -216,8 +216,10 @@ func buildConfigJob(sc *vyogotechv1.SiteConfig, bench *vyogotechv1.FrappeBench, 
 						Image:           benchImage,
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Command:         []string{"bash", "-c", script},
-						Env:             env,
-						Resources:       vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindMaintenance),
+						// benchJobEnv first: USER/HOME so `bench` resolves an arbitrary uid,
+						// PYTHONPATH for SiteApp-installed apps; then the plan's secret env.
+						Env:       append(benchJobEnv(), env...),
+						Resources: vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindMaintenance),
 						// Match the bench deployments' PVC layout: site data lives under the
 						// "frappe-sites" subPath (assets under "frappe-sites/assets"). Mounting
 						// the wrong subPath yields an empty sites dir and bench can't find

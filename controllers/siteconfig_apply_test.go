@@ -179,3 +179,20 @@ func TestBuildConfigJobCarriesBenchPullSecrets(t *testing.T) {
 		t.Fatalf("config Job must carry the bench image pull secrets, got %+v", ps)
 	}
 }
+
+func TestBuildConfigJobHasBenchJobEnv(t *testing.T) {
+	sc := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "vyogo-cloud"},
+		Spec:       vyogotechv1.SiteConfigSpec{SiteRef: &vyogotechv1.NamespacedName{Name: "cp"}, CustomConfig: map[string]string{"ignore_csrf": "1"}},
+	}
+	job, _ := buildConfigJob(sc, &vyogotechv1.FrappeBench{}, "cp.example", "img")
+	env := job.Spec.Template.Spec.Containers[0].Env
+	// Without USER, `bench` dies at import with "No username set in the environment"
+	// when the pod runs as a uid the image's /etc/passwd does not know.
+	if e := envByName(env, "USER"); e == nil || e.Value != "frappe" {
+		t.Fatalf("config Job must set USER=frappe, got %+v", e)
+	}
+	if e := envByName(env, "HOME"); e == nil || e.Value != "/home/frappe" {
+		t.Fatalf("config Job must set HOME, got %+v", e)
+	}
+}
