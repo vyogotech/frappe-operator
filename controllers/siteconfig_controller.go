@@ -43,6 +43,7 @@ type SiteConfigReconciler struct {
 	Scheme       *runtime.Scheme
 	Recorder     record.EventRecorder
 	FrappeClient *FrappeClient // Optional injected client for testing
+	IsOpenShift  bool
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=siteconfigs,verbs=get;list;watch;create;update;patch;delete
@@ -123,6 +124,16 @@ func (r *SiteConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	job, appliedKeys := buildConfigJob(siteConfig, bench, domain, benchImage)
+	if job != nil {
+		// Same identity as the site's init Job and serving pods (uid/fsGroup from the
+		// bench's security config): site files on the PVC are written 0644 by that
+		// user, so a Job running as the image's default user cannot edit
+		// site_config.json and fails instantly with EACCES.
+		job.Spec.Template.Spec.SecurityContext = PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security)
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].SecurityContext = ContainerSecurityContextForBench(r.IsOpenShift, bench.Spec.Security)
+		}
+	}
 	if job == nil {
 		// Nothing to apply — converge to Ready with no keys.
 		siteConfig.Status.Phase = "Ready"

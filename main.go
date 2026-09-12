@@ -271,9 +271,10 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteConfigReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("siteconfig-controller"),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Recorder:    mgr.GetEventRecorderFor("siteconfig-controller"),
+		IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteConfig")
 		os.Exit(1)
@@ -290,9 +291,10 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.SiteCronReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("sitecron-controller"),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		Recorder:    mgr.GetEventRecorderFor("sitecron-controller"),
+		IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteCron")
 		os.Exit(1)
