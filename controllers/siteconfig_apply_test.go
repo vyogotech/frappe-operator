@@ -117,3 +117,39 @@ func TestBuildConfigPlan_Empty(t *testing.T) {
 		t.Errorf("expected empty plan, got cmds=%v keys=%v", cmds, keys)
 	}
 }
+
+func TestBuildConfigPlanSecretConfig(t *testing.T) {
+	sc := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "vyogo-cloud"},
+		Spec: vyogotechv1.SiteConfigSpec{
+			SiteRef: &vyogotechv1.NamespacedName{Name: "cp"},
+			SecretConfig: []vyogotechv1.SecretConfigEntry{
+				{Key: "oidc_service_token", SecretKeyRef: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "platform-kc"}, Key: "OIDC_SERVICE_TOKEN"}},
+				{Key: "agent_webhook_secret", SecretKeyRef: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "agent-webhook-secret"}, Key: "webhook-secret"}},
+				// incomplete entry is skipped, not applied half-way
+				{Key: "", SecretKeyRef: corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "x"}, Key: "y"}},
+			},
+		},
+	}
+	cmds, env, keys := buildConfigPlan(sc, "fcloud-cp.vyogo.cloud")
+	if len(keys) != 2 || keys[0] != "oidc_service_token" || keys[1] != "agent_webhook_secret" {
+		t.Fatalf("applied keys = %v", keys)
+	}
+	e0 := envByName(env, "CFG_SECRET_0")
+	if e0 == nil || e0.ValueFrom == nil || e0.ValueFrom.SecretKeyRef == nil ||
+		e0.ValueFrom.SecretKeyRef.Name != "platform-kc" || e0.ValueFrom.SecretKeyRef.Key != "OIDC_SERVICE_TOKEN" {
+		t.Fatalf("CFG_SECRET_0 not sourced from the Secret: %+v", e0)
+	}
+	if envByName(env, "CFG_SECRET_1") == nil {
+		t.Fatalf("CFG_SECRET_1 missing")
+	}
+	joined := strings.Join(cmds, "\n")
+	if !strings.Contains(joined, `set-config 'oidc_service_token' "$CFG_SECRET_0"`) {
+		t.Fatalf("expected set-config to read the env var, got:\n%s", joined)
+	}
+	if strings.Contains(joined, "platform-kc") || strings.Contains(joined, "webhook-secret") {
+		t.Fatalf("secret names/values must not appear on the command line:\n%s", joined)
+	}
+}

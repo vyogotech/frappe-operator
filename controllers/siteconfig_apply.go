@@ -84,6 +84,24 @@ func buildConfigPlan(sc *vyogotechv1.SiteConfig, domain string) (cmds []string, 
 		appliedKeys = append(appliedKeys, "encryption_key")
 	}
 
+	// SecretConfig — each value reaches the Job only as an env var sourced from the
+	// Secret (CFG_SECRET_<n>), and set-config reads it from that env var, so neither the
+	// CR nor the Job command line ever carries it. Order preserved from the spec.
+	for i, entry := range sc.Spec.SecretConfig {
+		if entry.Key == "" || entry.SecretKeyRef.Name == "" || entry.SecretKeyRef.Key == "" {
+			continue
+		}
+		envName := fmt.Sprintf("CFG_SECRET_%d", i)
+		env = append(env, corev1.EnvVar{
+			Name: envName,
+			ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: entry.SecretKeyRef.LocalObjectReference, Key: entry.SecretKeyRef.Key,
+			}},
+		})
+		cmds = append(cmds, base+" "+shellQuote(entry.Key)+` "$`+envName+`"`)
+		appliedKeys = append(appliedKeys, entry.Key)
+	}
+
 	// CustomConfig — sorted for deterministic Job specs.
 	custom := make([]string, 0, len(sc.Spec.CustomConfig))
 	for k := range sc.Spec.CustomConfig {
