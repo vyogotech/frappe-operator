@@ -87,3 +87,35 @@ func TestShouldFallbackStorage(t *testing.T) {
 		t.Fatalf("expected fallback to be false when bench already opts into fallback")
 	}
 }
+
+func TestStorageClassSupportsRWXAnnotationOverride(t *testing.T) {
+	// A driver the heuristic does not know (Longhorn) declares RWX explicitly.
+	scLonghornRWX := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "longhorn-rwx", Annotations: map[string]string{AccessModeAnnotation: "ReadWriteMany"}},
+		Provisioner: "driver.longhorn.io",
+	}
+	if !storageClassSupportsRWX(scLonghornRWX) {
+		t.Fatalf("expected annotated longhorn class to be RWX")
+	}
+	// The same driver without the annotation stays on the heuristic (RWO).
+	scLonghorn := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "longhorn"}, Provisioner: "driver.longhorn.io"}
+	if storageClassSupportsRWX(scLonghorn) {
+		t.Fatalf("expected unannotated longhorn class to be RWO")
+	}
+	// The annotation can also force RWO on an NFS-named class.
+	scNFSForcedRWO := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "nfs-rwo", Annotations: map[string]string{AccessModeAnnotation: "ReadWriteOnce"}},
+		Provisioner: "cluster.local/nfs-server-provisioner",
+	}
+	if storageClassSupportsRWX(scNFSForcedRWO) {
+		t.Fatalf("expected annotation to force RWO")
+	}
+	// An unknown value falls back to the heuristic.
+	scGarbage := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "nfs-garbage", Annotations: map[string]string{AccessModeAnnotation: "whatever"}},
+		Provisioner: "nfs.csi.k8s.io",
+	}
+	if !storageClassSupportsRWX(scGarbage) {
+		t.Fatalf("expected heuristic fallback for an invalid annotation value")
+	}
+}

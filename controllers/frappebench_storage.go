@@ -178,9 +178,26 @@ func (r *FrappeBenchReconciler) determineAccessMode(ctx context.Context, bench *
 	return mode, nil
 }
 
+// AccessModeAnnotation lets a StorageClass declare the access mode bench PVCs
+// should request on it, overriding the provisioner-name heuristic below.
+// Needed for provisioners that serve both modes from one driver (Longhorn,
+// for example, is RWO by default and RWX only when the PVC asks for it):
+//
+//	metadata.annotations:
+//	  frappe.tech/access-mode: ReadWriteMany
+const AccessModeAnnotation = "frappe.tech/access-mode"
+
 func storageClassSupportsRWX(sc *storagev1.StorageClass) bool {
 	if sc == nil {
 		return false
+	}
+	if mode, ok := sc.Annotations[AccessModeAnnotation]; ok {
+		switch corev1.PersistentVolumeAccessMode(strings.TrimSpace(mode)) {
+		case corev1.ReadWriteMany:
+			return true
+		case corev1.ReadWriteOnce:
+			return false
+		}
 	}
 	provisioner := strings.ToLower(sc.Provisioner)
 	rwxProviders := []string{"nfs", "ceph", "gluster", "netapp", "azurefile", "filestore", "portworx"}
