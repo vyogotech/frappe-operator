@@ -11,8 +11,17 @@ data:
   defaultDomainSuffix: {{ .Values.operatorConfig.defaultDomainSuffix | quote }}
   
   # Ingress controller service to detect domain from
+  {{- /* When ingress-nginx ships as a subchart its controller Service is
+       <release>-ingress-nginx-controller in the release namespace, not
+       ingress-nginx-controller in ingress-nginx. Point the operator there
+       automatically; otherwise the configured external controller is used. */}}
+  {{- if (index .Values "ingress-nginx" "enabled") }}
+  ingressControllerService: {{ printf "%s-ingress-nginx-controller" .Release.Name | quote }}
+  ingressControllerNamespace: {{ .Release.Namespace | quote }}
+  {{- else }}
   ingressControllerService: {{ .Values.operatorConfig.ingressControllerService | quote }}
   ingressControllerNamespace: {{ .Values.operatorConfig.ingressControllerNamespace | quote }}
+  {{- end }}
   
   # Git configuration
   # Set to "false" to disable Git-based app installation (enterprise mode)
