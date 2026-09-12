@@ -696,8 +696,10 @@ func (r *SiteAppReconciler) buildAppJob(ctx context.Context, siteApp *vyogotechv
 					},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:   corev1.RestartPolicyNever,
-					SecurityContext: podSec,
+					RestartPolicy: corev1.RestartPolicyNever,
+
+					ImagePullSecrets: benchImagePullSecrets(bench),
+					SecurityContext:  podSec,
 					Containers: []corev1.Container{
 						{
 							Name:            containerName,

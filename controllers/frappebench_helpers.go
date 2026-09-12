@@ -41,6 +41,21 @@ func (r *FrappeBenchReconciler) componentLabels(bench *vyogotechv1.FrappeBench, 
 
 // Image getters
 
+// benchImagePullSecrets returns the bench image's pull secrets for any pod that runs
+// that image — every site Job (config, migration, app install, cron) must carry them,
+// or a private bench image leaves the Job in ImagePullBackOff while the site itself
+// runs fine.
+func benchImagePullSecrets(bench *vyogotechv1.FrappeBench) []corev1.LocalObjectReference {
+	if bench == nil || bench.Spec.ImageConfig == nil || len(bench.Spec.ImageConfig.PullSecrets) == 0 {
+		return nil
+	}
+	secrets := make([]corev1.LocalObjectReference, len(bench.Spec.ImageConfig.PullSecrets))
+	for i, s := range bench.Spec.ImageConfig.PullSecrets {
+		secrets[i] = corev1.LocalObjectReference{Name: s.Name}
+	}
+	return secrets
+}
+
 func (r *FrappeBenchReconciler) getImagePullSecrets(bench *vyogotechv1.FrappeBench) []corev1.LocalObjectReference {
 	if bench.Spec.ImageConfig != nil && len(bench.Spec.ImageConfig.PullSecrets) > 0 {
 		secrets := make([]corev1.LocalObjectReference, len(bench.Spec.ImageConfig.PullSecrets))

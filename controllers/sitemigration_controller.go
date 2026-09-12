@@ -139,8 +139,10 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					Labels: map[string]string{"app": "frappe", "site": site.Name},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:   corev1.RestartPolicyOnFailure,
-					SecurityContext: PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security),
+					RestartPolicy: corev1.RestartPolicyOnFailure,
+
+					ImagePullSecrets: benchImagePullSecrets(bench),
+					SecurityContext:  PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security),
 					Containers: []corev1.Container{
 						{
 							Name:            "migrate-runner",

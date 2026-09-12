@@ -153,3 +153,29 @@ func TestBuildConfigPlanSecretConfig(t *testing.T) {
 		t.Fatalf("secret names/values must not appear on the command line:\n%s", joined)
 	}
 }
+
+func TestBuildConfigJobCarriesBenchPullSecrets(t *testing.T) {
+	sc := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "vyogo-cloud"},
+		Spec: vyogotechv1.SiteConfigSpec{
+			SiteRef:      &vyogotechv1.NamespacedName{Name: "cp"},
+			CustomConfig: map[string]string{"ignore_csrf": "1"},
+		},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "control-plane", Namespace: "vyogo-cloud"},
+		Spec: vyogotechv1.FrappeBenchSpec{ImageConfig: &vyogotechv1.ImageConfig{
+			Repository:  "ghcr.io/vyogotech/frappe-cloud-bench",
+			Tag:         "version-16",
+			PullSecrets: []corev1.LocalObjectReference{{Name: "ghcr-pull-secret"}},
+		}},
+	}
+	job, _ := buildConfigJob(sc, bench, "fcloud-cp.vyogo.cloud", "ghcr.io/vyogotech/frappe-cloud-bench:version-16")
+	if job == nil {
+		t.Fatalf("expected a job")
+	}
+	ps := job.Spec.Template.Spec.ImagePullSecrets
+	if len(ps) != 1 || ps[0].Name != "ghcr-pull-secret" {
+		t.Fatalf("config Job must carry the bench image pull secrets, got %+v", ps)
+	}
+}
