@@ -149,6 +149,8 @@ func (r *SiteCronReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 						},
 						Spec: corev1.PodSpec{
 							RestartPolicy: corev1.RestartPolicyOnFailure,
+
+							ImagePullSecrets: benchImagePullSecrets(bench),
 							Containers: []corev1.Container{
 								{
 									Name:            "cron-runner",

@@ -209,6 +209,8 @@ func buildConfigJob(sc *vyogotechv1.SiteConfig, bench *vyogotechv1.FrappeBench, 
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "frappe", "siteconfig": sc.Name}},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyOnFailure,
+
+					ImagePullSecrets: benchImagePullSecrets(bench),
 					Containers: []corev1.Container{{
 						Name:            "config-runner",
 						Image:           benchImage,
