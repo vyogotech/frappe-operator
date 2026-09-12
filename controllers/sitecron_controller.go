@@ -159,6 +159,7 @@ func (r *SiteCronReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 									ImagePullPolicy: corev1.PullIfNotPresent,
 									SecurityContext: ContainerSecurityContextForBench(r.IsOpenShift, bench.Spec.Security),
 									Command:         []string{"bash", "-c", cmdStr},
+									Env:             benchJobEnv(),
 									Resources:       vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindCron),
 									VolumeMounts: []corev1.VolumeMount{
 										{
