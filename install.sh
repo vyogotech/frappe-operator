@@ -212,6 +212,17 @@ if [ -d "./helm/frappe-operator" ]; then
     # `build` (not `update`) fetches exactly the versions Chart.lock pins.
     if ! ls "$CHART"/charts/*.tgz >/dev/null 2>&1; then
         echo "Fetching chart dependencies (charts/ is not checked in)..."
+        # `helm dependency build` needs every dependency's repository registered
+        # first, and a fresh machine has none -- it fails with "no repository
+        # definition for <url>". Read the URLs from Chart.yaml so this list can
+        # never drift from the declared dependencies. Helm matches by URL, so the
+        # alias name is irrelevant; --force-update makes re-runs idempotent.
+        i=0
+        for url in $(grep -E '^[[:space:]]+repository:' "$CHART/Chart.yaml" | awk '{print $2}' | sort -u); do
+            i=$((i + 1))
+            helm repo add "frappe-dep-$i" "$url" --force-update >/dev/null
+        done
+        helm repo update >/dev/null
         helm dependency build "$CHART" || fail "Failed to fetch chart dependencies"
     fi
 else
