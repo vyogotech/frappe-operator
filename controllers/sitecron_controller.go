@@ -40,8 +40,9 @@ import (
 // SiteCronReconciler reconciles a SiteCron object
 type SiteCronReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme      *runtime.Scheme
+	Recorder    record.EventRecorder
+	IsOpenShift bool
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitecrons,verbs=get;list;watch;create;update;patch;delete
@@ -148,14 +149,15 @@ func (r *SiteCronReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 							Labels: map[string]string{"app": "frappe", "site": site.Name},
 						},
 						Spec: corev1.PodSpec{
-							RestartPolicy: corev1.RestartPolicyOnFailure,
-
+							RestartPolicy:    corev1.RestartPolicyOnFailure,
+							SecurityContext:  PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security),
 							ImagePullSecrets: benchImagePullSecrets(bench),
 							Containers: []corev1.Container{
 								{
 									Name:            "cron-runner",
 									Image:           benchImage,
 									ImagePullPolicy: corev1.PullIfNotPresent,
+									SecurityContext: ContainerSecurityContextForBench(r.IsOpenShift, bench.Spec.Security),
 									Command:         []string{"bash", "-c", cmdStr},
 									Resources:       vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindCron),
 									VolumeMounts: []corev1.VolumeMount{
