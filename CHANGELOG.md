@@ -5,6 +5,17 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.1] - 2026-09-14
+
+### Added
+- **SiteConfig `secretConfig`**: site_config.json keys whose values come from Kubernetes Secrets (API tokens, shared HMAC secrets, seeded admin passwords). Values reach the config Job only as env vars sourced from the Secret and never appear in the CR or the Job command line.
+- **StorageClass access-mode annotation**: `frappe.tech/access-mode: ReadWriteMany` on a StorageClass makes bench PVCs request RWX on drivers that serve both modes (Longhorn), instead of the provisioner-name heuristic.
+
+### Fixed
+- SiteConfig, SiteMigration, SiteApp and SiteCron Jobs now carry the bench image's `imageConfig.pullSecrets`; a private bench image left them in ImagePullBackOff.
+- SiteConfig and SiteCron Jobs run with the bench pod/container security context and the standard bench env (`USER`, `HOME`, `PYTHONPATH`); previously `bench` failed at once when the Job's uid differed from the serving pods'.
+- Helm chart: icon assets and a Chart.yaml icon URL that resolves; OpenShift console plugin and aggregated RBAC roles shipped via Helm.
+
 ## [5.2.0] - 2026-09-08
 
 ### Added
