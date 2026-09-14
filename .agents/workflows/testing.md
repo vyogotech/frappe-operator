@@ -40,7 +40,26 @@ kind load docker-image localhost:5001/frappe-operator:test --name frappe-operato
 ./scripts/e2e-suite.sh
 ```
 
-## 4. Handling Test Failures (Auto-Correction)
+## 4. The probe app (runs on every change)
+
+Unit and envtest suites do not run Frappe. The acceptance test that does is the
+probe app — `.github/workflows/probe-e2e.yml` builds the image from your commit
+and runs [frappe-operator-probe](https://github.com/vyogotech/frappe-operator-probe)
+on kind, git and FPM install legs, every CR. It is mandatory and blocks a
+change; see `.agents/workflows/probe-e2e.md` for what it covers, how to run it
+by hand, and the rule that a new CRD ships with probe coverage
+(`make probe-coverage`).
+
+## 5. OpenShift
+
+There is no OpenShift cluster in CI, so `controllers/openshift_contract_test.go`
+asserts on the emitted objects with real OpenShift inputs (SCC range
+annotations, the cluster Ingress config). Anything that builds a Pod/Job or an
+HTTP surface is tested with `IsOpenShift` both false and true; see
+`.agents/workflows/openshift.md`.
+
+## 6. Handling Test Failures (Auto-Correction)
 - If `make test` fails, evaluate the Ginkgo failure trace.
 - If an E2E test fails, aggressively use `kubectl logs` on the `frappe` / `test` namespaces to extract the operator panic or routing error.
-- **Rule:** Do NOT modify `api/v1alpha1/.*_types.go` struct fields just to make a test pass. Fix the faulty logic in the controller.
+- **Rule:** Do NOT modify `api/v1/*_types.go` struct fields just to make a test pass. Fix the faulty logic in the controller.
+- If the probe is red, read its phase table (`PASS`/`FAIL` lines) and the diagnostics step (operator logs, Job logs, ingresses, site dirs); fix the operator, or the probe in the same change set if the probe is wrong. Never mark it non-blocking.
