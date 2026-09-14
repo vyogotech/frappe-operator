@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -65,9 +66,19 @@ func (r *SiteRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// Get the bench
+	// Get the bench. benchRef.namespace defaults to the SiteRestore's own
+	// namespace (an empty namespace never matches anything), and a missing
+	// bench is reported on the CR instead of only in the controller log.
 	bench := &vyogotechv1.FrappeBench{}
-	if err := r.Get(ctx, client.ObjectKey{Name: siteRestore.Spec.BenchRef.Name, Namespace: siteRestore.Spec.BenchRef.Namespace}, bench); err != nil {
+	benchNS := siteRestore.Spec.BenchRef.Namespace
+	if benchNS == "" {
+		benchNS = siteRestore.Namespace
+	}
+	if err := r.Get(ctx, client.ObjectKey{Name: siteRestore.Spec.BenchRef.Name, Namespace: benchNS}, bench); err != nil {
+		if errors.IsNotFound(err) {
+			_ = r.updateStatus(ctx, siteRestore, "Pending", fmt.Sprintf("FrappeBench %s/%s not found", benchNS, siteRestore.Spec.BenchRef.Name), "")
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
 		return ctrl.Result{}, err
 	}
 
