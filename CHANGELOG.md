@@ -5,6 +5,32 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.2] - 2026-09-15
+
+Every fix in this release was found by the new acceptance test,
+[frappe-operator-probe](https://github.com/vyogotech/frappe-operator-probe): a
+Frappe app plus runner that exercises every CR on a kind cluster, installing the
+app from git and from its FPM package. It now runs on every operator change
+(`probe e2e` workflow), and every CRD must have probe coverage
+(`make probe-coverage`).
+
+### Added
+- **`FrappeBench.spec.commonSiteConfig`**: keys merged into `common_site_config.json` at bench init (Frappe honours `server_script_enabled` only there).
+- **`SiteApp.spec.autoMigrate` / `backupBeforeInstall`** are now tri-state (`*bool`, default true) and `autoMigrate` really runs `bench migrate` — on the git and the FPM install path — so an app's patches and `after_migrate` hooks execute; `install-app` alone only records patches as executed.
+- **SiteAPIKey** mints a real key pair through Frappe (`generate_keys`) instead of writing placeholders.
+- **SiteDomain `tls.enabled`** is a pointer: an explicit `enabled: false` is an opt-out (no forced HTTPS redirect, no Ingress TLS section, no certificate request) and survives the controller's finalizer update.
+
+### Fixed
+- A FrappeSite named like its FrappeBench reused the bench's init Job and reported Ready without `bench new-site`; the site Job is now `<site>-site-init` on collision.
+- Content controllers (custom field, property setter, client/server script, webhook, user permission) required a `<site>-admin-password` Secret; they now resolve the site's `adminPasswordSecretRef`.
+- Client Script and Webhook creates carried no document name (Prompt-named DocTypes) and the webhook event went into a field Frappe ignores (`webhook_docevent`).
+- **Data loss:** SiteMigration, SiteCron and SiteConfig Jobs and site re-init rebuilt `sites/apps.txt` from the image only, so `bench migrate` deleted a SiteApp-installed app's DocTypes as orphans. `apps.txt` is now the union of image and volume apps.
+- Finalizers looped forever once the namespace was terminating (Jobs/Secrets cannot be created there); they now release and keep data.
+- SiteUserPermission failed with a duplicate on every re-reconcile (hash-named document); lookup by fields, 409 tolerated.
+- SiteRestore defaulted `benchRef.namespace` wrongly, hid a missing bench, and could not read a cross-namespace MariaDB root Secret (now mirrored as `<restore>-dbroot`).
+- SiteConfig and SiteCron Jobs carry the bench image's pull secrets, security context and `USER`/`HOME`.
+- SiteDomain finalizer is added with a merge Patch so the spec is never re-serialized (a plain `omitempty` bool with a CRD default of `true` cannot hold `false` across an Update).
+
 ## [5.2.1] - 2026-09-14
 
 ### Added
