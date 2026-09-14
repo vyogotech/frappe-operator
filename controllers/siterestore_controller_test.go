@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	corev1 "k8s.io/api/core/v1"
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -64,5 +65,33 @@ func TestSiteRestoreReportsMissingBench(t *testing.T) {
 	_ = c.Get(context.Background(), types.NamespacedName{Name: "r1", Namespace: "t1"}, got)
 	if got.Status.Phase != "Pending" || got.Status.Message == "" {
 		t.Fatalf("missing bench must be visible on the CR, got phase=%q message=%q", got.Status.Phase, got.Status.Message)
+	}
+}
+
+func TestMirrorSecretKeyCopiesAcrossNamespaces(t *testing.T) {
+	scheme := testScheme(t)
+	src := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mariadb-root-password", Namespace: "mariadb"}, Data: map[string][]byte{"password": []byte("r00t")}}
+	sr := restoreCR(true)
+	c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(src, sr).Build()
+	name, err := mirrorSecretKey(context.Background(), c, scheme, sr, "mariadb", "mariadb-root-password", "password", "r1-dbroot")
+	if err != nil || name != "r1-dbroot" {
+		t.Fatalf("mirror: %v (%q)", err, name)
+	}
+	got := &corev1.Secret{}
+	if err := c.Get(context.Background(), types.NamespacedName{Name: "r1-dbroot", Namespace: "t1"}, got); err != nil {
+		t.Fatalf("mirror not created in the restore namespace: %v", err)
+	}
+	if string(got.Data["password"]) != "r00t" || len(got.OwnerReferences) != 1 || got.OwnerReferences[0].Kind != "SiteRestore" {
+		t.Fatalf("mirror content/owner wrong: %+v", got)
+	}
+	// idempotent refresh
+	src.Data["password"] = []byte("new")
+	_ = c.Update(context.Background(), src)
+	if _, err := mirrorSecretKey(context.Background(), c, scheme, sr, "mariadb", "mariadb-root-password", "password", "r1-dbroot"); err != nil {
+		t.Fatalf("second mirror: %v", err)
+	}
+	_ = c.Get(context.Background(), types.NamespacedName{Name: "r1-dbroot", Namespace: "t1"}, got)
+	if string(got.Data["password"]) != "new" {
+		t.Fatalf("mirror not refreshed")
 	}
 }
