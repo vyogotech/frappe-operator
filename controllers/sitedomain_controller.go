@@ -185,7 +185,12 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// origin). Inheriting the site annotations after these defaults lets a site
 	// opt in per-domain too, and stripInsecureOverrides below prevents opting back
 	// out when the policy is enforced.
-	forceHTTPS := effectiveTLS(r.EnforceHTTPS, site) || siteDomain.Spec.TLS != nil
+	// A `tls:` block with enabled: false is an explicit opt-out, not TLS config:
+	// treating its mere presence as "on" forced force-ssl-redirect (which the
+	// site's ssl-redirect: "false" cannot undo) and a TLS section on the Ingress,
+	// so plain-HTTP clusters got a 308 for every alias request.
+	domainTLS := siteDomain.Spec.TLS != nil && siteDomain.Spec.TLS.Enabled
+	forceHTTPS := effectiveTLS(r.EnforceHTTPS, site) || domainTLS
 	annotations := map[string]string{
 		"nginx.ingress.kubernetes.io/proxy-body-size": "100m",
 	}
@@ -214,7 +219,8 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		issuerName = r.DefaultClusterIssuer
 		issuerKind = "ClusterIssuer"
 	}
-	if issuerName != "" {
+	// Certificates are only requested when TLS is actually on for this domain.
+	if issuerName != "" && forceHTTPS {
 		if issuerKind == "ClusterIssuer" {
 			annotations["cert-manager.io/cluster-issuer"] = issuerName
 		} else {
@@ -263,13 +269,17 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					},
 				},
 			},
-			TLS: []networkingv1.IngressTLS{
-				{
-					Hosts:      []string{siteDomain.Spec.Domain},
-					SecretName: secretName,
-				},
-			},
 		},
+	}
+	// The TLS section only when TLS is on: with it present, ingress-nginx
+	// serves a fake cert for a missing Secret and redirects HTTP by default.
+	if forceHTTPS {
+		ingress.Spec.TLS = []networkingv1.IngressTLS{
+			{
+				Hosts:      []string{siteDomain.Spec.Domain},
+				SecretName: secretName,
+			},
+		}
 	}
 	_ = controllerutil.SetControllerReference(siteDomain, ingress, r.Scheme)
 
@@ -300,7 +310,7 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	siteDomain.Status.Phase = "Ready"
 	siteDomain.Status.IngressName = ingressName
-	siteDomain.Status.TLSCertificateIssued = true
+	siteDomain.Status.TLSCertificateIssued = forceHTTPS
 	siteDomain.Status.ObservedGeneration = siteDomain.Generation
 	r.setCondition(siteDomain, metav1.Condition{
 		Type:    "Ready",
