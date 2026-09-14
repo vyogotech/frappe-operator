@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -100,10 +101,45 @@ func (r *SiteAPIKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 
-	// Generate deterministic API Key & Secret
-	apiKeyStr := fmt.Sprintf("k8s_ak_%s_%s", site.Name, siteAPIKey.Name)
-	apiSecretStr := fmt.Sprintf("k8s_sec_%s_%s", site.Name, siteAPIKey.Name)
+	// Already minted: the Secret exists with a real key and we recorded it. Do
+	// not call generate_keys again — every call rotates the user's api_secret.
+	existing := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{Name: siteAPIKey.Spec.SecretName, Namespace: siteAPIKey.Namespace}, existing); err == nil &&
+		siteAPIKey.Status.APIKeyGenerated && len(existing.Data["api_key"]) > 0 && !strings.HasPrefix(string(existing.Data["api_key"]), "k8s_ak_") {
+		siteAPIKey.Status.Phase = "Ready"
+		siteAPIKey.Status.SecretCreated = true
+		siteAPIKey.Status.ObservedGeneration = siteAPIKey.Generation
+		_ = r.updateStatus(ctx, siteAPIKey)
+		return ctrl.Result{}, nil
+	}
 
+	// Mint the key pair through Frappe (`frappe.core.doctype.user.user.generate_keys`)
+	// as Administrator, exactly as a human would in Desk. The values written to
+	// the Secret are the ones Frappe will accept in `Authorization: token k:s`.
+	adminPassword, err := siteAdminPassword(ctx, r.Client, site)
+	if err != nil {
+		return r.failReconciliation(ctx, siteAPIKey, fmt.Sprintf("Failed to fetch admin password: %v", err), "AdminPasswordFailed")
+	}
+	frappeClient := r.FrappeClient
+	if frappeClient == nil {
+		baseURL := fmt.Sprintf("http://%s.%s.svc.cluster.local", site.Name, site.Namespace)
+		if site.Spec.BenchRef != nil && site.Spec.BenchRef.Name != "" {
+			baseURL = fmt.Sprintf("http://%s-nginx.%s.svc.cluster.local:8080", site.Spec.BenchRef.Name, site.Namespace)
+		}
+		c := NewFrappeClient(baseURL, "Administrator", adminPassword)
+		c.HostHeader = site.Status.ResolvedDomain
+		if c.HostHeader == "" {
+			c.HostHeader = site.Spec.SiteName
+		}
+		frappeClient = c
+	}
+	apiKeyStr, apiSecretStr, err := frappeClient.GenerateAPIKeys(ctx, siteAPIKey.Spec.User)
+	if err != nil {
+		return r.failReconciliation(ctx, siteAPIKey, fmt.Sprintf("Failed to generate API keys in Frappe: %v", err), "KeyGenerationFailed")
+	}
+	if apiKeyStr == "" || apiSecretStr == "" {
+		return r.failReconciliation(ctx, siteAPIKey, "Frappe returned an empty api_key/api_secret", "KeyGenerationFailed")
+	}
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      siteAPIKey.Spec.SecretName,
@@ -119,20 +155,21 @@ func (r *SiteAPIKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		},
 	}
 	_ = controllerutil.SetControllerReference(siteAPIKey, secret, r.Scheme)
-
 	var existingSecret corev1.Secret
-	err := r.Get(ctx, types.NamespacedName{Name: siteAPIKey.Spec.SecretName, Namespace: siteAPIKey.Namespace}, &existingSecret)
+	err = r.Get(ctx, types.NamespacedName{Name: siteAPIKey.Spec.SecretName, Namespace: siteAPIKey.Namespace}, &existingSecret)
 	if err != nil && errors.IsNotFound(err) {
 		if err := r.Create(ctx, secret); err != nil {
 			return r.failReconciliation(ctx, siteAPIKey, fmt.Sprintf("Failed to create K8s Secret: %v", err), "SecretCreationFailed")
 		}
 	} else if err == nil {
-		existingSecret.StringData = secret.StringData
+		existingSecret.Data = secret.Data
+		existingSecret.Labels = secret.Labels
 		if err := r.Update(ctx, &existingSecret); err != nil {
 			return r.failReconciliation(ctx, siteAPIKey, fmt.Sprintf("Failed to update K8s Secret: %v", err), "SecretUpdateFailed")
 		}
+	} else {
+		return r.failReconciliation(ctx, siteAPIKey, fmt.Sprintf("Failed to read K8s Secret: %v", err), "SecretReadFailed")
 	}
-
 	siteAPIKey.Status.Phase = "Ready"
 	siteAPIKey.Status.APIKeyGenerated = true
 	siteAPIKey.Status.SecretCreated = true
