@@ -75,3 +75,19 @@ func TestSiteInitJobNameAvoidsTheBenchJob(t *testing.T) {
 		t.Fatalf("got %q; no Job yet keeps the default name", got)
 	}
 }
+
+func TestNamespaceTerminating(t *testing.T) {
+	now := metav1.Now()
+	live := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "live"}}
+	going := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "going", DeletionTimestamp: &now, Finalizers: []string{"kubernetes"}}}
+	c := fake.NewClientBuilder().WithScheme(testScheme(t)).WithRuntimeObjects(live, going).Build()
+	if namespaceTerminating(context.Background(), c, "live") {
+		t.Fatalf("live namespace reported as terminating")
+	}
+	if !namespaceTerminating(context.Background(), c, "going") {
+		t.Fatalf("terminating namespace not detected")
+	}
+	if namespaceTerminating(context.Background(), c, "missing") {
+		t.Fatalf("unknown namespace must not be treated as terminating")
+	}
+}

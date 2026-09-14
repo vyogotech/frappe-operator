@@ -273,6 +273,17 @@ func (r *FrappeBenchReconciler) handleFinalizer(ctx context.Context, bench *vyog
 				return ctrl.Result{}, err
 			}
 
+			if namespaceTerminating(ctx, r.Client, bench.Namespace) {
+				// Everything in the namespace is going; cleanup Jobs cannot be
+				// created any more. Release the finalizer so the namespace can finish.
+				logger.Info("Namespace is terminating; releasing the FrappeBench finalizer", "bench", bench.Name)
+				controllerutil.RemoveFinalizer(bench, frappeBenchFinalizer)
+				if err := r.Update(ctx, bench); err != nil {
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{}, nil
+			}
+
 			// 1. Check for dependent sites
 			siteList := &vyogotechv1.FrappeSiteList{}
 			if err := r.List(ctx, siteList, client.InNamespace(bench.Namespace)); err != nil {
