@@ -416,6 +416,13 @@ func (in *FrappeBenchSpec) DeepCopyInto(out *FrappeBenchSpec) {
 		*out = new(RedisConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.CommonSiteConfig != nil {
+		in, out := &in.CommonSiteConfig, &out.CommonSiteConfig
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.DBConfig != nil {
 		in, out := &in.DBConfig, &out.DBConfig
 		*out = new(DatabaseConfig)
@@ -1405,6 +1412,11 @@ func (in *SiteAppSpec) DeepCopyInto(out *SiteAppSpec) {
 	if in.SiteRef != nil {
 		in, out := &in.SiteRef, &out.SiteRef
 		*out = new(NamespacedName)
+		**out = **in
+	}
+	if in.AutoMigrate != nil {
+		in, out := &in.AutoMigrate, &out.AutoMigrate
+		*out = new(bool)
 		**out = **in
 	}
 	if in.BackupBeforeInstall != nil {

@@ -49,6 +49,22 @@ cat > sites/common_site_config.json <<EOF
 }
 EOF
 
+# Bench-wide keys from FrappeBench.spec.commonSiteConfig, merged on top of the
+# defaults above (a site's own site_config.json cannot carry some of these,
+# e.g. server_script_enabled).
+EXTRA_COMMON_CONFIG='{{if .CommonSiteConfigJSON}}{{.CommonSiteConfigJSON}}{{else}}{}{{end}}'
+if [ "$EXTRA_COMMON_CONFIG" != "{}" ]; then
+  echo "Merging extra common_site_config keys..."
+  EXTRA_COMMON_CONFIG="$EXTRA_COMMON_CONFIG" python3 -c '
+import json, os
+p = "sites/common_site_config.json"
+c = json.load(open(p))
+c.update(json.loads(os.environ["EXTRA_COMMON_CONFIG"]))
+json.dump(c, open(p, "w"), indent=1)
+print("common_site_config keys:", sorted(c))
+'
+fi
+
 # Sync assets from the image cache to the Persistent Volume
 if [ -d "/home/frappe/assets_cache" ]; then
     echo "Syncing pre-built assets from image to PVC (preserving dynamic app hashes)..."

@@ -544,9 +544,10 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 	logger.Info("Creating bench init job", "job", jobName)
 
 	initScript, err := scripts.RenderScript(scripts.BenchInit, scripts.BenchInitData{
-		BenchName:         bench.Name,
-		RedisCacheAddress: r.resolveRedisCacheURL(ctx, bench),
-		RedisQueueAddress: r.resolveRedisQueueURL(ctx, bench),
+		BenchName:            bench.Name,
+		RedisCacheAddress:    r.resolveRedisCacheURL(ctx, bench),
+		RedisQueueAddress:    r.resolveRedisQueueURL(ctx, bench),
+		CommonSiteConfigJSON: commonSiteConfigJSON(bench.Spec.CommonSiteConfig),
 	})
 	if err != nil {
 		return false, fmt.Errorf("failed to render bench init script: %w", err)
@@ -860,4 +861,26 @@ func (r *FrappeBenchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return builder.Complete(r)
+}
+
+// commonSiteConfigJSON renders spec.commonSiteConfig for the bench init script:
+// values that parse as JSON (numbers, booleans, objects) are kept as JSON, the
+// rest become strings. Returns "{}" when nothing is configured.
+func commonSiteConfigJSON(cfg map[string]string) string {
+	out := map[string]interface{}{}
+	for k, v := range cfg {
+		if looksLikeJSON(v) {
+			var parsed interface{}
+			if err := json.Unmarshal([]byte(v), &parsed); err == nil {
+				out[k] = parsed
+				continue
+			}
+		}
+		out[k] = v
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
 }

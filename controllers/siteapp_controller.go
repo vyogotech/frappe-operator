@@ -559,6 +559,13 @@ bench build --app "$APP_NAME" 2>/dev/null || true
 echo "Clearing site cache..."
 bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
 
+# autoMigrate (default true): run the app's patches and after_migrate hooks.
+# install-app alone records patches as executed without running them.
+if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
+  echo "Running bench migrate (autoMigrate)..."
+  bench --site "$SITE_NAME" migrate
+fi
+
 # Post-install health probe: a bad app (e.g. one incompatible with the bench's
 # Frappe version) can leave the site unbootable so every desk request 500s. Do a
 # cheap boot of the site and enumerate installed apps; if this errors the site is
@@ -578,6 +585,7 @@ bench --site "$SITE_NAME" execute frappe.get_installed_apps
 			{Name: "FPM_REPO", Value: siteApp.Spec.FPMRepo},
 			{Name: "FPM_REPO_TYPE", Value: siteApp.Spec.FPMRepoType},
 			{Name: "FPM_VERSION", Value: fpmCLIVersion},
+			{Name: "AUTO_MIGRATE", Value: fmt.Sprintf("%t", siteApp.Spec.AutoMigrate == nil || *siteApp.Spec.AutoMigrate)},
 			{Name: "FRAPPE_VERSION", Value: bench.Spec.FrappeVersion},
 			{Name: "USER", Value: "frappe"},
 		}

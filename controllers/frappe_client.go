@@ -672,7 +672,10 @@ func (c *FrappeClient) EnsureClientScript(ctx context.Context, name, dt, script 
 	}
 	defer resp.Body.Close()
 
+	// Client Script is Prompt-named: the name must travel in the payload or
+	// Frappe answers "Please set the document name".
 	payload := map[string]interface{}{
+		"name":    name,
 		"dt":      dt,
 		"script":  script,
 		"enabled": enabledVal,
@@ -749,8 +752,11 @@ func (c *FrappeClient) EnsureWebhook(ctx context.Context, name, webhookDoctype, 
 	defer resp.Body.Close()
 
 	payload := map[string]interface{}{
+		// Prompt-named, and the event field is `webhook_docevent` in Frappe
+		// (`webhook_event` was silently ignored, leaving the webhook without one).
+		"name":              name,
 		"webhook_doctype":   webhookDoctype,
-		"webhook_event":     webhookEvent,
+		"webhook_docevent":  webhookEvent,
 		"request_url":       requestUrl,
 		"request_structure": requestStructure,
 		"enabled":           enabledVal,

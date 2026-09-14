@@ -112,6 +112,15 @@ spec:
                   AppsJSON is deprecated, use Apps instead
                   JSON array of app names (e.g., '["erpnext", "hrms"]')
                 type: string
+              commonSiteConfig:
+                additionalProperties:
+                  type: string
+                description: |-
+                  CommonSiteConfig adds bench-wide keys to sites/common_site_config.json when
+                  the bench is initialised (values that parse as JSON are applied as such,
+                  everything else as a string). Some Frappe settings can only live there —
+                  server_script_enabled, for one, is refused in a site's own config.
+                type: object
               componentAutoscaling:
                 additionalProperties:
                   description: |-
