@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -153,16 +152,7 @@ func (r *SiteCustomFieldReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 func (r *SiteCustomFieldReconciler) getAdminPassword(ctx context.Context, site *vyogotechv1.FrappeSite) (string, error) {
-	secretName := fmt.Sprintf("%s-admin-password", site.Name)
-	secret := &corev1.Secret{}
-	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: site.Namespace}, secret); err != nil {
-		return "", err
-	}
-	password := string(secret.Data["password"])
-	if password == "" {
-		return "", fmt.Errorf("password key missing or empty in secret %s", secretName)
-	}
-	return password, nil
+	return siteAdminPassword(ctx, r.Client, site)
 }
 
 func (r *SiteCustomFieldReconciler) failReconciliation(ctx context.Context, customField *vyogotechv1.SiteCustomField, msg, reason string) (ctrl.Result, error) {

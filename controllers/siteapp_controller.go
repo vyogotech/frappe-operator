@@ -273,7 +273,7 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 		// Rollback safety: before installing/upgrading the app, take a full backup
 		// and wait for it to succeed. The install job is not created until the
 		// preflight backup is done, so a corrupt install can always be reverted.
-		if siteApp.Spec.BackupBeforeInstall {
+		if siteApp.Spec.BackupBeforeInstall == nil || *siteApp.Spec.BackupBeforeInstall { // nil = default true
 			backupName := fmt.Sprintf("%s-pre-g%d", siteApp.Name, siteApp.Generation)
 			done, berr := ensurePreflightBackup(ctx, r.Client, siteApp.Namespace, site.Spec.SiteName, backupName)
 			if berr != nil {

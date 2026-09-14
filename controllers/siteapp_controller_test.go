@@ -358,7 +358,7 @@ func TestSiteAppReconciler_Reconcile_FPMInstallPath(t *testing.T) {
 			FPMPackage:          "frappe/wiki==3.0.0",
 			FPMRepo:             "ghcr.io/vyogotech/fpm",
 			FPMRepoType:         "oci",
-			BackupBeforeInstall: skipBackup, // skip preflight backup so the install Job is built now
+			BackupBeforeInstall: &skipBackup, // skip preflight backup so the install Job is built now
 		},
 	}
 	site := &vyogotechv1.FrappeSite{
