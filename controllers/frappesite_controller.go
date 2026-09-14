@@ -137,7 +137,13 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return ctrl.Result{}, err
 			}
 
-			if err := r.deleteSite(ctx, site); err != nil {
+			if namespaceTerminating(ctx, r.Client, site.Namespace) {
+				// No Job or Secret can be created in a terminating namespace, so
+				// `bench drop-site` cannot run: release the finalizer and leave the
+				// database in place (the same outcome as deletionPolicy Retain).
+				logger.Info("Namespace is terminating; skipping drop-site and releasing the finalizer (database retained)", "site", site.Name)
+				r.Recorder.Event(site, corev1.EventTypeWarning, "NamespaceTerminating", "Namespace is being deleted; database retained, finalizer released")
+			} else if err := r.deleteSite(ctx, site); err != nil {
 				logger.Error(err, "Failed to delete site, will requeue")
 				r.setCondition(site, metav1.Condition{
 					Type:    "Terminating",

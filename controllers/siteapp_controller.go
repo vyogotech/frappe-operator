@@ -180,9 +180,18 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// Just removing the finalizer would delete the console card but leave
 			// the app installed on the shared PVC — a bad app then keeps 500ing the
 			// desk. Run a bench uninstall-app Job and wait for it to complete.
-			res, removable, err := r.reconcileAppUninstallJob(ctx, siteApp, site)
-			if err != nil {
-				return res, err
+			removable := true
+			var res ctrl.Result
+			if namespaceTerminating(ctx, r.Client, siteApp.Namespace) {
+				// The bench PVC is going with the namespace; an uninstall Job could
+				// not even be created there. Release the finalizer.
+				log.FromContext(ctx).Info("Namespace is terminating; skipping uninstall Job and releasing the finalizer", "siteApp", siteApp.Name)
+			} else {
+				var err error
+				res, removable, err = r.reconcileAppUninstallJob(ctx, siteApp, site)
+				if err != nil {
+					return res, err
+				}
 			}
 			if !removable {
 				// Job still running (or just created) — requeue without removing
