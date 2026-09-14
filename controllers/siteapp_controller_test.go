@@ -539,3 +539,30 @@ func TestSiteAppReconciler_SecurityContext_OpenShift(t *testing.T) {
 		t.Errorf("expected AllowPrivilegeEscalation to be false on OpenShift, got %v", jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
 	}
 }
+
+// autoMigrate must run `bench migrate` on BOTH install paths (fpm and git):
+// install-app records patches as executed without running them, and the FPM
+// branch exits early, so a migrate placed only on the git path never ran for
+// packaged apps (found by the vyogo_probe FPM e2e).
+func TestSiteAppInstallScriptMigratesOnBothPaths(t *testing.T) {
+	split := strings.Index(siteAppInstallScript, "# 1) Clone the target app")
+	if split < 0 {
+		t.Fatalf("git path marker not found in install script")
+	}
+	fpmPart, gitPart := siteAppInstallScript[:split], siteAppInstallScript[split:]
+	if !strings.Contains(fpmPart, `if [ -n "$FPM_PACKAGE" ]`) || !strings.Contains(fpmPart, "exit 0") {
+		t.Fatalf("expected the FPM branch (with its early exit) before the git path")
+	}
+	for name, part := range map[string]string{"fpm": fpmPart, "git": gitPart} {
+		if !strings.Contains(part, `bench --site "$SITE_NAME" migrate`) {
+			t.Fatalf("%s install path never runs bench migrate for autoMigrate", name)
+		}
+		if !strings.Contains(part, `"${AUTO_MIGRATE:-true}" = "true"`) {
+			t.Fatalf("%s install path migrate is not gated on AUTO_MIGRATE", name)
+		}
+	}
+	// The FPM branch must migrate before its early exit.
+	if strings.Index(fpmPart, `bench --site "$SITE_NAME" migrate`) > strings.LastIndex(fpmPart, "exit 0") {
+		t.Fatalf("fpm path runs migrate after its exit 0")
+	}
+}

@@ -273,50 +273,9 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return r.reconcileAppInstallJob(ctx, siteApp, site)
 }
 
-func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp *vyogotechv1.SiteApp, site *vyogotechv1.FrappeSite) (ctrl.Result, error) {
-	jobName := fmt.Sprintf("%s-app-install", siteApp.Name)
-	job := &batchv1.Job{}
-	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
-
-	if errors.IsNotFound(err) {
-		// Rollback safety: before installing/upgrading the app, take a full backup
-		// and wait for it to succeed. The install job is not created until the
-		// preflight backup is done, so a corrupt install can always be reverted.
-		if siteApp.Spec.BackupBeforeInstall == nil || *siteApp.Spec.BackupBeforeInstall { // nil = default true
-			backupName := fmt.Sprintf("%s-pre-g%d", siteApp.Name, siteApp.Generation)
-			done, berr := ensurePreflightBackup(ctx, r.Client, siteApp.Namespace, site.Spec.SiteName, backupName)
-			if berr != nil {
-				return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Pre-install backup failed: %v", berr), "PreBackupFailed")
-			}
-			if !done {
-				siteApp.Status.Phase = "BackingUp"
-				siteApp.Status.PreBackupRef = backupName
-				r.setCondition(siteApp, metav1.Condition{
-					Type:    "Ready",
-					Status:  metav1.ConditionFalse,
-					Reason:  "BackingUp",
-					Message: fmt.Sprintf("Taking pre-install backup %s before installing %s", backupName, siteApp.Spec.AppName),
-				})
-				_ = r.updateStatus(ctx, siteApp)
-				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-			}
-			siteApp.Status.PreBackupRef = backupName
-		}
-
-		bench := &vyogotechv1.FrappeBench{}
-		benchName := site.Spec.BenchRef.Name
-		benchNamespace := site.Spec.BenchRef.Namespace
-		if benchNamespace == "" {
-			benchNamespace = site.Namespace
-		}
-		if err := r.Get(ctx, types.NamespacedName{Name: benchName, Namespace: benchNamespace}, bench); err != nil {
-			return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Failed to fetch referenced bench %s: %v", benchName, err), "BenchNotFound")
-		}
-
-		image := resolveBenchImage(bench)
-		pvcName := fmt.Sprintf("%s-sites", bench.Name)
-
-		script := `#!/bin/bash
+// siteAppInstallScript is the SiteApp install Job script. Both install paths
+// (FPM package, then git) honour AUTO_MIGRATE; see TestSiteAppInstallScript*.
+const siteAppInstallScript = `#!/bin/bash
 set -e
 
 mkdir -p /home/frappe/frappe-bench/logs 2>/dev/null || true
@@ -516,6 +475,11 @@ if [ -n "$FPM_PACKAGE" ]; then
   # 404s (only the framework's /assets/frappe/* load). ln -sfn is idempotent.
   [ -d "$DEST/$APP_NAME/public" ] && ln -sfn "$DEST/$APP_NAME/public" "/home/frappe/frappe-bench/sites/assets/$APP_NAME"
   bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
+  # autoMigrate (default true), same as the git path: patches + after_migrate.
+  if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
+    echo "Running bench migrate (autoMigrate)..."
+    bench --site "$SITE_NAME" migrate
+  fi
   echo "Verifying site health after FPM install..."
   bench --site "$SITE_NAME" execute frappe.get_installed_apps
   echo "FPM install complete for $APP_NAME."
@@ -575,6 +539,51 @@ fi
 echo "Verifying site health after install..."
 bench --site "$SITE_NAME" execute frappe.get_installed_apps
 `
+
+func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp *vyogotechv1.SiteApp, site *vyogotechv1.FrappeSite) (ctrl.Result, error) {
+	jobName := fmt.Sprintf("%s-app-install", siteApp.Name)
+	job := &batchv1.Job{}
+	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
+
+	if errors.IsNotFound(err) {
+		// Rollback safety: before installing/upgrading the app, take a full backup
+		// and wait for it to succeed. The install job is not created until the
+		// preflight backup is done, so a corrupt install can always be reverted.
+		if siteApp.Spec.BackupBeforeInstall == nil || *siteApp.Spec.BackupBeforeInstall { // nil = default true
+			backupName := fmt.Sprintf("%s-pre-g%d", siteApp.Name, siteApp.Generation)
+			done, berr := ensurePreflightBackup(ctx, r.Client, siteApp.Namespace, site.Spec.SiteName, backupName)
+			if berr != nil {
+				return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Pre-install backup failed: %v", berr), "PreBackupFailed")
+			}
+			if !done {
+				siteApp.Status.Phase = "BackingUp"
+				siteApp.Status.PreBackupRef = backupName
+				r.setCondition(siteApp, metav1.Condition{
+					Type:    "Ready",
+					Status:  metav1.ConditionFalse,
+					Reason:  "BackingUp",
+					Message: fmt.Sprintf("Taking pre-install backup %s before installing %s", backupName, siteApp.Spec.AppName),
+				})
+				_ = r.updateStatus(ctx, siteApp)
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
+			siteApp.Status.PreBackupRef = backupName
+		}
+
+		bench := &vyogotechv1.FrappeBench{}
+		benchName := site.Spec.BenchRef.Name
+		benchNamespace := site.Spec.BenchRef.Namespace
+		if benchNamespace == "" {
+			benchNamespace = site.Namespace
+		}
+		if err := r.Get(ctx, types.NamespacedName{Name: benchName, Namespace: benchNamespace}, bench); err != nil {
+			return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Failed to fetch referenced bench %s: %v", benchName, err), "BenchNotFound")
+		}
+
+		image := resolveBenchImage(bench)
+		pvcName := fmt.Sprintf("%s-sites", bench.Name)
+
+		script := siteAppInstallScript
 
 		env := []corev1.EnvVar{
 			{Name: "APP_NAME", Value: siteApp.Spec.AppName},
