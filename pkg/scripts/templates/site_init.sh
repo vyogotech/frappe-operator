@@ -349,8 +349,8 @@ fi
 # Force update apps.txt to ensure it reflects current image state
 # The apps directory in the container is the source of truth
 if [ -d "apps" ]; then
-    echo "Updating apps.txt from container image..."
-    ls -1 apps > sites/apps.txt || echo "Warning: Failed to update apps.txt"
+    echo "Updating apps.txt (image apps + apps installed on the shared volume)..."
+    { { ls -1 apps 2>/dev/null; for d in sites/apps/*/; do [ -d "$d" ] && basename "$d"; done; } | grep -v '^__pycache__$' | grep -v '^$' | awk '!seen[$0]++' > sites/apps.txt.new && mv sites/apps.txt.new sites/apps.txt; } || echo "Warning: Failed to update apps.txt"
     # Create symlink if needed (bench expects apps.txt in root)
     ln -sf sites/apps.txt apps.txt || cp sites/apps.txt apps.txt || echo "Warning: Failed to create apps.txt in root"
 else

@@ -386,3 +386,13 @@ func applyDefaultJobTTL(spec *batchv1.JobSpec) {
 	}
 	spec.TTLSecondsAfterFinished = int32Ptr(resources.DefaultJobTTL)
 }
+
+// appsTxtSyncCmd rebuilds sites/apps.txt for a Job pod as the UNION of the
+// apps baked into the image (apps/) and the apps SiteApp installed onto the
+// shared volume (sites/apps/<name>/). Every site Job must use this instead of
+// `ls -1 apps > sites/apps.txt`: that overwrote the file with the image's list,
+// and the next `bench migrate` then treated a SiteApp-installed app's DocTypes
+// as orphans and DELETED them ("Removing orphan doctypes"). The bench root's
+// apps.txt is only ever a symlink to sites/apps.txt (the image layer is
+// ephemeral), so the link is re-created too.
+const appsTxtSyncCmd = `cd /home/frappe/frappe-bench && { { ls -1 apps 2>/dev/null; for d in sites/apps/*/; do [ -d "$d" ] && basename "$d"; done; } | grep -v '^__pycache__$' | grep -v '^$' | awk '!seen[$0]++' > sites/apps.txt.new && mv sites/apps.txt.new sites/apps.txt; ln -sf sites/apps.txt apps.txt; }`

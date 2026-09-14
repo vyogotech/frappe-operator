@@ -120,7 +120,8 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// starts fresh. Recreate it from the image's apps/ dir (the source of
 	// truth) before invoking bench, same as site_init.sh does.
 	cmdStr := fmt.Sprintf(
-		"cd /home/frappe/frappe-bench && { [ -d apps ] && ls -1 apps > sites/apps.txt && ln -sf sites/apps.txt apps.txt; }; bench --site %s migrate",
+		"%s; bench --site %s migrate",
+		appsTxtSyncCmd,
 		site.Status.ResolvedDomain,
 	)
 	if siteMigration.Spec.SkipFixtures {
