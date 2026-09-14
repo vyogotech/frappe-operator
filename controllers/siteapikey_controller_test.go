@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -54,11 +56,28 @@ func TestSiteAPIKeyReconciler_Reconcile_Success(t *testing.T) {
 		},
 	}
 
-	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteKey, site).WithStatusSubresource(siteKey).Build()
+	adminSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "site1-admin", Namespace: "default"}, Data: map[string][]byte{"password": []byte("pw")}}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteKey, site, adminSecret).WithStatusSubresource(siteKey).Build()
+	// A stand-in for Frappe: generate_keys answers with a real-looking pair.
+	calls := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
+		case "/api/method/login":
+			w.Header().Set("Set-Cookie", "sid=abc")
+			_, _ = w.Write([]byte(`{"message":"Logged In"}`))
+		case "/api/method/frappe.core.doctype.user.user.generate_keys":
+			calls++
+			_, _ = w.Write([]byte(`{"message":{"api_key":"realkey123","api_secret":"realsecret456"}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
 	r := &SiteAPIKeyReconciler{
-		Client:   client,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(10),
+		Client:       client,
+		Scheme:       scheme,
+		Recorder:     record.NewFakeRecorder(10),
+		FrappeClient: NewFrappeClient(ts.URL, "Administrator", "pw"),
 	}
 
 	ctx := context.Background()
@@ -85,6 +104,16 @@ func TestSiteAPIKeyReconciler_Reconcile_Success(t *testing.T) {
 	}
 	if string(secret.Data["user"]) != "Administrator" {
 		t.Errorf("expected secret user Administrator, got %s", string(secret.Data["user"]))
+	}
+	if string(secret.Data["api_key"]) != "realkey123" || string(secret.Data["api_secret"]) != "realsecret456" {
+		t.Errorf("secret must carry the pair Frappe minted, got %q/%q", secret.Data["api_key"], secret.Data["api_secret"])
+	}
+	// A second reconcile must not rotate the secret again.
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "key1", Namespace: "default"}}); err != nil {
+		t.Fatalf("second reconcile: %v", err)
+	}
+	if calls != 1 {
+		t.Errorf("generate_keys called %d times; must be idempotent once minted", calls)
 	}
 }
 
