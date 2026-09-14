@@ -127,7 +127,8 @@ func (r *SiteCronReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// the site-init Job created in its own now-gone container layer, so recreate
 	// it from the image's apps/ dir before invoking bench.
 	cmdStr := fmt.Sprintf(
-		"cd /home/frappe/frappe-bench && { [ -d apps ] && ls -1 apps > sites/apps.txt && ln -sf sites/apps.txt apps.txt; }; bench --site %s execute %s",
+		"%s; bench --site %s execute %s",
+		appsTxtSyncCmd,
 		site.Status.ResolvedDomain, siteCron.Spec.Method,
 	)
 

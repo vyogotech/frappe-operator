@@ -191,7 +191,7 @@ func buildConfigJob(sc *vyogotechv1.SiteConfig, bench *vyogotechv1.FrappeBench, 
 	// site-init Job's own symlink lives in its container's writable layer and is
 	// gone by the time this Job's pod starts.
 	script := "set -e\ncd /home/frappe/frappe-bench\n" +
-		"if [ -d apps ]; then ls -1 apps > sites/apps.txt; ln -sf sites/apps.txt apps.txt; fi\n" +
+		appsTxtSyncCmd + "\n" +
 		strings.Join(cmds, "\n") + "\n"
 	jobName := fmt.Sprintf("%s-apply-%d", sc.Name, sc.Generation)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)

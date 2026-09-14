@@ -206,8 +206,11 @@ func TestSiteMigrationReconciler_Reconcile_JobMountAndCommand(t *testing.T) {
 	if !strings.Contains(script, "cd /home/frappe/frappe-bench") {
 		t.Errorf("migrate Job script does not cd into the bench root: %q", script)
 	}
-	if !strings.Contains(script, "ls -1 apps > sites/apps.txt") || !strings.Contains(script, "ln -sf sites/apps.txt apps.txt") {
-		t.Errorf("migrate Job script does not recreate apps.txt at the bench root: %q", script)
+	// apps.txt must be the union of image apps and SiteApp-installed apps
+	// (sites/apps/*), never the image list alone — that made migrate delete
+	// SiteApp doctypes as orphans.
+	if strings.Contains(script, "ls -1 apps > sites/apps.txt") || !strings.Contains(script, "sites/apps/*/") || !strings.Contains(script, "ln -sf sites/apps.txt apps.txt") {
+		t.Errorf("migrate Job script does not rebuild apps.txt as image+volume union at the bench root: %q", script)
 	}
 	if !strings.Contains(script, "bench --site primary.example.com migrate") {
 		t.Errorf("migrate Job script does not run bench migrate against the resolved domain: %q", script)

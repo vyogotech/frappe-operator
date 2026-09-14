@@ -196,3 +196,21 @@ func TestBuildConfigJobHasBenchJobEnv(t *testing.T) {
 		t.Fatalf("config Job must set HOME, got %+v", e)
 	}
 }
+
+func TestJobsNeverOverwriteAppsTxtWithTheImageList(t *testing.T) {
+	sc := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "vyogo-cloud"},
+		Spec:       vyogotechv1.SiteConfigSpec{SiteRef: &vyogotechv1.NamespacedName{Name: "cp"}, CustomConfig: map[string]string{"k": "v"}},
+	}
+	job, _ := buildConfigJob(sc, &vyogotechv1.FrappeBench{}, "cp.example", "img")
+	script := strings.Join(job.Spec.Template.Spec.Containers[0].Command, " ")
+	if strings.Contains(script, "ls -1 apps > sites/apps.txt") {
+		t.Fatalf("config Job overwrites apps.txt with the image list; SiteApp-installed apps would be dropped and their DocTypes deleted on migrate")
+	}
+	if !strings.Contains(script, "sites/apps/*/") {
+		t.Fatalf("config Job must include apps installed on the shared volume in apps.txt")
+	}
+	if !strings.Contains(appsTxtSyncCmd, "ln -sf sites/apps.txt apps.txt") {
+		t.Fatalf("bench root apps.txt link missing")
+	}
+}
