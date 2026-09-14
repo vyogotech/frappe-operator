@@ -119,6 +119,15 @@ func TestSiteDomainReconciler_HTTPSPolicy(t *testing.T) {
 			wantRedirect: "",
 		},
 		{
+			// tls: {enabled: false} is an opt-out, not TLS config (probe e2e on
+			// kind: every alias request 308'd to https).
+			name:            "domain TLS explicitly disabled, policy off: no forced redirect",
+			enforceHTTPS:    false,
+			domainTLS:       &vyogotechv1.SiteDomainTLSSpec{Enabled: false},
+			siteAnnotations: map[string]string{"nginx.ingress.kubernetes.io/ssl-redirect": "false"},
+			wantRedirect:    "false",
+		},
+		{
 			name:         "domain has its own TLS: redirect added regardless of policy",
 			enforceHTTPS: false,
 			domainTLS:    &vyogotechv1.SiteDomainTLSSpec{Enabled: true, SecretName: "acme-tls"},
@@ -189,6 +198,17 @@ func TestSiteDomainReconciler_HTTPSPolicy(t *testing.T) {
 				t.Errorf("expected no ssl-redirect annotation, got %q", got)
 			} else if tt.wantRedirect != "" && got != tt.wantRedirect {
 				t.Errorf("expected ssl-redirect %q, got %q", tt.wantRedirect, got)
+			}
+			// TLS on <=> force-ssl-redirect + an Ingress TLS section + issued flag.
+			tlsOn := tt.enforceHTTPS || (tt.domainTLS != nil && tt.domainTLS.Enabled)
+			if _, forced := ingress.Annotations["nginx.ingress.kubernetes.io/force-ssl-redirect"]; forced != tlsOn {
+				t.Errorf("force-ssl-redirect present=%v, want %v", forced, tlsOn)
+			}
+			if (len(ingress.Spec.TLS) > 0) != tlsOn {
+				t.Errorf("Ingress TLS section present=%v, want %v", len(ingress.Spec.TLS) > 0, tlsOn)
+			}
+			if updatedDomain.Status.TLSCertificateIssued != tlsOn {
+				t.Errorf("status.tlsCertificateIssued=%v, want %v", updatedDomain.Status.TLSCertificateIssued, tlsOn)
 			}
 
 			select {
