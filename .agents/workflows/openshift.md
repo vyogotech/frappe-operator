@@ -29,7 +29,9 @@ and every HTTP surface must have a Route path.**
    `controllers/security_context.go` — never hand-written. On OpenShift they
    leave `runAsUser` unset (SCC assigns a UID from the project range), set
    `fsGroup` inside the namespace's `openshift.io/sa.scc.supplemental-groups`
-   range, drop all capabilities and forbid privilege escalation.
+   range (`getNamespaceFSGroup`), apply the project's SELinux MCS label
+   (`getNamespaceMCSLabel`), drop all capabilities and forbid privilege
+   escalation.
 2. No `runAsUser: 0`, no `fsGroup: 0`, no `privileged`, no hostPath, no
    `hostNetwork`, no added capabilities. Anything needing root does not ship.
 3. Scripts must not assume uid 1000 or a writable `$HOME` — set `HOME=/tmp`,
