@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,7 +48,7 @@ func TestSiteDomainReconciler_Reconcile_Success(t *testing.T) {
 			SiteRef: &vyogotechv1.NamespacedName{Name: "site1"},
 			Domain:  "erp.acmecorp.com",
 			TLS: &vyogotechv1.SiteDomainTLSSpec{
-				Enabled:    true,
+				Enabled:    ptrBool(true),
 				SecretName: "acme-tls",
 			},
 		},
@@ -123,14 +125,14 @@ func TestSiteDomainReconciler_HTTPSPolicy(t *testing.T) {
 			// kind: every alias request 308'd to https).
 			name:            "domain TLS explicitly disabled, policy off: no forced redirect",
 			enforceHTTPS:    false,
-			domainTLS:       &vyogotechv1.SiteDomainTLSSpec{Enabled: false},
+			domainTLS:       &vyogotechv1.SiteDomainTLSSpec{Enabled: ptrBool(false)},
 			siteAnnotations: map[string]string{"nginx.ingress.kubernetes.io/ssl-redirect": "false"},
 			wantRedirect:    "false",
 		},
 		{
 			name:         "domain has its own TLS: redirect added regardless of policy",
 			enforceHTTPS: false,
-			domainTLS:    &vyogotechv1.SiteDomainTLSSpec{Enabled: true, SecretName: "acme-tls"},
+			domainTLS:    &vyogotechv1.SiteDomainTLSSpec{Enabled: ptrBool(true), SecretName: "acme-tls"},
 			wantRedirect: "true",
 		},
 		{
@@ -200,7 +202,7 @@ func TestSiteDomainReconciler_HTTPSPolicy(t *testing.T) {
 				t.Errorf("expected ssl-redirect %q, got %q", tt.wantRedirect, got)
 			}
 			// TLS on <=> force-ssl-redirect + an Ingress TLS section + issued flag.
-			tlsOn := tt.enforceHTTPS || (tt.domainTLS != nil && tt.domainTLS.Enabled)
+			tlsOn := tt.enforceHTTPS || tt.domainTLS.TLSEnabled()
 			if _, forced := ingress.Annotations["nginx.ingress.kubernetes.io/force-ssl-redirect"]; forced != tlsOn {
 				t.Errorf("force-ssl-redirect present=%v, want %v", forced, tlsOn)
 			}
@@ -386,5 +388,36 @@ func TestSiteDomainReconciler_SecurityContext_OpenShift(t *testing.T) {
 	}
 	if jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser != nil {
 		t.Errorf("expected container RunAsUser to be nil on OpenShift, got %v", *jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser)
+	}
+}
+
+func ptrBool(b bool) *bool { return &b }
+
+// An explicit tls.enabled=false must survive a round trip through the API
+// server: with a plain bool + omitempty it was dropped and the CRD default
+// (true) re-enabled TLS on the first finalizer update (probe e2e on kind:
+// every alias request was a 308).
+func TestSiteDomainTLSEnabledFalseSerializes(t *testing.T) {
+	spec := vyogotechv1.SiteDomainSpec{
+		SiteRef: &vyogotechv1.NamespacedName{Name: "s"},
+		Domain:  "erp.example.com",
+		TLS:     &vyogotechv1.SiteDomainTLSSpec{Enabled: ptrBool(false)},
+	}
+	b, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"enabled":false`) {
+		t.Fatalf("tls.enabled=false was dropped from the wire form: %s", b)
+	}
+	if spec.TLS.TLSEnabled() {
+		t.Fatal("TLSEnabled() must be false for an explicit enabled: false")
+	}
+	if !(&vyogotechv1.SiteDomainTLSSpec{}).TLSEnabled() {
+		t.Fatal("TLSEnabled() must default to true when enabled is unset")
+	}
+	var nilTLS *vyogotechv1.SiteDomainTLSSpec
+	if nilTLS.TLSEnabled() {
+		t.Fatal("TLSEnabled() must be false with no tls block")
 	}
 }

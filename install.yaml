@@ -5443,7 +5443,11 @@ spec:
                 properties:
                   enabled:
                     default: true
-                    description: Enabled determines whether to generate an automated TLS certificate.
+                    description: |-
+                      Enabled determines whether to generate an automated TLS certificate.
+                      A pointer so an explicit `enabled: false` survives serialization: a plain
+                      bool with omitempty is dropped when the controller updates the object and
+                      the CRD default (true) silently re-enables TLS.
                     type: boolean
                   issuerRef:
                     description: IssuerRef references a cert-manager ClusterIssuer or Issuer.

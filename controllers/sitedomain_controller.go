@@ -136,8 +136,11 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Add finalizer if missing
 	if !controllerutil.ContainsFinalizer(siteDomain, siteDomainFinalizer) {
+		// Patch (not Update) so the spec is never re-serialized: an Update
+		// drops omitempty zero values and lets CRD defaults overwrite them.
+		patch := client.MergeFrom(siteDomain.DeepCopy())
 		controllerutil.AddFinalizer(siteDomain, siteDomainFinalizer)
-		if err := r.Update(ctx, siteDomain); err != nil {
+		if err := r.Patch(ctx, siteDomain, patch); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -189,7 +192,7 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// treating its mere presence as "on" forced force-ssl-redirect (which the
 	// site's ssl-redirect: "false" cannot undo) and a TLS section on the Ingress,
 	// so plain-HTTP clusters got a 308 for every alias request.
-	domainTLS := siteDomain.Spec.TLS != nil && siteDomain.Spec.TLS.Enabled
+	domainTLS := siteDomain.Spec.TLS.TLSEnabled()
 	forceHTTPS := effectiveTLS(r.EnforceHTTPS, site) || domainTLS
 	annotations := map[string]string{
 		"nginx.ingress.kubernetes.io/proxy-body-size": "100m",
