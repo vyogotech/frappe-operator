@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -183,5 +184,46 @@ func TestFrappeClient_CreatePayloadsCarryNameAndDocevent(t *testing.T) {
 	wh := bodies["/api/resource/Webhook"]
 	if wh["name"] != "hook" || wh["webhook_docevent"] != "on_update" {
 		t.Fatalf("webhook payload must carry name and webhook_docevent: %v", wh)
+	}
+}
+
+// User Permission is hash-named: existence is decided by a filtered list, an
+// existing one is updated by its real name, and a 409 on create is success.
+func TestFrappeClient_EnsureUserPermissionIsIdempotent(t *testing.T) {
+	posts, puts := 0, 0
+	exists := false
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/method/login":
+			_, _ = w.Write([]byte(`{"message":"Logged In"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/resource/User Permission":
+			if !strings.Contains(r.URL.RawQuery, "filters=") {
+				t.Errorf("lookup must filter by fields, got %s", r.URL.RawQuery)
+			}
+			if exists {
+				_, _ = w.Write([]byte(`{"data":[{"name":"u06fsnkpl1"}]}`))
+			} else {
+				_, _ = w.Write([]byte(`{"data":[]}`))
+			}
+		case r.Method == http.MethodPost:
+			posts++
+			exists = true
+			_, _ = w.Write([]byte(`{"data":{"name":"u06fsnkpl1"}}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/api/resource/User Permission/u06fsnkpl1":
+			puts++
+			_, _ = w.Write([]byte(`{"data":{}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+	c := NewFrappeClient(ts.URL, "Administrator", "pw")
+	for i := 0; i < 2; i++ {
+		if err := c.EnsureUserPermission(context.Background(), "u@x", "Probe Record", "seed-00002", true); err != nil {
+			t.Fatalf("round %d: %v", i, err)
+		}
+	}
+	if posts != 1 || puts != 1 {
+		t.Fatalf("want one create then one update by real name, got posts=%d puts=%d", posts, puts)
 	}
 }

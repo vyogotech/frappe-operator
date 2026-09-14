@@ -816,19 +816,33 @@ func (c *FrappeClient) EnsureUserPermission(ctx context.Context, user, allow, fo
 	if !applyToAllDoctypes {
 		applyAllVal = 0
 	}
+	label := fmt.Sprintf("%s/%s/%s", user, allow, forValue)
 
-	name := fmt.Sprintf("%s-%s-%s", user, allow, forValue)
-	permURL := fmt.Sprintf("%s/api/resource/User Permission/%s", c.BaseURL, url.PathEscape(name))
-	req, err := c.newRequest(ctx, http.MethodGet, permURL, nil)
+	// User Permission is hash-named by Frappe, so look it up by its fields —
+	// a lookup by a composed name never matches, and the retry then POSTs a
+	// duplicate (409 "User permission already exists") on every reconcile.
+	filters, _ := json.Marshal([][]string{{"user", "=", user}, {"allow", "=", allow}, {"for_value", "=", forValue}})
+	listURL := fmt.Sprintf("%s/api/resource/User Permission?filters=%s&fields=%s&limit_page_length=1",
+		c.BaseURL, url.QueryEscape(string(filters)), url.QueryEscape(`["name"]`))
+	req, err := c.newRequest(ctx, http.MethodGet, listURL, nil)
 	if err != nil {
 		return err
 	}
-
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to check user permission %s: status %d: %s", label, resp.StatusCode, string(body))
+	}
+	var listed struct {
+		Data []struct {
+			Name string `json:"name"`
+		} `json:"data"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&listed)
 
 	payload := map[string]interface{}{
 		"user":                  user,
@@ -838,7 +852,7 @@ func (c *FrappeClient) EnsureUserPermission(ctx context.Context, user, allow, fo
 	}
 	payloadBytes, _ := json.Marshal(payload)
 
-	if resp.StatusCode == http.StatusNotFound {
+	if len(listed.Data) == 0 {
 		createURL := fmt.Sprintf("%s/api/resource/User Permission", c.BaseURL)
 		req, err := c.newRequest(ctx, http.MethodPost, createURL, bytes.NewReader(payloadBytes))
 		if err != nil {
@@ -850,31 +864,31 @@ func (c *FrappeClient) EnsureUserPermission(ctx context.Context, user, allow, fo
 			return err
 		}
 		defer createResp.Body.Close()
-		if createResp.StatusCode != http.StatusOK && createResp.StatusCode != http.StatusCreated {
-			body, _ := io.ReadAll(createResp.Body)
-			return fmt.Errorf("failed to create user permission %s: status %d: %s", name, createResp.StatusCode, string(body))
+		switch createResp.StatusCode {
+		case http.StatusOK, http.StatusCreated:
+			return nil
+		case http.StatusConflict:
+			// Created by a racing reconcile: the desired state exists.
+			return nil
 		}
-		return nil
+		body, _ := io.ReadAll(createResp.Body)
+		return fmt.Errorf("failed to create user permission %s: status %d: %s", label, createResp.StatusCode, string(body))
 	}
 
-	if resp.StatusCode == http.StatusOK {
-		req, err := c.newRequest(ctx, http.MethodPut, permURL, bytes.NewReader(payloadBytes))
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Content-Type", "application/json")
-		updateResp, err := c.HTTPClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer updateResp.Body.Close()
-		if updateResp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(updateResp.Body)
-			return fmt.Errorf("failed to update user permission %s: status %d: %s", name, updateResp.StatusCode, string(body))
-		}
-		return nil
+	permURL := fmt.Sprintf("%s/api/resource/User Permission/%s", c.BaseURL, url.PathEscape(listed.Data[0].Name))
+	req, err = c.newRequest(ctx, http.MethodPut, permURL, bytes.NewReader(payloadBytes))
+	if err != nil {
+		return err
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	return fmt.Errorf("failed to check user permission %s: status %d: %s", name, resp.StatusCode, string(body))
+	req.Header.Set("Content-Type", "application/json")
+	updateResp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer updateResp.Body.Close()
+	if updateResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(updateResp.Body)
+		return fmt.Errorf("failed to update user permission %s: status %d: %s", label, updateResp.StatusCode, string(body))
+	}
+	return nil
 }
