@@ -105,6 +105,9 @@ type BenchInitData struct {
 	BenchName         string
 	RedisCacheAddress string
 	RedisQueueAddress string
+	// CommonSiteConfigJSON is a JSON object of extra keys merged into
+	// common_site_config.json after the defaults are written ("{}" for none).
+	CommonSiteConfigJSON string
 }
 
 // SiteBackupData provides data for site backup script

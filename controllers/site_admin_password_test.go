@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -89,5 +90,17 @@ func TestNamespaceTerminating(t *testing.T) {
 	}
 	if namespaceTerminating(context.Background(), c, "missing") {
 		t.Fatalf("unknown namespace must not be treated as terminating")
+	}
+}
+
+func TestCommonSiteConfigJSON(t *testing.T) {
+	if got := commonSiteConfigJSON(nil); got != "{}" {
+		t.Fatalf("empty config must render {}, got %s", got)
+	}
+	got := commonSiteConfigJSON(map[string]string{"server_script_enabled": "1", "mail_server": "smtp.example", "allow": "true"})
+	for _, want := range []string{`"server_script_enabled":1`, `"mail_server":"smtp.example"`, `"allow":true`} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("%s missing from %s", want, got)
+		}
 	}
 }

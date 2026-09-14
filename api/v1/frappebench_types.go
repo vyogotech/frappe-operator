@@ -48,6 +48,13 @@ type FrappeBenchSpec struct {
 	// +optional
 	StorageClassName string `json:"storageClassName,omitempty"`
 
+	// CommonSiteConfig adds bench-wide keys to sites/common_site_config.json when
+	// the bench is initialised (values that parse as JSON are applied as such,
+	// everything else as a string). Some Frappe settings can only live there —
+	// server_script_enabled, for one, is refused in a site's own config.
+	// +optional
+	CommonSiteConfig map[string]string `json:"commonSiteConfig,omitempty"`
+
 	// StorageSize for the bench PVC (e.g., "10Gi")
 	// +optional
 	// +kubebuilder:default="10Gi"
