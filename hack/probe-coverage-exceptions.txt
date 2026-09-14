@@ -1,0 +1,9 @@
+# CRDs the probe (vyogotech/frappe-operator-probe) is allowed NOT to exercise.
+# One per line: <Kind> <reason>. Every other CRD in config/crd/bases must have
+# a `kind: <Kind>` manifest in the probe's manifests/ (hack/check-probe-coverage.sh).
+# Implementing one of these means removing it here and adding a probe phase.
+FrappeWorkspace     scaffold only: spec has just `description`, controller is a no-op
+SiteDashboard       scaffold only: spec has just `description`, controller is a no-op
+SiteDashboardChart  scaffold only: spec has just `description`, controller is a no-op
+SiteJob             scaffold only: spec has just `description`, controller is a no-op
+SiteWorkspace       scaffold only: spec has just `description`, controller is a no-op
