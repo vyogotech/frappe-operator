@@ -118,6 +118,10 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run unit tests (includes root package and all modules, excludes test/ subdirectory).
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
+.PHONY: probe-coverage
+probe-coverage: ## Check every CRD is exercised by the probe app (PROBE_DIR=../frappe-operator-probe).
+	hack/check-probe-coverage.sh $(PROBE_DIR)
+
 .PHONY: integration-test
 integration-test: manifests generate fmt vet envtest ## Run integration tests (requires a real cluster).
 	INTEGRATION_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./test/integration/...

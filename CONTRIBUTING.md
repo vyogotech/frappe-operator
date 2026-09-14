@@ -116,6 +116,28 @@ Closes #123
 4. **Keep changes focused** - one feature/fix per PR
 5. **Add comments** for complex logic
 
+### Acceptance test: the probe app
+
+Every operator change is run against [vyogotech/frappe-operator-probe](https://github.com/vyogotech/frappe-operator-probe)
+by the `probe e2e` workflow: it builds the operator image from your commit and
+exercises every CR on a kind cluster, installing the `vyogo_probe` Frappe app
+from git and from its FPM package. A red probe blocks the change.
+
+Rules that follow from this:
+
+1. **A new CRD ships with probe coverage.** Add a `manifests/NN-<kind>.yaml`
+   and a phase in `probe.py` to the probe repo (in the same change set), or —
+   only for an unimplemented scaffold — list the Kind with a reason in
+   `hack/probe-coverage-exceptions.txt`. `make probe-coverage` runs the same
+   check CI does (`hack/check-probe-coverage.sh`).
+2. **A bug the probe could have caught gets a probe assertion**, not only a
+   unit test: the probe is where install paths, Jobs, Ingress, DNS and Frappe
+   itself meet.
+3. To run it by hand: `gh workflow run e2e.yml` in the probe repo with
+   `-f operator_image_tag=sha-<your commit>` (operator-image.yml publishes
+   `sha-*` tags), or point `./probe.py` at any cluster that must not be
+   production.
+
 ## Submitting Changes
 
 ### Before Submitting
@@ -125,6 +147,7 @@ Closes #123
 - [ ] Update documentation if needed
 - [ ] Add/update tests for your changes
 - [ ] Regenerate manifests: `make manifests`
+- [ ] Added a CRD? `make probe-coverage` passes (probe manifest + phase added, or scaffold listed)
 - [ ] Update API docs if CRDs changed
 - [ ] Ensure all CI checks pass
 
