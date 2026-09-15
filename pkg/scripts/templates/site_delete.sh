@@ -33,8 +33,27 @@ DOMAIN=$(cat /tmp/secrets/domain 2>/dev/null || true)
 echo "Dropping Frappe site: $SITE_NAME"
 echo "Using MariaDB root credentials from secret volume for secure deletion"
 
-# Use root credentials to drop the site (site user cannot drop database)
-bench drop-site "$SITE_NAME" --force --db-root-username "$DB_ROOT_USER" --db-root-password "$DB_ROOT_PASSWORD" --no-backup
+# Use root credentials to drop the site (site user cannot drop database).
+# On an NFS-style shared volume (Longhorn RWX, NFS) drop-site can drop the
+# database and then fail removing the site directory: a bench process (the
+# scheduler enumerates every site) may hold the site's log open, which the
+# volume keeps as a `.nfs*` file until the handle closes. The site is gone at
+# that point; a directory holding only such temp files must not fail the
+# deletion. So: tolerate the failure, best-effort remove what is left, and
+# succeed when site_config.json is gone (the site no longer exists to Frappe).
+DROP_RC=0
+bench drop-site "$SITE_NAME" --force --db-root-username "$DB_ROOT_USER" --db-root-password "$DB_ROOT_PASSWORD" --no-backup || DROP_RC=$?
+if [ -d "sites/$SITE_NAME" ]; then
+    rm -rf "sites/$SITE_NAME" 2>/dev/null || true
+fi
+if [ -f "sites/$SITE_NAME/site_config.json" ]; then
+    echo "drop-site failed (exit $DROP_RC) and sites/$SITE_NAME still holds site_config.json"
+    exit "${DROP_RC:-1}"
+fi
+if [ -d "sites/$SITE_NAME" ]; then
+    echo "Note: sites/$SITE_NAME still exists (open-file temp entries on a shared volume); it clears when the holder closes the file:"
+    find "sites/$SITE_NAME" -type f 2>/dev/null | head -5
+fi
 
 # drop-site removes the real site directory only. If site_init aliased the
 # resolved domain onto it, that symlink is now dangling and would shadow any
