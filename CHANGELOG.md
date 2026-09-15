@@ -5,6 +5,16 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.3] - 2026-09-15
+
+Three defects found by the first real tenant on a pooled bench (vyogo.cloud),
+each now covered by the probe (`site2` phase) or a script test.
+
+### Fixed
+- **FPM installs relocate every app fpm adds**, not only the requested one: a package's required apps (lms brings `payments`) were installed on the site but left in the Job's ephemeral bench, so every serving pod failed with "No module named 'payments'". The "already installed" short-circuit now re-runs the install when an app the site lists is missing from the bench, which heals a site left in that state.
+- **Site-init, site-delete and bench-init Jobs carry the shared bench Job env** (`USER`, `HOME`, `PYTHONPATH=sites/apps`). Since `apps.txt` lists volume-installed apps, `frappe.init` imports them in every Job; without the import path the second site on a pooled bench failed with "No module named 'lms'".
+- **Site deletion succeeds on shared volumes** when `bench drop-site` drops the database but cannot remove a directory that only holds `.nfs*` temp entries (the bench scheduler keeps every site's log open on Longhorn RWX / NFS).
+
 ## [5.2.2] - 2026-09-15
 
 Every fix in this release was found by the new acceptance test,
