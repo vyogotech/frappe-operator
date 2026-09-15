@@ -386,8 +386,20 @@ PY
 # to do against Spec.Apps, moved to where the database is reachable and the truth
 # actually lives.
 if bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}' | grep -qx "$APP_NAME"; then
-  echo "App $APP_NAME already installed on $SITE_NAME (verified via list-apps); nothing to do."
-  exit 0
+  # Already on the site. Still re-run when any app the site lists is missing
+  # from the bench (neither the image's apps/ nor the sites PVC has it): a
+  # dependency that fpm installed but was never relocated (lms -> payments)
+  # leaves every serving pod 500ing with "No module named <dep>", and a re-run
+  # is what restores it.
+  MISSING=""
+  for a in $(bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}'); do
+    [ -d "/home/frappe/frappe-bench/apps/$a" ] || [ -d "/home/frappe/frappe-bench/sites/apps/$a" ] || MISSING="$MISSING $a"
+  done
+  if [ -z "$MISSING" ]; then
+    echo "App $APP_NAME already installed on $SITE_NAME (verified via list-apps); nothing to do."
+    exit 0
+  fi
+  echo "App $APP_NAME is on $SITE_NAME but these apps are missing from the bench:$MISSING - re-running the install to restore them."
 fi
 
 # FPM install path (preferred when the app is a published package). Installs a
@@ -395,6 +407,57 @@ fi
 # no yarn/pip build on the bench, and lets fpm resolve the transitive app
 # dependency tree. The git clone path below is the fallback for apps that have no
 # published package (FPM_PACKAGE empty).
+# relocate_fpm_app <app>: copy an app fpm installed into this job's ephemeral
+# bench (HOME/.fpm store, symlinked from apps/<app>) onto the sites PVC - the
+# same durable location the git path uses - so it survives pod restarts and the
+# serving pods (PYTHONPATH=sites/apps + sitecustomize) load it. Called for the
+# requested app AND for every required app fpm pulled in alongside it.
+relocate_fpm_app() {
+  app="$1"
+  SRC=$(readlink -f "/home/frappe/frappe-bench/apps/$app" 2>/dev/null || true)
+  DEST="/home/frappe/frappe-bench/sites/apps/$app"
+  if [ -z "$SRC" ] || [ ! -d "$SRC" ] || [ "$SRC" = "$DEST" ]; then
+    return 0
+  fi
+  echo "Relocating $app onto the sites PVC for durability..."
+  rm -rf "$DEST"; cp -a "$SRC" "$DEST"
+  ln -sfn "$DEST" "/home/frappe/frappe-bench/apps/$app"
+  [ -d "$DEST/$app/public" ] && ln -sfn "$DEST/$app/public" "/home/frappe/frappe-bench/sites/assets/$app"
+  grep -q "^$DEST$" /home/frappe/frappe-bench/sites/apps.pth 2>/dev/null || echo "$DEST" >> /home/frappe/frappe-bench/sites/apps.pth
+  grep -q "^$app$" /home/frappe/frappe-bench/sites/apps.txt 2>/dev/null || echo "$app" >> /home/frappe/frappe-bench/sites/apps.txt
+  # Stage the app's vendored wheels into a durable PVC dir so the serving pods
+  # (which do not share this job's env/) can import the app's Python deps. The
+  # wheels came with the .fpm and are installed offline. sitecustomize appends
+  # .pydeps to sys.path, so the bench env's own pins still win for shared deps.
+  PYDEPS="/home/frappe/frappe-bench/sites/apps/.pydeps"
+  if ls "$DEST"/wheels/*.whl >/dev/null 2>&1; then
+    mkdir -p "$PYDEPS"
+    echo "Staging vendored wheels for $app into $PYDEPS..."
+    /home/frappe/frappe-bench/env/bin/pip install --no-index --find-links "$DEST/wheels" \
+      --target "$PYDEPS" --upgrade "$DEST"/wheels/*.whl 2>/dev/null || \
+      echo "warning: could not stage vendored wheels; app deps must be in the base image"
+  elif [ -n "$NEWDEPS" ] && [ -z "$STAGED_ONLINE_DEPS" ]; then
+    # No vendored wheels: fpm resolved the Python deps online into this job's
+    # env/ (see the pip snapshot). Stage the dists the install ADDED beyond the
+    # base image into .pydeps, one by one with --no-deps, so nothing is
+    # re-resolved or rebuilt: every one of them is already in pip's cache.
+    # Without this the app installs cleanly here and then 500s on every serving
+    # pod with "No module named <dep>" (insights/ibis was the case that found it).
+    # The diff covers the whole resolve, so it is staged once per job.
+    STAGED_ONLINE_DEPS=1
+    mkdir -p "$PYDEPS"
+    echo "No vendored wheels for $app; staging the $(printf '%s\n' "$NEWDEPS" | wc -l | tr -d ' ') Python deps the online install added into $PYDEPS:"
+    printf '%s\n' "$NEWDEPS" | sed 's/^/  /'
+    printf '%s\n' "$NEWDEPS" > /tmp/pydeps-requirements.txt
+    /home/frappe/frappe-bench/env/bin/pip install --no-deps --target "$PYDEPS" --upgrade \
+      -r /tmp/pydeps-requirements.txt 2>&1 | tail -5 || \
+      echo "warning: could not stage $app's Python deps into $PYDEPS; the serving pods may fail to import it"
+  else
+    echo "No vendored wheels for $app and nothing new to stage beyond the base image."
+  fi
+  return 0
+}
+
 if [ -n "$FPM_PACKAGE" ]; then
   echo "Installing $FPM_PACKAGE via FPM (repo: ${FPM_REPO:-none})..."
   # Bench images may not ship the fpm CLI yet; fetch the pinned release if absent.
@@ -419,61 +482,20 @@ if [ -n "$FPM_PACKAGE" ]; then
   # image is exactly what the serving pods will lack, so it is staged into
   # .pydeps below by diffing against this snapshot.
   /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-before.txt || true
+  # Snapshot apps/ too: fpm installs the package's required apps as well (lms
+  # brings payments), so every app it adds - not only the one this SiteApp
+  # names - has to be relocated below, or the serving pods lack the dependency
+  # and 500 on every request.
+  ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-before.txt || true
   # fpm install extracts to the FPM store, symlinks apps/<app>, and installs on the site.
   fpm install "$FPM_PACKAGE" --bench-path /home/frappe/frappe-bench --site "$SITE_NAME"
-  # Durability: the FPM store (HOME/.fpm) is ephemeral, so relocate the app onto
-  # the sites PVC — the same durable location the git path uses — so it survives
-  # pod restarts and the serving pods (PYTHONPATH=sites/apps + sitecustomize)
-  # load it. Without this the app vanishes on the next roll.
-  SRC=$(readlink -f "/home/frappe/frappe-bench/apps/$APP_NAME" 2>/dev/null || true)
-  DEST="/home/frappe/frappe-bench/sites/apps/$APP_NAME"
-  if [ -n "$SRC" ] && [ -d "$SRC" ] && [ "$SRC" != "$DEST" ]; then
-    echo "Relocating $APP_NAME onto the sites PVC for durability..."
-    rm -rf "$DEST"; cp -a "$SRC" "$DEST"
-    ln -sfn "$DEST" "/home/frappe/frappe-bench/apps/$APP_NAME"
-    [ -d "$DEST/$APP_NAME/public" ] && ln -sfn "$DEST/$APP_NAME/public" "/home/frappe/frappe-bench/sites/assets/$APP_NAME"
-    grep -q "^$DEST$" /home/frappe/frappe-bench/sites/apps.pth 2>/dev/null || echo "$DEST" >> /home/frappe/frappe-bench/sites/apps.pth
-    grep -q "^$APP_NAME$" /home/frappe/frappe-bench/sites/apps.txt 2>/dev/null || echo "$APP_NAME" >> /home/frappe/frappe-bench/sites/apps.txt
-    # Stage the app's vendored wheels into a durable PVC dir so the serving pods
-    # (which do not share this job's env/) can import the app's Python deps. The
-    # wheels came with the .fpm and are installed offline. sitecustomize appends
-    # .pydeps to sys.path, so the bench env's own pins still win for shared deps.
-    PYDEPS="/home/frappe/frappe-bench/sites/apps/.pydeps"
-    if ls "$DEST"/wheels/*.whl >/dev/null 2>&1; then
-      mkdir -p "$PYDEPS"
-      echo "Staging vendored wheels for $APP_NAME into $PYDEPS..."
-      /home/frappe/frappe-bench/env/bin/pip install --no-index --find-links "$DEST/wheels" \
-        --target "$PYDEPS" --upgrade "$DEST"/wheels/*.whl 2>/dev/null || \
-        echo "warning: could not stage vendored wheels; app deps must be in the base image"
-    else
-      # No vendored wheels: fpm resolved the app's Python deps online into this
-      # job's env/ (see the snapshot above). Stage the dists that install ADDED
-      # beyond the base image into .pydeps, one by one with --no-deps, so nothing
-      # is re-resolved or rebuilt: every one of them was already fetched (or
-      # built) into pip's cache by the online install. Without this the app
-      # installs cleanly here and then 500s on every serving pod with
-      # "No module named <dep>" (insights/ibis was the case that found it).
-      /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-after.txt || true
-      NEWDEPS=$(comm -13 /tmp/pip-before.txt /tmp/pip-after.txt 2>/dev/null | grep -E '^[A-Za-z0-9][A-Za-z0-9._-]*==' || true)
-      if [ -n "$NEWDEPS" ]; then
-        mkdir -p "$PYDEPS"
-        echo "No vendored wheels for $APP_NAME; staging the $(printf '%s\n' "$NEWDEPS" | wc -l | tr -d ' ') Python deps its online install added into $PYDEPS:"
-        printf '%s\n' "$NEWDEPS" | sed 's/^/  /'
-        printf '%s\n' "$NEWDEPS" > /tmp/pydeps-requirements.txt
-        /home/frappe/frappe-bench/env/bin/pip install --no-deps --target "$PYDEPS" --upgrade \
-          -r /tmp/pydeps-requirements.txt 2>&1 | tail -5 || \
-          echo "warning: could not stage $APP_NAME's Python deps into $PYDEPS; the serving pods may fail to import it"
-      else
-        echo "No vendored wheels for $APP_NAME and its online install added nothing beyond the base image; nothing to stage."
-      fi
-    fi
-  fi
-  # Always (re)create the /assets/<app> symlink, not just during the one-time
-  # relocate above. The relocate block is skipped whenever the app is already on
-  # the PVC (a re-reconcile, or a retried install), and a bench step can drop
-  # sites/assets — either way the symlink goes missing and the app's frontend
-  # 404s (only the framework's /assets/frappe/* load). ln -sfn is idempotent.
-  [ -d "$DEST/$APP_NAME/public" ] && ln -sfn "$DEST/$APP_NAME/public" "/home/frappe/frappe-bench/sites/assets/$APP_NAME"
+  ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-after.txt || true
+  NEW_APPS=$(comm -13 /tmp/apps-before.txt /tmp/apps-after.txt 2>/dev/null || true)
+  /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-after.txt || true
+  NEWDEPS=$(comm -13 /tmp/pip-before.txt /tmp/pip-after.txt 2>/dev/null | grep -E '^[A-Za-z0-9][A-Za-z0-9._-]*==' || true)
+  for app in $(printf '%s\n' "$APP_NAME" $NEW_APPS | awk '!seen[$0]++'); do
+    relocate_fpm_app "$app"
+  done
   bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
   # autoMigrate (default true), same as the git path: patches + after_migrate.
   if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
