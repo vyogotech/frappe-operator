@@ -566,3 +566,31 @@ func TestSiteAppInstallScriptMigratesOnBothPaths(t *testing.T) {
 		t.Fatalf("fpm path runs migrate after its exit 0")
 	}
 }
+
+// fpm also installs a package's required apps (lms brings payments); every app
+// it adds must be relocated onto the sites PVC, not only the requested one,
+// or the serving pods 500 with "No module named <dep>". And a site whose
+// listed apps are missing from the bench must be healed by a re-run instead
+// of short-circuiting on "already installed".
+func TestSiteAppInstallScriptRelocatesEveryFpmApp(t *testing.T) {
+	for _, want := range []string{
+		`ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-before.txt`,
+		`NEW_APPS=$(comm -13 /tmp/apps-before.txt /tmp/apps-after.txt`,
+		`for app in $(printf '%s\n' "$APP_NAME" $NEW_APPS | awk '!seen[$0]++'); do`,
+		`relocate_fpm_app "$app"`,
+		`relocate_fpm_app() {`,
+		`missing from the bench:$MISSING`,
+	} {
+		if !strings.Contains(siteAppInstallScript, want) {
+			t.Fatalf("install script lacks %q", want)
+		}
+	}
+	// The function must be defined before the FPM branch uses it.
+	if strings.Index(siteAppInstallScript, "relocate_fpm_app() {") > strings.Index(siteAppInstallScript, `relocate_fpm_app "$app"`) {
+		t.Fatal("relocate_fpm_app is used before it is defined")
+	}
+	// The old single-app relocate must be gone.
+	if strings.Contains(siteAppInstallScript, `SRC=$(readlink -f "/home/frappe/frappe-bench/apps/$APP_NAME"`) {
+		t.Fatal("single-app relocate block still present")
+	}
+}
