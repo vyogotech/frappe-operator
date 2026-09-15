@@ -603,16 +603,10 @@ func (r *FrappeBenchReconciler) ensureBenchInitialized(ctx context.Context, benc
 								},
 							},
 							SecurityContext: r.getContainerSecurityContext(ctx, bench),
-							Env: []corev1.EnvVar{
-								{
-									Name:  "SKIP_BENCH_BUILD",
-									Value: skipBuild,
-								},
-								{
-									Name:  "USER",
-									Value: "frappe",
-								},
-							},
+							// SKIP_BENCH_BUILD plus the shared bench Job env (USER/HOME/
+							// PYTHONPATH): a bench re-init on a volume that already carries
+							// SiteApp-installed apps must be able to import them.
+							Env: append([]corev1.EnvVar{{Name: "SKIP_BENCH_BUILD", Value: skipBuild}}, benchJobEnv()...),
 						},
 					},
 					Volumes: []corev1.Volume{
