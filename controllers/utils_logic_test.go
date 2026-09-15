@@ -234,3 +234,24 @@ func TestFrappeSiteReconciler_getBenchImage(t *testing.T) {
 		}
 	})
 }
+
+// Every bench Job needs the sites/apps import path once apps.txt lists
+// volume-installed apps; the site-init Job lacked it and failed the second
+// site on a pooled bench ("No module named 'lms'").
+func TestWithBenchJobEnvAddsMissingOnly(t *testing.T) {
+	c := corev1.Container{Env: []corev1.EnvVar{{Name: "USER", Value: "custom"}, {Name: "X", Value: "1"}}}
+	got := withBenchJobEnv(c)
+	byName := map[string]string{}
+	for _, e := range got.Env {
+		if _, dup := byName[e.Name]; dup {
+			t.Fatalf("duplicate env %s", e.Name)
+		}
+		byName[e.Name] = e.Value
+	}
+	if byName["USER"] != "custom" {
+		t.Fatalf("existing USER overwritten: %q", byName["USER"])
+	}
+	if byName["PYTHONPATH"] != "/tmp/pip:/home/frappe/frappe-bench/sites/apps" || byName["HOME"] == "" {
+		t.Fatalf("PYTHONPATH/HOME not added: %v", byName)
+	}
+}

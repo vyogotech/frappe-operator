@@ -222,6 +222,8 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		WithVolumeMount("site-secrets", "/tmp/site-secrets").
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		Build()
+	// USER/HOME/PYTHONPATH like every other bench Job (see withBenchJobEnv).
+	container = withBenchJobEnv(container)
 
 	// Prepare job annotations
 	jobAnnotations := map[string]string{}
@@ -375,6 +377,8 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 			WithVolumeMountReadOnly("deletion-secret", "/tmp/secrets").
 			WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 			Build()
+		// USER/HOME/PYTHONPATH like every other bench Job (see withBenchJobEnv).
+		container = withBenchJobEnv(container)
 
 		// Build the job
 		job = resources.NewJobBuilder(jobName, site.Namespace).

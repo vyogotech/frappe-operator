@@ -147,6 +147,26 @@ func benchJobEnv() []corev1.EnvVar {
 	}
 }
 
+// withBenchJobEnv adds benchJobEnv to a container's env, skipping names the
+// container already sets. Every Job that runs `bench` against the shared sites
+// volume needs it: since apps.txt lists the apps installed on the volume
+// (SiteApp installs), `frappe.init` imports all of them, so a Job without the
+// sites/apps import path dies with "No module named '<app>'" — which is how the
+// site-init Job broke the second site on a pooled bench once the first site
+// had installed an app.
+func withBenchJobEnv(c corev1.Container) corev1.Container {
+	have := map[string]bool{}
+	for _, e := range c.Env {
+		have[e.Name] = true
+	}
+	for _, e := range benchJobEnv() {
+		if !have[e.Name] {
+			c.Env = append(c.Env, e)
+		}
+	}
+	return c
+}
+
 // benchImageTag maps a bench's FrappeVersion onto the tag scheme the published
 // bench images actually use. A bare numeric major ("16") becomes "version-16"
 // (the vyogotech *-for-operator images and upstream frappe/erpnext both publish
