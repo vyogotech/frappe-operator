@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -416,3 +418,19 @@ func applyDefaultJobTTL(spec *batchv1.JobSpec) {
 // apps.txt is only ever a symlink to sites/apps.txt (the image layer is
 // ephemeral), so the link is re-created too.
 const appsTxtSyncCmd = `cd /home/frappe/frappe-bench && { { ls -1 apps 2>/dev/null; for d in sites/apps/*/; do [ -d "$d" ] && basename "$d"; done; } | grep -v '^__pycache__$' | grep -v '^$' | awk '!seen[$0]++' > sites/apps.txt.new && mv sites/apps.txt.new sites/apps.txt; ln -sf sites/apps.txt apps.txt; }`
+
+// jobNameFor joins the parts with "-" into a Job name that is also a valid
+// label value: at most 63 bytes. A longer name is truncated and suffixed with
+// a short hash of the full name, so it stays unique and stable. Site names on
+// a pooled bench ("<site>-<zone>-vyogo-cloud") plus a migration name easily
+// exceed the limit, and the Job then failed to create with
+// "spec.template.labels: Invalid value ... must be no more than 63 bytes".
+func jobNameFor(parts ...string) string {
+	full := strings.Join(parts, "-")
+	if len(full) <= 63 {
+		return full
+	}
+	sum := sha256.Sum256([]byte(full))
+	suffix := "-" + hex.EncodeToString(sum[:])[:6]
+	return strings.TrimRight(full[:63-len(suffix)], "-.") + suffix
+}

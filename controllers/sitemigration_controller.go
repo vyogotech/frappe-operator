@@ -103,7 +103,7 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return r.failReconciliation(ctx, siteMigration, fmt.Sprintf("Referenced FrappeBench %s not found: %v", benchKey.Name, err), "BenchNotFound")
 	}
 
-	jobName := fmt.Sprintf("%s-migrate-%s", site.Name, siteMigration.Name)
+	jobName := jobNameFor(site.Name, "migrate", siteMigration.Name)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 	benchImage := "docker.io/frappe/erpnext:latest"
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {

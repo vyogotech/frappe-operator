@@ -82,7 +82,7 @@ func (r *SiteRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	jobName := siteRestore.Name + "-restore"
+	jobName := jobNameFor(siteRestore.Name, "restore")
 	job := &batchv1.Job{}
 	err := r.Get(ctx, client.ObjectKey{Name: jobName, Namespace: siteRestore.Namespace}, job)
 

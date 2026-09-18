@@ -158,7 +158,7 @@ func (r *SiteBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 func (r *SiteBackupReconciler) handleFinalizer(ctx context.Context, siteBackup *vyogotechv1.SiteBackup) error {
 	logger := log.FromContext(ctx)
-	jobName := siteBackup.Name + "-backup"
+	jobName := jobNameFor(siteBackup.Name, "backup")
 
 	if siteBackup.Spec.Schedule == "" {
 		// One-time backup: delete Job
@@ -216,7 +216,7 @@ func (r *SiteBackupReconciler) warnIfObjectStorage(ctx context.Context, sb *vyog
 // reconcileOneTimeBackup handles one-time backup creation and status updates
 func (r *SiteBackupReconciler) reconcileOneTimeBackup(ctx context.Context, siteBackup *vyogotechv1.SiteBackup, bench *vyogotechv1.FrappeBench) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	jobName := siteBackup.Name + "-backup"
+	jobName := jobNameFor(siteBackup.Name, "backup")
 
 	job := &batchv1.Job{}
 	err := r.Get(ctx, client.ObjectKey{Name: jobName, Namespace: siteBackup.Namespace}, job)
@@ -477,7 +477,7 @@ PYEOF
 
 // buildBackupJob creates a Job for one-time backup
 func (r *SiteBackupReconciler) buildBackupJob(ctx context.Context, siteBackup *vyogotechv1.SiteBackup, bench *vyogotechv1.FrappeBench) *batchv1.Job {
-	jobName := siteBackup.Name + "-backup"
+	jobName := jobNameFor(siteBackup.Name, "backup")
 	command, args := r.backupCommandAndArgs(siteBackup)
 	env := benchJobEnv()
 	if s3Configured(siteBackup) {
