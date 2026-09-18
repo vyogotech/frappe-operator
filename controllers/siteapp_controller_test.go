@@ -621,3 +621,25 @@ func TestSiteAppInstallScriptSharedBenchFastPath(t *testing.T) {
 		t.Fatal("fast path runs after the fpm fetch")
 	}
 }
+
+// The serving pods' extra Python deps are ONE resolution over every app's
+// vendored wheels, rebuilt atomically; layering per app with --target
+// --upgrade corrupted numpy on the hub's shared bench.
+func TestSiteAppInstallScriptRebuildsPydepsAtomically(t *testing.T) {
+	for _, want := range []string{
+		`rebuild_pydeps() {`,
+		`--no-index --no-deps --target "$PYDEPS.new"`,
+		`mv "$PYDEPS.new" "$PYDEPS"`,
+		`pip download --no-deps -d "$DEST/wheels"`,
+	} {
+		if !strings.Contains(siteAppInstallScript, want) {
+			t.Fatalf("install script lacks %q", want)
+		}
+	}
+	if strings.Contains(siteAppInstallScript, `--target "$PYDEPS" --upgrade`) {
+		t.Fatal("per-app --target --upgrade staging still present")
+	}
+	if strings.Index(siteAppInstallScript, "rebuild_pydeps() {") > strings.Index(siteAppInstallScript, "\n  rebuild_pydeps\n") {
+		t.Fatal("rebuild_pydeps used before it is defined")
+	}
+}

@@ -462,35 +462,72 @@ relocate_fpm_app() {
     mv "$TMP" "$DEST"
   fi
   link_durable_app "$app"
-  # Stage the app's vendored wheels into a durable PVC dir so the serving pods
-  # (which do not share this job's env/) can import the app's Python deps. The
-  # wheels came with the .fpm and are installed offline. sitecustomize appends
-  # .pydeps to sys.path, so the bench env's own pins still win for shared deps.
-  PYDEPS="/home/frappe/frappe-bench/sites/apps/.pydeps"
-  if ls "$DEST"/wheels/*.whl >/dev/null 2>&1; then
-    mkdir -p "$PYDEPS"
-    echo "Staging vendored wheels for $app into $PYDEPS..."
-    /home/frappe/frappe-bench/env/bin/pip install --no-index --find-links "$DEST/wheels" \
-      --target "$PYDEPS" --upgrade "$DEST"/wheels/*.whl 2>/dev/null || \
-      echo "warning: could not stage vendored wheels; app deps must be in the base image"
-  elif [ -n "$NEWDEPS" ] && [ -z "$STAGED_ONLINE_DEPS" ]; then
-    # No vendored wheels: fpm resolved the Python deps online into this job's
-    # env/ (see the pip snapshot). Stage the dists the install ADDED beyond the
-    # base image into .pydeps, one by one with --no-deps, so nothing is
-    # re-resolved or rebuilt: every one of them is already in pip's cache.
-    # Without this the app installs cleanly here and then 500s on every serving
-    # pod with "No module named <dep>" (insights/ibis was the case that found it).
-    # The diff covers the whole resolve, so it is staged once per job.
+  # No vendored wheels: fpm resolved the app's Python deps online into this
+  # job's env/ (see the pip snapshot). Fetch exactly the dists that added
+  # beyond the base image into the app's own wheels dir, so rebuild_pydeps
+  # below can treat every app the same way. Without this the app installs
+  # cleanly here and then 500s on every serving pod with "No module named
+  # <dep>" (insights/ibis was the case that found it).
+  if ! ls "$DEST"/wheels/*.whl >/dev/null 2>&1 && [ -n "$NEWDEPS" ] && [ -z "$STAGED_ONLINE_DEPS" ]; then
     STAGED_ONLINE_DEPS=1
-    mkdir -p "$PYDEPS"
-    echo "No vendored wheels for $app; staging the $(printf '%s\n' "$NEWDEPS" | wc -l | tr -d ' ') Python deps the online install added into $PYDEPS:"
+    mkdir -p "$DEST/wheels"
+    echo "No vendored wheels for $app; fetching the $(printf '%s\n' "$NEWDEPS" | wc -l | tr -d ' ') Python deps its online install added into $DEST/wheels:"
     printf '%s\n' "$NEWDEPS" | sed 's/^/  /'
     printf '%s\n' "$NEWDEPS" > /tmp/pydeps-requirements.txt
-    /home/frappe/frappe-bench/env/bin/pip install --no-deps --target "$PYDEPS" --upgrade \
-      -r /tmp/pydeps-requirements.txt 2>&1 | tail -5 || \
-      echo "warning: could not stage $app's Python deps into $PYDEPS; the serving pods may fail to import it"
+    /home/frappe/frappe-bench/env/bin/pip download --no-deps -d "$DEST/wheels" -r /tmp/pydeps-requirements.txt 2>&1 | tail -3 || \
+      echo "warning: could not fetch $app's Python deps; the serving pods may fail to import it"
+  fi
+  return 0
+}
+
+# rebuild_pydeps: the ONE resolution of every app's Python deps that the
+# serving pods import (sitecustomize appends sites/apps/.pydeps to sys.path;
+# the bench env's own pins still win for shared deps). Built fresh from the
+# union of all apps' vendored wheels, newest version per distribution, into a
+# temp dir and swapped in atomically. It used to be layered per app with
+# pip --target --upgrade, which does not remove the previous version's
+# files: two apps vendoring numpy 2.5.2 and 2.5.3 left a numpy with no
+# __version__, openpyxl could not import, and every ERPNext page that touched
+# it broke on the shared bench.
+rebuild_pydeps() {
+  cd /home/frappe/frappe-bench
+  PYDEPS="/home/frappe/frappe-bench/sites/apps/.pydeps"
+  /home/frappe/frappe-bench/env/bin/python - > /tmp/pydeps-wheels.txt <<'PY'
+import glob, os, re
+try:
+    from packaging.version import Version
+except Exception:
+    from pip._vendor.packaging.version import Version
+best = {}
+for w in glob.glob("/home/frappe/frappe-bench/sites/apps/*/wheels/*.whl"):
+    m = re.match(r"([A-Za-z0-9_.]+)-([^-]+)-", os.path.basename(w))
+    if not m:
+        continue
+    name = m.group(1).lower().replace("_", "-")
+    try:
+        v = Version(m.group(2))
+    except Exception:
+        continue
+    if name not in best or v > best[name][0]:
+        best[name] = (v, w)
+for name in sorted(best):
+    print(best[name][1])
+PY
+  if [ ! -s /tmp/pydeps-wheels.txt ]; then
+    echo "No vendored wheels on the bench; nothing to stage."
+    return 0
+  fi
+  echo "Rebuilding $PYDEPS from $(wc -l < /tmp/pydeps-wheels.txt | tr -d ' ') wheels (newest per distribution)..."
+  rm -rf "$PYDEPS.new"
+  if /home/frappe/frappe-bench/env/bin/pip install -q --no-index --no-deps --target "$PYDEPS.new" $(cat /tmp/pydeps-wheels.txt) 2>&1 | grep -v "^WARNING: The directory"; then
+    rm -rf "$PYDEPS.old"
+    [ -d "$PYDEPS" ] && mv "$PYDEPS" "$PYDEPS.old"
+    mv "$PYDEPS.new" "$PYDEPS"
+    rm -rf "$PYDEPS.old"
+    echo "Staged Python deps for the serving pods into $PYDEPS."
   else
-    echo "No vendored wheels for $app and nothing new to stage beyond the base image."
+    rm -rf "$PYDEPS.new"
+    echo "warning: could not rebuild $PYDEPS; leaving the previous one in place"
   fi
   return 0
 }
@@ -572,6 +609,7 @@ if [ -n "$FPM_PACKAGE" ]; then
   for app in $(printf '%s\n' "$APP_NAME" $NEW_APPS | awk '!seen[$0]++'); do
     relocate_fpm_app "$app"
   done
+  rebuild_pydeps
   bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
   # autoMigrate (default true), same as the git path: patches + after_migrate.
   if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
