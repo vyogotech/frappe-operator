@@ -5,6 +5,11 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.5] - 2026-09-18
+
+### Changed
+- **The SiteApp install Job fetches fpm v4.6.0** (was v3.0.0) when the bench image ships no CLI. fpm 4.6.0 treats an app the bench already has — in `apps/<app>`, or listed in `sites/apps.txt` and importable — as bench-level and never re-fetches or replaces it, so a required app another site already installed on a pooled bench is reused rather than pulled again beside the Job's fast path; 4.4.0 stopped the mirror publishing dependency-less packages (`withheld-nodeps`), which is what left `frappe/hrms` uninstallable on a pooled bench.
+
 ## [5.2.4] - 2026-09-18
 
 All found by the first multi-tenant day on a shared (pooled) bench.
