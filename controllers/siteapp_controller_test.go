@@ -594,3 +594,30 @@ func TestSiteAppInstallScriptRelocatesEveryFpmApp(t *testing.T) {
 		t.Fatal("single-app relocate block still present")
 	}
 }
+
+// A shared bench holds one copy of an app: a second site installing an app
+// that is already on the volume must not fetch or copy anything (the old
+// rm -rf + cp raced with the other site's imports and left dangling asset
+// links), and a first-time copy must land atomically.
+func TestSiteAppInstallScriptSharedBenchFastPath(t *testing.T) {
+	for _, want := range []string{
+		`if [ -d "/home/frappe/frappe-bench/sites/apps/$APP_NAME/$APP_NAME" ]; then`,
+		`Bench already provides $APP_NAME from the shared volume; site-level install only.`,
+		`link_durable_app() {`,
+		`$app is already on the shared volume; keeping that copy`,
+		`tar --exclude='__pycache__' -C "$SRC" -cf - . | tar -C "$TMP" -xf -`,
+		`mv "$TMP" "$DEST"`,
+		`MISSING="$MISSING $a(assets)"`,
+	} {
+		if !strings.Contains(siteAppInstallScript, want) {
+			t.Fatalf("install script lacks %q", want)
+		}
+	}
+	if strings.Contains(siteAppInstallScript, `rm -rf "$DEST"; cp -a "$SRC" "$DEST"`) {
+		t.Fatal("destructive relocate still present")
+	}
+	// The fast path must be checked before fpm is fetched or run.
+	if strings.Index(siteAppInstallScript, "Bench already provides $APP_NAME") > strings.Index(siteAppInstallScript, `fpm install "$FPM_PACKAGE"`) {
+		t.Fatal("fast path runs after the fpm fetch")
+	}
+}

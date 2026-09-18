@@ -255,3 +255,22 @@ func TestWithBenchJobEnvAddsMissingOnly(t *testing.T) {
 		t.Fatalf("PYTHONPATH/HOME not added: %v", byName)
 	}
 }
+
+// Job names are also label values (63 bytes max); a pooled site name plus a
+// migration name blew past it and the Job never got created.
+func TestJobNameForStaysWithin63Bytes(t *testing.T) {
+	short := jobNameFor("site", "migrate", "mig-1")
+	if short != "site-migrate-mig-1" {
+		t.Fatalf("short name altered: %q", short)
+	}
+	long := jobNameFor("builder-z5cfvsxb-vyogo-cloud", "migrate", "mig-builder-z5cfvsxb-vyogo-cloud-1789703413")
+	if len(long) > 63 {
+		t.Fatalf("still too long (%d): %q", len(long), long)
+	}
+	if long == jobNameFor("builder-z5cfvsxb-vyogo-cloud", "migrate", "mig-builder-z5cfvsxb-vyogo-cloud-1789703414") {
+		t.Fatal("distinct long names collided")
+	}
+	if long != jobNameFor("builder-z5cfvsxb-vyogo-cloud", "migrate", "mig-builder-z5cfvsxb-vyogo-cloud-1789703413") {
+		t.Fatal("long name is not stable")
+	}
+}

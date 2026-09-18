@@ -331,7 +331,7 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // $host-based multitenant routing resolves the custom domain to the site.
 // The symlink lives on the shared PVC, so a single run serves every bench pod.
 func (r *SiteDomainReconciler) ensureFrappeDomainAlias(ctx context.Context, siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite) error {
-	jobName := fmt.Sprintf("%s-domain-alias", siteDomain.Name)
+	jobName := jobNameFor(siteDomain.Name, "domain-alias")
 
 	// Idempotent: leave an existing Job alone unless it failed, in which case
 	// recreate it so the alias eventually lands. `ln -sfn` is itself idempotent.
@@ -360,7 +360,7 @@ func (r *SiteDomainReconciler) ensureFrappeDomainAlias(ctx context.Context, site
 // symlink when the SiteDomain is deleted. It carries no owner reference (so it
 // outlives the SiteDomain it is cleaning up after) and self-deletes via TTL.
 func (r *SiteDomainReconciler) cleanupFrappeDomainAlias(ctx context.Context, siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite) {
-	jobName := fmt.Sprintf("%s-domain-unalias", siteDomain.Name)
+	jobName := jobNameFor(siteDomain.Name, "domain-unalias")
 	existing := &batchv1.Job{}
 	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteDomain.Namespace}, existing); err == nil {
 		return

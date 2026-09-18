@@ -394,6 +394,11 @@ if bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}' | grep -qx
   MISSING=""
   for a in $(bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}'); do
     [ -d "/home/frappe/frappe-bench/apps/$a" ] || [ -d "/home/frappe/frappe-bench/sites/apps/$a" ] || MISSING="$MISSING $a"
+    # An assets link left pointing into a finished job's scratch dir means
+    # every page of that app 404s its CSS/JS; a re-run relinks it.
+    if [ -L "/home/frappe/frappe-bench/sites/assets/$a" ] && [ ! -e "/home/frappe/frappe-bench/sites/assets/$a" ]; then
+      MISSING="$MISSING $a(assets)"
+    fi
   done
   if [ -z "$MISSING" ]; then
     echo "App $APP_NAME already installed on $SITE_NAME (verified via list-apps); nothing to do."
@@ -412,6 +417,19 @@ fi
 # same durable location the git path uses - so it survives pod restarts and the
 # serving pods (PYTHONPATH=sites/apps + sitecustomize) load it. Called for the
 # requested app AND for every required app fpm pulled in alongside it.
+# link_durable_app <app>: point this job's bench at the copy of <app> that is
+# already on the shared volume, and repair the durable pointers every serving
+# pod relies on (apps.pth, apps.txt, sites/assets/<app>). Never copies.
+link_durable_app() {
+  app="$1"
+  DEST="/home/frappe/frappe-bench/sites/apps/$app"
+  ln -sfn "$DEST" "/home/frappe/frappe-bench/apps/$app"
+  [ -d "$DEST/$app/public" ] && ln -sfn "$DEST/$app/public" "/home/frappe/frappe-bench/sites/assets/$app"
+  grep -q "^$DEST$" /home/frappe/frappe-bench/sites/apps.pth 2>/dev/null || echo "$DEST" >> /home/frappe/frappe-bench/sites/apps.pth
+  grep -q "^$app$" /home/frappe/frappe-bench/sites/apps.txt 2>/dev/null || echo "$app" >> /home/frappe/frappe-bench/sites/apps.txt
+  return 0
+}
+
 relocate_fpm_app() {
   app="$1"
   SRC=$(readlink -f "/home/frappe/frappe-bench/apps/$app" 2>/dev/null || true)
@@ -419,12 +437,31 @@ relocate_fpm_app() {
   if [ -z "$SRC" ] || [ ! -d "$SRC" ] || [ "$SRC" = "$DEST" ]; then
     return 0
   fi
+  # A shared bench holds ONE copy of an app. If the volume already has it,
+  # keep that copy: other sites on this bench are serving from it right now,
+  # and replacing it under them (rm -rf + cp) raced with their imports and
+  # left dangling asset links. Upgrading a shared app is a bench-level
+  # operation, not a per-site install.
+  if [ -d "$DEST/$app" ]; then
+    echo "$app is already on the shared volume; keeping that copy (site-level install only)."
+    link_durable_app "$app"
+    return 0
+  fi
   echo "Relocating $app onto the sites PVC for durability..."
-  rm -rf "$DEST"; cp -a "$SRC" "$DEST"
-  ln -sfn "$DEST" "/home/frappe/frappe-bench/apps/$app"
-  [ -d "$DEST/$app/public" ] && ln -sfn "$DEST/$app/public" "/home/frappe/frappe-bench/sites/assets/$app"
-  grep -q "^$DEST$" /home/frappe/frappe-bench/sites/apps.pth 2>/dev/null || echo "$DEST" >> /home/frappe/frappe-bench/sites/apps.pth
-  grep -q "^$app$" /home/frappe/frappe-bench/sites/apps.txt 2>/dev/null || echo "$app" >> /home/frappe/frappe-bench/sites/apps.txt
+  # Copy into a private temp dir and swap it in atomically, so no serving pod
+  # ever sees a half-copied app and a concurrent first install of the same app
+  # on another site simply finds the finished copy. __pycache__ is left out:
+  # it is what a live import writes mid-copy, and pods regenerate it.
+  TMP="$DEST.tmp.$$"
+  rm -rf "$TMP"; mkdir -p "$TMP"
+  tar --exclude='__pycache__' -C "$SRC" -cf - . | tar -C "$TMP" -xf -
+  if [ -d "$DEST/$app" ]; then
+    echo "$app appeared on the shared volume meanwhile (another install won); using that copy."
+    rm -rf "$TMP"
+  else
+    mv "$TMP" "$DEST"
+  fi
+  link_durable_app "$app"
   # Stage the app's vendored wheels into a durable PVC dir so the serving pods
   # (which do not share this job's env/) can import the app's Python deps. The
   # wheels came with the .fpm and are installed offline. sitecustomize appends
@@ -459,6 +496,45 @@ relocate_fpm_app() {
 }
 
 if [ -n "$FPM_PACKAGE" ]; then
+  cd /home/frappe/frappe-bench
+  # Shared-bench fast path: the volume already provides this app (and every
+  # app it requires), so this is a site-level install against that copy -
+  # no package fetch, no copy, nothing bench-level. Only an app the bench
+  # has never seen goes through fpm below.
+  if [ -d "/home/frappe/frappe-bench/sites/apps/$APP_NAME/$APP_NAME" ]; then
+    link_durable_app "$APP_NAME"
+    SHARED_OK=1
+    for dep in $(read_required_apps "$APP_NAME"); do
+      [ "$dep" = "frappe" ] && continue
+      if [ -d "/home/frappe/frappe-bench/sites/apps/$dep/$dep" ]; then
+        link_durable_app "$dep"
+      elif [ ! -d "/home/frappe/frappe-bench/apps/$dep" ]; then
+        echo "Required app $dep is not on this bench yet; resolving through fpm."
+        SHARED_OK=0
+      fi
+    done
+    if [ "$SHARED_OK" = "1" ]; then
+      echo "Bench already provides $APP_NAME from the shared volume; site-level install only."
+      INSTALLED=$(bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}')
+      for app in $(read_required_apps "$APP_NAME") "$APP_NAME"; do
+        [ "$app" = "frappe" ] && continue
+        if echo "$INSTALLED" | grep -qx "$app"; then
+          echo "$app already on $SITE_NAME."
+          continue
+        fi
+        bench --site "$SITE_NAME" install-app "$app"
+      done
+      bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
+      if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
+        echo "Running bench migrate (autoMigrate)..."
+        bench --site "$SITE_NAME" migrate
+      fi
+      echo "Verifying site health after FPM install..."
+      bench --site "$SITE_NAME" execute frappe.get_installed_apps
+      echo "FPM install complete for $APP_NAME (shared bench copy)."
+      exit 0
+    fi
+  fi
   echo "Installing $FPM_PACKAGE via FPM (repo: ${FPM_REPO:-none})..."
   # Bench images may not ship the fpm CLI yet; fetch the pinned release if absent.
   if ! command -v fpm >/dev/null 2>&1; then
@@ -563,7 +639,7 @@ bench --site "$SITE_NAME" execute frappe.get_installed_apps
 `
 
 func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp *vyogotechv1.SiteApp, site *vyogotechv1.FrappeSite) (ctrl.Result, error) {
-	jobName := fmt.Sprintf("%s-app-install", siteApp.Name)
+	jobName := jobNameFor(siteApp.Name, "app-install")
 	job := &batchv1.Job{}
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
 
@@ -818,7 +894,7 @@ func (r *SiteAppReconciler) buildAppJob(ctx context.Context, siteApp *vyogotechv
 // best-effort and never blocks finalizer removal.
 func (r *SiteAppReconciler) reconcileAppUninstallJob(ctx context.Context, siteApp *vyogotechv1.SiteApp, site *vyogotechv1.FrappeSite) (ctrl.Result, bool, error) {
 	logger := log.FromContext(ctx)
-	jobName := fmt.Sprintf("%s-app-uninstall", siteApp.Name)
+	jobName := jobNameFor(siteApp.Name, "app-uninstall")
 
 	job := &batchv1.Job{}
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)

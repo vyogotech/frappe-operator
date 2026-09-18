@@ -193,7 +193,7 @@ func buildConfigJob(sc *vyogotechv1.SiteConfig, bench *vyogotechv1.FrappeBench, 
 	script := "set -e\ncd /home/frappe/frappe-bench\n" +
 		appsTxtSyncCmd + "\n" +
 		strings.Join(cmds, "\n") + "\n"
-	jobName := fmt.Sprintf("%s-apply-%d", sc.Name, sc.Generation)
+	jobName := jobNameFor(sc.Name, "apply", fmt.Sprintf("%d", sc.Generation))
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 	backoff := int32(3)
 
