@@ -43,8 +43,12 @@ const (
 	siteAppFinalizer = "vyogo.tech/siteapp-finalizer"
 	// fpmCLIVersion is the fpm release the install Job fetches when the bench
 	// image does not already ship the CLI. v3.0.0+ resolves the transitive app
-	// dependency tree (cascade install) and rolls back atomically on failure.
-	fpmCLIVersion = "v3.0.0"
+	// dependency tree (cascade install) and rolls back atomically on failure;
+	// v4.6.0+ never re-fetches or replaces an app the bench already has (in
+	// apps/<app>, or listed in sites/apps.txt and importable), which is exactly
+	// the shared-volume layout a pooled bench uses, and withholds a package
+	// whose wheels could not be vendored instead of publishing it dependency-less.
+	fpmCLIVersion = "v4.6.0"
 )
 
 // SiteAppReconciler reconciles a SiteApp object
@@ -575,8 +579,8 @@ if [ -n "$FPM_PACKAGE" ]; then
   echo "Installing $FPM_PACKAGE via FPM (repo: ${FPM_REPO:-none})..."
   # Bench images may not ship the fpm CLI yet; fetch the pinned release if absent.
   if ! command -v fpm >/dev/null 2>&1; then
-    echo "fpm CLI not found in image; fetching ${FPM_VERSION:-v3.0.0}..."
-    curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v3.0.0}/fpm-linux-amd64" && chmod +x /tmp/fpm
+    echo "fpm CLI not found in image; fetching ${FPM_VERSION:-v4.6.0}..."
+    curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v4.6.0}/fpm-linux-amd64" && chmod +x /tmp/fpm
     export PATH="/tmp:$PATH"
   fi
   if [ -n "$FPM_REPO" ]; then
