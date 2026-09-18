@@ -70,6 +70,7 @@ type FrappeSiteReconciler struct {
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappebenches,verbs=get;list;watch
+//+kubebuilder:rbac:groups=vyogo.tech,resources=siteapps,verbs=get;list;watch;delete
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;ingressclasses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets;services;configmaps,verbs=get;list;watch;create;update;patch;delete
@@ -134,6 +135,11 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Message: "Site is being deleted",
 			})
 			if err := r.updateStatus(ctx, site); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			// The site's SiteApps go with it; nothing else would ever delete them.
+			if err := r.deleteSiteApps(ctx, site); err != nil {
 				return ctrl.Result{}, err
 			}
 
