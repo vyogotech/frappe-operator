@@ -5,6 +5,18 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.4] - 2026-09-18
+
+All found by the first multi-tenant day on a shared (pooled) bench.
+
+### Fixed
+- **A shared bench keeps one copy of an app.** Installing an app on a second site re-fetched the package and replaced the copy on the volume (`rm -rf` + `cp`) while another site was serving from it; a live import wrote `__pycache__` mid-copy, the copy failed, and `sites/assets/<app>` was left pointing into the finished Job's scratch dir (every ERPNext page 404'd its CSS/JS). Now: if the volume already provides the app and its required apps, the Job links them and runs a site-level `install-app` + migrate, with no fetch and no copy; a first-time copy goes to a temp dir (without `__pycache__`) and is swapped in atomically; the "already installed" check also re-runs when an assets link dangles.
+- **Python deps for the serving pods are one atomic resolution.** `sites/apps/.pydeps` was layered per app with `pip --target --upgrade`, which leaves the previous version's files behind; two apps vendoring numpy 2.5.2 and 2.5.3 produced a numpy without `__version__`, openpyxl could not import, and ERPNext installs and pages failed. `rebuild_pydeps` now installs the newest version of every distribution across all apps' vendored wheels into a fresh directory and swaps it in; a package without vendored wheels has its online-added deps downloaded into its own wheels dir first.
+- **Job names stay within 63 bytes.** `<site>-migrate-<migration>` on a pooled site exceeded the label limit and the Job was never created ("must be no more than 63 bytes"); `jobNameFor` truncates and hashes, and every Job-creating controller uses it.
+
+### Probe
+- `site2` installs the same app on the second site (must reuse the shared copy) and uninstalls it; the `migration` phase uses a deliberately long name.
+
 ## [5.2.3] - 2026-09-15
 
 Three defects found by the first real tenant on a pooled bench (vyogo.cloud),
