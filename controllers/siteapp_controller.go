@@ -152,19 +152,21 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	site := &vyogotechv1.FrappeSite{}
 	siteKey := types.NamespacedName{Name: siteApp.Spec.SiteRef.Name, Namespace: siteNamespace}
 	if err := r.Get(ctx, siteKey, site); err != nil {
-		if siteApp.DeletionTimestamp != nil && errors.IsNotFound(err) {
+		if errors.IsNotFound(err) && siteApp.DeletionTimestamp != nil {
 			// The site is already gone, so there is nothing to uninstall the app
 			// FROM: the uninstall Job would fail forever ("site does not exist")
 			// and this CR would sit in Terminating behind its finalizer, which is
 			// exactly what deleting a site before its SiteApps used to leave
 			// behind - a dozen orphans per site. Release it.
-			if controllerutil.ContainsFinalizer(siteApp, siteAppFinalizer) {
-				controllerutil.RemoveFinalizer(siteApp, siteAppFinalizer)
-				if err := r.Update(ctx, siteApp); err != nil && !errors.IsNotFound(err) {
-					return ctrl.Result{}, err
-				}
-			}
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, r.releaseFinalizer(ctx, siteApp)
+		}
+		if errors.IsNotFound(err) && controllerutil.ContainsFinalizer(siteApp, siteAppFinalizer) {
+			// The finalizer is only added once the site has been fetched, so this
+			// SiteApp belonged to a site that has since been deleted (before the
+			// FrappeSite finalizer cascaded, or while the operator was down). It
+			// would sit Pending on SiteNotFound forever; it goes with its site. A
+			// SiteApp applied ahead of its site has no finalizer yet and waits below.
+			return ctrl.Result{}, r.deleteWithSite(ctx, siteApp, siteKey.Name, "has been deleted")
 		}
 		siteApp.Status.Phase = "Pending"
 		r.setCondition(siteApp, metav1.Condition{
@@ -175,6 +177,16 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		})
 		_ = r.updateStatus(ctx, siteApp)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	// A site that is being deleted takes its SiteApps with it, without an
+	// uninstall Job: the database is about to be dropped (deletionPolicy Delete)
+	// or must be kept as it is (Retain), and the Job would race `bench drop-site`.
+	if site.DeletionTimestamp != nil {
+		if siteApp.DeletionTimestamp != nil {
+			return ctrl.Result{}, r.releaseFinalizer(ctx, siteApp)
+		}
+		return ctrl.Result{}, r.deleteWithSite(ctx, siteApp, site.Name, "is being deleted")
 	}
 
 	// Handle Deletion & Finalizer
@@ -523,13 +535,17 @@ PY
   fi
   echo "Rebuilding $PYDEPS from $(wc -l < /tmp/pydeps-wheels.txt | tr -d ' ') wheels (newest per distribution)..."
   rm -rf "$PYDEPS.new"
-  if /home/frappe/frappe-bench/env/bin/pip install -q --no-index --no-deps --target "$PYDEPS.new" $(cat /tmp/pydeps-wheels.txt) 2>&1 | grep -v "^WARNING: The directory"; then
+  # pip's exit status decides, captured on its own: an "if pip | grep -v"
+  # pipeline tests grep, so a quiet success read as failure (and the fresh
+  # tree was thrown away) while a failure that printed errors read as success.
+  if PIP_OUT=$(/home/frappe/frappe-bench/env/bin/pip install -q --no-index --no-deps --target "$PYDEPS.new" $(cat /tmp/pydeps-wheels.txt) 2>&1); then
     rm -rf "$PYDEPS.old"
     [ -d "$PYDEPS" ] && mv "$PYDEPS" "$PYDEPS.old"
     mv "$PYDEPS.new" "$PYDEPS"
     rm -rf "$PYDEPS.old"
     echo "Staged Python deps for the serving pods into $PYDEPS."
   else
+    echo "$PIP_OUT" | grep -v "^WARNING: The directory"
     rm -rf "$PYDEPS.new"
     echo "warning: could not rebuild $PYDEPS; leaving the previous one in place"
   fi
@@ -1053,6 +1069,30 @@ bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
 	siteApp.Status.Phase = "Uninstalling"
 	_ = r.updateStatus(ctx, siteApp)
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, false, nil
+}
+
+// releaseFinalizer drops the SiteApp finalizer without running an uninstall Job.
+func (r *SiteAppReconciler) releaseFinalizer(ctx context.Context, siteApp *vyogotechv1.SiteApp) error {
+	if !controllerutil.ContainsFinalizer(siteApp, siteAppFinalizer) {
+		return nil
+	}
+	controllerutil.RemoveFinalizer(siteApp, siteAppFinalizer)
+	if err := r.Update(ctx, siteApp); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+// deleteWithSite deletes a SiteApp whose FrappeSite is terminating or gone. The
+// delete event brings the SiteApp back through Reconcile, which releases the
+// finalizer.
+func (r *SiteAppReconciler) deleteWithSite(ctx context.Context, siteApp *vyogotechv1.SiteApp, siteName, siteState string) error {
+	log.FromContext(ctx).Info("Deleting SiteApp along with its FrappeSite", "siteApp", siteApp.Name, "site", siteName)
+	r.Recorder.Eventf(siteApp, corev1.EventTypeNormal, "SiteDeleted", "Referenced FrappeSite %s %s; deleting the SiteApp with it", siteName, siteState)
+	if err := r.Delete(ctx, siteApp); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }
 
 func (r *SiteAppReconciler) updateStatus(ctx context.Context, siteApp *vyogotechv1.SiteApp) error {

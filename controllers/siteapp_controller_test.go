@@ -639,6 +639,16 @@ func TestSiteAppInstallScriptRebuildsPydepsAtomically(t *testing.T) {
 	if strings.Contains(siteAppInstallScript, `--target "$PYDEPS" --upgrade`) {
 		t.Fatal("per-app --target --upgrade staging still present")
 	}
+	// The swap must be decided by pip's exit status. `if pip ... | grep -v
+	// WARNING; then` tests grep: a quiet success (no output) read as failure
+	// and the fresh tree was discarded, so the hub's bench kept its layered
+	// .pydeps through a whole install that claimed to rebuild it.
+	if strings.Contains(siteAppInstallScript, `--target "$PYDEPS.new" $(cat /tmp/pydeps-wheels.txt) 2>&1 | grep`) {
+		t.Fatal("rebuild_pydeps tests grep's exit status instead of pip's")
+	}
+	if !strings.Contains(siteAppInstallScript, `if PIP_OUT=$(/home/frappe/frappe-bench/env/bin/pip install -q --no-index --no-deps --target "$PYDEPS.new"`) {
+		t.Fatal("rebuild_pydeps must capture pip's output and branch on its exit status")
+	}
 	if strings.Index(siteAppInstallScript, "rebuild_pydeps() {") > strings.Index(siteAppInstallScript, "\n  rebuild_pydeps\n") {
 		t.Fatal("rebuild_pydeps used before it is defined")
 	}
