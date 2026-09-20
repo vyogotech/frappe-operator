@@ -5,5 +5,14 @@ dependencies:
 - name: keda
   repository: https://kedacore.github.io/charts
   version: 2.16.1
-digest: sha256:b25cdc28c420077921233a6ee9de92eb3bb79d75f5f84e3d95c10527b1a2734f
-generated: "2025-11-28T22:57:54.368931+11:00"
+- name: ingress-nginx
+  repository: https://kubernetes.github.io/ingress-nginx
+  version: 4.15.1
+- name: cert-manager
+  repository: https://charts.jetstack.io
+  version: v1.21.2
+- name: nfs-provisioner
+  repository: https://openebs-archive.github.io/dynamic-nfs-provisioner
+  version: 0.11.0
+digest: sha256:efb9fa3682adbc11e456a798c315bcbdd9f8d4e022522017cf5084682392267f
+generated: "2026-09-20T20:11:39.679181+10:00"
