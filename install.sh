@@ -323,7 +323,7 @@ if [ "$INSTALL_OPENEBS" = "true" ]; then
     else
         warn "OpenEBS RWX StorageClass not found"
     fi
-    if kubectl get pod -n "$NAMESPACE" -l app=nfs-provisioner 2>/dev/null | grep -q Running; then
+    if kubectl get pod -n "$NAMESPACE" -l component=nfs-provisioner 2>/dev/null | grep -q Running; then
         ok "OpenEBS NFS Provisioner is running"
     else
         warn "OpenEBS NFS Provisioner pod may still be starting..."
