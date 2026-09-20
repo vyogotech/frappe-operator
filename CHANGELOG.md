@@ -5,6 +5,15 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.7] - 2026-09-21
+
+### Added
+- **Unified subchart dependencies in Helm chart.** Added `ingress-nginx` (v4.15.1), `cert-manager` (v1.21.2), and `openebs-nfs` (v0.11.0) as conditional subcharts (off by default). Auto-wires the operator ConfigMap to the bundled NGINX controller when enabled, and provisions the `nfs-rwx-storage` StorageClass via `openebs-nfs` for ReadWriteMany (RWX) multi-replica benches.
+- **POSIX compliant `install.sh`.** Pure `/bin/sh` installer script with flags for automated component deployment (`INSTALL_INGRESS`, `INSTALL_CERT_MANAGER`, `INSTALL_OPENEBS`), chart version overrides, and health verification.
+
+### Fixed
+- **SiteApp deletion with parent FrappeSite.** The SiteApp controller now actively watches `FrappeSite` resources and immediately strips finalizers upon site deletion to prevent orphaned or stuck `Terminating` SiteApp custom resources.
+
 ## [5.2.6] - 2026-09-18
 
 ### Fixed
