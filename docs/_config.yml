@@ -42,3 +42,7 @@ kramdown:
   input: GFM
   syntax_highlighter: rouge
 
+# Exclude helm-repo from Jekyll compilation to prevent clobbering helm-repo/index.yaml on gh-pages
+exclude:
+  - helm-repo
+
