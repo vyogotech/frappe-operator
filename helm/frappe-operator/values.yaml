@@ -265,17 +265,37 @@ mariadb:
     innodb_flush_log_at_trx_commit=2
     innodb_flush_method=O_DIRECT
 
-# Ingress controller configuration (optional)
+# NGINX Ingress Controller, as a subchart (optional). When enabled, the operator's
+# ConfigMap is pointed at the bundled controller automatically -- see
+# templates/configmap.yaml -- so operatorConfig.ingressControllerService and
+# ingressControllerNamespace need not be set by hand. Provisions a cloud
+# LoadBalancer on most providers, which is billed separately.
 ingress-nginx:
   enabled: false
-  # If you want to install NGINX Ingress Controller with the operator
-  # Set to true and configure as needed
 
-# cert-manager configuration (optional)
+# cert-manager, as a subchart (optional). Needed only when sites use TLS via
+# operatorConfig.defaultClusterIssuer or spec.tls.issuer. CRDs are kept on
+# uninstall so Certificate resources are not deleted with the release.
 cert-manager:
   enabled: false
-  # If you want to install cert-manager with the operator
-  # Set to true for automatic TLS certificate management
+  crds:
+    enabled: true
+    keep: true
+
+# OpenEBS Dynamic NFS Provisioner, as a subchart (optional). Provides ReadWriteMany (RWX)
+# volumes for multi-replica benches when the cloud provisioner is RWO only (such as
+# do-block-storage on DigitalOcean DOKS). When enabled, creates the 'nfs-rwx-storage'
+# StorageClass backed by the cluster's block storage.
+openebs-nfs:
+  enabled: false
+  nfsProvisioner:
+    privileged: true
+  nfsStorageClass:
+    name: nfs-rwx-storage
+    enabled: true
+    reclaimPolicy: Delete
+    nfsServerType: kernel
+    backendStorageClass: ""
 
 # Default FrappeBench example (optional)
 examples:
