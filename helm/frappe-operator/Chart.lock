@@ -11,5 +11,8 @@ dependencies:
 - name: cert-manager
   repository: https://charts.jetstack.io
   version: v1.21.2
-digest: sha256:bf2f2bfddcec878a11e3041fbad3dd0bd4b228d6960b6a67a3550bf8661536bf
-generated: "2026-09-13T07:05:47.453339+10:00"
+- name: nfs-provisioner
+  repository: https://openebs-archive.github.io/dynamic-nfs-provisioner
+  version: 0.11.0
+digest: sha256:efb9fa3682adbc11e456a798c315bcbdd9f8d4e022522017cf5084682392267f
+generated: "2026-09-20T20:11:39.679181+10:00"

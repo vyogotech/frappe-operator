@@ -282,6 +282,21 @@ cert-manager:
     enabled: true
     keep: true
 
+# OpenEBS Dynamic NFS Provisioner, as a subchart (optional). Provides ReadWriteMany (RWX)
+# volumes for multi-replica benches when the cloud provisioner is RWO only (such as
+# do-block-storage on DigitalOcean DOKS). When enabled, creates the 'nfs-rwx-storage'
+# StorageClass backed by the cluster's block storage.
+openebs-nfs:
+  enabled: false
+  nfsProvisioner:
+    privileged: true
+  nfsStorageClass:
+    name: nfs-rwx-storage
+    enabled: true
+    reclaimPolicy: Delete
+    nfsServerType: kernel
+    backendStorageClass: ""
+
 # Default FrappeBench example (optional)
 examples:
   # Create a sample FrappeBench after installation

@@ -48,6 +48,13 @@ dependencies:
     condition: cert-manager.enabled
     tags:
       - networking
+  - name: nfs-provisioner
+    alias: openebs-nfs
+    version: "0.11.0"
+    repository: https://openebs-archive.github.io/dynamic-nfs-provisioner
+    condition: openebs-nfs.enabled
+    tags:
+      - storage
 
 annotations:
   # Artifact Hub annotations

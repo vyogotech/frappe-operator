@@ -26,6 +26,7 @@ set -e
 #   INSTALL_KEDA           KEDA subchart                    true
 #   INSTALL_INGRESS        ingress-nginx subchart           false
 #   INSTALL_CERT_MANAGER   cert-manager subchart            false
+#   INSTALL_OPENEBS        openebs-nfs subchart (RWX)       false
 #   INSTALL_STACKGRES      StackGres PostgreSQL operator    false
 #   INSTALL_POSTGRES_SCC   Percona SCC (OpenShift only)     false
 #   POSTGRES_NAMESPACE     for the Percona SCC bindings     frappe-pg
@@ -45,6 +46,7 @@ INSTALL_MARIADB_CRDS="${INSTALL_MARIADB_CRDS:-true}"
 INSTALL_KEDA="${INSTALL_KEDA:-true}"
 INSTALL_INGRESS="${INSTALL_INGRESS:-false}"
 INSTALL_CERT_MANAGER="${INSTALL_CERT_MANAGER:-false}"
+INSTALL_OPENEBS="${INSTALL_OPENEBS:-false}"
 INSTALL_STACKGRES="${INSTALL_STACKGRES:-false}"
 STACKGRES_NAMESPACE="${STACKGRES_NAMESPACE:-stackgres}"
 # Percona's PostgreSQL runs as uid/gid 26 and never sets an fsGroup - its
@@ -249,6 +251,7 @@ else
 fi
 [ "$INSTALL_INGRESS" = "true" ]      && set -- "$@" --set ingress-nginx.enabled=true
 [ "$INSTALL_CERT_MANAGER" = "true" ] && set -- "$@" --set cert-manager.enabled=true
+[ "$INSTALL_OPENEBS" = "true" ]      && set -- "$@" --set openebs-nfs.enabled=true
 
 [ -n "$CHART_VERSION" ] && set -- "$@" --version "$CHART_VERSION"
 [ -n "$VALUES_FILE" ]   && set -- "$@" --values "$VALUES_FILE"
@@ -312,6 +315,18 @@ if [ "$INSTALL_INGRESS" = "true" ]; then
         ok "NGINX Ingress Controller is running"
     else
         warn "NGINX Ingress Controller pods may still be starting..."
+    fi
+fi
+if [ "$INSTALL_OPENEBS" = "true" ]; then
+    if kubectl get sc nfs-rwx-storage >/dev/null 2>&1; then
+        ok "OpenEBS RWX StorageClass (nfs-rwx-storage) installed"
+    else
+        warn "OpenEBS RWX StorageClass not found"
+    fi
+    if kubectl get pod -n "$NAMESPACE" -l app=nfs-provisioner 2>/dev/null | grep -q Running; then
+        ok "OpenEBS NFS Provisioner is running"
+    else
+        warn "OpenEBS NFS Provisioner pod may still be starting..."
     fi
 fi
 

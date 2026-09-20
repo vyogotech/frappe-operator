@@ -95,6 +95,7 @@ jobs:
           IMAGE_TAG: local-install-test
           INSTALL_INGRESS: "true"
           INSTALL_CERT_MANAGER: "true"
+          INSTALL_OPENEBS: "true"
         run: /bin/sh ./install.sh
 
       - name: Verify operator and bundled subcharts
@@ -103,6 +104,8 @@ jobs:
           kubectl wait deployment -n frappe-operator-system -l app.kubernetes.io/name=ingress-nginx --for=condition=Available --timeout=180s
           kubectl wait deployment -n frappe-operator-system -l app.kubernetes.io/name=cert-manager  --for=condition=Available --timeout=180s
           kubectl wait deployment -n frappe-operator-system -l app=keda-operator                    --for=condition=Available --timeout=180s
+          kubectl wait deployment -n frappe-operator-system -l app=nfs-provisioner                 --for=condition=Available --timeout=180s
+          kubectl get sc nfs-rwx-storage
           # The ConfigMap must point at the bundled controller, not the external default.
           svc=$(kubectl get configmap frappe-operator-config -n frappe-operator-system -o jsonpath='{.data.ingressControllerService}')
           ns=$(kubectl get configmap frappe-operator-config -n frappe-operator-system -o jsonpath='{.data.ingressControllerNamespace}')
@@ -110,7 +113,7 @@ jobs:
           test "$ns"  = "frappe-operator-system"                  || { echo "ingressControllerNamespace=$ns"; exit 1; }
           kubectl get service "$svc" -n "$ns"
           kubectl get crd certificates.cert-manager.io
-          echo "✅ install.sh: operator, ingress-nginx, cert-manager and KEDA running; ConfigMap auto-wired"
+          echo "✅ install.sh: operator, ingress-nginx, cert-manager, KEDA, and OpenEBS running; ConfigMap auto-wired"
 
   test-helm-install:
     name: Test Helm deployment
