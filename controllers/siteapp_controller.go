@@ -34,7 +34,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
@@ -1083,12 +1085,16 @@ func (r *SiteAppReconciler) releaseFinalizer(ctx context.Context, siteApp *vyogo
 	return nil
 }
 
-// deleteWithSite deletes a SiteApp whose FrappeSite is terminating or gone. The
-// delete event brings the SiteApp back through Reconcile, which releases the
-// finalizer.
+// deleteWithSite deletes a SiteApp whose FrappeSite is terminating or gone.
 func (r *SiteAppReconciler) deleteWithSite(ctx context.Context, siteApp *vyogotechv1.SiteApp, siteName, siteState string) error {
 	log.FromContext(ctx).Info("Deleting SiteApp along with its FrappeSite", "siteApp", siteApp.Name, "site", siteName)
 	r.Recorder.Eventf(siteApp, corev1.EventTypeNormal, "SiteDeleted", "Referenced FrappeSite %s %s; deleting the SiteApp with it", siteName, siteState)
+	if controllerutil.ContainsFinalizer(siteApp, siteAppFinalizer) {
+		controllerutil.RemoveFinalizer(siteApp, siteAppFinalizer)
+		if err := r.Update(ctx, siteApp); err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
 	if err := r.Delete(ctx, siteApp); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
@@ -1118,8 +1124,36 @@ func (r *SiteAppReconciler) failReconciliation(ctx context.Context, siteApp *vyo
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SiteAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	siteToSiteApps := func(ctx context.Context, obj client.Object) []reconcile.Request {
+		site, ok := obj.(*vyogotechv1.FrappeSite)
+		if !ok {
+			return nil
+		}
+		var list vyogotechv1.SiteAppList
+		if err := r.List(ctx, &list, client.InNamespace(site.Namespace)); err != nil {
+			return nil
+		}
+		var reqs []reconcile.Request
+		for _, app := range list.Items {
+			refNs := app.Spec.SiteRef.Namespace
+			if refNs == "" {
+				refNs = app.Namespace
+			}
+			if app.Spec.SiteRef.Name == site.Name && refNs == site.Namespace {
+				reqs = append(reqs, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      app.Name,
+						Namespace: app.Namespace,
+					},
+				})
+			}
+		}
+		return reqs
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&vyogotechv1.SiteApp{}).
 		Owns(&batchv1.Job{}).
+		Watches(&vyogotechv1.FrappeSite{}, handler.EnqueueRequestsFromMapFunc(siteToSiteApps)).
 		Complete(r)
 }

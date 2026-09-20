@@ -58,6 +58,63 @@ jobs:
           kubectl get pods -n frappe-operator-system
           echo "✅ Operator successfully deployed via committed install.yaml and running!"
 
+  test-install-sh:
+    name: Test install.sh (POSIX, bundled ingress + cert-manager)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+
+      - name: Create Kind Cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          cluster_name: install-sh-test
+
+      - name: Build Operator Image
+        run: |
+          make docker-build IMG=ghcr.io/vyogotech/frappe-operator:local-install-test CONTAINER_TOOL=docker
+
+      - name: Load image into Kind
+        run: |
+          kind load docker-image ghcr.io/vyogotech/frappe-operator:local-install-test --name install-sh-test
+
+      # Run under /bin/sh (dash on Ubuntu), not bash: this script is curl-piped
+      # into environments whose only proven shell is sh, and the DigitalOcean
+      # 1-Click wrapper invokes it from a #!/bin/sh deploy.sh. Both optional
+      # subcharts are switched on so the Chart.yaml dependencies, the ConfigMap
+      # auto-wiring, and `helm dependency build` on a fresh clone (charts/*.tgz
+      # is not checked in) are all exercised in one run.
+      - name: Run install.sh
+        env:
+          IMAGE_REPO: ghcr.io/vyogotech/frappe-operator
+          IMAGE_TAG: local-install-test
+          INSTALL_INGRESS: "true"
+          INSTALL_CERT_MANAGER: "true"
+          INSTALL_OPENEBS: "true"
+        run: /bin/sh ./install.sh
+
+      - name: Verify operator and bundled subcharts
+        run: |
+          kubectl wait deployment/frappe-operator-controller-manager -n frappe-operator-system --for=condition=Available --timeout=180s
+          kubectl wait deployment -n frappe-operator-system -l app.kubernetes.io/name=ingress-nginx --for=condition=Available --timeout=180s
+          kubectl wait deployment -n frappe-operator-system -l app.kubernetes.io/name=cert-manager  --for=condition=Available --timeout=180s
+          kubectl wait deployment -n frappe-operator-system -l app=keda-operator                    --for=condition=Available --timeout=180s
+          kubectl wait deployment -n frappe-operator-system -l component=nfs-provisioner         --for=condition=Available --timeout=180s
+          kubectl get sc nfs-rwx-storage
+          # The ConfigMap must point at the bundled controller, not the external default.
+          svc=$(kubectl get configmap frappe-operator-config -n frappe-operator-system -o jsonpath='{.data.ingressControllerService}')
+          ns=$(kubectl get configmap frappe-operator-config -n frappe-operator-system -o jsonpath='{.data.ingressControllerNamespace}')
+          test "$svc" = "frappe-operator-ingress-nginx-controller" || { echo "ingressControllerService=$svc"; exit 1; }
+          test "$ns"  = "frappe-operator-system"                  || { echo "ingressControllerNamespace=$ns"; exit 1; }
+          kubectl get service "$svc" -n "$ns"
+          kubectl get crd certificates.cert-manager.io
+          echo "✅ install.sh: operator, ingress-nginx, cert-manager, KEDA, and OpenEBS running; ConfigMap auto-wired"
+
   test-helm-install:
     name: Test Helm deployment
     runs-on: ubuntu-latest

@@ -59,3 +59,87 @@ func TestSiteAppReconciler_ReleasesFinalizerWhenSiteIsGone(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestSiteAppReconciler_DeletesSiteAppWhenSiteIsBeingDeleted(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	now := metav1.NewTime(time.Now())
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "site-terminating",
+			Namespace:         "bench-v16",
+			DeletionTimestamp: &now,
+			Finalizers:        []string{"vyogo.tech/site-protection"},
+		},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			SiteName: "site-terminating.example.com",
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench-test"},
+		},
+	}
+	siteApp := &vyogotechv1.SiteApp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "app-fpm-hrms",
+			Namespace:  "bench-v16",
+			Finalizers: []string{siteAppFinalizer},
+		},
+		Spec: vyogotechv1.SiteAppSpec{
+			SiteRef: &vyogotechv1.NamespacedName{Name: "site-terminating"},
+			AppName: "hrms",
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(site, siteApp).WithStatusSubresource(siteApp).Build()
+	r := &SiteAppReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+	key := types.NamespacedName{Name: "app-fpm-hrms", Namespace: "bench-v16"}
+	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if res.RequeueAfter != 0 {
+		t.Fatalf("unexpected RequeueAfter=%s", res.RequeueAfter)
+	}
+	got := &vyogotechv1.SiteApp{}
+	if err := client.Get(context.Background(), key, got); err == nil {
+		t.Fatalf("SiteApp still exists with finalizers %v", got.Finalizers)
+	} else if !errors.IsNotFound(err) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSiteAppReconciler_DeletesSiteAppWhenSiteHasBeenDeleted(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	siteApp := &vyogotechv1.SiteApp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "app-fpm-hrms",
+			Namespace:  "bench-v16",
+			Finalizers: []string{siteAppFinalizer},
+		},
+		Spec: vyogotechv1.SiteAppSpec{
+			SiteRef: &vyogotechv1.NamespacedName{Name: "site-gone"},
+			AppName: "hrms",
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteApp).WithStatusSubresource(siteApp).Build()
+	r := &SiteAppReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+	key := types.NamespacedName{Name: "app-fpm-hrms", Namespace: "bench-v16"}
+	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if res.RequeueAfter != 0 {
+		t.Fatalf("unexpected RequeueAfter=%s", res.RequeueAfter)
+	}
+	got := &vyogotechv1.SiteApp{}
+	if err := client.Get(context.Background(), key, got); err == nil {
+		t.Fatalf("SiteApp still exists with finalizers %v", got.Finalizers)
+	} else if !errors.IsNotFound(err) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
