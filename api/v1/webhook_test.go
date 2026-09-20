@@ -315,3 +315,156 @@ func TestFrappeSiteValidateDelete(t *testing.T) {
 		t.Errorf("ValidateDelete() expected nil warnings, got %v", warnings)
 	}
 }
+
+func TestFrappeSiteValidatePostgresEngine(t *testing.T) {
+	baseSite := func(provider, mode, engine string) *FrappeSite {
+		return &FrappeSite{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-site"},
+			Spec: FrappeSiteSpec{
+				SiteName: "test.local",
+				BenchRef: &NamespacedName{Name: "test-bench"},
+				DBConfig: DatabaseConfig{
+					Provider:       provider,
+					Mode:           mode,
+					PostgresEngine: engine,
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		site     *FrappeSite
+		wantErr  bool
+		errMatch string
+	}{
+		{
+			name:    "valid stackgres engine on postgres",
+			site:    baseSite("postgres", "dedicated", "stackgres"),
+			wantErr: false,
+		},
+		{
+			name:    "valid percona engine on postgres",
+			site:    baseSite("postgres", "dedicated", "percona"),
+			wantErr: false,
+		},
+		{
+			name:    "invalid engine value",
+			site:    baseSite("postgres", "dedicated", "mysql"),
+			wantErr: true,
+		},
+		{
+			name:    "postgresEngine on mariadb provider rejected",
+			site:    baseSite("mariadb", "shared", "stackgres"),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.site.ValidateCreate(context.TODO(), tt.site)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateCreate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFrappeSiteValidateUpdate_PostgresEngineImmutability(t *testing.T) {
+	oldSite := &FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-site"},
+		Spec: FrappeSiteSpec{
+			SiteName: "test.local",
+			BenchRef: &NamespacedName{Name: "test-bench"},
+			DBConfig: DatabaseConfig{
+				Provider:       "postgres",
+				Mode:           "dedicated",
+				PostgresEngine: "percona",
+			},
+		},
+	}
+
+	// Changing to stackgres should fail
+	newSiteChanged := oldSite.DeepCopy()
+	newSiteChanged.Spec.DBConfig.PostgresEngine = "stackgres"
+
+	_, err := newSiteChanged.ValidateUpdate(context.TODO(), oldSite, newSiteChanged)
+	if err == nil {
+		t.Error("ValidateUpdate expected error when changing postgresEngine on dedicated cluster, got nil")
+	}
+
+	// Keeping percona should succeed
+	newSiteSame := oldSite.DeepCopy()
+	_, err = newSiteSame.ValidateUpdate(context.TODO(), oldSite, newSiteSame)
+	if err != nil {
+		t.Errorf("ValidateUpdate expected success when keeping postgresEngine, got %v", err)
+	}
+
+	// Dedicated site created with empty postgresEngine (defaults to stackgres)
+	oldSiteDefault := &FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-site-default"},
+		Spec: FrappeSiteSpec{
+			SiteName: "test.local",
+			BenchRef: &NamespacedName{Name: "test-bench"},
+			DBConfig: DatabaseConfig{
+				Provider: "postgres",
+				Mode:     "dedicated",
+			},
+		},
+	}
+
+	// Attempting to change to percona should fail
+	newSiteSwitchPercona := oldSiteDefault.DeepCopy()
+	newSiteSwitchPercona.Spec.DBConfig.PostgresEngine = "percona"
+	_, err = newSiteSwitchPercona.ValidateUpdate(context.TODO(), oldSiteDefault, newSiteSwitchPercona)
+	if err == nil {
+		t.Error("ValidateUpdate expected error when changing defaulted postgresEngine to percona, got nil")
+	}
+
+	// Updating other fields without changing default engine should succeed
+	newSiteDefaultSame := oldSiteDefault.DeepCopy()
+	newSiteDefaultSame.Spec.SiteName = "new-name.local"
+	_, err = newSiteDefaultSame.ValidateUpdate(context.TODO(), oldSiteDefault, newSiteDefaultSame)
+	if err != nil {
+		t.Errorf("ValidateUpdate expected success when keeping default engine, got %v", err)
+	}
+}
+
+// TestFrappeSiteValidateIngress_HTTPSPolicyIsOperatorWide asserts that the
+// webhook itself does not reject ssl-redirect/force-ssl-redirect overrides:
+// whether HTTPS is mandatory is the operator-wide FRAPPE_ENFORCE_HTTPS setting
+// (see controllers/tls_policy.go), which this type-level validator has no
+// access to. Enforcement happens in the FrappeSite controller, which strips
+// any insecure override before creating the Ingress when the policy is on.
+func TestFrappeSiteValidateIngress_HTTPSPolicyIsOperatorWide(t *testing.T) {
+	site := &FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-site"},
+		Spec: FrappeSiteSpec{
+			SiteName: "test.local",
+			BenchRef: &NamespacedName{Name: "test-bench"},
+			Ingress: &IngressConfig{
+				Annotations: map[string]string{
+					"nginx.ingress.kubernetes.io/ssl-redirect": "false",
+				},
+			},
+		},
+	}
+
+	if _, err := site.ValidateCreate(context.TODO(), site); err != nil {
+		t.Errorf("expected ValidateCreate to allow ssl-redirect=false (enforcement is operator-wide, not webhook-level), got: %v", err)
+	}
+
+	site.Spec.Ingress.Annotations = map[string]string{
+		"nginx.ingress.kubernetes.io/force-ssl-redirect": "false",
+	}
+	if _, err := site.ValidateCreate(context.TODO(), site); err != nil {
+		t.Errorf("expected ValidateCreate to allow force-ssl-redirect=false, got: %v", err)
+	}
+
+	site.Spec.Ingress.Annotations = map[string]string{
+		"nginx.ingress.kubernetes.io/proxy-body-size": "50m",
+	}
+	if _, err := site.ValidateCreate(context.TODO(), site); err != nil {
+		t.Errorf("expected ValidateCreate to succeed with valid annotations, got: %v", err)
+	}
+}

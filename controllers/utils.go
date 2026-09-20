@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -145,6 +147,26 @@ func benchJobEnv() []corev1.EnvVar {
 		{Name: "HOME", Value: "/home/frappe"},
 		{Name: "PYTHONPATH", Value: "/tmp/pip:/home/frappe/frappe-bench/sites/apps"},
 	}
+}
+
+// withBenchJobEnv adds benchJobEnv to a container's env, skipping names the
+// container already sets. Every Job that runs `bench` against the shared sites
+// volume needs it: since apps.txt lists the apps installed on the volume
+// (SiteApp installs), `frappe.init` imports all of them, so a Job without the
+// sites/apps import path dies with "No module named '<app>'" — which is how the
+// site-init Job broke the second site on a pooled bench once the first site
+// had installed an app.
+func withBenchJobEnv(c corev1.Container) corev1.Container {
+	have := map[string]bool{}
+	for _, e := range c.Env {
+		have[e.Name] = true
+	}
+	for _, e := range benchJobEnv() {
+		if !have[e.Name] {
+			c.Env = append(c.Env, e)
+		}
+	}
+	return c
 }
 
 // benchImageTag maps a bench's FrappeVersion onto the tag scheme the published
@@ -385,4 +407,30 @@ func applyDefaultJobTTL(spec *batchv1.JobSpec) {
 		return
 	}
 	spec.TTLSecondsAfterFinished = int32Ptr(resources.DefaultJobTTL)
+}
+
+// appsTxtSyncCmd rebuilds sites/apps.txt for a Job pod as the UNION of the
+// apps baked into the image (apps/) and the apps SiteApp installed onto the
+// shared volume (sites/apps/<name>/). Every site Job must use this instead of
+// `ls -1 apps > sites/apps.txt`: that overwrote the file with the image's list,
+// and the next `bench migrate` then treated a SiteApp-installed app's DocTypes
+// as orphans and DELETED them ("Removing orphan doctypes"). The bench root's
+// apps.txt is only ever a symlink to sites/apps.txt (the image layer is
+// ephemeral), so the link is re-created too.
+const appsTxtSyncCmd = `cd /home/frappe/frappe-bench && { { ls -1 apps 2>/dev/null; for d in sites/apps/*/; do [ -d "$d" ] && basename "$d"; done; } | grep -v '^__pycache__$' | grep -v '^$' | awk '!seen[$0]++' > sites/apps.txt.new && mv sites/apps.txt.new sites/apps.txt; ln -sf sites/apps.txt apps.txt; }`
+
+// jobNameFor joins the parts with "-" into a Job name that is also a valid
+// label value: at most 63 bytes. A longer name is truncated and suffixed with
+// a short hash of the full name, so it stays unique and stable. Site names on
+// a pooled bench ("<site>-<zone>-vyogo-cloud") plus a migration name easily
+// exceed the limit, and the Job then failed to create with
+// "spec.template.labels: Invalid value ... must be no more than 63 bytes".
+func jobNameFor(parts ...string) string {
+	full := strings.Join(parts, "-")
+	if len(full) <= 63 {
+		return full
+	}
+	sum := sha256.Sum256([]byte(full))
+	suffix := "-" + hex.EncodeToString(sum[:])[:6]
+	return strings.TrimRight(full[:63-len(suffix)], "-.") + suffix
 }

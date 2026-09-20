@@ -153,6 +153,13 @@ with open('/tmp/site-secrets/site_name', 'r') as f:
 with open('/tmp/site-secrets/domain', 'r') as f:
     domain = f.read().strip()
 try:
+    with open('/tmp/site-secrets/scheme', 'r') as f:
+        scheme = f.read().strip() or "http"
+except FileNotFoundError:
+    # Older operator versions didn't write this key; keep the previous
+    # behavior (Frappe defaults to http:// when host_name has no scheme).
+    scheme = ""
+try:
     with open('/tmp/site-secrets/redis_cache_address', 'r') as f:
         redis_cache_address = f.read().strip()
 except FileNotFoundError:
@@ -197,7 +204,7 @@ except FileNotFoundError:
 
 # Update with resolved domain and redis configuration
 if domain:
-    config['host_name'] = domain
+    config['host_name'] = f"{scheme}://{domain}" if scheme else domain
 if redis_cache_address:
     config['redis_cache'] = f"redis://{redis_cache_address}"
 if redis_queue_address:
@@ -239,7 +246,14 @@ echo "Domain: $DOMAIN"
 # The "unknown" state is critical: a transient DB error (e.g. "Packet sequence number
 # wrong") must never be conflated with "empty", or we would destroy and recreate a
 # live, working site during a failed/racy upgrade.
-DB_HAS_FRAPPE=$(python3 << 'PYTHON_CHECK'
+# Run the check with the bench's own interpreter: psycopg2 (Postgres) lives only in
+# the bench virtualenv, and the system python3 has no such module - which made every
+# Postgres site read "unknown" and skip the stale-directory recovery below.
+DB_CHECK_PY="python3"
+if [ -x /home/frappe/frappe-bench/env/bin/python ]; then
+    DB_CHECK_PY="/home/frappe/frappe-bench/env/bin/python"
+fi
+DB_HAS_FRAPPE=$("$DB_CHECK_PY" << 'PYTHON_CHECK'
 import sys
 
 try:
@@ -249,6 +263,22 @@ try:
     with open('/tmp/site-secrets/db_user', 'r') as f: db_user = f.read().strip()
     with open('/tmp/site-secrets/db_password', 'r') as f: db_password = f.read().strip()
     with open('/tmp/site-secrets/db_provider', 'r') as f: db_provider = f.read().strip()
+
+    if db_provider == 'postgres':
+        # Frappe hardcodes the public schema on Postgres. Without this branch a
+        # Postgres site always read "unknown", so a site directory left behind by
+        # a deleted site (deletionPolicy Retain keeps it) made the operator skip
+        # new-site and run migrate against the empty database the provisioner
+        # had just created - the site failed to initialise every time.
+        import psycopg2
+        db = psycopg2.connect(host=db_host, port=int(db_port), user=db_user, password=db_password, dbname=db_name)
+        cur = db.cursor()
+        cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tabInstalled Application'")
+        if cur.fetchone()[0] == 0:
+            print("false"); sys.exit(0)      # connected, table absent -> genuinely empty
+        cur.execute('SELECT COUNT(*) FROM "tabInstalled Application" WHERE app_name = %s', ('frappe',))
+        print("true" if cur.fetchone()[0] > 0 else "false")
+        sys.exit(0)
 
     if db_provider not in ('mariadb', 'external'):
         print("unknown"); sys.exit(0)
@@ -274,6 +304,23 @@ SITE_DIR="/home/frappe/frappe-bench/sites/$SITE_NAME"
 SITE_ALREADY_INITIALIZED="false"
 if [[ -f "$SITE_DIR/.init_complete" ]] || [[ -f "$SITE_DIR/site_config.json" ]]; then
     SITE_ALREADY_INITIALIZED="true"
+fi
+
+# A site directory whose database is CONFIRMED empty is stale, not evidence: it is
+# what a deleted site leaves behind (deletionPolicy Retain keeps the directory and
+# the database; if that database is later dropped or the server re-initialised, the
+# directory outlives it), and what a same-named site inherits when it is created
+# again. Skipping new-site here meant `bench migrate` against an empty schema and a
+# site that never left Provisioning. Only a DEFINITIVE "false" triggers this - an
+# "unknown" (transient DB error) still takes the conservative path below - and the
+# directory is moved aside, not deleted, so the old site's uploaded files survive.
+# Never during an explicit upgrade/skip, where the operator asserts the site exists.
+if [[ "$SITE_ALREADY_INITIALIZED" == "true" ]] && [[ "$DB_HAS_FRAPPE" == "false" ]] \
+   && [[ "$IS_UPGRADE" != "true" ]] && [[ "$SKIP_INIT" != "true" ]]; then
+    STALE_DIR="${SITE_DIR}.stale.$(date +%Y%m%d%H%M%S)"
+    echo "Warning: site directory $SITE_DIR exists but its database is confirmed empty - a site by this name was created before and its database is gone. Moving the directory to $STALE_DIR and creating the site fresh."
+    mv "$SITE_DIR" "$STALE_DIR"
+    SITE_ALREADY_INITIALIZED="false"
 fi
 
 # Decision — skip the destructive new-site whenever ANYTHING indicates the site already
@@ -302,8 +349,8 @@ fi
 # Force update apps.txt to ensure it reflects current image state
 # The apps directory in the container is the source of truth
 if [ -d "apps" ]; then
-    echo "Updating apps.txt from container image..."
-    ls -1 apps > sites/apps.txt || echo "Warning: Failed to update apps.txt"
+    echo "Updating apps.txt (image apps + apps installed on the shared volume)..."
+    { { ls -1 apps 2>/dev/null; for d in sites/apps/*/; do [ -d "$d" ] && basename "$d"; done; } | grep -v '^__pycache__$' | grep -v '^$' | awk '!seen[$0]++' > sites/apps.txt.new && mv sites/apps.txt.new sites/apps.txt; } || echo "Warning: Failed to update apps.txt"
     # Create symlink if needed (bench expects apps.txt in root)
     ln -sf sites/apps.txt apps.txt || cp sites/apps.txt apps.txt || echo "Warning: Failed to create apps.txt in root"
 else
@@ -416,7 +463,7 @@ if [[ "$DB_PROVIDER" == "mariadb" ]] || [[ "$DB_PROVIDER" == "postgres" ]] || [[
 
     # Check bench capabilities
     SUPPORTS_DB_USER=0
-    if bench new-site --help | grep -qE "db-user|mariadb-user"; then
+    if bench new-site --help | grep -qE -- "--db-user[ =]|--mariadb-user[ =]"; then
         SUPPORTS_DB_USER=1
     fi
 

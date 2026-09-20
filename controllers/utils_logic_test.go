@@ -234,3 +234,43 @@ func TestFrappeSiteReconciler_getBenchImage(t *testing.T) {
 		}
 	})
 }
+
+// Every bench Job needs the sites/apps import path once apps.txt lists
+// volume-installed apps; the site-init Job lacked it and failed the second
+// site on a pooled bench ("No module named 'lms'").
+func TestWithBenchJobEnvAddsMissingOnly(t *testing.T) {
+	c := corev1.Container{Env: []corev1.EnvVar{{Name: "USER", Value: "custom"}, {Name: "X", Value: "1"}}}
+	got := withBenchJobEnv(c)
+	byName := map[string]string{}
+	for _, e := range got.Env {
+		if _, dup := byName[e.Name]; dup {
+			t.Fatalf("duplicate env %s", e.Name)
+		}
+		byName[e.Name] = e.Value
+	}
+	if byName["USER"] != "custom" {
+		t.Fatalf("existing USER overwritten: %q", byName["USER"])
+	}
+	if byName["PYTHONPATH"] != "/tmp/pip:/home/frappe/frappe-bench/sites/apps" || byName["HOME"] == "" {
+		t.Fatalf("PYTHONPATH/HOME not added: %v", byName)
+	}
+}
+
+// Job names are also label values (63 bytes max); a pooled site name plus a
+// migration name blew past it and the Job never got created.
+func TestJobNameForStaysWithin63Bytes(t *testing.T) {
+	short := jobNameFor("site", "migrate", "mig-1")
+	if short != "site-migrate-mig-1" {
+		t.Fatalf("short name altered: %q", short)
+	}
+	long := jobNameFor("builder-z5cfvsxb-vyogo-cloud", "migrate", "mig-builder-z5cfvsxb-vyogo-cloud-1789703413")
+	if len(long) > 63 {
+		t.Fatalf("still too long (%d): %q", len(long), long)
+	}
+	if long == jobNameFor("builder-z5cfvsxb-vyogo-cloud", "migrate", "mig-builder-z5cfvsxb-vyogo-cloud-1789703414") {
+		t.Fatal("distinct long names collided")
+	}
+	if long != jobNameFor("builder-z5cfvsxb-vyogo-cloud", "migrate", "mig-builder-z5cfvsxb-vyogo-cloud-1789703413") {
+		t.Fatal("long name is not stable")
+	}
+}

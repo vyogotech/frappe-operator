@@ -103,9 +103,9 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return r.failReconciliation(ctx, siteMigration, fmt.Sprintf("Referenced FrappeBench %s not found: %v", benchKey.Name, err), "BenchNotFound")
 	}
 
-	jobName := fmt.Sprintf("%s-migrate-%s", site.Name, siteMigration.Name)
+	jobName := jobNameFor(site.Name, "migrate", siteMigration.Name)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
-	benchImage := "frappe/erpnext:latest"
+	benchImage := "docker.io/frappe/erpnext:latest"
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
 		benchImage = bench.Spec.ImageConfig.Repository
 		if bench.Spec.ImageConfig.Tag != "" {
@@ -113,7 +113,17 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	cmdStr := fmt.Sprintf("bench --site %s migrate", site.Status.ResolvedDomain)
+	// bench reads apps.txt from the bench root, but that file only exists as a
+	// symlink the site-init Job creates in ITS OWN container's writable layer
+	// (site_init.sh: "ln -sf sites/apps.txt apps.txt") - only sites/ is the
+	// persistent volume, so the symlink is gone by the time this Job's pod
+	// starts fresh. Recreate it from the image's apps/ dir (the source of
+	// truth) before invoking bench, same as site_init.sh does.
+	cmdStr := fmt.Sprintf(
+		"%s; bench --site %s migrate",
+		appsTxtSyncCmd,
+		site.Status.ResolvedDomain,
+	)
 	if siteMigration.Spec.SkipFixtures {
 		cmdStr += " --skip-fixtures"
 	}
@@ -130,8 +140,10 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					Labels: map[string]string{"app": "frappe", "site": site.Name},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:   corev1.RestartPolicyOnFailure,
-					SecurityContext: PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security),
+					RestartPolicy: corev1.RestartPolicyOnFailure,
+
+					ImagePullSecrets: benchImagePullSecrets(bench),
+					SecurityContext:  PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security),
 					Containers: []corev1.Container{
 						{
 							Name:            "migrate-runner",
@@ -139,11 +151,16 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command:         []string{"bash", "-c", cmdStr},
 							Env:             benchJobEnv(),
+							Resources:       vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindMigration),
 							VolumeMounts: []corev1.VolumeMount{
 								{
+									// Every other Job/Deployment in this operator mounts the sites
+									// PVC at the "frappe-sites" subPath - this one used "sites",
+									// an unrelated (empty) slice of the same PVC, so the site this
+									// Job was meant to migrate looked like it did not exist at all.
 									Name:      "sites",
 									MountPath: "/home/frappe/frappe-bench/sites",
-									SubPath:   "sites",
+									SubPath:   "frappe-sites",
 								},
 							},
 						},

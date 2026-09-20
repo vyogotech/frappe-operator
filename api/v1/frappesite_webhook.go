@@ -59,6 +59,21 @@ func (r *FrappeSite) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.
 		return nil, err
 	}
 
+	old, ok := oldObj.(*FrappeSite)
+	if ok && old.Spec.DBConfig.Mode == "dedicated" && (old.Spec.DBConfig.Provider == "postgres" || old.Spec.DBConfig.PostgresEngine != "" || r.Spec.DBConfig.PostgresEngine != "") {
+		oldEngine := old.Spec.DBConfig.PostgresEngine
+		if oldEngine == "" {
+			oldEngine = "stackgres"
+		}
+		newEngine := r.Spec.DBConfig.PostgresEngine
+		if newEngine == "" {
+			newEngine = "stackgres"
+		}
+		if oldEngine != newEngine {
+			return nil, fmt.Errorf("dbConfig.postgresEngine cannot be changed after a dedicated cluster has been provisioned (current: %s, requested: %s)", oldEngine, newEngine)
+		}
+	}
+
 	return nil, nil
 }
 
@@ -91,6 +106,18 @@ func (r *FrappeSite) validateSite() error {
 	case "mariadb", "postgres", "sqlite", "external":
 	default:
 		return fmt.Errorf("dbConfig.provider must be one of 'mariadb', 'postgres', 'sqlite', 'external'")
+	}
+
+	// Validate postgresEngine
+	if r.Spec.DBConfig.PostgresEngine != "" {
+		if provider != "postgres" {
+			return fmt.Errorf("dbConfig.postgresEngine is only valid when dbConfig.provider is 'postgres'")
+		}
+		switch r.Spec.DBConfig.PostgresEngine {
+		case "stackgres", "percona":
+		default:
+			return fmt.Errorf("dbConfig.postgresEngine must be one of 'stackgres', 'percona'")
+		}
 	}
 
 	// Validate database mode (empty DBConfig is valid; defaults to shared)
@@ -131,6 +158,13 @@ func (r *FrappeSite) validateSite() error {
 	if r.Spec.DeletionPolicy != "" && r.Spec.DeletionPolicy != "Retain" && r.Spec.DeletionPolicy != "Delete" {
 		return fmt.Errorf("deletionPolicy must be either 'Retain' or 'Delete'")
 	}
+
+	// Whether HTTPS is mandatory is an operator-wide policy (FRAPPE_ENFORCE_HTTPS,
+	// see controllers/tls_policy.go), not a per-object CRD rule: this type-level
+	// validator has no access to that runtime setting. When the policy is
+	// enforced, the FrappeSite controller strips any insecure ssl-redirect /
+	// force-ssl-redirect override before creating the Ingress and records a
+	// TLSPolicyEnforced warning event, rather than rejecting the write here.
 
 	return nil
 }

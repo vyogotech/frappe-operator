@@ -1,11 +1,16 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
-- _v1alpha1_frappesite.yaml
-- _v1alpha1_siteuser.yaml
-- _v1alpha1_frappeworkpace.yaml
-- _v1alpha1_siteworkspace.yaml
-- _v1alpha1_sitedashboardchart.yaml
-- _v1alpha1_sitedashboard.yaml
-- _v1alpha1_sitejob.yaml
-- _v1alpha1_sitebackup.yaml
+- v1_frappebench.yaml
+- v1_frappesite.yaml
+- v1_siteapp.yaml
+- v1_sitedomain.yaml
+- v1_sitebackup.yaml
+- v1_siterestore.yaml
+- v1_sitemigration.yaml
+- v1_siteuser.yaml
+- v1_frappeworkspace.yaml
+- v1_siteworkspace.yaml
+- v1_sitedashboardchart.yaml
+- v1_sitedashboard.yaml
+- v1_sitejob.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

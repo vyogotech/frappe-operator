@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 5.0.0
+VERSION ?= 5.2.6
 CONTAINER_TOOL ?= podman
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -47,8 +47,15 @@ ifeq ($(USE_IMAGE_DIGESTS), true)
 	BUNDLE_GEN_FLAGS += --use-image-digests
 endif
 
-# Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+# Image URL to use all building/pushing image targets.
+# Defaults to the published coordinates rather than a bare controller:latest,
+# because `make deploy` and `make bundle` both run `kustomize edit set image
+# controller=$(IMG)`, which rewrites config/manager/kustomization.yaml in place.
+# With a placeholder default, running either without IMG silently reverted the
+# fully-qualified image and left install.yaml and the CSV pointing at a tag no
+# cluster can pull. Local builds still work: imagePullPolicy is IfNotPresent, so
+# an image built and loaded under this tag is used without reaching a registry.
+IMG ?= ghcr.io/vyogotech/frappe-operator:v$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.26.0
 
@@ -111,6 +118,10 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run unit tests (includes root package and all modules, excludes test/ subdirectory).
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
+.PHONY: probe-coverage
+probe-coverage: ## Check every CRD is exercised by the probe app (PROBE_DIR=../frappe-operator-probe).
+	hack/check-probe-coverage.sh $(PROBE_DIR)
+
 .PHONY: integration-test
 integration-test: manifests generate fmt vet envtest ## Run integration tests (requires a real cluster).
 	INTEGRATION_TEST=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v ./test/integration/...
@@ -162,7 +173,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: manifests generate ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
+	$(CONTAINER_TOOL) build --build-arg VERSION=v$(VERSION) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -181,7 +192,7 @@ docker-buildx: test ## Build and push docker image for the manager for cross-pla
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name project-v3-builder
 	$(CONTAINER_TOOL) buildx use project-v3-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx build --build-arg VERSION=v$(VERSION) --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm project-v3-builder
 	rm Dockerfile.cross
 
@@ -264,11 +275,17 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
 	sed -i.bak -e '/namespace: frappe-operator-system/d' bundle/manifests/frappe-operator-config_v1_configmap.yaml && rm bundle/manifests/*.bak || true
+	@grep -q 'com.redhat.delivery.operator.bundle' bundle/metadata/annotations.yaml || printf '  # Red Hat annotations\n  com.redhat.delivery.operator.bundle: "true"\n  com.redhat.openshift.versions: "v4.14"\n' >> bundle/metadata/annotations.yaml
+	@grep -q 'com.redhat.delivery.operator.bundle' bundle.Dockerfile || printf '\n# Red Hat bundle delivery labels\nLABEL com.redhat.delivery.operator.bundle=true\nLABEL com.redhat.openshift.versions="v4.14"\nCOPY LICENSE /licenses/LICENSE\n' >> bundle.Dockerfile
 	operator-sdk bundle validate ./bundle
+
+.PHONY: bundle-validate
+bundle-validate: ## Validate the bundle using operator-sdk.
+	operator-sdk bundle validate ./bundle --select-optional suite=operatorframework
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.

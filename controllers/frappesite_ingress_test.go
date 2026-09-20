@@ -104,6 +104,11 @@ var _ = Describe("FrappeSite Ingress", func() {
 			}, ingress)).To(Succeed())
 
 			Expect(ingress.Spec.Rules[0].Host).To(Equal("test-site.local"))
+			// TLS is per-site opt-in (spec.tls.enabled) unless the operator-wide
+			// EnforceHTTPS policy is on; neither is set here, so no TLS block.
+			// See "HTTPS Policy" below for the opt-in and enforced cases.
+			Expect(ingress.Spec.TLS).To(BeEmpty())
+			Expect(ingress.Annotations).NotTo(HaveKey("nginx.ingress.kubernetes.io/ssl-redirect"))
 		})
 
 		It("should not create Ingress when disabled", func() {
@@ -119,6 +124,45 @@ var _ = Describe("FrappeSite Ingress", func() {
 				Namespace: site.Namespace,
 			}, ingress)
 			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Describe("HTTPS Policy", func() {
+		It("should configure TLS when the site opts in via spec.tls.enabled", func() {
+			site.Spec.TLS.Enabled = true
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+
+			Expect(reconciler.ensureIngress(ctx, site, bench, "test-site.local")).To(Succeed())
+
+			ingress := &networkingv1.Ingress{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{
+				Name:      site.Name + "-ingress",
+				Namespace: site.Namespace,
+			}, ingress)).To(Succeed())
+
+			Expect(ingress.Spec.TLS).NotTo(BeEmpty())
+			Expect(ingress.Annotations["nginx.ingress.kubernetes.io/ssl-redirect"]).To(Equal("true"))
+		})
+
+		It("should force TLS and strip an insecure override when EnforceHTTPS is on", func() {
+			reconciler.EnforceHTTPS = true
+			site.Spec.Ingress.Annotations = map[string]string{
+				"nginx.ingress.kubernetes.io/ssl-redirect": "false",
+			}
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+
+			Expect(reconciler.ensureIngress(ctx, site, bench, "test-site.local")).To(Succeed())
+
+			ingress := &networkingv1.Ingress{}
+			Expect(fakeClient.Get(ctx, types.NamespacedName{
+				Name:      site.Name + "-ingress",
+				Namespace: site.Namespace,
+			}, ingress)).To(Succeed())
+
+			Expect(ingress.Spec.TLS).NotTo(BeEmpty())
+			Expect(ingress.Annotations["nginx.ingress.kubernetes.io/ssl-redirect"]).To(Equal("true"))
+
+			Eventually(fakeRecorder.Events).Should(Receive(ContainSubstring("TLSPolicyEnforced")))
 		})
 	})
 

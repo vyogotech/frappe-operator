@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -51,6 +52,13 @@ type SiteDomainReconciler struct {
 
 	// Optional injected DNS lookup function for testing
 	DNSLookupFunc func(host string) ([]string, error)
+	IsOpenShift   bool
+
+	// EnforceHTTPS and DefaultClusterIssuer mirror FrappeSiteReconciler's
+	// fields of the same name (see controllers/tls_policy.go) so custom
+	// domains follow the same operator-wide HTTPS policy as the primary site.
+	EnforceHTTPS         bool
+	DefaultClusterIssuer string
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitedomains,verbs=get;list;watch;create;update;patch;delete
@@ -84,6 +92,19 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	site := &vyogotechv1.FrappeSite{}
 	siteKey := types.NamespacedName{Name: siteDomain.Spec.SiteRef.Name, Namespace: siteNamespace}
 	if err := r.Get(ctx, siteKey, site); err != nil {
+		if siteDomain.DeletionTimestamp != nil && errors.IsNotFound(err) {
+			// The site is gone: its Ingress/Certificate went with it via owner
+			// references and the alias symlink lived in its site directory, so
+			// there is nothing left to clean. Holding the finalizer here left the
+			// SiteDomain in Terminating forever when a site was deleted first.
+			if controllerutil.ContainsFinalizer(siteDomain, siteDomainFinalizer) {
+				controllerutil.RemoveFinalizer(siteDomain, siteDomainFinalizer)
+				if err := r.Update(ctx, siteDomain); err != nil && !errors.IsNotFound(err) {
+					return ctrl.Result{}, err
+				}
+			}
+			return ctrl.Result{}, nil
+		}
 		siteDomain.Status.Phase = "Pending"
 		r.setCondition(siteDomain, metav1.Condition{
 			Type:    "SiteReady",
@@ -115,8 +136,11 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Add finalizer if missing
 	if !controllerutil.ContainsFinalizer(siteDomain, siteDomainFinalizer) {
+		// Patch (not Update) so the spec is never re-serialized: an Update
+		// drops omitempty zero values and lets CRD defaults overwrite them.
+		patch := client.MergeFrom(siteDomain.DeepCopy())
 		controllerutil.AddFinalizer(siteDomain, siteDomainFinalizer)
-		if err := r.Update(ctx, siteDomain); err != nil {
+		if err := r.Patch(ctx, siteDomain, patch); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -156,14 +180,26 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	pathTypePrefix := networkingv1.PathTypePrefix
 	// Mirror the primary-site ingress (frappesite_ingress.go): a sane default,
-	// then whatever the site's ingress config specifies. Do NOT hardcode
-	// ssl-redirect here — that belongs to the cluster/site. Forcing it "true"
-	// 308-loops on proxy-fronted clusters (e.g. Cloudflare Flexible SSL, where
-	// the edge speaks HTTP to the origin), which is why the platform ingresses
-	// set ssl-redirect "false". Inheriting the site annotations lets that flow
-	// through to custom domains too.
+	// then whatever the site's ingress config specifies. The HTTPS redirect is
+	// only forced when the operator-wide HTTPS policy is enforced (FRAPPE_ENFORCE_HTTPS,
+	// see controllers/tls_policy.go) or this domain has its own TLS config —
+	// otherwise it stays off. Forcing it unconditionally 308-loops on proxy-fronted
+	// clusters (e.g. Cloudflare Flexible SSL, where the edge speaks HTTP to the
+	// origin). Inheriting the site annotations after these defaults lets a site
+	// opt in per-domain too, and stripInsecureOverrides below prevents opting back
+	// out when the policy is enforced.
+	// A `tls:` block with enabled: false is an explicit opt-out, not TLS config:
+	// treating its mere presence as "on" forced force-ssl-redirect (which the
+	// site's ssl-redirect: "false" cannot undo) and a TLS section on the Ingress,
+	// so plain-HTTP clusters got a 308 for every alias request.
+	domainTLS := siteDomain.Spec.TLS.TLSEnabled()
+	forceHTTPS := effectiveTLS(r.EnforceHTTPS, site) || domainTLS
 	annotations := map[string]string{
 		"nginx.ingress.kubernetes.io/proxy-body-size": "100m",
+	}
+	if forceHTTPS {
+		annotations["nginx.ingress.kubernetes.io/ssl-redirect"] = "true"
+		annotations["nginx.ingress.kubernetes.io/force-ssl-redirect"] = "true"
 	}
 	if site.Spec.Ingress != nil && site.Spec.Ingress.Annotations != nil {
 		for k, v := range site.Spec.Ingress.Annotations {
@@ -171,11 +207,27 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	if r.EnforceHTTPS {
+		if stripped := stripInsecureOverrides(annotations); len(stripped) > 0 {
+			r.Recorder.Eventf(site, corev1.EventTypeWarning, "TLSPolicyEnforced",
+				"HTTPS is enforced operator-wide; ignoring annotations on domain %s: %v", siteDomain.Spec.Domain, stripped)
+		}
+	}
+
+	issuerName, issuerKind := "", ""
 	if siteDomain.Spec.TLS != nil && siteDomain.Spec.TLS.IssuerRef != nil && siteDomain.Spec.TLS.IssuerRef.Name != "" {
-		if siteDomain.Spec.TLS.IssuerRef.Kind == "ClusterIssuer" {
-			annotations["cert-manager.io/cluster-issuer"] = siteDomain.Spec.TLS.IssuerRef.Name
+		issuerName = siteDomain.Spec.TLS.IssuerRef.Name
+		issuerKind = siteDomain.Spec.TLS.IssuerRef.Kind
+	} else if r.DefaultClusterIssuer != "" {
+		issuerName = r.DefaultClusterIssuer
+		issuerKind = "ClusterIssuer"
+	}
+	// Certificates are only requested when TLS is actually on for this domain.
+	if issuerName != "" && forceHTTPS {
+		if issuerKind == "ClusterIssuer" {
+			annotations["cert-manager.io/cluster-issuer"] = issuerName
 		} else {
-			annotations["cert-manager.io/issuer"] = siteDomain.Spec.TLS.IssuerRef.Name
+			annotations["cert-manager.io/issuer"] = issuerName
 		}
 	}
 
@@ -220,13 +272,17 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					},
 				},
 			},
-			TLS: []networkingv1.IngressTLS{
-				{
-					Hosts:      []string{siteDomain.Spec.Domain},
-					SecretName: secretName,
-				},
-			},
 		},
+	}
+	// The TLS section only when TLS is on: with it present, ingress-nginx
+	// serves a fake cert for a missing Secret and redirects HTTP by default.
+	if forceHTTPS {
+		ingress.Spec.TLS = []networkingv1.IngressTLS{
+			{
+				Hosts:      []string{siteDomain.Spec.Domain},
+				SecretName: secretName,
+			},
+		}
 	}
 	_ = controllerutil.SetControllerReference(siteDomain, ingress, r.Scheme)
 
@@ -257,7 +313,7 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	siteDomain.Status.Phase = "Ready"
 	siteDomain.Status.IngressName = ingressName
-	siteDomain.Status.TLSCertificateIssued = true
+	siteDomain.Status.TLSCertificateIssued = forceHTTPS
 	siteDomain.Status.ObservedGeneration = siteDomain.Generation
 	r.setCondition(siteDomain, metav1.Condition{
 		Type:    "Ready",
@@ -275,7 +331,7 @@ func (r *SiteDomainReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // $host-based multitenant routing resolves the custom domain to the site.
 // The symlink lives on the shared PVC, so a single run serves every bench pod.
 func (r *SiteDomainReconciler) ensureFrappeDomainAlias(ctx context.Context, siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite) error {
-	jobName := fmt.Sprintf("%s-domain-alias", siteDomain.Name)
+	jobName := jobNameFor(siteDomain.Name, "domain-alias")
 
 	// Idempotent: leave an existing Job alone unless it failed, in which case
 	// recreate it so the alias eventually lands. `ln -sfn` is itself idempotent.
@@ -292,7 +348,7 @@ func (r *SiteDomainReconciler) ensureFrappeDomainAlias(ctx context.Context, site
 		return err
 	}
 
-	job := r.domainAliasJob(siteDomain, site, jobName, false)
+	job := r.domainAliasJob(ctx, siteDomain, site, jobName, false)
 	_ = controllerutil.SetControllerReference(siteDomain, job, r.Scheme)
 	if err := r.Create(ctx, job); err != nil && !errors.IsAlreadyExists(err) {
 		return err
@@ -304,23 +360,22 @@ func (r *SiteDomainReconciler) ensureFrappeDomainAlias(ctx context.Context, site
 // symlink when the SiteDomain is deleted. It carries no owner reference (so it
 // outlives the SiteDomain it is cleaning up after) and self-deletes via TTL.
 func (r *SiteDomainReconciler) cleanupFrappeDomainAlias(ctx context.Context, siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite) {
-	jobName := fmt.Sprintf("%s-domain-unalias", siteDomain.Name)
+	jobName := jobNameFor(siteDomain.Name, "domain-unalias")
 	existing := &batchv1.Job{}
 	if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteDomain.Namespace}, existing); err == nil {
 		return
 	}
-	job := r.domainAliasJob(siteDomain, site, jobName, true)
+	job := r.domainAliasJob(ctx, siteDomain, site, jobName, true)
 	_ = r.Create(ctx, job)
 }
 
 // domainAliasJob builds the create-or-remove alias Job. It passes the site name
 // and domain as env vars (never interpolated into the shell) and rejects a domain
 // containing a path separator, so a hostile domain value cannot escape sites/.
-func (r *SiteDomainReconciler) domainAliasJob(siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite, jobName string, cleanup bool) *batchv1.Job {
+func (r *SiteDomainReconciler) domainAliasJob(ctx context.Context, siteDomain *vyogotechv1.SiteDomain, site *vyogotechv1.FrappeSite, jobName string, cleanup bool) *batchv1.Job {
 	pvcName := fmt.Sprintf("%s-sites", site.Spec.BenchRef.Name)
 	backoff := int32(4)
 	ttl := int32(600)
-	runAsUser := int64(1000)
 
 	script := `set -e
 case "$DOMAIN" in */*|..|"") echo "invalid domain: $DOMAIN"; exit 1;; esac
@@ -336,6 +391,18 @@ cd /sites
 if [ -L "$DOMAIN" ]; then rm -f "$DOMAIN"; echo "removed alias $DOMAIN"; else echo "no alias $DOMAIN"; fi`
 	}
 
+	podSec := PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, siteDomain.Namespace, nil)
+	containerSec := ContainerSecurityContextForBench(r.IsOpenShift, nil)
+
+	aliasImage := os.Getenv("UTILITY_IMAGE")
+	if aliasImage == "" {
+		if r.IsOpenShift {
+			aliasImage = "registry.access.redhat.com/ubi9/ubi-minimal:latest"
+		} else {
+			aliasImage = "busybox:1.36"
+		}
+	}
+
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -348,11 +415,14 @@ if [ -L "$DOMAIN" ]; then rm -f "$DOMAIN"; echo "removed alias $DOMAIN"; else ec
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:   corev1.RestartPolicyOnFailure,
-					SecurityContext: &corev1.PodSecurityContext{FSGroup: &runAsUser},
+					SecurityContext: podSec,
 					Containers: []corev1.Container{{
 						Name:    "alias",
-						Image:   "busybox:latest",
+						Image:   aliasImage,
 						Command: []string{"sh", "-c", script},
+						// Built without the bench in scope: the built-in maintenance sizing.
+						Resources:       vyogotechv1.ResolveJobResources(nil, vyogotechv1.JobKindMaintenance),
+						SecurityContext: containerSec,
 						Env: []corev1.EnvVar{
 							{Name: "SITE_NAME", Value: site.Spec.SiteName},
 							{Name: "DOMAIN", Value: siteDomain.Spec.Domain},

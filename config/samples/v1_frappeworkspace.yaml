@@ -1,0 +1,12 @@
+apiVersion: vyogo.tech/v1
+kind: FrappeWorkspace
+metadata:
+  labels:
+    app.kubernetes.io/name: frappeworkspace
+    app.kubernetes.io/instance: frappeworkspace-sample
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: frappe-operator
+  name: frappeworkspace-sample
+spec:
+  description: "Frappe standard workspace"

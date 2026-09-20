@@ -117,3 +117,100 @@ func TestBuildConfigPlan_Empty(t *testing.T) {
 		t.Errorf("expected empty plan, got cmds=%v keys=%v", cmds, keys)
 	}
 }
+
+func TestBuildConfigPlanSecretConfig(t *testing.T) {
+	sc := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "vyogo-cloud"},
+		Spec: vyogotechv1.SiteConfigSpec{
+			SiteRef: &vyogotechv1.NamespacedName{Name: "cp"},
+			SecretConfig: []vyogotechv1.SecretConfigEntry{
+				{Key: "oidc_service_token", SecretKeyRef: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "platform-kc"}, Key: "OIDC_SERVICE_TOKEN"}},
+				{Key: "agent_webhook_secret", SecretKeyRef: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "agent-webhook-secret"}, Key: "webhook-secret"}},
+				// incomplete entry is skipped, not applied half-way
+				{Key: "", SecretKeyRef: corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "x"}, Key: "y"}},
+			},
+		},
+	}
+	cmds, env, keys := buildConfigPlan(sc, "fcloud-cp.vyogo.cloud")
+	if len(keys) != 2 || keys[0] != "oidc_service_token" || keys[1] != "agent_webhook_secret" {
+		t.Fatalf("applied keys = %v", keys)
+	}
+	e0 := envByName(env, "CFG_SECRET_0")
+	if e0 == nil || e0.ValueFrom == nil || e0.ValueFrom.SecretKeyRef == nil ||
+		e0.ValueFrom.SecretKeyRef.Name != "platform-kc" || e0.ValueFrom.SecretKeyRef.Key != "OIDC_SERVICE_TOKEN" {
+		t.Fatalf("CFG_SECRET_0 not sourced from the Secret: %+v", e0)
+	}
+	if envByName(env, "CFG_SECRET_1") == nil {
+		t.Fatalf("CFG_SECRET_1 missing")
+	}
+	joined := strings.Join(cmds, "\n")
+	if !strings.Contains(joined, `set-config 'oidc_service_token' "$CFG_SECRET_0"`) {
+		t.Fatalf("expected set-config to read the env var, got:\n%s", joined)
+	}
+	if strings.Contains(joined, "platform-kc") || strings.Contains(joined, "webhook-secret") {
+		t.Fatalf("secret names/values must not appear on the command line:\n%s", joined)
+	}
+}
+
+func TestBuildConfigJobCarriesBenchPullSecrets(t *testing.T) {
+	sc := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "vyogo-cloud"},
+		Spec: vyogotechv1.SiteConfigSpec{
+			SiteRef:      &vyogotechv1.NamespacedName{Name: "cp"},
+			CustomConfig: map[string]string{"ignore_csrf": "1"},
+		},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "control-plane", Namespace: "vyogo-cloud"},
+		Spec: vyogotechv1.FrappeBenchSpec{ImageConfig: &vyogotechv1.ImageConfig{
+			Repository:  "ghcr.io/vyogotech/frappe-cloud-bench",
+			Tag:         "version-16",
+			PullSecrets: []corev1.LocalObjectReference{{Name: "ghcr-pull-secret"}},
+		}},
+	}
+	job, _ := buildConfigJob(sc, bench, "fcloud-cp.vyogo.cloud", "ghcr.io/vyogotech/frappe-cloud-bench:version-16")
+	if job == nil {
+		t.Fatalf("expected a job")
+	}
+	ps := job.Spec.Template.Spec.ImagePullSecrets
+	if len(ps) != 1 || ps[0].Name != "ghcr-pull-secret" {
+		t.Fatalf("config Job must carry the bench image pull secrets, got %+v", ps)
+	}
+}
+
+func TestBuildConfigJobHasBenchJobEnv(t *testing.T) {
+	sc := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "vyogo-cloud"},
+		Spec:       vyogotechv1.SiteConfigSpec{SiteRef: &vyogotechv1.NamespacedName{Name: "cp"}, CustomConfig: map[string]string{"ignore_csrf": "1"}},
+	}
+	job, _ := buildConfigJob(sc, &vyogotechv1.FrappeBench{}, "cp.example", "img")
+	env := job.Spec.Template.Spec.Containers[0].Env
+	// Without USER, `bench` dies at import with "No username set in the environment"
+	// when the pod runs as a uid the image's /etc/passwd does not know.
+	if e := envByName(env, "USER"); e == nil || e.Value != "frappe" {
+		t.Fatalf("config Job must set USER=frappe, got %+v", e)
+	}
+	if e := envByName(env, "HOME"); e == nil || e.Value != "/home/frappe" {
+		t.Fatalf("config Job must set HOME, got %+v", e)
+	}
+}
+
+func TestJobsNeverOverwriteAppsTxtWithTheImageList(t *testing.T) {
+	sc := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "cp", Namespace: "vyogo-cloud"},
+		Spec:       vyogotechv1.SiteConfigSpec{SiteRef: &vyogotechv1.NamespacedName{Name: "cp"}, CustomConfig: map[string]string{"k": "v"}},
+	}
+	job, _ := buildConfigJob(sc, &vyogotechv1.FrappeBench{}, "cp.example", "img")
+	script := strings.Join(job.Spec.Template.Spec.Containers[0].Command, " ")
+	if strings.Contains(script, "ls -1 apps > sites/apps.txt") {
+		t.Fatalf("config Job overwrites apps.txt with the image list; SiteApp-installed apps would be dropped and their DocTypes deleted on migrate")
+	}
+	if !strings.Contains(script, "sites/apps/*/") {
+		t.Fatalf("config Job must include apps installed on the shared volume in apps.txt")
+	}
+	if !strings.Contains(appsTxtSyncCmd, "ln -sf sites/apps.txt apps.txt") {
+		t.Fatalf("bench root apps.txt link missing")
+	}
+}

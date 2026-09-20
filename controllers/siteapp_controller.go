@@ -43,8 +43,12 @@ const (
 	siteAppFinalizer = "vyogo.tech/siteapp-finalizer"
 	// fpmCLIVersion is the fpm release the install Job fetches when the bench
 	// image does not already ship the CLI. v3.0.0+ resolves the transitive app
-	// dependency tree (cascade install) and rolls back atomically on failure.
-	fpmCLIVersion = "v3.0.0"
+	// dependency tree (cascade install) and rolls back atomically on failure;
+	// v4.6.0+ never re-fetches or replaces an app the bench already has (in
+	// apps/<app>, or listed in sites/apps.txt and importable), which is exactly
+	// the shared-volume layout a pooled bench uses, and withholds a package
+	// whose wheels could not be vendored instead of publishing it dependency-less.
+	fpmCLIVersion = "v4.6.0"
 )
 
 // SiteAppReconciler reconciles a SiteApp object
@@ -53,6 +57,7 @@ type SiteAppReconciler struct {
 	Scheme       *runtime.Scheme
 	Recorder     record.EventRecorder
 	FrappeClient *FrappeClient // Optional injected client for testing
+	IsOpenShift  bool
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=siteapps,verbs=get;list;watch;create;update;patch;delete
@@ -147,6 +152,22 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	site := &vyogotechv1.FrappeSite{}
 	siteKey := types.NamespacedName{Name: siteApp.Spec.SiteRef.Name, Namespace: siteNamespace}
 	if err := r.Get(ctx, siteKey, site); err != nil {
+		if errors.IsNotFound(err) && siteApp.DeletionTimestamp != nil {
+			// The site is already gone, so there is nothing to uninstall the app
+			// FROM: the uninstall Job would fail forever ("site does not exist")
+			// and this CR would sit in Terminating behind its finalizer, which is
+			// exactly what deleting a site before its SiteApps used to leave
+			// behind - a dozen orphans per site. Release it.
+			return ctrl.Result{}, r.releaseFinalizer(ctx, siteApp)
+		}
+		if errors.IsNotFound(err) && controllerutil.ContainsFinalizer(siteApp, siteAppFinalizer) {
+			// The finalizer is only added once the site has been fetched, so this
+			// SiteApp belonged to a site that has since been deleted (before the
+			// FrappeSite finalizer cascaded, or while the operator was down). It
+			// would sit Pending on SiteNotFound forever; it goes with its site. A
+			// SiteApp applied ahead of its site has no finalizer yet and waits below.
+			return ctrl.Result{}, r.deleteWithSite(ctx, siteApp, siteKey.Name, "has been deleted")
+		}
 		siteApp.Status.Phase = "Pending"
 		r.setCondition(siteApp, metav1.Condition{
 			Type:    "SiteReady",
@@ -158,6 +179,16 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
+	// A site that is being deleted takes its SiteApps with it, without an
+	// uninstall Job: the database is about to be dropped (deletionPolicy Delete)
+	// or must be kept as it is (Retain), and the Job would race `bench drop-site`.
+	if site.DeletionTimestamp != nil {
+		if siteApp.DeletionTimestamp != nil {
+			return ctrl.Result{}, r.releaseFinalizer(ctx, siteApp)
+		}
+		return ctrl.Result{}, r.deleteWithSite(ctx, siteApp, site.Name, "is being deleted")
+	}
+
 	// Handle Deletion & Finalizer
 	if siteApp.DeletionTimestamp != nil {
 		if controllerutil.ContainsFinalizer(siteApp, siteAppFinalizer) {
@@ -165,9 +196,18 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// Just removing the finalizer would delete the console card but leave
 			// the app installed on the shared PVC — a bad app then keeps 500ing the
 			// desk. Run a bench uninstall-app Job and wait for it to complete.
-			res, removable, err := r.reconcileAppUninstallJob(ctx, siteApp, site)
-			if err != nil {
-				return res, err
+			removable := true
+			var res ctrl.Result
+			if namespaceTerminating(ctx, r.Client, siteApp.Namespace) {
+				// The bench PVC is going with the namespace; an uninstall Job could
+				// not even be created there. Release the finalizer.
+				log.FromContext(ctx).Info("Namespace is terminating; skipping uninstall Job and releasing the finalizer", "siteApp", siteApp.Name)
+			} else {
+				var err error
+				res, removable, err = r.reconcileAppUninstallJob(ctx, siteApp, site)
+				if err != nil {
+					return res, err
+				}
 			}
 			if !removable {
 				// Job still running (or just created) — requeue without removing
@@ -249,50 +289,9 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return r.reconcileAppInstallJob(ctx, siteApp, site)
 }
 
-func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp *vyogotechv1.SiteApp, site *vyogotechv1.FrappeSite) (ctrl.Result, error) {
-	jobName := fmt.Sprintf("%s-app-install", siteApp.Name)
-	job := &batchv1.Job{}
-	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
-
-	if errors.IsNotFound(err) {
-		// Rollback safety: before installing/upgrading the app, take a full backup
-		// and wait for it to succeed. The install job is not created until the
-		// preflight backup is done, so a corrupt install can always be reverted.
-		if siteApp.Spec.BackupBeforeInstall {
-			backupName := fmt.Sprintf("%s-pre-g%d", siteApp.Name, siteApp.Generation)
-			done, berr := ensurePreflightBackup(ctx, r.Client, siteApp.Namespace, site.Spec.SiteName, backupName)
-			if berr != nil {
-				return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Pre-install backup failed: %v", berr), "PreBackupFailed")
-			}
-			if !done {
-				siteApp.Status.Phase = "BackingUp"
-				siteApp.Status.PreBackupRef = backupName
-				r.setCondition(siteApp, metav1.Condition{
-					Type:    "Ready",
-					Status:  metav1.ConditionFalse,
-					Reason:  "BackingUp",
-					Message: fmt.Sprintf("Taking pre-install backup %s before installing %s", backupName, siteApp.Spec.AppName),
-				})
-				_ = r.updateStatus(ctx, siteApp)
-				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-			}
-			siteApp.Status.PreBackupRef = backupName
-		}
-
-		bench := &vyogotechv1.FrappeBench{}
-		benchName := site.Spec.BenchRef.Name
-		benchNamespace := site.Spec.BenchRef.Namespace
-		if benchNamespace == "" {
-			benchNamespace = site.Namespace
-		}
-		if err := r.Get(ctx, types.NamespacedName{Name: benchName, Namespace: benchNamespace}, bench); err != nil {
-			return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Failed to fetch referenced bench %s: %v", benchName, err), "BenchNotFound")
-		}
-
-		image := resolveBenchImage(bench)
-		pvcName := fmt.Sprintf("%s-sites", bench.Name)
-
-		script := `#!/bin/bash
+// siteAppInstallScript is the SiteApp install Job script. Both install paths
+// (FPM package, then git) honour AUTO_MIGRATE; see TestSiteAppInstallScript*.
+const siteAppInstallScript = `#!/bin/bash
 set -e
 
 mkdir -p /home/frappe/frappe-bench/logs 2>/dev/null || true
@@ -403,8 +402,25 @@ PY
 # to do against Spec.Apps, moved to where the database is reachable and the truth
 # actually lives.
 if bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}' | grep -qx "$APP_NAME"; then
-  echo "App $APP_NAME already installed on $SITE_NAME (verified via list-apps); nothing to do."
-  exit 0
+  # Already on the site. Still re-run when any app the site lists is missing
+  # from the bench (neither the image's apps/ nor the sites PVC has it): a
+  # dependency that fpm installed but was never relocated (lms -> payments)
+  # leaves every serving pod 500ing with "No module named <dep>", and a re-run
+  # is what restores it.
+  MISSING=""
+  for a in $(bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}'); do
+    [ -d "/home/frappe/frappe-bench/apps/$a" ] || [ -d "/home/frappe/frappe-bench/sites/apps/$a" ] || MISSING="$MISSING $a"
+    # An assets link left pointing into a finished job's scratch dir means
+    # every page of that app 404s its CSS/JS; a re-run relinks it.
+    if [ -L "/home/frappe/frappe-bench/sites/assets/$a" ] && [ ! -e "/home/frappe/frappe-bench/sites/assets/$a" ]; then
+      MISSING="$MISSING $a(assets)"
+    fi
+  done
+  if [ -z "$MISSING" ]; then
+    echo "App $APP_NAME already installed on $SITE_NAME (verified via list-apps); nothing to do."
+    exit 0
+  fi
+  echo "App $APP_NAME is on $SITE_NAME but these apps are missing from the bench:$MISSING - re-running the install to restore them."
 fi
 
 # FPM install path (preferred when the app is a published package). Installs a
@@ -412,12 +428,175 @@ fi
 # no yarn/pip build on the bench, and lets fpm resolve the transitive app
 # dependency tree. The git clone path below is the fallback for apps that have no
 # published package (FPM_PACKAGE empty).
+# relocate_fpm_app <app>: copy an app fpm installed into this job's ephemeral
+# bench (HOME/.fpm store, symlinked from apps/<app>) onto the sites PVC - the
+# same durable location the git path uses - so it survives pod restarts and the
+# serving pods (PYTHONPATH=sites/apps + sitecustomize) load it. Called for the
+# requested app AND for every required app fpm pulled in alongside it.
+# link_durable_app <app>: point this job's bench at the copy of <app> that is
+# already on the shared volume, and repair the durable pointers every serving
+# pod relies on (apps.pth, apps.txt, sites/assets/<app>). Never copies.
+link_durable_app() {
+  app="$1"
+  DEST="/home/frappe/frappe-bench/sites/apps/$app"
+  ln -sfn "$DEST" "/home/frappe/frappe-bench/apps/$app"
+  [ -d "$DEST/$app/public" ] && ln -sfn "$DEST/$app/public" "/home/frappe/frappe-bench/sites/assets/$app"
+  grep -q "^$DEST$" /home/frappe/frappe-bench/sites/apps.pth 2>/dev/null || echo "$DEST" >> /home/frappe/frappe-bench/sites/apps.pth
+  grep -q "^$app$" /home/frappe/frappe-bench/sites/apps.txt 2>/dev/null || echo "$app" >> /home/frappe/frappe-bench/sites/apps.txt
+  return 0
+}
+
+relocate_fpm_app() {
+  app="$1"
+  SRC=$(readlink -f "/home/frappe/frappe-bench/apps/$app" 2>/dev/null || true)
+  DEST="/home/frappe/frappe-bench/sites/apps/$app"
+  if [ -z "$SRC" ] || [ ! -d "$SRC" ] || [ "$SRC" = "$DEST" ]; then
+    return 0
+  fi
+  # A shared bench holds ONE copy of an app. If the volume already has it,
+  # keep that copy: other sites on this bench are serving from it right now,
+  # and replacing it under them (rm -rf + cp) raced with their imports and
+  # left dangling asset links. Upgrading a shared app is a bench-level
+  # operation, not a per-site install.
+  if [ -d "$DEST/$app" ]; then
+    echo "$app is already on the shared volume; keeping that copy (site-level install only)."
+    link_durable_app "$app"
+    return 0
+  fi
+  echo "Relocating $app onto the sites PVC for durability..."
+  # Copy into a private temp dir and swap it in atomically, so no serving pod
+  # ever sees a half-copied app and a concurrent first install of the same app
+  # on another site simply finds the finished copy. __pycache__ is left out:
+  # it is what a live import writes mid-copy, and pods regenerate it.
+  TMP="$DEST.tmp.$$"
+  rm -rf "$TMP"; mkdir -p "$TMP"
+  tar --exclude='__pycache__' -C "$SRC" -cf - . | tar -C "$TMP" -xf -
+  if [ -d "$DEST/$app" ]; then
+    echo "$app appeared on the shared volume meanwhile (another install won); using that copy."
+    rm -rf "$TMP"
+  else
+    mv "$TMP" "$DEST"
+  fi
+  link_durable_app "$app"
+  # No vendored wheels: fpm resolved the app's Python deps online into this
+  # job's env/ (see the pip snapshot). Fetch exactly the dists that added
+  # beyond the base image into the app's own wheels dir, so rebuild_pydeps
+  # below can treat every app the same way. Without this the app installs
+  # cleanly here and then 500s on every serving pod with "No module named
+  # <dep>" (insights/ibis was the case that found it).
+  if ! ls "$DEST"/wheels/*.whl >/dev/null 2>&1 && [ -n "$NEWDEPS" ] && [ -z "$STAGED_ONLINE_DEPS" ]; then
+    STAGED_ONLINE_DEPS=1
+    mkdir -p "$DEST/wheels"
+    echo "No vendored wheels for $app; fetching the $(printf '%s\n' "$NEWDEPS" | wc -l | tr -d ' ') Python deps its online install added into $DEST/wheels:"
+    printf '%s\n' "$NEWDEPS" | sed 's/^/  /'
+    printf '%s\n' "$NEWDEPS" > /tmp/pydeps-requirements.txt
+    /home/frappe/frappe-bench/env/bin/pip download --no-deps -d "$DEST/wheels" -r /tmp/pydeps-requirements.txt 2>&1 | tail -3 || \
+      echo "warning: could not fetch $app's Python deps; the serving pods may fail to import it"
+  fi
+  return 0
+}
+
+# rebuild_pydeps: the ONE resolution of every app's Python deps that the
+# serving pods import (sitecustomize appends sites/apps/.pydeps to sys.path;
+# the bench env's own pins still win for shared deps). Built fresh from the
+# union of all apps' vendored wheels, newest version per distribution, into a
+# temp dir and swapped in atomically. It used to be layered per app with
+# pip --target --upgrade, which does not remove the previous version's
+# files: two apps vendoring numpy 2.5.2 and 2.5.3 left a numpy with no
+# __version__, openpyxl could not import, and every ERPNext page that touched
+# it broke on the shared bench.
+rebuild_pydeps() {
+  cd /home/frappe/frappe-bench
+  PYDEPS="/home/frappe/frappe-bench/sites/apps/.pydeps"
+  /home/frappe/frappe-bench/env/bin/python - > /tmp/pydeps-wheels.txt <<'PY'
+import glob, os, re
+try:
+    from packaging.version import Version
+except Exception:
+    from pip._vendor.packaging.version import Version
+best = {}
+for w in glob.glob("/home/frappe/frappe-bench/sites/apps/*/wheels/*.whl"):
+    m = re.match(r"([A-Za-z0-9_.]+)-([^-]+)-", os.path.basename(w))
+    if not m:
+        continue
+    name = m.group(1).lower().replace("_", "-")
+    try:
+        v = Version(m.group(2))
+    except Exception:
+        continue
+    if name not in best or v > best[name][0]:
+        best[name] = (v, w)
+for name in sorted(best):
+    print(best[name][1])
+PY
+  if [ ! -s /tmp/pydeps-wheels.txt ]; then
+    echo "No vendored wheels on the bench; nothing to stage."
+    return 0
+  fi
+  echo "Rebuilding $PYDEPS from $(wc -l < /tmp/pydeps-wheels.txt | tr -d ' ') wheels (newest per distribution)..."
+  rm -rf "$PYDEPS.new"
+  # pip's exit status decides, captured on its own: an "if pip | grep -v"
+  # pipeline tests grep, so a quiet success read as failure (and the fresh
+  # tree was thrown away) while a failure that printed errors read as success.
+  if PIP_OUT=$(/home/frappe/frappe-bench/env/bin/pip install -q --no-index --no-deps --target "$PYDEPS.new" $(cat /tmp/pydeps-wheels.txt) 2>&1); then
+    rm -rf "$PYDEPS.old"
+    [ -d "$PYDEPS" ] && mv "$PYDEPS" "$PYDEPS.old"
+    mv "$PYDEPS.new" "$PYDEPS"
+    rm -rf "$PYDEPS.old"
+    echo "Staged Python deps for the serving pods into $PYDEPS."
+  else
+    echo "$PIP_OUT" | grep -v "^WARNING: The directory"
+    rm -rf "$PYDEPS.new"
+    echo "warning: could not rebuild $PYDEPS; leaving the previous one in place"
+  fi
+  return 0
+}
+
 if [ -n "$FPM_PACKAGE" ]; then
+  cd /home/frappe/frappe-bench
+  # Shared-bench fast path: the volume already provides this app (and every
+  # app it requires), so this is a site-level install against that copy -
+  # no package fetch, no copy, nothing bench-level. Only an app the bench
+  # has never seen goes through fpm below.
+  if [ -d "/home/frappe/frappe-bench/sites/apps/$APP_NAME/$APP_NAME" ]; then
+    link_durable_app "$APP_NAME"
+    SHARED_OK=1
+    for dep in $(read_required_apps "$APP_NAME"); do
+      [ "$dep" = "frappe" ] && continue
+      if [ -d "/home/frappe/frappe-bench/sites/apps/$dep/$dep" ]; then
+        link_durable_app "$dep"
+      elif [ ! -d "/home/frappe/frappe-bench/apps/$dep" ]; then
+        echo "Required app $dep is not on this bench yet; resolving through fpm."
+        SHARED_OK=0
+      fi
+    done
+    if [ "$SHARED_OK" = "1" ]; then
+      echo "Bench already provides $APP_NAME from the shared volume; site-level install only."
+      INSTALLED=$(bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}')
+      for app in $(read_required_apps "$APP_NAME") "$APP_NAME"; do
+        [ "$app" = "frappe" ] && continue
+        if echo "$INSTALLED" | grep -qx "$app"; then
+          echo "$app already on $SITE_NAME."
+          continue
+        fi
+        bench --site "$SITE_NAME" install-app "$app"
+      done
+      bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
+      if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
+        echo "Running bench migrate (autoMigrate)..."
+        bench --site "$SITE_NAME" migrate
+      fi
+      echo "Verifying site health after FPM install..."
+      bench --site "$SITE_NAME" execute frappe.get_installed_apps
+      echo "FPM install complete for $APP_NAME (shared bench copy)."
+      exit 0
+    fi
+  fi
   echo "Installing $FPM_PACKAGE via FPM (repo: ${FPM_REPO:-none})..."
   # Bench images may not ship the fpm CLI yet; fetch the pinned release if absent.
   if ! command -v fpm >/dev/null 2>&1; then
-    echo "fpm CLI not found in image; fetching ${FPM_VERSION:-v3.0.0}..."
-    curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v3.0.0}/fpm-linux-amd64" && chmod +x /tmp/fpm
+    echo "fpm CLI not found in image; fetching ${FPM_VERSION:-v4.6.0}..."
+    curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v4.6.0}/fpm-linux-amd64" && chmod +x /tmp/fpm
     export PATH="/tmp:$PATH"
   fi
   if [ -n "$FPM_REPO" ]; then
@@ -436,62 +615,27 @@ if [ -n "$FPM_PACKAGE" ]; then
   # image is exactly what the serving pods will lack, so it is staged into
   # .pydeps below by diffing against this snapshot.
   /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-before.txt || true
+  # Snapshot apps/ too: fpm installs the package's required apps as well (lms
+  # brings payments), so every app it adds - not only the one this SiteApp
+  # names - has to be relocated below, or the serving pods lack the dependency
+  # and 500 on every request.
+  ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-before.txt || true
   # fpm install extracts to the FPM store, symlinks apps/<app>, and installs on the site.
   fpm install "$FPM_PACKAGE" --bench-path /home/frappe/frappe-bench --site "$SITE_NAME"
-  # Durability: the FPM store (HOME/.fpm) is ephemeral, so relocate the app onto
-  # the sites PVC — the same durable location the git path uses — so it survives
-  # pod restarts and the serving pods (PYTHONPATH=sites/apps + sitecustomize)
-  # load it. Without this the app vanishes on the next roll.
-  SRC=$(readlink -f "/home/frappe/frappe-bench/apps/$APP_NAME" 2>/dev/null || true)
-  DEST="/home/frappe/frappe-bench/sites/apps/$APP_NAME"
-  if [ -n "$SRC" ] && [ -d "$SRC" ] && [ "$SRC" != "$DEST" ]; then
-    echo "Relocating $APP_NAME onto the sites PVC for durability..."
-    rm -rf "$DEST"; cp -a "$SRC" "$DEST"
-    ln -sfn "$DEST" "/home/frappe/frappe-bench/apps/$APP_NAME"
-    [ -d "$DEST/$APP_NAME/public" ] && ln -sfn "$DEST/$APP_NAME/public" "/home/frappe/frappe-bench/sites/assets/$APP_NAME"
-    grep -q "^$DEST$" /home/frappe/frappe-bench/sites/apps.pth 2>/dev/null || echo "$DEST" >> /home/frappe/frappe-bench/sites/apps.pth
-    grep -q "^$APP_NAME$" /home/frappe/frappe-bench/sites/apps.txt 2>/dev/null || echo "$APP_NAME" >> /home/frappe/frappe-bench/sites/apps.txt
-    # Stage the app's vendored wheels into a durable PVC dir so the serving pods
-    # (which do not share this job's env/) can import the app's Python deps. The
-    # wheels came with the .fpm and are installed offline. sitecustomize appends
-    # .pydeps to sys.path, so the bench env's own pins still win for shared deps.
-    PYDEPS="/home/frappe/frappe-bench/sites/apps/.pydeps"
-    if ls "$DEST"/wheels/*.whl >/dev/null 2>&1; then
-      mkdir -p "$PYDEPS"
-      echo "Staging vendored wheels for $APP_NAME into $PYDEPS..."
-      /home/frappe/frappe-bench/env/bin/pip install --no-index --find-links "$DEST/wheels" \
-        --target "$PYDEPS" --upgrade "$DEST"/wheels/*.whl 2>/dev/null || \
-        echo "warning: could not stage vendored wheels; app deps must be in the base image"
-    else
-      # No vendored wheels: fpm resolved the app's Python deps online into this
-      # job's env/ (see the snapshot above). Stage the dists that install ADDED
-      # beyond the base image into .pydeps, one by one with --no-deps, so nothing
-      # is re-resolved or rebuilt: every one of them was already fetched (or
-      # built) into pip's cache by the online install. Without this the app
-      # installs cleanly here and then 500s on every serving pod with
-      # "No module named <dep>" (insights/ibis was the case that found it).
-      /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-after.txt || true
-      NEWDEPS=$(comm -13 /tmp/pip-before.txt /tmp/pip-after.txt 2>/dev/null | grep -E '^[A-Za-z0-9][A-Za-z0-9._-]*==' || true)
-      if [ -n "$NEWDEPS" ]; then
-        mkdir -p "$PYDEPS"
-        echo "No vendored wheels for $APP_NAME; staging the $(printf '%s\n' "$NEWDEPS" | wc -l | tr -d ' ') Python deps its online install added into $PYDEPS:"
-        printf '%s\n' "$NEWDEPS" | sed 's/^/  /'
-        printf '%s\n' "$NEWDEPS" > /tmp/pydeps-requirements.txt
-        /home/frappe/frappe-bench/env/bin/pip install --no-deps --target "$PYDEPS" --upgrade \
-          -r /tmp/pydeps-requirements.txt 2>&1 | tail -5 || \
-          echo "warning: could not stage $APP_NAME's Python deps into $PYDEPS; the serving pods may fail to import it"
-      else
-        echo "No vendored wheels for $APP_NAME and its online install added nothing beyond the base image; nothing to stage."
-      fi
-    fi
-  fi
-  # Always (re)create the /assets/<app> symlink, not just during the one-time
-  # relocate above. The relocate block is skipped whenever the app is already on
-  # the PVC (a re-reconcile, or a retried install), and a bench step can drop
-  # sites/assets — either way the symlink goes missing and the app's frontend
-  # 404s (only the framework's /assets/frappe/* load). ln -sfn is idempotent.
-  [ -d "$DEST/$APP_NAME/public" ] && ln -sfn "$DEST/$APP_NAME/public" "/home/frappe/frappe-bench/sites/assets/$APP_NAME"
+  ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-after.txt || true
+  NEW_APPS=$(comm -13 /tmp/apps-before.txt /tmp/apps-after.txt 2>/dev/null || true)
+  /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-after.txt || true
+  NEWDEPS=$(comm -13 /tmp/pip-before.txt /tmp/pip-after.txt 2>/dev/null | grep -E '^[A-Za-z0-9][A-Za-z0-9._-]*==' || true)
+  for app in $(printf '%s\n' "$APP_NAME" $NEW_APPS | awk '!seen[$0]++'); do
+    relocate_fpm_app "$app"
+  done
+  rebuild_pydeps
   bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
+  # autoMigrate (default true), same as the git path: patches + after_migrate.
+  if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
+    echo "Running bench migrate (autoMigrate)..."
+    bench --site "$SITE_NAME" migrate
+  fi
   echo "Verifying site health after FPM install..."
   bench --site "$SITE_NAME" execute frappe.get_installed_apps
   echo "FPM install complete for $APP_NAME."
@@ -535,6 +679,13 @@ bench build --app "$APP_NAME" 2>/dev/null || true
 echo "Clearing site cache..."
 bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
 
+# autoMigrate (default true): run the app's patches and after_migrate hooks.
+# install-app alone records patches as executed without running them.
+if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
+  echo "Running bench migrate (autoMigrate)..."
+  bench --site "$SITE_NAME" migrate
+fi
+
 # Post-install health probe: a bad app (e.g. one incompatible with the bench's
 # Frappe version) can leave the site unbootable so every desk request 500s. Do a
 # cheap boot of the site and enumerate installed apps; if this errors the site is
@@ -545,6 +696,51 @@ echo "Verifying site health after install..."
 bench --site "$SITE_NAME" execute frappe.get_installed_apps
 `
 
+func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp *vyogotechv1.SiteApp, site *vyogotechv1.FrappeSite) (ctrl.Result, error) {
+	jobName := jobNameFor(siteApp.Name, "app-install")
+	job := &batchv1.Job{}
+	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
+
+	if errors.IsNotFound(err) {
+		// Rollback safety: before installing/upgrading the app, take a full backup
+		// and wait for it to succeed. The install job is not created until the
+		// preflight backup is done, so a corrupt install can always be reverted.
+		if siteApp.Spec.BackupBeforeInstall == nil || *siteApp.Spec.BackupBeforeInstall { // nil = default true
+			backupName := fmt.Sprintf("%s-pre-g%d", siteApp.Name, siteApp.Generation)
+			done, berr := ensurePreflightBackup(ctx, r.Client, siteApp.Namespace, site.Spec.SiteName, backupName)
+			if berr != nil {
+				return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Pre-install backup failed: %v", berr), "PreBackupFailed")
+			}
+			if !done {
+				siteApp.Status.Phase = "BackingUp"
+				siteApp.Status.PreBackupRef = backupName
+				r.setCondition(siteApp, metav1.Condition{
+					Type:    "Ready",
+					Status:  metav1.ConditionFalse,
+					Reason:  "BackingUp",
+					Message: fmt.Sprintf("Taking pre-install backup %s before installing %s", backupName, siteApp.Spec.AppName),
+				})
+				_ = r.updateStatus(ctx, siteApp)
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
+			siteApp.Status.PreBackupRef = backupName
+		}
+
+		bench := &vyogotechv1.FrappeBench{}
+		benchName := site.Spec.BenchRef.Name
+		benchNamespace := site.Spec.BenchRef.Namespace
+		if benchNamespace == "" {
+			benchNamespace = site.Namespace
+		}
+		if err := r.Get(ctx, types.NamespacedName{Name: benchName, Namespace: benchNamespace}, bench); err != nil {
+			return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Failed to fetch referenced bench %s: %v", benchName, err), "BenchNotFound")
+		}
+
+		image := resolveBenchImage(bench)
+		pvcName := fmt.Sprintf("%s-sites", bench.Name)
+
+		script := siteAppInstallScript
+
 		env := []corev1.EnvVar{
 			{Name: "APP_NAME", Value: siteApp.Spec.AppName},
 			{Name: "SITE_NAME", Value: site.Spec.SiteName},
@@ -554,6 +750,7 @@ bench --site "$SITE_NAME" execute frappe.get_installed_apps
 			{Name: "FPM_REPO", Value: siteApp.Spec.FPMRepo},
 			{Name: "FPM_REPO_TYPE", Value: siteApp.Spec.FPMRepoType},
 			{Name: "FPM_VERSION", Value: fpmCLIVersion},
+			{Name: "AUTO_MIGRATE", Value: fmt.Sprintf("%t", siteApp.Spec.AutoMigrate == nil || *siteApp.Spec.AutoMigrate)},
 			{Name: "FRAPPE_VERSION", Value: bench.Spec.FrappeVersion},
 			{Name: "USER", Value: "frappe"},
 		}
@@ -570,7 +767,7 @@ bench --site "$SITE_NAME" execute frappe.get_installed_apps
 			)
 		}
 
-		newJob := r.buildAppJob(siteApp, jobName, "app-installer", image, pvcName, script, env, int32(1), nil)
+		newJob := r.buildAppJob(ctx, siteApp, bench, jobName, "app-installer", image, pvcName, script, env, vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindAppInstall), int32(1), nil)
 
 		// The install job is owned by the SiteApp so it is garbage-collected with
 		// it. (The uninstall job cannot be — see reconcileAppUninstallJob.)
@@ -644,7 +841,23 @@ func resolveBenchImage(bench *vyogotechv1.FrappeBench) string {
 // shape (image, sites PVC mount at frappe-sites subPath, security context,
 // RestartPolicy Never) shared by the install and uninstall paths. The caller
 // sets the owner reference (or deliberately does not — see the uninstall path).
-func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, containerName, image, pvcName, script string, env []corev1.EnvVar, backoffLimit int32, ttlSecondsAfterFinished *int32) *batchv1.Job {
+func (r *SiteAppReconciler) buildAppJob(ctx context.Context, siteApp *vyogotechv1.SiteApp, bench *vyogotechv1.FrappeBench, jobName, containerName, image, pvcName, script string, env []corev1.EnvVar, resources corev1.ResourceRequirements, backoffLimit int32, ttlSecondsAfterFinished *int32) *batchv1.Job {
+	var secConfig *vyogotechv1.SecurityConfig
+	if bench != nil {
+		secConfig = bench.Spec.Security
+	}
+
+	podSec := PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, siteApp.Namespace, secConfig)
+	if !r.IsOpenShift && (podSec.RunAsGroup == nil || *podSec.RunAsGroup != 0) {
+		// Group 0 (not 1000) to match the serving pods: the bench
+		// image's apps/ and env/ dirs are root-group-writable
+		// (mode 775), so a job running as gid 1000 cannot write the
+		// apps/<name> symlink that `fpm install` requires — the git
+		// path only survived because its symlink is `|| true`.
+		podSec.RunAsGroup = ptr.To(int64(0))
+	}
+	containerSec := ContainerSecurityContextForBench(r.IsOpenShift, secConfig)
+
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -666,16 +879,9 @@ func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, c
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser: ptr.To(int64(1000)),
-						// Group 0 (not 1000) to match the serving pods: the bench
-						// image's apps/ and env/ dirs are root-group-writable
-						// (mode 775), so a job running as gid 1000 cannot write the
-						// apps/<name> symlink that `fpm install` requires — the git
-						// path only survived because its symlink is `|| true`.
-						RunAsGroup: ptr.To(int64(0)),
-						FSGroup:    ptr.To(int64(1000)),
-					},
+
+					ImagePullSecrets: benchImagePullSecrets(bench),
+					SecurityContext:  podSec,
 					Containers: []corev1.Container{
 						{
 							Name:            containerName,
@@ -683,6 +889,8 @@ func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, c
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command:         []string{"bash", "-c", script},
 							Env:             env,
+							Resources:       resources,
+							SecurityContext: containerSec,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",
@@ -744,7 +952,7 @@ func (r *SiteAppReconciler) buildAppJob(siteApp *vyogotechv1.SiteApp, jobName, c
 // best-effort and never blocks finalizer removal.
 func (r *SiteAppReconciler) reconcileAppUninstallJob(ctx context.Context, siteApp *vyogotechv1.SiteApp, site *vyogotechv1.FrappeSite) (ctrl.Result, bool, error) {
 	logger := log.FromContext(ctx)
-	jobName := fmt.Sprintf("%s-app-uninstall", siteApp.Name)
+	jobName := jobNameFor(siteApp.Name, "app-uninstall")
 
 	job := &batchv1.Job{}
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
@@ -805,7 +1013,7 @@ bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
 		// set), and the API server rejects creating a child with a
 		// blockOwnerDeletion owner reference to an object being deleted. Instead the
 		// Job self-cleans via TTLSecondsAfterFinished once it finishes.
-		newJob := r.buildAppJob(siteApp, jobName, "app-uninstaller", image, pvcName, script, env, int32(2), ptr.To(int32(300)))
+		newJob := r.buildAppJob(ctx, siteApp, bench, jobName, "app-uninstaller", image, pvcName, script, env, vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindAppInstall), int32(2), ptr.To(int32(300)))
 
 		if err := r.Create(ctx, newJob); err != nil {
 			return ctrl.Result{}, false, fmt.Errorf("failed to create uninstall job: %w", err)
@@ -861,6 +1069,30 @@ bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
 	siteApp.Status.Phase = "Uninstalling"
 	_ = r.updateStatus(ctx, siteApp)
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, false, nil
+}
+
+// releaseFinalizer drops the SiteApp finalizer without running an uninstall Job.
+func (r *SiteAppReconciler) releaseFinalizer(ctx context.Context, siteApp *vyogotechv1.SiteApp) error {
+	if !controllerutil.ContainsFinalizer(siteApp, siteAppFinalizer) {
+		return nil
+	}
+	controllerutil.RemoveFinalizer(siteApp, siteAppFinalizer)
+	if err := r.Update(ctx, siteApp); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+// deleteWithSite deletes a SiteApp whose FrappeSite is terminating or gone. The
+// delete event brings the SiteApp back through Reconcile, which releases the
+// finalizer.
+func (r *SiteAppReconciler) deleteWithSite(ctx context.Context, siteApp *vyogotechv1.SiteApp, siteName, siteState string) error {
+	log.FromContext(ctx).Info("Deleting SiteApp along with its FrappeSite", "siteApp", siteApp.Name, "site", siteName)
+	r.Recorder.Eventf(siteApp, corev1.EventTypeNormal, "SiteDeleted", "Referenced FrappeSite %s %s; deleting the SiteApp with it", siteName, siteState)
+	if err := r.Delete(ctx, siteApp); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }
 
 func (r *SiteAppReconciler) updateStatus(ctx context.Context, siteApp *vyogotechv1.SiteApp) error {

@@ -1,0 +1,81 @@
+{{- if .Values.rbac.create -}}
+{{/*
+Aggregated edit/view ClusterRoles, matching config/rbac/frappe_aggregated_*_role.yaml
+so Helm and kustomize installs grant identical user-facing RBAC.
+
+Without these, only cluster-admins can create a SiteMigration, SiteBackup,
+SiteRestore or SiteApp, so the web console's Migrate, Back up, Restore and
+Install app actions are greyed out for every other user.
+
+The kind list is declared once here and reused for both roles and their /status
+rules. The manager ClusterRole solves the same drift problem with "*", which is
+not usable here: "*" would also match /finalizers, and handing edit users
+finalizer writes is not something an aggregated role should do.
+*/}}
+{{- $crds := list
+  "frappebenches" "frappesites" "frappeworkspaces" "siteapikeys" "siteapps"
+  "sitebackups" "siteclientscripts" "siteconfigs" "sitecrons" "sitecustomfields"
+  "sitedashboardcharts" "sitedashboards" "sitedomains" "sitejobs" "sitemigrations"
+  "sitepropertysetters" "sitequotas" "siterestores" "siteroles" "siteserverscripts"
+  "siteuserpermissions" "siteusers" "sitewebhooks" "siteworkspaces"
+-}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "frappe-operator.fullname" . }}-aggregated-edit
+  labels:
+    {{- include "frappe-operator.labels" . | nindent 4 }}
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  {{- range $crds }}
+  - {{ . }}
+  {{- end }}
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  {{- range $crds }}
+  - {{ . }}/status
+  {{- end }}
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "frappe-operator.fullname" . }}-aggregated-view
+  labels:
+    {{- include "frappe-operator.labels" . | nindent 4 }}
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+- apiGroups:
+  - vyogo.tech
+  resources:
+  {{- range $crds }}
+  - {{ . }}
+  {{- end }}
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vyogo.tech
+  resources:
+  {{- range $crds }}
+  - {{ . }}/status
+  {{- end }}
+  verbs:
+  - get
+{{- end }}

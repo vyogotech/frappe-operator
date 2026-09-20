@@ -28,7 +28,6 @@ import (
 	"github.com/vyogotech/frappe-operator/controllers/database"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -168,6 +167,16 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		isUpgrade = "true"
 	}
 
+	// Scheme Frappe should use for its own host_name (and therefore every
+	// absolute URL it generates: password-reset/notification emails, OAuth
+	// callbacks, PDF asset fetches). Follows the same effective TLS decision
+	// as the Ingress/Route and the status SiteURL (see ensureIngress,
+	// FrappeSiteReconciler.Reconcile, and controllers/tls_policy.go).
+	scheme := "http"
+	if r.IsOpenShift || effectiveTLS(r.EnforceHTTPS, site) {
+		scheme = "https"
+	}
+
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
 		// The site directory keeps spec.SiteName: every other controller addresses
@@ -176,6 +185,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		// on it with a sites/<domain> alias rather than by renaming the site.
 		"site_name":           []byte(site.Spec.SiteName),
 		"domain":              []byte(domain),
+		"scheme":              []byte(scheme),
 		"admin_password":      []byte(adminPassword),
 		"bench_name":          []byte(bench.Name),
 		"db_provider":         []byte(dbProvider),
@@ -321,6 +331,9 @@ func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1.FrappeSite, ben
 
 	if config.Provider == "" {
 		config.Provider = bench.Spec.DBConfig.Provider
+	}
+	if config.PostgresEngine == "" {
+		config.PostgresEngine = bench.Spec.DBConfig.PostgresEngine
 	}
 	if config.Mode == "" {
 		config.Mode = bench.Spec.DBConfig.Mode
@@ -570,28 +583,10 @@ func (r *FrappeSiteReconciler) getContainerSecurityContext(ctx context.Context, 
 
 // getSiteInitResources returns resource requirements for site initialization jobs
 func (r *FrappeSiteReconciler) getSiteInitResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
-	return corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("1Gi"),
-		},
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("500m"),
-			corev1.ResourceMemory: resource.MustParse("1Gi"),
-		},
-	}
+	return vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindSiteInit)
 }
 
 // getSiteDeleteResources returns resource requirements for site deletion jobs
 func (r *FrappeSiteReconciler) getSiteDeleteResources(bench *vyogotechv1.FrappeBench) corev1.ResourceRequirements {
-	return corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("1Gi"),
-		},
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("500m"),
-			corev1.ResourceMemory: resource.MustParse("1Gi"),
-		},
-	}
+	return vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindMaintenance)
 }

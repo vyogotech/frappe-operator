@@ -1,0 +1,82 @@
+# Acceptance test for every operator change: build the operator image from
+# this commit, hand it (and this commit's Helm chart) to the probe app's kind
+# e2e (github.com/vyogotech/frappe-operator-probe), which exercises every CR
+# with vyogo_probe installed from git and from its FPM package.
+#
+# Also enforces that every CRD in config/crd/bases has probe coverage
+# (hack/check-probe-coverage.sh): a new CRD lands together with its probe
+# manifest + phase, or is listed as a scaffold in hack/probe-coverage-exceptions.txt.
+name: probe e2e
+
+on:
+  push:
+    branches: [main, master, develop, release]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master, develop, release, feature/**, fix/**, fix-*]
+  workflow_dispatch:
+
+concurrency:
+  group: probe-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_TAG: ci-${{ github.sha }}
+
+jobs:
+  crd-coverage:
+    name: Every CRD has a probe phase
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: vyogotech/frappe-operator-probe
+          path: probe
+      - run: hack/check-probe-coverage.sh probe
+
+  image:
+    name: Build operator image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      tag: ${{ env.IMAGE_TAG }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build (linux/amd64, for kind)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: ghcr.io/vyogotech/frappe-operator:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ env.IMAGE_TAG }}
+      - name: Save image + chart as artifacts for the probe
+        run: |
+          mkdir -p /tmp/out
+          docker save "ghcr.io/vyogotech/frappe-operator:${IMAGE_TAG}" -o /tmp/out/operator-image.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: operator-image
+          path: /tmp/out/operator-image.tar
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: operator-chart
+          path: helm/frappe-operator
+          retention-days: 1
+          include-hidden-files: true
+
+  probe:
+    name: probe
+    needs: [crd-coverage, image]
+    uses: vyogotech/frappe-operator-probe/.github/workflows/e2e.yml@main
+    with:
+      operator_image_tag: ci-${{ github.sha }}
+      operator_image_artifact: operator-image
+      operator_chart_artifact: operator-chart
+    secrets: inherit

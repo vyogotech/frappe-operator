@@ -40,8 +40,9 @@ import (
 // SiteCronReconciler reconciles a SiteCron object
 type SiteCronReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme      *runtime.Scheme
+	Recorder    record.EventRecorder
+	IsOpenShift bool
 }
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitecrons,verbs=get;list;watch;create;update;patch;delete
@@ -109,7 +110,7 @@ func (r *SiteCronReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	cronJobName := fmt.Sprintf("%s-cron-%s", site.Name, siteCron.Name)
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
-	benchImage := "frappe/erpnext:latest"
+	benchImage := "docker.io/frappe/erpnext:latest"
 	if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
 		benchImage = bench.Spec.ImageConfig.Repository
 		if bench.Spec.ImageConfig.Tag != "" {
@@ -122,7 +123,14 @@ func (r *SiteCronReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		timeoutSec = 3600
 	}
 
-	cmdStr := fmt.Sprintf("bench --site %s execute %s", site.Status.ResolvedDomain, siteCron.Spec.Method)
+	// Same fix as the migrate Job: bench root's apps.txt is only ever a symlink
+	// the site-init Job created in its own now-gone container layer, so recreate
+	// it from the image's apps/ dir before invoking bench.
+	cmdStr := fmt.Sprintf(
+		"%s; bench --site %s execute %s",
+		appsTxtSyncCmd,
+		site.Status.ResolvedDomain, siteCron.Spec.Method,
+	)
 
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -142,18 +150,23 @@ func (r *SiteCronReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 							Labels: map[string]string{"app": "frappe", "site": site.Name},
 						},
 						Spec: corev1.PodSpec{
-							RestartPolicy: corev1.RestartPolicyOnFailure,
+							RestartPolicy:    corev1.RestartPolicyOnFailure,
+							SecurityContext:  PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security),
+							ImagePullSecrets: benchImagePullSecrets(bench),
 							Containers: []corev1.Container{
 								{
 									Name:            "cron-runner",
 									Image:           benchImage,
 									ImagePullPolicy: corev1.PullIfNotPresent,
+									SecurityContext: ContainerSecurityContextForBench(r.IsOpenShift, bench.Spec.Security),
 									Command:         []string{"bash", "-c", cmdStr},
+									Env:             benchJobEnv(),
+									Resources:       vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindCron),
 									VolumeMounts: []corev1.VolumeMount{
 										{
 											Name:      "sites",
 											MountPath: "/home/frappe/frappe-bench/sites",
-											SubPath:   "sites",
+											SubPath:   "frappe-sites", // same fix as the migrate Job: "frappe-sites" is the correct subPath every other component uses
 										},
 									},
 								},

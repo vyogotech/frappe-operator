@@ -19,17 +19,18 @@ package controllers
 import (
 	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
@@ -65,13 +66,23 @@ func (r *SiteRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// Get the bench
+	// Get the bench. benchRef.namespace defaults to the SiteRestore's own
+	// namespace (an empty namespace never matches anything), and a missing
+	// bench is reported on the CR instead of only in the controller log.
 	bench := &vyogotechv1.FrappeBench{}
-	if err := r.Get(ctx, client.ObjectKey{Name: siteRestore.Spec.BenchRef.Name, Namespace: siteRestore.Spec.BenchRef.Namespace}, bench); err != nil {
+	benchNS := siteRestore.Spec.BenchRef.Namespace
+	if benchNS == "" {
+		benchNS = siteRestore.Namespace
+	}
+	if err := r.Get(ctx, client.ObjectKey{Name: siteRestore.Spec.BenchRef.Name, Namespace: benchNS}, bench); err != nil {
+		if errors.IsNotFound(err) {
+			_ = r.updateStatus(ctx, siteRestore, "Pending", fmt.Sprintf("FrappeBench %s/%s not found", benchNS, siteRestore.Spec.BenchRef.Name), "")
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
 		return ctrl.Result{}, err
 	}
 
-	jobName := siteRestore.Name + "-restore"
+	jobName := jobNameFor(siteRestore.Name, "restore")
 	job := &batchv1.Job{}
 	err := r.Get(ctx, client.ObjectKey{Name: jobName, Namespace: siteRestore.Namespace}, job)
 
@@ -219,7 +230,21 @@ func (r *SiteRestoreReconciler) buildRestoreJob(ctx context.Context, siteRestore
 				break
 			}
 			secName, secKey, secNs, rerr := mariaDBRootSecretRef(ctx, r.Client, s.Name, s.Namespace, s.Spec.DBConfig)
-			if rerr == nil && secName != "" && secNs == siteRestore.Namespace {
+			if rerr == nil && secName != "" {
+				if secNs != siteRestore.Namespace {
+					// The MariaDB (and its root Secret) live in another namespace — a
+					// shared server the site was pointed at with mariadbRef. Env can only
+					// reference Secrets in the Job's namespace, so mirror the one key into
+					// a Secret owned by this SiteRestore (deleted with it), as site
+					// deletion does. Without this `bench restore` prompts for the root
+					// password and the Job fails.
+					mirrored, merr := mirrorSecretKey(ctx, r.Client, r.Scheme, siteRestore, secNs, secName, secKey, siteRestore.Name+"-dbroot")
+					if merr != nil {
+						log.FromContext(ctx).Error(merr, "could not mirror the MariaDB root secret into the restore namespace", "secret", secNs+"/"+secName)
+						break
+					}
+					secName, secKey = mirrored, "password"
+				}
 				env = append(env, corev1.EnvVar{
 					Name: "DB_ROOT_PASSWORD",
 					ValueFrom: &corev1.EnvVarSource{
@@ -314,8 +339,9 @@ func (r *SiteRestoreReconciler) buildRestoreJob(ctx context.Context, siteRestore
 								}
 								return corev1.PullPolicy("")
 							}(),
-							Command: []string{"bash", "-c"},
-							Args:    []string{r.buildRestoreScript(siteRestore, withMariaDBRoot)},
+							Command:   []string{"bash", "-c"},
+							Args:      []string{r.buildRestoreScript(siteRestore, withMariaDBRoot)},
+							Resources: vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindRestore),
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "sites",
@@ -391,4 +417,43 @@ func (r *SiteRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&vyogotechv1.SiteRestore{}).
 		Owns(&batchv1.Job{}).
 		Complete(r)
+}
+
+// mirrorSecretKey copies one key of a Secret from another namespace into a
+// Secret named dstName in the owner's namespace (key "password"), owned by the
+// owner so it is garbage-collected with it. Idempotent: an existing mirror is
+// refreshed. Returns the mirror's name.
+func mirrorSecretKey(ctx context.Context, c client.Client, scheme *runtime.Scheme, owner client.Object, srcNs, srcName, srcKey, dstName string) (string, error) {
+	src := &corev1.Secret{}
+	if err := c.Get(ctx, client.ObjectKey{Name: srcName, Namespace: srcNs}, src); err != nil {
+		return "", fmt.Errorf("read %s/%s: %w", srcNs, srcName, err)
+	}
+	val, ok := src.Data[srcKey]
+	if !ok || len(val) == 0 {
+		return "", fmt.Errorf("%s/%s has no key %q", srcNs, srcName, srcKey)
+	}
+	dst := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: dstName, Namespace: owner.GetNamespace()},
+		Type:       corev1.SecretTypeOpaque,
+		Data:       map[string][]byte{"password": val},
+	}
+	if err := controllerutil.SetControllerReference(owner, dst, scheme); err != nil {
+		return "", err
+	}
+	existing := &corev1.Secret{}
+	err := c.Get(ctx, client.ObjectKeyFromObject(dst), existing)
+	switch {
+	case err == nil:
+		existing.Data = dst.Data
+		if err := c.Update(ctx, existing); err != nil {
+			return "", err
+		}
+	case errors.IsNotFound(err):
+		if err := c.Create(ctx, dst); err != nil {
+			return "", err
+		}
+	default:
+		return "", err
+	}
+	return dstName, nil
 }

@@ -28,6 +28,9 @@ func TestGetScript(t *testing.T) {
 	}{
 		{SiteInit, "bench new-site"},
 		{SiteDelete, "bench drop-site"},
+		// drop-site may drop the DB and then fail removing a directory that only
+		// holds .nfs* temp files on a shared volume; the deletion must still succeed.
+		{SiteDelete, `if [ -f "sites/$SITE_NAME/site_config.json" ]; then`},
 		{SiteBackup, "bench --site"},
 		{AppInstall, "install-app"},
 		{UpdateSiteConfig, "site_config.json"},

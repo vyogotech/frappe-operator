@@ -18,8 +18,10 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -148,5 +150,80 @@ func TestFrappeClient_EnsureUser_And_GenerateAPIKeys(t *testing.T) {
 
 	if apiKey != "key123" || apiSecret != "secret456" {
 		t.Errorf("expected key123/secret456, got %s/%s", apiKey, apiSecret)
+	}
+}
+
+// Prompt-named doctypes need the name in the create payload, and Frappe's
+// webhook event field is `webhook_docevent`.
+func TestFrappeClient_CreatePayloadsCarryNameAndDocevent(t *testing.T) {
+	var bodies = map[string]map[string]interface{}{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/method/login":
+			_, _ = w.Write([]byte(`{"message":"Logged In"}`))
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusNotFound)
+		case r.Method == http.MethodPost:
+			var body map[string]interface{}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			bodies[r.URL.Path] = body
+			_, _ = w.Write([]byte(`{"data":{}}`))
+		}
+	}))
+	defer ts.Close()
+	c := NewFrappeClient(ts.URL, "Administrator", "pw")
+	if err := c.EnsureClientScript(context.Background(), "banner", "Probe Record", "x", true); err != nil {
+		t.Fatalf("client script: %v", err)
+	}
+	if err := c.EnsureWebhook(context.Background(), "hook", "Probe Record", "on_update", "http://x", "JSON", true); err != nil {
+		t.Fatalf("webhook: %v", err)
+	}
+	if bodies["/api/resource/Client Script"]["name"] != "banner" {
+		t.Fatalf("client script payload lacks name: %v", bodies["/api/resource/Client Script"])
+	}
+	wh := bodies["/api/resource/Webhook"]
+	if wh["name"] != "hook" || wh["webhook_docevent"] != "on_update" {
+		t.Fatalf("webhook payload must carry name and webhook_docevent: %v", wh)
+	}
+}
+
+// User Permission is hash-named: existence is decided by a filtered list, an
+// existing one is updated by its real name, and a 409 on create is success.
+func TestFrappeClient_EnsureUserPermissionIsIdempotent(t *testing.T) {
+	posts, puts := 0, 0
+	exists := false
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/method/login":
+			_, _ = w.Write([]byte(`{"message":"Logged In"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/resource/User Permission":
+			if !strings.Contains(r.URL.RawQuery, "filters=") {
+				t.Errorf("lookup must filter by fields, got %s", r.URL.RawQuery)
+			}
+			if exists {
+				_, _ = w.Write([]byte(`{"data":[{"name":"u06fsnkpl1"}]}`))
+			} else {
+				_, _ = w.Write([]byte(`{"data":[]}`))
+			}
+		case r.Method == http.MethodPost:
+			posts++
+			exists = true
+			_, _ = w.Write([]byte(`{"data":{"name":"u06fsnkpl1"}}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/api/resource/User Permission/u06fsnkpl1":
+			puts++
+			_, _ = w.Write([]byte(`{"data":{}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+	c := NewFrappeClient(ts.URL, "Administrator", "pw")
+	for i := 0; i < 2; i++ {
+		if err := c.EnsureUserPermission(context.Background(), "u@x", "Probe Record", "seed-00002", true); err != nil {
+			t.Fatalf("round %d: %v", i, err)
+		}
+	}
+	if posts != 1 || puts != 1 {
+		t.Fatalf("want one create then one update by real name, got posts=%d puts=%d", posts, puts)
 	}
 }

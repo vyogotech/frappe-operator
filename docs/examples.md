@@ -1,6 +1,6 @@
-# Examples
+# <i data-lucide="folder-code"></i> Examples
 
-Real-world deployment patterns and configuration examples for Frappe Operator.
+Real-world deployment patterns and configuration examples for Frappe Operator by **Vyogo Technologies**.
 
 > **Note**: All example YAML files are available in the [`examples/`](https://github.com/vyogotech/frappe-operator/tree/main/examples) directory of the repository.
 
@@ -54,7 +54,8 @@ metadata:
   namespace: default
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext"]'
+  apps:
+    - "erpnext"
   domainConfig:
     suffix: ".local"
     autoDetect: false
@@ -101,7 +102,9 @@ metadata:
   namespace: production
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext", "hrms"]'
+  apps:
+    - "erpnext"
+    - "hrms"
 
   imageConfig:
     repository: frappe/erpnext
@@ -238,7 +241,9 @@ metadata:
   namespace: saas-platform
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext", "hrms"]'
+  apps:
+    - "erpnext"
+    - "hrms"
 
   # Automatic domain assignment
   domainConfig:
@@ -349,7 +354,10 @@ metadata:
   namespace: acme-corp
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext", "hrms", "custom_app"]'
+  apps:
+    - "erpnext"
+    - "hrms"
+    - "custom_app"
 
   imageConfig:
     repository: acmecorp.azurecr.io/frappe-custom
@@ -441,7 +449,8 @@ metadata:
   namespace: default
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext"]'
+  apps:
+    - "erpnext"
 
 ---
 # Site 1: Custom domain
@@ -505,7 +514,9 @@ metadata:
   namespace: production
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext", "hrms"]'
+  apps:
+    - "erpnext"
+    - "hrms"
 
   # Start with moderate replicas
   componentReplicas:
@@ -1145,7 +1156,8 @@ metadata:
   name: small-bench
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext"]'
+  apps:
+    - "erpnext"
 
   componentReplicas:
     gunicorn: 1
@@ -1178,7 +1190,9 @@ metadata:
   name: medium-bench
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext", "hrms"]'
+  apps:
+    - "erpnext"
+    - "hrms"
 
   componentReplicas:
     gunicorn: 3
@@ -1211,7 +1225,9 @@ metadata:
   name: large-bench
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext", "hrms"]'
+  apps:
+    - "erpnext"
+    - "hrms"
 
   componentReplicas:
     gunicorn: 5

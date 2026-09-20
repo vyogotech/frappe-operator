@@ -12,6 +12,11 @@ on:
       - 'config/**'
       - 'install.yaml'
       - 'Makefile'
+      # The RBAC parity step renders the chart, so a Helm-only change must run
+      # this job -- otherwise RBAC can drift out of the chart unnoticed, which
+      # is exactly how the aggregated roles went missing from it.
+      - 'helm/**'
+      - 'scripts/verify-rbac-parity.py'
       - '.github/workflows/validate-manifests.yml'
   pull_request:
     paths:
@@ -24,6 +29,11 @@ on:
       - 'config/**'
       - 'install.yaml'
       - 'Makefile'
+      # The RBAC parity step renders the chart, so a Helm-only change must run
+      # this job -- otherwise RBAC can drift out of the chart unnoticed, which
+      # is exactly how the aggregated roles went missing from it.
+      - 'helm/**'
+      - 'scripts/verify-rbac-parity.py'
       - '.github/workflows/validate-manifests.yml'
 
 jobs:
@@ -45,6 +55,14 @@ jobs:
           make kustomize
           ./bin/kustomize build config/default > temp-install.yaml
           diff -u install.yaml temp-install.yaml
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Verify Helm and kustomize grant the same RBAC
+        run: |
+          pip install pyyaml
+          python3 scripts/verify-rbac-parity.py
 
       - name: Setup Kind
         uses: helm/kind-action@v1.10.0
@@ -68,6 +86,9 @@ jobs:
           
       - name: Validate examples/ (Server Dry Run)
         run: |
+          # Every Kind the cluster serves, gathered once.
+          known_kinds=$(kubectl api-resources --no-headers 2>/dev/null | awk '{print $NF}' | sort -u)
+
           for file in examples/*.yaml; do
             echo "---"
             echo "Validating $file"
@@ -84,6 +105,27 @@ jobs:
               kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - || true
             fi
             
+            # Some examples reference CRDs owned by optional third-party operators
+            # (StackGres, Percona, KEDA). Those are not installed on this
+            # validation cluster, and requiring them would mean installing every
+            # optional operator just to lint YAML. Skip such files instead of
+            # failing: this job exists to catch malformed manifests of our own.
+            # Match on the KIND column of api-resources rather than using
+            # `kubectl explain <Kind>`: explain resolves by resource name, not
+            # kind, so a CRD whose plural differs from its kind (StackGres
+            # SGPostgresConfig is served as sgpgconfigs) would look absent even
+            # when installed, and the file would be silently skipped.
+            missing=""
+            for kind in $(grep -E '^kind:' "$file" | awk '{print $2}' | sort -u); do
+              if ! echo "$known_kinds" | grep -qx "$kind"; then
+                missing="$missing $kind"
+              fi
+            done
+            if [ -n "$missing" ]; then
+              echo "Skipping $file - no CRD on this cluster for:$missing"
+              continue
+            fi
+
             # Perform structurally bounded dry-run compilation against the active API server
             kubectl apply -f "$file" --dry-run=server || exit 1
           done

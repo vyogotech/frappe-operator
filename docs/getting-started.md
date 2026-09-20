@@ -1,557 +1,175 @@
-# Getting Started
+# Getting Started with Frappe Operator
 
-This guide will help you install the Frappe Operator and deploy your first Frappe site.
+This guide walks you through installing the **Frappe Operator** by **Vyogo Technologies** and deploying your first Frappe/ERPNext site in 5 minutes.
+
+---
 
 ## Prerequisites
 
 Before you begin, ensure you have:
 
-- **Kubernetes cluster** (1.19+)
-  - [KIND](https://kind.sigs.k8s.io/) for local development
-  - [Minikube](https://minikube.sigs.k8s.io/) as an alternative
-  - Or any cloud Kubernetes service (EKS, GKE, AKS)
-- **kubectl** configured to access your cluster
-- **At least 4GB RAM** available in your cluster
+- **Kubernetes Cluster** (v1.22+) or **OpenShift** (4.10+)
+  - [KIND](https://kind.sigs.k8s.io/) or [Minikube](https://minikube.sigs.k8s.io/) for local development
+  - OpenShift Local (CRC), Red Hat OpenShift on AWS (ROSA), or public cloud (EKS, GKE, AKS)
+- **kubectl** or **oc** CLI configured to access your cluster
+- **Helm 3.x** installed
 
-### Required Dependencies (v1.0.0+)
+---
 
-- **MariaDB Operator** - For secure, declarative database provisioning
-  - Install from: https://github.com/mariadb-operator/mariadb-operator
+## 1. Database Backend (Choose One)
 
-### Optional Dependencies
+The Frappe Operator features a polymorphic database architecture supporting multiple database engines:
 
-- **Ingress Controller** - For external access (nginx, traefik)
-- **cert-manager** - For automatic TLS certificate management
+| Engine | Recommended Provider | Documentation |
+|---|---|---|
+| **PostgreSQL** (Default) | [StackGres Operator](https://stackgres.io) or [Percona PG Operator](https://docs.percona.com/percona-operator-for-postgresql/2.0/) | [PostgreSQL Integration Guide](POSTGRESQL_INTEGRATION.md) |
+| **MariaDB** | [MariaDB Operator](https://github.com/mariadb-operator/mariadb-operator) | [MariaDB Integration Guide](MARIADB_INTEGRATION.md) |
+| **External Database** | AWS RDS, Google Cloud SQL, Azure Database, or on-premise | [External Resources](external-resources.md) |
 
-## Installation
+For quick testing with PostgreSQL via StackGres:
+```bash
+# Add StackGres Helm repo and install operator
+helm repo add stackgres https://stackgres.io/downloads/stackgres-k8s/stackgres/helm
+helm repo update
+helm install stackgres-operator stackgres/stackgres-operator \
+  --namespace stackgres --create-namespace
+```
 
-### Step 1: Install Frappe Operator
+---
 
-Install the operator and its CRDs:
+## 2. Install Frappe Operator
+
+Install the operator using the official Vyogo Technologies Helm repository:
 
 ```bash
-# Install CRDs and operator
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.yaml
+# Add the official Vyogo Helm repository
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
+helm repo update
 
-# Verify installation
-kubectl get deployment -n frappe-operator-system
+# Install the operator into frappe-operator-system namespace
+helm install frappe-operator frappe-operator/frappe-operator \
+  --namespace frappe-operator-system \
+  --create-namespace
+```
+
+### Verify Installation
+
+Verify that the controller manager pod is running:
+
+```bash
+kubectl get pods -n frappe-operator-system
+```
+
+Verify that the CRDs are registered:
+
+```bash
 kubectl get crd | grep vyogo.tech
 ```
 
-You should see the following CRDs:
-- `frappebenchs.vyogo.tech`
+The operator registers all 24 `vyogo.tech/v1` Custom Resource Definitions, including:
+- `frappebenches.vyogo.tech`
 - `frappesites.vyogo.tech`
-- `siteusers.vyogo.tech`
-- `siteworkspaces.vyogo.tech`
-- `sitedashboards.vyogo.tech`
-- `sitedashboardcharts.vyogo.tech`
+- `sitedomains.vyogo.tech`
+- `siteapps.vyogo.tech`
 - `sitebackups.vyogo.tech`
 - `sitejobs.vyogo.tech`
 
-### Step 2: Install MariaDB (For Development)
-
-For a quick development setup, install a simple MariaDB instance:
-
-```bash
-cat <<EOF | kubectl apply -f -
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: mariadb
-  namespace: default
-spec:
-  serviceName: mariadb
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mariadb
-  template:
-    metadata:
-      labels:
-        app: mariadb
-    spec:
-      containers:
-      - name: mariadb
-        image: mariadb:10.6
-        env:
-        - name: MYSQL_ROOT_PASSWORD
-          value: "admin"
-        ports:
-        - containerPort: 3306
-          name: mysql
-        volumeMounts:
-        - name: mariadb-data
-          mountPath: /var/lib/mysql
-  volumeClaimTemplates:
-  - metadata:
-      name: mariadb-data
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 10Gi
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: mariadb
-  namespace: default
-spec:
-  type: ClusterIP
-  selector:
-    app: mariadb
-  ports:
-  - port: 3306
-    targetPort: 3306
-EOF
-```
 
-**For production**, use [MariaDB Operator](operations.md#mariadb-operator-setup) instead.
+## 3. Deploy Your First Bench and Site
 
-### Step 3: Install Ingress Controller (Optional)
+### Step 3.1: Deploy the FrappeBench (Shared Infrastructure)
 
-If you want external access to your sites:
-
-```bash
-# Install NGINX Ingress Controller
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
-
-# Wait for it to be ready
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=120s
-```
-
-## Deploying Your First Site
-
-### Method 1: Minimal Setup (Recommended for First-Time Users)
-
-Create a file named `my-first-site.yaml`:
+The `FrappeBench` represents shared infrastructure (Nginx, Gunicorn, Redis Cache/Queue, SocketIO, Scheduler, and background workers):
 
 ```yaml
----
-# FrappeBench: Shared infrastructure
 apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
-  name: dev-bench
+  name: prod-bench
   namespace: default
 spec:
   frappeVersion: "version-15"
-  appsJSON: '["erpnext"]'
-
----
-# FrappeSite: Your site
-apiVersion: vyogo.tech/v1
-kind: FrappeSite
-metadata:
-  name: mysite
-  namespace: default
-spec:
-  benchRef:
-    name: dev-bench
-  siteName: "mysite.local"
-  dbConfig:
-    mode: shared
-```
-
-Deploy it:
-
-```bash
-# Apply the manifest
-kubectl apply -f my-first-site.yaml
-
-# Watch the resources being created
-kubectl get frappebench,frappesite -w
-```
-
-### Method 2: Using Example Manifests
-
-```bash
-# Download and apply the minimal example
-kubectl apply -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/examples/minimal-bench-and-site.yaml
-
-# Check status
-kubectl get frappebench,frappesite
-```
-
-### Understanding What Gets Created
-
-When you deploy a bench and site, the operator creates:
-
-**For FrappeBench:**
-- Deployments: nginx, redis/dragonfly
-- Services: for internal communication
-- ConfigMaps: Frappe configuration
-- Jobs: bench initialization
-
-**For FrappeSite:**
-- Deployments: gunicorn, socketio, scheduler, workers
-- Services: gunicorn, socketio
-- Ingress: (if enabled) external access
-- Jobs: site creation, migration
-- PVCs: site files and logs storage
-- Secrets: database credentials, admin password
-
-## Checking Deployment Status
-
-### Check Custom Resources
-
-```bash
-# Check bench status
-kubectl get frappebench dev-bench -o yaml
-
-# Check site status  
-kubectl get frappesite mysite -o yaml
-
-# View all Frappe resources
-kubectl get frappebench,frappesite
-```
-
-### Check Kubernetes Resources
-
-```bash
-# View all pods
-kubectl get pods
-
-# Check deployments
-kubectl get deployments
-
-# Check services
-kubectl get services
-
-# Check jobs
-kubectl get jobs
-```
-
-### Watch Logs
-
-```bash
-# Bench initialization
-kubectl logs -l job-name=dev-bench-init -f
-
-# Site initialization
-kubectl logs -l job-name=mysite-init -f
-
-# Application logs
-kubectl logs -l app=mysite-gunicorn -f
-```
-
-## Accessing Your Site
-
-### Method 1: Port Forwarding (Easiest for Testing)
-
-```bash
-# Forward nginx service to localhost
-kubectl port-forward service/dev-bench-nginx 8080:8080
-
-# Add to /etc/hosts (Linux/Mac)
-echo "127.0.0.1 mysite.local" | sudo tee -a /etc/hosts
-
-# Or on Windows (as Administrator)
-# echo 127.0.0.1 mysite.local >> C:\Windows\System32\drivers\etc\hosts
-
-# Access in browser
-# http://mysite.local:8080
-```
-
-### Method 2: Using Ingress (Production)
-
-If you have an ingress controller and proper DNS:
-
-```yaml
-apiVersion: vyogo.tech/v1
-kind: FrappeSite
-metadata:
-  name: mysite
-spec:
-  benchRef:
-    name: dev-bench
-  siteName: "mysite.example.com"
-  domain: "mysite.example.com"
-  ingress:
-    enabled: true
-    className: "nginx"
-    tls:
-      enabled: true
-      certManagerIssuer: "letsencrypt-prod"
-  dbConfig:
-    mode: shared
-```
-
-Access at: `https://mysite.example.com`
-
-### Method 3: NodePort (Development)
-
-For local development without DNS:
-
-```bash
-# Expose nginx service as NodePort
-kubectl patch service dev-bench-nginx -p '{"spec":{"type":"NodePort"}}'
-
-# Get the NodePort
-kubectl get service dev-bench-nginx
-
-# Access via NodePort
-# http://<node-ip>:<node-port>
-```
-
-## Default Credentials
-
-After site initialization, use these default credentials:
-
-- **Username**: `Administrator`
-- **Password**: `admin` (or check the secret if custom password was set)
-
-```bash
-# Get admin password from secret (if configured)
-kubectl get secret mysite-admin-password -o jsonpath='{.data.password}' | base64 -d
-```
-
-## Verifying the Installation
-
-### 1. Check Bench Status
-
-```bash
-kubectl get frappebench dev-bench -o jsonpath='{.status.ready}'
-# Should return: true
-```
-
-### 2. Check Site Status
-
-```bash
-kubectl get frappesite mysite -o jsonpath='{.status.phase}'
-# Should return: Ready
-```
-
-### 3. Test Site Access
-
-```bash
-# Get site URL
-kubectl get frappesite mysite -o jsonpath='{.status.siteURL}'
-
-# Test with curl
-curl -H "Host: mysite.local" http://localhost:8080/api/method/ping
-# Should return: {"message":"pong"}
-```
-
-### 4. Check Component Health
-
-```bash
-# All pods should be running
-kubectl get pods -l bench=dev-bench
-kubectl get pods -l site=mysite
-
-# Check endpoints
-kubectl get endpoints
-```
-
-## Common Initial Setup Tasks
-
-### Change Admin Password
-
-```bash
-# Create a password secret
-kubectl create secret generic mysite-admin-pwd \
-  --from-literal=password='YourSecurePassword123!'
-
-# Reference it in FrappeSite
-kubectl patch frappesite mysite --type=merge -p '{
-  "spec": {
-    "adminPasswordSecretRef": {
-      "name": "mysite-admin-pwd"
-    }
-  }
-}'
-```
-
-### Install Additional Apps
-
-```bash
-# Update bench with more apps
-kubectl patch frappebench dev-bench --type=merge -p '{
-  "spec": {
-    "appsJSON": "[\"erpnext\", \"hrms\", \"custom_app\"]"
-  }
-}'
-
-# The operator will handle the update
-```
-
-### Scale Components
-
-```bash
-# Scale gunicorn replicas manually
-kubectl patch frappebench dev-bench --type=merge -p '{
-  "spec": {
-    "componentReplicas": {
-      "gunicorn": 3,
-      "workerDefault": 2
-    }
-  }
-}'
-```
-
-### Enable Worker Autoscaling (NEW)
-
-For production workloads, enable KEDA-based autoscaling to automatically scale workers based on queue length:
-
-```bash
-kubectl patch frappebench dev-bench --type=merge -p '{
-  "spec": {
-    "workerAutoscaling": {
-      "short": {
-        "enabled": true,
-        "minReplicas": 0,
-        "maxReplicas": 10,
-        "queueLength": 2
-      },
-      "long": {
-        "enabled": true,
-        "minReplicas": 1,
-        "maxReplicas": 5,
-        "queueLength": 5
-      },
-      "default": {
-        "enabled": false,
-        "staticReplicas": 2
-      }
-    }
-  }
-}'
-
-# Check autoscaling status
-kubectl get scaledobjects
-kubectl get frappebench dev-bench -o jsonpath='{.status.workerScaling}' | jq
-```
-
-**Benefits:**
-- Workers scale to zero when idle (save costs)
-- Auto-scale based on actual job queue length
-- Handle traffic spikes automatically
-- Fine-tune scaling per queue type
-
-For more details, see [Worker Autoscaling](operations.md#worker-autoscaling-with-keda-recommended).
-
-## Next Steps
-
-Now that you have a working installation:
-
-1. **[Learn about concepts](concepts.md)** - Understanding benches, sites, and architecture
-2. **[Explore examples](examples.md)** - Common deployment patterns
-3. **[Configure for production](operations.md#production-deployment)** - Best practices
-4. **[Set up monitoring](operations.md#monitoring)** - Observability
-5. **[Configure backups](operations.md#backups)** - Data protection
-
-## Troubleshooting
-
-If something goes wrong, check:
-
-1. **Operator logs**:
-   ```bash
-   kubectl logs -n frappe-operator-system deployment/frappe-operator-controller-manager
-   ```
-
-2. **Resource events**:
-   ```bash
-   kubectl describe frappebench dev-bench
-   kubectl describe frappesite mysite
-   ```
-
-3. **Pod logs**:
-   ```bash
-   kubectl logs <pod-name>
-   ```
-
-For more detailed troubleshooting, see the [Troubleshooting Guide](troubleshooting.md).
-
-## Security Context Configuration
-
-The operator provides flexible security context configuration for different environments.
-
-### Default Behavior (OpenShift Compatible)
-
-Out of the box, the operator uses OpenShift-compatible defaults:
-- `runAsUser: 1001` (OpenShift arbitrary UID)
-- `runAsGroup: 0` (root group for OpenShift)
-- `fsGroup: 0`
-
-**No configuration needed for OpenShift deployments!**
-
-### Custom Security Contexts
-
-#### Option 1: Per-Bench Override
-
-Configure security context for a specific bench:
-
-```yaml
-apiVersion: vyogo.tech/v1
-kind: FrappeBench
-metadata:
-  name: custom-bench
-spec:
-  security:
-    podSecurityContext:
-      runAsUser: 2000      # Custom UID
-      runAsGroup: 2000
-      fsGroup: 2000
-    securityContext:
-      runAsUser: 2000
-      runAsGroup: 2000
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop: ["ALL"]
+  imageConfig:
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-15
+    pullPolicy: IfNotPresent
   apps:
     - name: erpnext
 ```
 
-#### Option 2: Cluster-Wide Defaults
+Apply the manifest:
+```bash
+kubectl apply -f prod-bench.yaml
+kubectl wait --for=condition=Ready frappebench/prod-bench --timeout=300s
+```
 
-Set environment variables in the operator deployment:
+---
+
+### Step 3.2: Deploy the FrappeSite (Tenant Site)
+
+Create a dedicated PostgreSQL tenant site using StackGres:
 
 ```yaml
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
 metadata:
-  name: frappe-operator-controller-manager
-  namespace: frappe-operator-system
+  name: my-first-site
+  namespace: default
 spec:
-  template:
-    spec:
-      containers:
-      - name: manager
-        env:
-        - name: FRAPPE_DEFAULT_UID
-          value: "2000"        # All benches default to UID 2000
-        - name: FRAPPE_DEFAULT_GID
-          value: "2000"
-        - name: FRAPPE_DEFAULT_FSGROUP
-          value: "2000"
+  benchRef:
+    name: prod-bench
+  siteName: my-first-site.example.com
+  dbConfig:
+    provider: postgres
+    mode: dedicated
+    postgresEngine: stackgres
+  deletionPolicy: Delete
 ```
 
-**Priority:** `spec.security` → Environment Variables → Hardcoded Defaults (1001/0/0)
+Apply the manifest:
+```bash
+kubectl apply -f my-first-site.yaml
+kubectl wait --for=condition=Ready frappesite/my-first-site --timeout=300s
+```
 
-For detailed examples and best practices, see:
-- [SECURITY_CONTEXT_FIX.md](../SECURITY_CONTEXT_FIX.md)
-- [Operations Guide - Security](operations.md#security)
+---
 
-## Clean Up
+## 4. Accessing Your Site
 
-To remove everything:
+### OpenShift
+On OpenShift, an OpenShift Route (`<site-name>-route`) is automatically provisioned with edge TLS termination and HTTP-to-HTTPS redirect (`tls.insecureEdgeTerminationPolicy: Redirect`):
 
 ```bash
-# Delete site
-kubectl delete frappesite mysite
-
-# Delete bench
-kubectl delete frappebench dev-bench
-
-# Delete MariaDB (if you created it)
-kubectl delete statefulset mariadb
-kubectl delete service mariadb
-
-# Uninstall operator (optional)
-kubectl delete -f https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.yaml
+oc get routes -l site=my-first-site
 ```
 
+### Kubernetes (Port-Forward for Local Development)
+```bash
+# Forward traffic to the bench nginx service
+kubectl port-forward svc/prod-bench-nginx 8080:8080
+
+# Add host entry in /etc/hosts:
+# 127.0.0.1 my-first-site.example.com
+
+# Access in browser:
+# http://my-first-site.example.com:8080
+```
+
+---
+
+## 5. Security & OpenShift Compliance
+
+Frappe Operator is engineered for strict enterprise compliance:
+
+- **OpenShift `restricted-v2` SCC**: Default configurations use dynamic non-root UIDs allocated by OpenShift (`runAsUser: nil`), dynamic filesystem groups, and drop all Linux capabilities (`drop: ["ALL"]`). No cluster-admin or root privileges are required.
+- **HTTPS Enforcement**: Ingresses and OpenShift Routes strictly enforce HTTPS redirection.
+- **Database Credential Isolation**: Site credentials and passwords are automatically generated and mounted via Kubernetes Secrets.
+
+---
+
+## Next Steps
+
+- **[Comprehensive Guide](COMPREHENSIVE_GUIDE.md)**: Explore high-availability production configurations.
+- **[PostgreSQL Integration Guide](POSTGRESQL_INTEGRATION.md)**: Sizing, pooling, and StackGres/Percona features.
+- **[Operations Guide](operations.md)**: Site backups, autoscaling with HPA/KEDA, and rolling updates.

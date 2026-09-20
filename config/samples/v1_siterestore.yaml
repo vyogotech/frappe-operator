@@ -1,0 +1,13 @@
+apiVersion: vyogo.tech/v1
+kind: SiteRestore
+metadata:
+  name: siterestore-sample
+  labels:
+    app.kubernetes.io/name: siterestore
+    app.kubernetes.io/instance: siterestore-sample
+    app.kubernetes.io/part-of: frappe-operator
+spec:
+  site: site1.example.com
+  backupSource:
+    existingBackupRef:
+      name: sitebackup-sample

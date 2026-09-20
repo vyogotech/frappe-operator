@@ -1,197 +1,208 @@
-# Installing Frappe Operator on OpenShift
+# Installing Frappe Operator on OpenShift (Production Guide)
 
-This guide provides step-by-step instructions for deploying the Frappe Operator in an OpenShift environment.
+This guide provides the authoritative, enterprise-grade procedure for deploying the **Frappe Operator** by **Vyogo Technologies** on Red Hat OpenShift 4.x.
+
+---
 
 ## 1. Prerequisites
 
--   Access to an OpenShift 4.x cluster.
--   `oc` CLI authenticated (`oc login`).
--   `helm` CLI installed.
--   Sufficient permissions to create Namespaces, CRDs, and cluster-wide RBAC.
+- **OpenShift Cluster**: Version 4.10+ (compatible with OpenShift 4.12, 4.14, 4.16+).
+- **CLI Tools**: `oc` CLI authenticated (`oc login`) with cluster-admin or project-admin permissions, and `helm` v3+.
+- **Storage**: A dynamic StorageClass supporting `ReadWriteMany` (RWX) (e.g., OpenShift Data Foundation / CephFS, AWS EFS, or Azure Files). For single-node test clusters (such as OpenShift Local / CRC), `ReadWriteOnce` (RWO) with pod-affinity fallback is supported.
 
-## 2. Prepare the Project
+---
 
-Create a dedicated namespace for the operator and its components:
+## 2. Prepare the Operator Project
+
+Create a dedicated namespace for the operator:
 
 ```bash
 oc new-project frappe-operator-system
 ```
 
-## 3. Install MariaDB Operator (Mandatory)
+---
 
-The Frappe Operator relies on the [MariaDB Operator](https://mariadb-operator.github.io/mariadb-operator/) for database provisioning. This must be installed before deploying any Frappe sites.
+## 3. Database Provider Setup (Choose One)
+
+Frappe Operator provides polymorphic database management. Choose your preferred database backend:
+
+### Option A: PostgreSQL via StackGres (Recommended on OpenShift)
+
+StackGres is certified on Red Hat OpenShift and runs natively under `restricted-v2` SCCs:
 
 ```bash
-# Add the MariaDB Operator repository
+# Add StackGres Helm repository
+helm repo add stackgres https://stackgres.io/downloads/stackgres-k8s/stackgres/helm
+helm repo update
+
+# Install StackGres Operator
+helm install stackgres-operator stackgres/stackgres-operator \
+  --namespace stackgres --create-namespace
+```
+*Alternatively, install the **StackGres Community Operator** directly from OpenShift OperatorHub via the OpenShift Web Console.*
+
+---
+
+### Option B: MariaDB Operator
+
+If your Frappe/ERPNext workload requires MariaDB:
+
+```bash
+# Add MariaDB Operator Helm repository
 helm repo add mariadb-operator https://mariadb-operator.github.io/mariadb-operator
 helm repo update
 
-# Install the MariaDB Operator
+# Install MariaDB Operator
 helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
   --namespace frappe-operator-system \
-  --set crds.enabled=true --create-namespace
+  --set crds.enabled=true \
+  --create-namespace \
+  --wait
 ```
+
+---
+
+### Option C: External Database (Managed Cloud SQL / RDS)
+
+No operator is required. Simply provision a Kubernetes Secret with your database credentials as documented in [External Resources](external-resources.md).
+
+---
 
 ## 4. Install Frappe Operator
 
-Install the Frappe Operator using the official Helm chart and the stable `v2.6.3` image.
+Deploy the operator using the official Vyogo Technologies Helm repository:
 
 ```bash
-# Add the Frappe Operator repository
-helm repo add frappe-operator https://rmallam.github.io/frappe-operator/helm-repo
+# Add the official Vyogo Helm repository
+helm repo add frappe-operator https://vyogotech.github.io/frappe-operator/helm-repo
 helm repo update
 
-# Install the Frappe Operator
+# Install Frappe Operator v5.2.0
 helm upgrade --install frappe-operator frappe-operator/frappe-operator \
   --namespace frappe-operator-system \
-  --set operator.image.repository=ghcr.io/rmallam/frappe-operator \
-  --set operator.image.tag=2.6.3 \
+  --set operator.image.repository=ghcr.io/vyogotech/frappe-operator \
+  --set operator.image.tag=v5.2.0 \
+  --set operatorConfig.enforceHTTPS=true \
   --wait
 ```
 
 ### Verification
-Ensure the operator is running and has correctly detected the OpenShift platform:
+Verify that the controller manager is running and has identified OpenShift:
 
 ```bash
 oc logs -l control-plane=controller-manager -n frappe-operator-system -c manager | grep "OpenShift platform detected"
 ```
 
-## 5. Security Note: SCC Compatibility
-
-The Frappe Operator `v2.6.3` is designed to work with OpenShift's standard `restricted-v2` Security Context Constraint (SCC) out of the box. 
-
--   **Dynamic UIDs**: The operator uses `nil` defaults for `runAsUser`, allowing OpenShift to automatically assign a compliant UID from the namespace's range.
--   **Filesystem Access**: It uses a platform-aware approach to volume permissions, ensuring compatibility with OpenShift's filesystem group management.
-
-For more technical details on how we handle SCCs, see the [OpenShift Technical Guide](./openshift.md).
-
-## 6. Deployment Examples
-
-Once the operators are running, you can deploy your first site using the following sequence of manifests.
-
-### Step 6.1: Create MariaDB Shared Instance
-Create a file named `mariadb-instance.yaml`. This provides the database infrastructure for multiple sites.
-
-```yaml
-# 1. Root password for MariaDB admin access
-apiVersion: v1
-kind: Secret
-metadata:
-  name: frappe-mariadb-root
-  namespace: frappe-operator-system
-type: Opaque
-stringData:
-  password: "StrongRootPassword123"  # CHANGE THIS
 ---
-# 2. Main MariaDB deployment managed by mariadb-operator
-apiVersion: k8s.mariadb.com/v1alpha1
-kind: MariaDB
-metadata:
-  name: frappe-mariadb
-  namespace: frappe-operator-system
-spec:
-  rootPasswordSecretKeyRef:
-    name: frappe-mariadb-root
-    key: password
-  image: mariadb:10.11
-  storage:
-    size: 20Gi
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-  replicas: 1
----
-apiVersion: k8s.mariadb.com/v1alpha1
-kind: MariaDB
-metadata:
-  name: frappe-mariadb
-  namespace: frappe-operator-system
-spec:
-  rootPasswordSecretKeyRef:
-    name: mariadb-root-password
-    key: password
-  image: mariadb:10.11
-  storage:
-    size: 2Gi
-  replicas: 1
+
+## 5. Security Context Constraints (`restricted-v2`) Architecture
+
+The Frappe Operator is engineered for strict adherence to OpenShift's default `restricted-v2` Security Context Constraint:
+
+- **Dynamic Non-Root UIDs**: The operator sets `runAsUser: nil` in its pod definitions. OpenShift's admission controller automatically assigns a compliant non-root UID from the project's allocated UID range (e.g., `1000880000/10000`).
+- **SELinux & MCS Label Isolation**: Containers run with unique SELinux Multi-Category Security (MCS) labels managed dynamically by OpenShift.
+- **Filesystem Permissions**: Workloads rely on platform-managed group allocations rather than hardcoding `fsGroup: 0` (which is prohibited by `restricted-v2`).
+- **Dropped Capabilities**: All containers drop all Linux capabilities (`capabilities: drop: ["ALL"]`) and set `allowPrivilegeEscalation: false`.
+
+You can verify that all workloads run under `restricted-v2`:
+```bash
+oc get pods -n <your-project> -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.openshift\.io/scc}{"\n"}{end}'
 ```
 
-### Step 6.2: Create a FrappeBench
-A Bench represents your application environment (source code and common infrastructure). Create `my-bench.yaml`:
+---
+
+## 6. Deploy a Production Bench & Site
+
+### Step 6.1: Create a Production Project
+```bash
+oc new-project erp-prod
+```
+
+### Step 6.2: Deploy the FrappeBench
+Create `prod-bench.yaml`:
 
 ```yaml
 apiVersion: vyogo.tech/v1
 kind: FrappeBench
 metadata:
-  name: prod-bench
-  namespace: frappe-operator-system
+  name: erp-bench
+  namespace: erp-prod
 spec:
-  # The Frappe framework version to use
   frappeVersion: "version-15"
-  # Common apps to include in this environment
+  imageConfig:
+    repository: ghcr.io/vyogotech/erpnext-for-operator
+    tag: version-15
+    pullPolicy: IfNotPresent
   apps:
-    - name: frappe
     - name: erpnext
 ```
 
-### Step 6.3: Create a FrappeSite
-A Site is your actual application instance (SaaS tenant). Create `my-site.yaml`:
+Deploy the bench:
+```bash
+oc apply -f prod-bench.yaml
+oc wait --for=condition=Ready frappebench/erp-bench -n erp-prod --timeout=300s
+```
+
+---
+
+### Step 6.3: Deploy a Dedicated Tenant Site
+
+Create `prod-site.yaml`:
 
 ```yaml
-# 1. Admin user password for the Frappe web interface
-apiVersion: v1
-kind: Secret
-metadata:
-  name: prod-site-admin
-  namespace: frappe-operator-system
-type: Opaque
-stringData:
-  password: "AdminPassword123"  # CHANGE THIS
----
-# 2. The Site resource
 apiVersion: vyogo.tech/v1
 kind: FrappeSite
 metadata:
-  name: prod-site
-  namespace: frappe-operator-system
+  name: my-company
+  namespace: erp-prod
 spec:
-  benchRef: prod-bench
-  siteName: prod-site.apps.cluster.example.com  # Must be a valid domain
-  adminPasswordSecretRef:
-    name: prod-site-admin
-    key: password
+  benchRef:
+    name: erp-bench
+  siteName: my-company.apps.cluster.example.com
   dbConfig:
-    mode: shared
-    mariadbRef:
-      name: frappe-mariadb
-  routeConfig:
-    enabled: true        # Automatically create OpenShift Route
-    termination: edge    # Provide SSL termination (OOB certificates)
+    provider: postgres
+    mode: dedicated
+    postgresEngine: stackgres
+  deletionPolicy: Delete
 ```
 
-Apply all manifests in the following order:
+Deploy the site:
 ```bash
-oc apply -f mariadb-instance.yaml
-oc apply -f my-bench.yaml
-oc apply -f my-site.yaml
+oc apply -f prod-site.yaml
+oc wait --for=condition=Ready frappesite/my-company -n erp-prod --timeout=300s
 ```
 
-## 7. Verification & Troubleshooting
+---
 
-### Check Pods and Jobs
-OpenShift monitors resource compatibility. You can verify the status with:
+## 7. OpenShift Route & Automatic HTTPS Redirection
+
+When running on OpenShift, the Frappe Operator automatically provisions an OpenShift Route:
+
+- **Edge TLS Termination**: Route specifies `tls.termination: edge`.
+- **Enforced Redirection**: Route specifies `tls.insecureEdgeTerminationPolicy: Redirect`, ensuring all plain HTTP traffic is redirected to HTTPS automatically.
+- **Site URL**: The site's status URL is populated as `https://my-company.apps.cluster.example.com`.
+
+Check the route:
 ```bash
-oc get pods -n frappe-operator-system
-oc get jobs -n frappe-operator-system
+oc get route -n erp-prod
 ```
 
-### Access the Site
-Once the site phase is `Ready`, retrieve the URL from the OpenShift Route:
+Test access over HTTPS:
 ```bash
-oc get route prod-site -n frappe-operator-system -o jsonpath='{.spec.host}'
+curl -I https://my-company.apps.cluster.example.com/login
 ```
 
-For more architectural details on Security Contexts (SCC) or database isolation, see:
-- [OpenShift Technical Guide](./openshift.md).
-- [MariaDB Integration Guide](./MARIADB_INTEGRATION.md).
+---
+
+## 8. Day-2 Diagnostics & Troubleshooting
+
+```bash
+# View operator controller manager logs
+oc logs -l control-plane=controller-manager -n frappe-operator-system -f
+
+# Inspect site initialization job logs
+oc logs -l job-name=my-company-init -n erp-prod -f
+
+# Check bench runtime pods
+oc get pods -n erp-prod -l bench=erp-bench
+```

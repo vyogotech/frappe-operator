@@ -1,0 +1,12 @@
+apiVersion: vyogo.tech/v1
+kind: SiteApp
+metadata:
+  name: siteapp-sample
+  labels:
+    app.kubernetes.io/name: siteapp
+    app.kubernetes.io/instance: siteapp-sample
+    app.kubernetes.io/part-of: frappe-operator
+spec:
+  siteRef:
+    name: frappesite-sample
+  appName: erpnext

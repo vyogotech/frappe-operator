@@ -217,7 +217,7 @@ func (m *FPMManager) GenerateAppInstallScript(apps []vyogotechv1.AppSource, gitE
 	}
 
 	script.WriteString("echo 'Generating apps.txt...'\n")
-	script.WriteString("ls -1 apps/ | grep -v '__pycache__' > sites/apps.txt || echo 'frappe' > sites/apps.txt\n\n")
+	script.WriteString("{ { ls -1 apps/ 2>/dev/null; for d in sites/apps/*/; do [ -d \"$d\" ] && basename \"$d\"; done; } | grep -v '^__pycache__$' | grep -v '^$' | awk '!seen[$0]++' > sites/apps.txt.new && mv sites/apps.txt.new sites/apps.txt; } || echo 'frappe' > sites/apps.txt\n\n")
 
 	script.WriteString("# Detect if we should build assets (requires node_modules and npm)\n")
 	script.WriteString("if [ \"$SKIP_BENCH_BUILD\" == \"1\" ]; then\n")

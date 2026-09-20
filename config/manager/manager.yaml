@@ -78,6 +78,29 @@ spec:
           capabilities:
             drop:
               - "ALL"
+        env:
+        - name: FRAPPE_ENFORCE_HTTPS
+          valueFrom:
+            configMapKeyRef:
+              name: frappe-operator-config
+              key: enforceHTTPS
+              optional: true
+        - name: FRAPPE_DEFAULT_CLUSTER_ISSUER
+          valueFrom:
+            configMapKeyRef:
+              name: frappe-operator-config
+              key: defaultClusterIssuer
+              optional: true
+        - name: RELATED_IMAGE_FRAPPE_BENCH_V15
+          value: frappe/erpnext:version-15
+        - name: RELATED_IMAGE_FRAPPE_BENCH_V14
+          value: frappe/erpnext:version-14
+        - name: RELATED_IMAGE_MARIADB
+          value: mariadb:10.6
+        - name: RELATED_IMAGE_REDIS
+          value: redis:7.0-alpine
+        - name: RELATED_IMAGE_UTILITY_UBI
+          value: registry.access.redhat.com/ubi9/ubi-minimal:latest
         livenessProbe:
           httpGet:
             path: /healthz

@@ -5,33 +5,127 @@ All notable changes to the Frappe Operator project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.2.6] - 2026-09-18
 
-### Added
-- **Provider-Agnostic Autoscaling**: Deep refactor of the autoscaling system to support multiple scaling backends (KEDA and HPA) through a unified `componentAutoscaling` API.
-- **HPA Scaling Provider**: Support for standard Kubernetes Horizontal Pod Autoscaler for CPU and Memory metrics.
-- **Enhanced KEDA Provider**: Improved Scaling-to-Zero support and Redis queue length triggers for background workers.
-- **Autoscaling Test Suite**: Comprehensive unit and E2E testing framework for autoscaling components, including provider-switching and graceful fallback scenarios.
-- **Scaling Status Observability**: Added `componentScaling` status map to `FrappeBench` for real-time visibility into scaling modes and replica counts.
+### Fixed
+- **`rebuild_pydeps` decides on pip's exit status.** The atomic rebuild of `sites/apps/.pydeps` (5.2.4) ran `if pip install ... 2>&1 | grep -v WARNING; then`, which tests grep: a quiet, successful pip printed nothing, grep exited 1, and the freshly built tree was discarded with "could not rebuild ... leaving the previous one in place" — while a pip failure that printed errors would have been swapped in. On the hub's pooled bench an install that claimed to rebuild left the layered tree (two dist-infos for pydantic, aiohttp, tokenizers, ...) untouched. pip's output is now captured and its own exit status branches. Covered by the probe: the probe app vendors a dependency the bench image lacks and the fpm leg asserts the serving pods import it from `.pydeps`.
+
+## [5.2.5] - 2026-09-18
 
 ### Changed
-- **API: Unified Autoscaling**: Replaced legacy `workerAutoscaling`, `nginxAutoscaling`, and `componentReplicas` with a unified `componentAutoscaling` map in `FrappeBenchSpec`.
-- **Default Scaling Provider**: Default autoscaling provider is now `hpa` for improved out-of-the-box compatibility on all platforms (including OpenShift).
-- **FrappeSite stability tests**: Fixed fake client not finding shared MariaDB CR by creating the MariaDB via `fakeClient.Create()` in test setup (matching `frappesite_jobs_test.go`), so reconciliation tests no longer fail with "shared MariaDB instance 'frappe-mariadb' not found".
-- **Security context test (non-OpenShift)**: Made the test deterministic by using explicit `bench.Spec.Security` overrides instead of env vars (`FRAPPE_DEFAULT_UID`/`FRAPPE_DEFAULT_GID`), avoiding flakiness from test order or environment.
-- **Integration Test Tags**: Corrected `FrappeVersion` tags from `v15` to `version-15` in integration tests to match official Docker images.
-- **Webhook Validation in Tests**: Added required `Apps` to `FrappeBench` and `FrappeSite` resources in integration tests to satisfy newer webhook validation rules.
+- **The SiteApp install Job fetches fpm v4.6.0** (was v3.0.0) when the bench image ships no CLI. fpm 4.6.0 treats an app the bench already has — in `apps/<app>`, or listed in `sites/apps.txt` and importable — as bench-level and never re-fetches or replaces it, so a required app another site already installed on a pooled bench is reused rather than pulled again beside the Job's fast path; 4.4.0 stopped the mirror publishing dependency-less packages (`withheld-nodeps`), which is what left `frappe/hrms` uninstallable on a pooled bench.
+
+## [5.2.4] - 2026-09-18
+
+All found by the first multi-tenant day on a shared (pooled) bench.
+
+### Fixed
+- **A shared bench keeps one copy of an app.** Installing an app on a second site re-fetched the package and replaced the copy on the volume (`rm -rf` + `cp`) while another site was serving from it; a live import wrote `__pycache__` mid-copy, the copy failed, and `sites/assets/<app>` was left pointing into the finished Job's scratch dir (every ERPNext page 404'd its CSS/JS). Now: if the volume already provides the app and its required apps, the Job links them and runs a site-level `install-app` + migrate, with no fetch and no copy; a first-time copy goes to a temp dir (without `__pycache__`) and is swapped in atomically; the "already installed" check also re-runs when an assets link dangles.
+- **Python deps for the serving pods are one atomic resolution.** `sites/apps/.pydeps` was layered per app with `pip --target --upgrade`, which leaves the previous version's files behind; two apps vendoring numpy 2.5.2 and 2.5.3 produced a numpy without `__version__`, openpyxl could not import, and ERPNext installs and pages failed. `rebuild_pydeps` now installs the newest version of every distribution across all apps' vendored wheels into a fresh directory and swaps it in; a package without vendored wheels has its online-added deps downloaded into its own wheels dir first.
+- **Job names stay within 63 bytes.** `<site>-migrate-<migration>` on a pooled site exceeded the label limit and the Job was never created ("must be no more than 63 bytes"); `jobNameFor` truncates and hashes, and every Job-creating controller uses it.
+
+### Probe
+- `site2` installs the same app on the second site (must reuse the shared copy) and uninstalls it; the `migration` phase uses a deliberately long name.
+
+## [5.2.3] - 2026-09-15
+
+Three defects found by the first real tenant on a pooled bench (vyogo.cloud),
+each now covered by the probe (`site2` phase) or a script test.
+
+### Fixed
+- **FPM installs relocate every app fpm adds**, not only the requested one: a package's required apps (lms brings `payments`) were installed on the site but left in the Job's ephemeral bench, so every serving pod failed with "No module named 'payments'". The "already installed" short-circuit now re-runs the install when an app the site lists is missing from the bench, which heals a site left in that state.
+- **Site-init, site-delete and bench-init Jobs carry the shared bench Job env** (`USER`, `HOME`, `PYTHONPATH=sites/apps`). Since `apps.txt` lists volume-installed apps, `frappe.init` imports them in every Job; without the import path the second site on a pooled bench failed with "No module named 'lms'".
+- **Site deletion succeeds on shared volumes** when `bench drop-site` drops the database but cannot remove a directory that only holds `.nfs*` temp entries (the bench scheduler keeps every site's log open on Longhorn RWX / NFS).
+
+## [5.2.2] - 2026-09-15
+
+Every fix in this release was found by the new acceptance test,
+[frappe-operator-probe](https://github.com/vyogotech/frappe-operator-probe): a
+Frappe app plus runner that exercises every CR on a kind cluster, installing the
+app from git and from its FPM package. It now runs on every operator change
+(`probe e2e` workflow), and every CRD must have probe coverage
+(`make probe-coverage`).
 
 ### Added
-- **Advanced Pod Configuration**: Added support for custom labels, node selectors, affinity, and tolerations via `podConfig` in `FrappeBench` and `FrappeSite` CRDs. 
-- **Geo-tagging Support**: Added `geoTag` configuration (under `podConfig`) to easily set region/zone labels and node affinity for geographic placement.
-- **Dynamic `envtest` Detection**: Improved test suites to automatically search for `etcd` and `kube-apiserver` in the project-local `bin/k8s` directory. This enables `TestAPIs` and E2E tests to run without manual `KUBEBUILDER_ASSETS` configuration.
-- **E2E Bootstrap Configuration**: Enabled E2E tests to attempt execution even when local `envtest` binaries are missing, provided an existing cluster is available.
+- **`FrappeBench.spec.commonSiteConfig`**: keys merged into `common_site_config.json` at bench init (Frappe honours `server_script_enabled` only there).
+- **`SiteApp.spec.autoMigrate` / `backupBeforeInstall`** are now tri-state (`*bool`, default true) and `autoMigrate` really runs `bench migrate` — on the git and the FPM install path — so an app's patches and `after_migrate` hooks execute; `install-app` alone only records patches as executed.
+- **SiteAPIKey** mints a real key pair through Frappe (`generate_keys`) instead of writing placeholders.
+- **SiteDomain `tls.enabled`** is a pointer: an explicit `enabled: false` is an opt-out (no forced HTTPS redirect, no Ingress TLS section, no certificate request) and survives the controller's finalizer update.
+
+### Fixed
+- A FrappeSite named like its FrappeBench reused the bench's init Job and reported Ready without `bench new-site`; the site Job is now `<site>-site-init` on collision.
+- Content controllers (custom field, property setter, client/server script, webhook, user permission) required a `<site>-admin-password` Secret; they now resolve the site's `adminPasswordSecretRef`.
+- Client Script and Webhook creates carried no document name (Prompt-named DocTypes) and the webhook event went into a field Frappe ignores (`webhook_docevent`).
+- **Data loss:** SiteMigration, SiteCron and SiteConfig Jobs and site re-init rebuilt `sites/apps.txt` from the image only, so `bench migrate` deleted a SiteApp-installed app's DocTypes as orphans. `apps.txt` is now the union of image and volume apps.
+- Finalizers looped forever once the namespace was terminating (Jobs/Secrets cannot be created there); they now release and keep data.
+- SiteUserPermission failed with a duplicate on every re-reconcile (hash-named document); lookup by fields, 409 tolerated.
+- SiteRestore defaulted `benchRef.namespace` wrongly, hid a missing bench, and could not read a cross-namespace MariaDB root Secret (now mirrored as `<restore>-dbroot`).
+- SiteConfig and SiteCron Jobs carry the bench image's pull secrets, security context and `USER`/`HOME`.
+- SiteDomain finalizer is added with a merge Patch so the spec is never re-serialized (a plain `omitempty` bool with a CRD default of `true` cannot hold `false` across an Update).
+
+## [5.2.1] - 2026-09-14
+
+### Added
+- **SiteConfig `secretConfig`**: site_config.json keys whose values come from Kubernetes Secrets (API tokens, shared HMAC secrets, seeded admin passwords). Values reach the config Job only as env vars sourced from the Secret and never appear in the CR or the Job command line.
+- **StorageClass access-mode annotation**: `frappe.tech/access-mode: ReadWriteMany` on a StorageClass makes bench PVCs request RWX on drivers that serve both modes (Longhorn), instead of the provisioner-name heuristic.
+
+### Fixed
+- SiteConfig, SiteMigration, SiteApp and SiteCron Jobs now carry the bench image's `imageConfig.pullSecrets`; a private bench image left them in ImagePullBackOff.
+- SiteConfig and SiteCron Jobs run with the bench pod/container security context and the standard bench env (`USER`, `HOME`, `PYTHONPATH`); previously `bench` failed at once when the Job's uid differed from the serving pods'.
+- Helm chart: icon assets and a Chart.yaml icon URL that resolves; OpenShift console plugin and aggregated RBAC roles shipped via Helm.
+
+## [5.2.0] - 2026-09-08
+
+### Added
+- **Polymorphic Database Architecture**: First-class PostgreSQL integration alongside MariaDB with automatic engine selection (`dbConfig.provider: postgres`, `dbConfig.postgresEngine`).
+- **StackGres Operator Integration**: Declarative per-site `SGCluster` and `SGScript` templates for dedicated PostgreSQL with automated JDBC-compatible schema initialization.
+- **Percona PostgreSQL Toggle**: Dedicated `PerconaPGCluster` option with backward-compatibility preservation for existing clusters.
+- **HTTPS-Only Ingress & Route Enforcement**: Sites automatically configure TLS certificates and enforce HTTPS edge redirection (`tls.insecureEdgeTerminationPolicy: Redirect` on OpenShift Routes, `ssl-redirect: "true"` on Kubernetes Ingress).
+- **Webhook Immutability Guard**: Validating webhook strictly prevents changing `dbConfig.postgresEngine` post-creation.
+
+### Security
+- **OpenShift `restricted-v2` SCC Compliance**: Verified end-to-end compatibility across all operator workloads, bench pods, site initialization jobs, and database instances.
+
+---
+
+## [5.1.4] - 2026-08-28
+
+### Added
+- **Job Sizing Defaults**: Configurable `spec.jobResources` with built-in default requests and limits across all operator-run jobs.
+- **Dynamic Image Versioning**: Dynamic version build argument passing in Dockerfile and CI workflows.
+
+### Fixed
+- **Site Hash Zero-Padding**: Zero-padded site hash in `generateDBName` ensuring slice operations never exceed string length bounds.
+- **Site Lifecycle Re-Creation**: Handled same-name site re-creation cleanly and ensured child resources (`SiteApps`, `SiteDomains`) cleanly terminate with their parent site.
+- **Clean Uninstall**: Added `uninstall.sh` script for clean teardown of operator and CRDs.
+
+---
+
+## [5.0.0] - 2026-07-15
+
+### Added
+- **Red Hat OperatorHub Certification**: Updated ClusterServiceVersion (CSV) and packaging for Red Hat OpenShift certification.
+- **Multi-Platform Container Builds**: Automated ARM64 and AMD64 release images.
+
+---
+
+## [4.2.0] - 2026-06-01
 
 ### Changed
-- **CI**: Unit test job runs on push/PR to `main`, `master`, `develop`, and `feature/**`; Docker build depends on test job. Go version in workflows aligned to 1.22.
-- **E2E workflow**: Added "Run Integration Tests" step that runs `./test/integration/...` with `INTEGRATION_TEST=true` in the Kind cluster after installing the operator. Go version set to 1.22.
-- **CONTRIBUTING.md**: Updated Testing section to match Makefile targets (`make test`, `make coverage`, `make integration-test`), Go prerequisite (1.22+), and described CI/E2E test integration.
+- **License Transition**: Shifted project license to Elastic License 2.0 (ELv2) for sustainable open ecosystem stewardship.
+- **Multi-Tenant Guardrails**: Enhanced tenant isolation and namespace security enforcement.
+
+---
+
+## [3.0.0] - 2026-03-15
+
+### Added
+- **Provider-Agnostic Autoscaling**: Refactored autoscaling to support HPA and KEDA via unified `componentAutoscaling` API in `FrappeBench`.
+- **Advanced Pod Configuration**: Custom labels, node selectors, affinity, tolerations, and `geoTag` configuration via `podConfig`.
+- **Scaling Observability**: Added `componentScaling` status map to `FrappeBench` for real-time visibility into scaling modes and replica counts.
+
+### Changed
+- **Default Scaling Provider**: Default autoscaling provider set to `hpa` for standard Kubernetes and OpenShift out-of-the-box compatibility.
 
 ---
 

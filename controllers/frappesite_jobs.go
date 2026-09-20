@@ -41,7 +41,7 @@ import (
 func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench, domain string, dbInfo *database.DatabaseInfo, dbCreds *database.DatabaseCredentials) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	jobName := fmt.Sprintf("%s-init", site.Name)
+	jobName := r.siteInitJobName(ctx, site)
 	job := &batchv1.Job{}
 
 	// Check for site version annotation
@@ -222,6 +222,8 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		WithVolumeMount("site-secrets", "/tmp/site-secrets").
 		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 		Build()
+	// USER/HOME/PYTHONPATH like every other bench Job (see withBenchJobEnv).
+	container = withBenchJobEnv(container)
 
 	// Prepare job annotations
 	jobAnnotations := map[string]string{}
@@ -375,6 +377,8 @@ func (r *FrappeSiteReconciler) deleteSite(ctx context.Context, site *vyogotechv1
 			WithVolumeMountReadOnly("deletion-secret", "/tmp/secrets").
 			WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
 			Build()
+		// USER/HOME/PYTHONPATH like every other bench Job (see withBenchJobEnv).
+		container = withBenchJobEnv(container)
 
 		// Build the job
 		job = resources.NewJobBuilder(jobName, site.Namespace).
@@ -513,4 +517,28 @@ func (r *FrappeSiteReconciler) GetPodLogs(ctx context.Context, namespace, podNam
 	}
 
 	return buf.String(), nil
+}
+
+// siteInitJobName is "<site>-init" unless that Job already belongs to something
+// else — a FrappeBench of the same name creates "<bench>-init" too, and a site
+// named like its bench would otherwise find the bench's completed Job, skip
+// `bench new-site` entirely and report Ready for a site that does not exist.
+// In that case the site uses "<site>-site-init".
+func (r *FrappeSiteReconciler) siteInitJobName(ctx context.Context, site *vyogotechv1.FrappeSite) string {
+	name := fmt.Sprintf("%s-init", site.Name)
+	job := &batchv1.Job{}
+	if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: site.Namespace}, job); err != nil {
+		return name
+	}
+	for _, o := range job.OwnerReferences {
+		if o.Kind == "FrappeSite" && o.Name == site.Name {
+			return name
+		}
+	}
+	if len(job.OwnerReferences) == 0 {
+		return name
+	}
+	log.FromContext(ctx).Info("init Job name is taken by another owner; using a site-specific name",
+		"job", name, "owner", job.OwnerReferences[0].Kind+"/"+job.OwnerReferences[0].Name)
+	return fmt.Sprintf("%s-site-init", site.Name)
 }

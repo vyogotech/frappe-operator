@@ -84,6 +84,24 @@ func buildConfigPlan(sc *vyogotechv1.SiteConfig, domain string) (cmds []string, 
 		appliedKeys = append(appliedKeys, "encryption_key")
 	}
 
+	// SecretConfig — each value reaches the Job only as an env var sourced from the
+	// Secret (CFG_SECRET_<n>), and set-config reads it from that env var, so neither the
+	// CR nor the Job command line ever carries it. Order preserved from the spec.
+	for i, entry := range sc.Spec.SecretConfig {
+		if entry.Key == "" || entry.SecretKeyRef.Name == "" || entry.SecretKeyRef.Key == "" {
+			continue
+		}
+		envName := fmt.Sprintf("CFG_SECRET_%d", i)
+		env = append(env, corev1.EnvVar{
+			Name: envName,
+			ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: entry.SecretKeyRef.LocalObjectReference, Key: entry.SecretKeyRef.Key,
+			}},
+		})
+		cmds = append(cmds, base+" "+shellQuote(entry.Key)+` "$`+envName+`"`)
+		appliedKeys = append(appliedKeys, entry.Key)
+	}
+
 	// CustomConfig — sorted for deterministic Job specs.
 	custom := make([]string, 0, len(sc.Spec.CustomConfig))
 	for k := range sc.Spec.CustomConfig {
@@ -168,8 +186,14 @@ func buildConfigJob(sc *vyogotechv1.SiteConfig, bench *vyogotechv1.FrappeBench, 
 		return nil, nil
 	}
 
-	script := "set -e\n" + strings.Join(cmds, "\n") + "\n"
-	jobName := fmt.Sprintf("%s-apply-%d", sc.Name, sc.Generation)
+	// Same fix as the migrate/cron Jobs: cd into the bench root, then recreate
+	// apps.txt as a symlink to sites/apps.txt from the image's apps/ dir - the
+	// site-init Job's own symlink lives in its container's writable layer and is
+	// gone by the time this Job's pod starts.
+	script := "set -e\ncd /home/frappe/frappe-bench\n" +
+		appsTxtSyncCmd + "\n" +
+		strings.Join(cmds, "\n") + "\n"
+	jobName := jobNameFor(sc.Name, "apply", fmt.Sprintf("%d", sc.Generation))
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 	backoff := int32(3)
 
@@ -185,12 +209,17 @@ func buildConfigJob(sc *vyogotechv1.SiteConfig, bench *vyogotechv1.FrappeBench, 
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "frappe", "siteconfig": sc.Name}},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyOnFailure,
+
+					ImagePullSecrets: benchImagePullSecrets(bench),
 					Containers: []corev1.Container{{
 						Name:            "config-runner",
 						Image:           benchImage,
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Command:         []string{"bash", "-c", script},
-						Env:             env,
+						// benchJobEnv first: USER/HOME so `bench` resolves an arbitrary uid,
+						// PYTHONPATH for SiteApp-installed apps; then the plan's secret env.
+						Env:       append(benchJobEnv(), env...),
+						Resources: vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindMaintenance),
 						// Match the bench deployments' PVC layout: site data lives under the
 						// "frappe-sites" subPath (assets under "frappe-sites/assets"). Mounting
 						// the wrong subPath yields an empty sites dir and bench can't find

@@ -1,0 +1,14 @@
+apiVersion: vyogo.tech/v1
+kind: FrappeSite
+metadata:
+  labels:
+    app.kubernetes.io/name: frappesite
+    app.kubernetes.io/instance: frappesite-sample
+    app.kubernetes.io/part-of: frappe-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: frappe-operator
+  name: frappesite-sample
+spec:
+  benchRef:
+    name: frappebench-sample
+  siteName: site1.example.com

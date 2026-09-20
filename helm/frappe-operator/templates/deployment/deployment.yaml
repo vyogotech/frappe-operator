@@ -50,6 +50,18 @@ spec:
               name: frappe-operator-config
               key: maxConcurrentReconciles
               optional: true
+        - name: FRAPPE_ENFORCE_HTTPS
+          valueFrom:
+            configMapKeyRef:
+              name: frappe-operator-config
+              key: enforceHTTPS
+              optional: true
+        - name: FRAPPE_DEFAULT_CLUSTER_ISSUER
+          valueFrom:
+            configMapKeyRef:
+              name: frappe-operator-config
+              key: defaultClusterIssuer
+              optional: true
         {{- if .Values.operatorConfig.clientQps }}
         - name: FRAPPE_CLIENT_QPS
           value: {{ .Values.operatorConfig.clientQps | quote }}

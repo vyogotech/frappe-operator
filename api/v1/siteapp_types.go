@@ -65,7 +65,7 @@ type SiteAppSpec struct {
 	// AutoMigrate determines whether to trigger database migration after app installation. Defaults to true.
 	// +optional
 	// +kubebuilder:default=true
-	AutoMigrate bool `json:"autoMigrate,omitempty"`
+	AutoMigrate *bool `json:"autoMigrate,omitempty"`
 
 	// BackupBeforeInstall determines whether the operator takes a full backup of
 	// the site and waits for it to succeed before installing/upgrading the app.
@@ -73,7 +73,7 @@ type SiteAppSpec struct {
 	// Defaults to true; set false to skip (e.g. for throwaway sites).
 	// +optional
 	// +kubebuilder:default=true
-	BackupBeforeInstall bool `json:"backupBeforeInstall,omitempty"`
+	BackupBeforeInstall *bool `json:"backupBeforeInstall,omitempty"`
 }
 
 // SiteAppStatus defines the observed state of SiteApp

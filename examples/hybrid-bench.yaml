@@ -54,8 +54,8 @@ spec:
         authSecretRef:
           name: fpm-auth
       
-      - name: frappe-community
-        url: https://fpm.frappe.io
+      - name: vyogo-official
+        url: https://fpm.vyogo.tech
         priority: 50
     
     defaultRepo: company-repo

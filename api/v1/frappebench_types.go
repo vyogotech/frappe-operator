@@ -33,6 +33,13 @@ type FrappeBenchSpec struct {
 	// +optional
 	ComponentResources *ComponentResources `json:"componentResources,omitempty"`
 
+	// JobResources sizes the one-off Jobs the operator runs for this bench and
+	// its sites (init, app install, backup, restore, migration, cron,
+	// maintenance). Unset entries fall back to the operator's built-in sizing;
+	// no Job ever runs without requests and limits.
+	// +optional
+	JobResources *JobResources `json:"jobResources,omitempty"`
+
 	// RedisConfig defines Redis/Dragonfly configuration
 	// +optional
 	RedisConfig *RedisConfig `json:"redisConfig,omitempty"`
@@ -40,6 +47,13 @@ type FrappeBenchSpec struct {
 	// StorageClassName allows overriding the storage class for bench PVC
 	// +optional
 	StorageClassName string `json:"storageClassName,omitempty"`
+
+	// CommonSiteConfig adds bench-wide keys to sites/common_site_config.json when
+	// the bench is initialised (values that parse as JSON are applied as such,
+	// everything else as a string). Some Frappe settings can only live there —
+	// server_script_enabled, for one, is refused in a site's own config.
+	// +optional
+	CommonSiteConfig map[string]string `json:"commonSiteConfig,omitempty"`
 
 	// StorageSize for the bench PVC (e.g., "10Gi")
 	// +optional

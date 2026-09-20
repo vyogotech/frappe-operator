@@ -24,9 +24,12 @@ import (
 // SiteDomainTLSSpec defines TLS certificate settings for custom domains
 type SiteDomainTLSSpec struct {
 	// Enabled determines whether to generate an automated TLS certificate.
+	// A pointer so an explicit `enabled: false` survives serialization: a plain
+	// bool with omitempty is dropped when the controller updates the object and
+	// the CRD default (true) silently re-enables TLS.
 	// +optional
 	// +kubebuilder:default=true
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// IssuerRef references a cert-manager ClusterIssuer or Issuer.
 	// +optional
@@ -105,4 +108,10 @@ type SiteDomainList struct {
 
 func init() {
 	SchemeBuilder.Register(&SiteDomain{}, &SiteDomainList{})
+}
+
+// TLSEnabled reports whether TLS is on for this domain: a tls block whose
+// enabled is unset (API default true) or true.
+func (t *SiteDomainTLSSpec) TLSEnabled() bool {
+	return t != nil && (t.Enabled == nil || *t.Enabled)
 }

@@ -45,12 +45,30 @@ type SiteConfigSpec struct {
 	// +optional
 	CustomConfig map[string]string `json:"customConfig,omitempty"`
 
+	// SecretConfig sets site_config.json keys whose VALUES live in Kubernetes Secrets
+	// (API tokens, shared HMAC secrets, seeded admin passwords). The value is read from
+	// the referenced Secret at apply time and injected into the config Job via env, so it
+	// never appears in the CR or in a Job spec's command line. Applied as strings.
+	// +optional
+	SecretConfig []SecretConfigEntry `json:"secretConfig,omitempty"`
+
 	// ObjectStorage, when set, configures the site to offload File attachments to an
 	// S3-compatible object store via the cloud_storage app (baked into the bench image).
 	// The operator assembles the cloud_storage_settings block in site_config.json, sourcing
 	// the access key/secret from CredentialsSecretRef so they never appear in the CR.
 	// +optional
 	ObjectStorage *ObjectStorageConfig `json:"objectStorage,omitempty"`
+}
+
+// SecretConfigEntry maps one site_config.json key to a key in a Secret.
+type SecretConfigEntry struct {
+	// Key is the site_config.json key to set (e.g. "oidc_service_token").
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z_][a-zA-Z0-9_]*$`
+	Key string `json:"key"`
+	// SecretKeyRef names the Secret (same namespace as the SiteConfig) and the key in it.
+	// +kubebuilder:validation:Required
+	SecretKeyRef corev1.SecretKeySelector `json:"secretKeyRef"`
 }
 
 // ObjectStorageConfig configures S3-compatible File offload via the cloud_storage app.

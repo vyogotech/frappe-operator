@@ -358,7 +358,7 @@ func TestSiteAppReconciler_Reconcile_FPMInstallPath(t *testing.T) {
 			FPMPackage:          "frappe/wiki==3.0.0",
 			FPMRepo:             "ghcr.io/vyogotech/fpm",
 			FPMRepoType:         "oci",
-			BackupBeforeInstall: skipBackup, // skip preflight backup so the install Job is built now
+			BackupBeforeInstall: &skipBackup, // skip preflight backup so the install Job is built now
 		},
 	}
 	site := &vyogotechv1.FrappeSite{
@@ -483,5 +483,173 @@ func TestSiteAppReconciler_reloadBenchServingPods(t *testing.T) {
 	r.reloadBenchServingPods(ctx, "b1", "user-ns", "builder", "gen-2")
 	if got := getAnn("b1-gunicorn"); got != "gen-2" {
 		t.Errorf("expected reload annotation gen-2 after new generation, got %q", got)
+	}
+}
+
+func TestSiteAppReconciler_SecurityContext_OpenShift(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	sa := &vyogotechv1.SiteApp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-app",
+			Namespace: "test-ns",
+		},
+		Spec: vyogotechv1.SiteAppSpec{
+			AppName: "erpnext",
+			SiteRef: &vyogotechv1.NamespacedName{Name: "site-sample"},
+		},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bench-sample",
+			Namespace: "test-ns",
+		},
+	}
+
+	// Test non-OpenShift (standard Kubernetes)
+	rStandard := &SiteAppReconciler{
+		Client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme:      scheme,
+		IsOpenShift: false,
+	}
+	jobStd := rStandard.buildAppJob(context.Background(), sa, bench, "test-job-std", "installer", "image:v1", "pvc", "echo test", nil, corev1.ResourceRequirements{}, 1, nil)
+	if jobStd.Spec.Template.Spec.SecurityContext.RunAsUser == nil || *jobStd.Spec.Template.Spec.SecurityContext.RunAsUser != 1000 {
+		t.Errorf("expected RunAsUser 1000 in standard k8s, got %v", jobStd.Spec.Template.Spec.SecurityContext.RunAsUser)
+	}
+	if jobStd.Spec.Template.Spec.SecurityContext.RunAsGroup == nil || *jobStd.Spec.Template.Spec.SecurityContext.RunAsGroup != 0 {
+		t.Errorf("expected RunAsGroup 0 in standard k8s, got %v", jobStd.Spec.Template.Spec.SecurityContext.RunAsGroup)
+	}
+
+	// Test OpenShift (SCC compliance)
+	rOpenShift := &SiteAppReconciler{
+		Client:      fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme:      scheme,
+		IsOpenShift: true,
+	}
+	jobOcp := rOpenShift.buildAppJob(context.Background(), sa, bench, "test-job-ocp", "installer", "image:v1", "pvc", "echo test", nil, corev1.ResourceRequirements{}, 1, nil)
+	if jobOcp.Spec.Template.Spec.SecurityContext.RunAsUser != nil {
+		t.Errorf("expected RunAsUser to be nil on OpenShift for SCC dynamic UID injection, got %v", *jobOcp.Spec.Template.Spec.SecurityContext.RunAsUser)
+	}
+	if jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser != nil {
+		t.Errorf("expected container RunAsUser to be nil on OpenShift, got %v", *jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser)
+	}
+	if jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation == nil || *jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation != false {
+		t.Errorf("expected AllowPrivilegeEscalation to be false on OpenShift, got %v", jobOcp.Spec.Template.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation)
+	}
+}
+
+// autoMigrate must run `bench migrate` on BOTH install paths (fpm and git):
+// install-app records patches as executed without running them, and the FPM
+// branch exits early, so a migrate placed only on the git path never ran for
+// packaged apps (found by the vyogo_probe FPM e2e).
+func TestSiteAppInstallScriptMigratesOnBothPaths(t *testing.T) {
+	split := strings.Index(siteAppInstallScript, "# 1) Clone the target app")
+	if split < 0 {
+		t.Fatalf("git path marker not found in install script")
+	}
+	fpmPart, gitPart := siteAppInstallScript[:split], siteAppInstallScript[split:]
+	if !strings.Contains(fpmPart, `if [ -n "$FPM_PACKAGE" ]`) || !strings.Contains(fpmPart, "exit 0") {
+		t.Fatalf("expected the FPM branch (with its early exit) before the git path")
+	}
+	for name, part := range map[string]string{"fpm": fpmPart, "git": gitPart} {
+		if !strings.Contains(part, `bench --site "$SITE_NAME" migrate`) {
+			t.Fatalf("%s install path never runs bench migrate for autoMigrate", name)
+		}
+		if !strings.Contains(part, `"${AUTO_MIGRATE:-true}" = "true"`) {
+			t.Fatalf("%s install path migrate is not gated on AUTO_MIGRATE", name)
+		}
+	}
+	// The FPM branch must migrate before its early exit.
+	if strings.Index(fpmPart, `bench --site "$SITE_NAME" migrate`) > strings.LastIndex(fpmPart, "exit 0") {
+		t.Fatalf("fpm path runs migrate after its exit 0")
+	}
+}
+
+// fpm also installs a package's required apps (lms brings payments); every app
+// it adds must be relocated onto the sites PVC, not only the requested one,
+// or the serving pods 500 with "No module named <dep>". And a site whose
+// listed apps are missing from the bench must be healed by a re-run instead
+// of short-circuiting on "already installed".
+func TestSiteAppInstallScriptRelocatesEveryFpmApp(t *testing.T) {
+	for _, want := range []string{
+		`ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-before.txt`,
+		`NEW_APPS=$(comm -13 /tmp/apps-before.txt /tmp/apps-after.txt`,
+		`for app in $(printf '%s\n' "$APP_NAME" $NEW_APPS | awk '!seen[$0]++'); do`,
+		`relocate_fpm_app "$app"`,
+		`relocate_fpm_app() {`,
+		`missing from the bench:$MISSING`,
+	} {
+		if !strings.Contains(siteAppInstallScript, want) {
+			t.Fatalf("install script lacks %q", want)
+		}
+	}
+	// The function must be defined before the FPM branch uses it.
+	if strings.Index(siteAppInstallScript, "relocate_fpm_app() {") > strings.Index(siteAppInstallScript, `relocate_fpm_app "$app"`) {
+		t.Fatal("relocate_fpm_app is used before it is defined")
+	}
+	// The old single-app relocate must be gone.
+	if strings.Contains(siteAppInstallScript, `SRC=$(readlink -f "/home/frappe/frappe-bench/apps/$APP_NAME"`) {
+		t.Fatal("single-app relocate block still present")
+	}
+}
+
+// A shared bench holds one copy of an app: a second site installing an app
+// that is already on the volume must not fetch or copy anything (the old
+// rm -rf + cp raced with the other site's imports and left dangling asset
+// links), and a first-time copy must land atomically.
+func TestSiteAppInstallScriptSharedBenchFastPath(t *testing.T) {
+	for _, want := range []string{
+		`if [ -d "/home/frappe/frappe-bench/sites/apps/$APP_NAME/$APP_NAME" ]; then`,
+		`Bench already provides $APP_NAME from the shared volume; site-level install only.`,
+		`link_durable_app() {`,
+		`$app is already on the shared volume; keeping that copy`,
+		`tar --exclude='__pycache__' -C "$SRC" -cf - . | tar -C "$TMP" -xf -`,
+		`mv "$TMP" "$DEST"`,
+		`MISSING="$MISSING $a(assets)"`,
+	} {
+		if !strings.Contains(siteAppInstallScript, want) {
+			t.Fatalf("install script lacks %q", want)
+		}
+	}
+	if strings.Contains(siteAppInstallScript, `rm -rf "$DEST"; cp -a "$SRC" "$DEST"`) {
+		t.Fatal("destructive relocate still present")
+	}
+	// The fast path must be checked before fpm is fetched or run.
+	if strings.Index(siteAppInstallScript, "Bench already provides $APP_NAME") > strings.Index(siteAppInstallScript, `fpm install "$FPM_PACKAGE"`) {
+		t.Fatal("fast path runs after the fpm fetch")
+	}
+}
+
+// The serving pods' extra Python deps are ONE resolution over every app's
+// vendored wheels, rebuilt atomically; layering per app with --target
+// --upgrade corrupted numpy on the hub's shared bench.
+func TestSiteAppInstallScriptRebuildsPydepsAtomically(t *testing.T) {
+	for _, want := range []string{
+		`rebuild_pydeps() {`,
+		`--no-index --no-deps --target "$PYDEPS.new"`,
+		`mv "$PYDEPS.new" "$PYDEPS"`,
+		`pip download --no-deps -d "$DEST/wheels"`,
+	} {
+		if !strings.Contains(siteAppInstallScript, want) {
+			t.Fatalf("install script lacks %q", want)
+		}
+	}
+	if strings.Contains(siteAppInstallScript, `--target "$PYDEPS" --upgrade`) {
+		t.Fatal("per-app --target --upgrade staging still present")
+	}
+	// The swap must be decided by pip's exit status. `if pip ... | grep -v
+	// WARNING; then` tests grep: a quiet success (no output) read as failure
+	// and the fresh tree was discarded, so the hub's bench kept its layered
+	// .pydeps through a whole install that claimed to rebuild it.
+	if strings.Contains(siteAppInstallScript, `--target "$PYDEPS.new" $(cat /tmp/pydeps-wheels.txt) 2>&1 | grep`) {
+		t.Fatal("rebuild_pydeps tests grep's exit status instead of pip's")
+	}
+	if !strings.Contains(siteAppInstallScript, `if PIP_OUT=$(/home/frappe/frappe-bench/env/bin/pip install -q --no-index --no-deps --target "$PYDEPS.new"`) {
+		t.Fatal("rebuild_pydeps must capture pip's output and branch on its exit status")
+	}
+	if strings.Index(siteAppInstallScript, "rebuild_pydeps() {") > strings.Index(siteAppInstallScript, "\n  rebuild_pydeps\n") {
+		t.Fatal("rebuild_pydeps used before it is defined")
 	}
 }
