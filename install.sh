@@ -22,7 +22,8 @@ set -e
 #   CHART_VERSION          pin the chart version            unset = latest
 #   VALUES_FILE            extra values file, path or URL   unset
 #   IMAGE_REPO, IMAGE_TAG  override the operator image      unset = chart default
-#   INSTALL_MARIADB_CRDS   MariaDB CRDs outside Helm        true
+#   INSTALL_MARIADB_OPERATOR MariaDB operator subchart      true
+#   INSTALL_MARIADB_CRDS   MariaDB CRDs outside Helm        true (tracks INSTALL_MARIADB_OPERATOR)
 #   INSTALL_KEDA           KEDA subchart                    true
 #   INSTALL_INGRESS        ingress-nginx subchart           false
 #   INSTALL_CERT_MANAGER   cert-manager subchart            false
@@ -42,7 +43,8 @@ VALUES_FILE="${VALUES_FILE:-}"
 # every install. Export these only to override.
 IMAGE_REPO="${IMAGE_REPO:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
-INSTALL_MARIADB_CRDS="${INSTALL_MARIADB_CRDS:-true}"
+INSTALL_MARIADB_OPERATOR="${INSTALL_MARIADB_OPERATOR:-true}"
+INSTALL_MARIADB_CRDS="${INSTALL_MARIADB_CRDS:-$INSTALL_MARIADB_OPERATOR}"
 INSTALL_KEDA="${INSTALL_KEDA:-true}"
 INSTALL_INGRESS="${INSTALL_INGRESS:-false}"
 INSTALL_CERT_MANAGER="${INSTALL_CERT_MANAGER:-false}"
@@ -238,11 +240,15 @@ fi
 # Build the Helm argument list in the positional parameters -- POSIX sh has no
 # arrays. This script takes no arguments of its own, so nothing is lost.
 set -- --namespace "$NAMESPACE" --create-namespace --timeout 10m \
-       --set mariadb-operator.enabled=true \
        --set mariadb.enabled=false
 
-# Step 1 owns the MariaDB CRDs; see the note there.
-[ "$INSTALL_MARIADB_CRDS" = "true" ] && set -- "$@" --set mariadb-operator.crds.enabled=false
+if [ "$INSTALL_MARIADB_OPERATOR" = "true" ]; then
+    set -- "$@" --set mariadb-operator.enabled=true
+    # Step 1 owns the MariaDB CRDs; see the note there.
+    [ "$INSTALL_MARIADB_CRDS" = "true" ] && set -- "$@" --set mariadb-operator.crds.enabled=false
+else
+    set -- "$@" --set mariadb-operator.enabled=false
+fi
 
 if [ "$INSTALL_KEDA" = "true" ]; then
     set -- "$@" --set keda.enabled=true
@@ -288,15 +294,17 @@ if kubectl get pod -n "$NAMESPACE" -l control-plane=controller-manager 2>/dev/nu
 else
     say "${RED}✗ Operator pod not running${NC}"
 fi
-if kubectl get crd mariadbs.k8s.mariadb.com >/dev/null 2>&1; then
-    ok "MariaDB Operator CRDs installed"
-    if kubectl get pod -n "$NAMESPACE" -l app.kubernetes.io/name=mariadb-operator 2>/dev/null | grep -q Running; then
-        ok "MariaDB Operator is running"
+if [ "$INSTALL_MARIADB_OPERATOR" = "true" ]; then
+    if kubectl get crd mariadbs.k8s.mariadb.com >/dev/null 2>&1; then
+        ok "MariaDB Operator CRDs installed"
+        if kubectl get pod -n "$NAMESPACE" -l app.kubernetes.io/name=mariadb-operator 2>/dev/null | grep -q Running; then
+            ok "MariaDB Operator is running"
+        else
+            warn "MariaDB Operator pods may still be starting..."
+        fi
     else
-        warn "MariaDB Operator pods may still be starting..."
+        warn "MariaDB Operator CRDs not found"
     fi
-else
-    warn "MariaDB Operator CRDs not found"
 fi
 if [ "$INSTALL_KEDA" = "true" ]; then
     if kubectl get crd scaledobjects.keda.sh >/dev/null 2>&1; then
