@@ -141,6 +141,96 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # OpenShift OperatorHub (Red Hat community catalogue). Unlike operatorhub.io,
+  # redhat-openshift-ecosystem/community-operators-prod documents no licence
+  # requirement beyond the DCO sign-off, and hosts other source-available
+  # operators. Opt-in: set the repository variable SUBMIT_TO_OPENSHIFT_COMMUNITY
+  # to "true" and the secret COMMUNITY_OP_PAT (a PAT that can fork/push and open
+  # PRs on GitHub) plus variables COMMUNITY_OP_AUTHOR_NAME/EMAIL (the DCO
+  # identity: real name, must match the commit author). Runbook:
+  # docs/openshift-community-operators.md
+  submit-to-openshift-community:
+    if: startsWith(github.ref, 'refs/tags/v') && vars.SUBMIT_TO_OPENSHIFT_COMMUNITY == 'true'
+    name: Submit bundle to OpenShift community-operators-prod
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM: redhat-openshift-ecosystem/community-operators-prod
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Install Operator SDK
+        run: |
+          export ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n $(uname -m) ;; esac)
+          export OS=$(uname | awk '{print tolower($0)}')
+          curl -sSLo operator-sdk "https://github.com/operator-framework/operator-sdk/releases/download/v1.42.2/operator-sdk_${OS}_${ARCH}"
+          chmod +x operator-sdk && sudo mv operator-sdk /usr/local/bin/operator-sdk
+
+      - name: Fork and clone community-operators-prod
+        env:
+          GH_TOKEN: ${{ secrets.COMMUNITY_OP_PAT }}
+        run: |
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+          gh repo fork "$UPSTREAM" --clone=true --remote=true -- community-operators-prod
+          cd community-operators-prod
+          git fetch upstream
+          git checkout -B main upstream/main
+
+      - name: Generate the OLM bundle
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          # `replaces` must name a version the catalogue already has, so it is
+          # taken from the fork's checkout of upstream, not from our git tags.
+          PREVIOUS=$(ls community-operators-prod/operators/frappe-operator 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+          make manifests
+          make bundle VERSION="$VERSION" IMG="ghcr.io/${{ github.repository }}:v${VERSION}"
+          python3 - "$VERSION" "$PREVIOUS" <<'PY'
+          import sys
+          version, previous = sys.argv[1], sys.argv[2]
+          path = 'bundle/manifests/frappe-operator.clusterserviceversion.yaml'
+          s = open(path).read()
+          if 'containerImage:' not in s:
+              s = s.replace('  annotations:\n', f'  annotations:\n    containerImage: ghcr.io/vyogotech/frappe-operator:v{version}\n', 1)
+          if previous and '\n  replaces:' not in s:
+              s = s.replace('\nspec:\n', f'\nspec:\n  replaces: frappe-operator.v{previous}\n', 1)
+          open(path, 'w').write(s)
+          PY
+          operator-sdk bundle validate ./bundle --select-optional name=operatorhub
+          operator-sdk bundle validate ./bundle --select-optional suite=operatorframework
+
+      - name: Commit the bundle to a fork branch and open the PR
+        env:
+          GH_TOKEN: ${{ secrets.COMMUNITY_OP_PAT }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          cd community-operators-prod
+          DIR="operators/frappe-operator/${VERSION}"
+          mkdir -p "$DIR"
+          cp -r ../bundle/manifests ../bundle/metadata ../bundle/tests "$DIR/"
+          if [ ! -f operators/frappe-operator/ci.yaml ]; then
+            printf -- '---\nreviewers:\n  - rmallam\n  - rakeshkumarmallam\nupdateGraph: replaces-mode\n' > operators/frappe-operator/ci.yaml
+          fi
+          git config user.name "${{ vars.COMMUNITY_OP_AUTHOR_NAME }}"
+          git config user.email "${{ vars.COMMUNITY_OP_AUTHOR_EMAIL }}"
+          git checkout -B "frappe-operator-${VERSION}"
+          git add operators/frappe-operator
+          git commit -s -m "operator frappe-operator (${VERSION})"
+          git push -f origin "frappe-operator-${VERSION}"
+          OWNER=$(gh api user --jq .login)
+          gh pr create --repo "$UPSTREAM" \
+            --title "operator frappe-operator (${VERSION})" \
+            --body "Release of frappe-operator ${VERSION}. Bundle generated with operator-sdk from https://github.com/vyogotech/frappe-operator/releases/tag/v${VERSION}." \
+            --head "${OWNER}:frappe-operator-${VERSION}" --base main \
+            || echo "Pull request already exists or could not be created."
+
   # DISABLED as of v4.2.0: Frappe Operator is now licensed under the Elastic
   # License 2.0 (source-available, NOT an OSI-approved open-source license).
   # OperatorHub / k8s-operatorhub community-operators only accepts open-source

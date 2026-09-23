@@ -2,6 +2,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
+    containerImage: ghcr.io/vyogotech/frappe-operator:v5.2.7
     alm-examples: |-
       [
         {
@@ -247,14 +248,14 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime,Database
-    createdAt: "2026-09-09T00:22:30Z"
+    createdAt: "2026-09-23T07:10:49Z"
     features.operators.openshift.io/disconnected-compliant: "true"
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
     operatorframework.io/suggested-namespace: frappe-operator-system
-    operators.operatorframework.io/builder: operator-sdk-v1.42.3
+    operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: frappe-operator.v5.2.0
+  name: frappe-operator.v5.2.7
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -810,7 +811,7 @@ spec:
                   value: redis:7.0-alpine
                 - name: RELATED_IMAGE_UTILITY_UBI
                   value: registry.access.redhat.com/ubi9/ubi-minimal:latest
-                image: ghcr.io/vyogotech/frappe-operator:v5.2.0
+                image: ghcr.io/vyogotech/frappe-operator:v5.2.7
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:
@@ -913,4 +914,4 @@ spec:
     name: redis
   - image: registry.access.redhat.com/ubi9/ubi-minimal:latest
     name: utility-ubi
-  version: 5.2.0
+  version: 5.2.7
