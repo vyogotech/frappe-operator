@@ -137,6 +137,50 @@ spec:
                 - credentialsSecretRef
                 - endpointUrl
                 type: object
+              secretConfig:
+                description: |-
+                  SecretConfig sets site_config.json keys whose VALUES live in Kubernetes Secrets
+                  (API tokens, shared HMAC secrets, seeded admin passwords). The value is read from
+                  the referenced Secret at apply time and injected into the config Job via env, so it
+                  never appears in the CR or in a Job spec's command line. Applied as strings.
+                items:
+                  description: SecretConfigEntry maps one site_config.json key to
+                    a key in a Secret.
+                  properties:
+                    key:
+                      description: Key is the site_config.json key to set (e.g. "oidc_service_token").
+                      pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                      type: string
+                    secretKeyRef:
+                      description: SecretKeyRef names the Secret (same namespace as
+                        the SiteConfig) and the key in it.
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  required:
+                  - key
+                  - secretKeyRef
+                  type: object
+                type: array
               siteRef:
                 description: SiteRef specifies the target FrappeSite custom resource.
                 properties:
