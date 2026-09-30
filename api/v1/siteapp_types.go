@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,6 +39,11 @@ type SiteAppSpec struct {
 	// GitBranch specifies the Git branch or tag to clone (defaults to "main" or "master").
 	// +optional
 	GitBranch string `json:"gitBranch,omitempty"`
+
+	// GitAuthSecretRef specifies an optional Secret in the same namespace containing a "token" key
+	// for authenticating private Git repository clones without baking credentials into GitRepo.
+	// +optional
+	GitAuthSecretRef *corev1.LocalObjectReference `json:"gitAuthSecretRef,omitempty"`
 
 	// FPMPackage, when set, installs the app from a prebuilt FPM package
 	// ("<org>/<app>==<version>", e.g. "frappe/wiki==3.0.0") instead of a runtime

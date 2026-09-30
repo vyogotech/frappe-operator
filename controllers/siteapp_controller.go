@@ -355,10 +355,14 @@ clone_app() {
   mkdir -p apps
   if [ ! -d "apps/$name" ]; then
     echo "Cloning $name from $repo (branch: ${branch:-default})..."
+    local git_cmd="git"
+    if [ -n "$GIT_AUTH_TOKEN" ]; then
+      git_cmd="git -c http.extraHeader=Authorization: Bearer $GIT_AUTH_TOKEN"
+    fi
     if [ -n "$branch" ]; then
-      git clone --depth 1 -b "$branch" "$repo" "apps/$name" 2>/dev/null || git clone --depth 1 "$repo" "apps/$name" || true
+      $git_cmd clone --depth 1 -b "$branch" "$repo" "apps/$name" 2>/dev/null || $git_cmd clone --depth 1 "$repo" "apps/$name" || true
     else
-      git clone --depth 1 "$repo" "apps/$name" || true
+      $git_cmd clone --depth 1 "$repo" "apps/$name" || true
     fi
   fi
   ln -sf $(pwd)/apps/$name /home/frappe/frappe-bench/apps/$name 2>/dev/null || true
@@ -764,6 +768,21 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 					LocalObjectReference: corev1.LocalObjectReference{Name: "fpm-registry-auth"}, Key: "username", Optional: &optional}}},
 				corev1.EnvVar{Name: "FPM_TOKEN", ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{Name: "fpm-registry-auth"}, Key: "token", Optional: &optional}}},
+			)
+		}
+		if siteApp.Spec.GitAuthSecretRef != nil && siteApp.Spec.GitAuthSecretRef.Name != "" {
+			optional := true
+			env = append(env,
+				corev1.EnvVar{
+					Name: "GIT_AUTH_TOKEN",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: *siteApp.Spec.GitAuthSecretRef,
+							Key:                  "token",
+							Optional:             &optional,
+						},
+					},
+				},
 			)
 		}
 
