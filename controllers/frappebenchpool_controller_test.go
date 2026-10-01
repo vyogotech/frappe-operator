@@ -363,3 +363,120 @@ func TestFrappeBenchPool_ComputeNextShardName(t *testing.T) {
 		}
 	}
 }
+
+func TestFrappeBenchPool_BufferWarmShards(t *testing.T) {
+	scheme := setupTestScheme()
+	namespace := "bench-v16"
+	pool := newTestPool(namespace, "v16-pool", 1, 5, 25, 80)
+	pool.Spec.ShardingPolicy.BufferWarmShards = 1
+
+	// bench1 has 5 sites (below watermark 20, but not empty)
+	bench1 := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "standard-v16-001", Namespace: namespace},
+		Status:     vyogotechv1.FrappeBenchStatus{Phase: "Ready"},
+	}
+
+	objs := []client.Object{pool, bench1}
+	for i := 1; i <= 5; i++ {
+		objs = append(objs, &vyogotechv1.FrappeSite{
+			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("s1-%d", i), Namespace: namespace},
+			Spec: vyogotechv1.FrappeSiteSpec{
+				SiteName: fmt.Sprintf("s1-%d.test.com", i),
+				BenchRef: &vyogotechv1.NamespacedName{Name: "standard-v16-001", Namespace: namespace},
+			},
+		})
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(objs...).
+		WithStatusSubresource(&vyogotechv1.FrappeBenchPool{}, &vyogotechv1.FrappeBench{}).
+		Build()
+
+	r := &FrappeBenchPoolReconciler{
+		Client:   c,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+
+	_, err := r.Reconcile(context.TODO(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: pool.Name, Namespace: pool.Namespace},
+	})
+	if err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+
+	// Should provision standard-v16-002 as a buffer warm shard
+	var benches vyogotechv1.FrappeBenchList
+	if err := c.List(context.TODO(), &benches, client.InNamespace(namespace)); err != nil {
+		t.Fatalf("Failed to list benches: %v", err)
+	}
+	if len(benches.Items) != 2 {
+		t.Fatalf("Expected 2 benches (1 occupied + 1 warm buffer), found %d", len(benches.Items))
+	}
+}
+
+func TestFrappeBenchPool_StatusUpdate(t *testing.T) {
+	scheme := setupTestScheme()
+	namespace := "bench-v16"
+	pool := newTestPool(namespace, "v16-pool", 2, 5, 25, 80)
+	pool.Spec.ShardingPolicy.BufferWarmShards = 0
+
+	bench1 := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "standard-v16-001", Namespace: namespace},
+		Status:     vyogotechv1.FrappeBenchStatus{Phase: "Ready"},
+	}
+	bench2 := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "standard-v16-002", Namespace: namespace},
+		Status:     vyogotechv1.FrappeBenchStatus{Phase: "Ready"},
+	}
+
+	objs := []client.Object{pool, bench1, bench2}
+	for i := 1; i <= 10; i++ {
+		objs = append(objs, &vyogotechv1.FrappeSite{
+			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("s-%d", i), Namespace: namespace},
+			Spec: vyogotechv1.FrappeSiteSpec{
+				SiteName: fmt.Sprintf("s-%d.test.com", i),
+				BenchRef: &vyogotechv1.NamespacedName{Name: "standard-v16-001", Namespace: namespace},
+			},
+		})
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(objs...).
+		WithStatusSubresource(&vyogotechv1.FrappeBenchPool{}, &vyogotechv1.FrappeBench{}).
+		Build()
+
+	r := &FrappeBenchPoolReconciler{
+		Client:   c,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+
+	_, err := r.Reconcile(context.TODO(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: pool.Name, Namespace: pool.Namespace},
+	})
+	if err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+
+	var updatedPool vyogotechv1.FrappeBenchPool
+	if err := c.Get(context.TODO(), types.NamespacedName{Name: pool.Name, Namespace: namespace}, &updatedPool); err != nil {
+		t.Fatalf("Failed to get pool: %v", err)
+	}
+
+	if updatedPool.Status.TotalShards != 2 {
+		t.Errorf("Expected TotalShards 2, got %d", updatedPool.Status.TotalShards)
+	}
+	if updatedPool.Status.ReadyShards != 2 {
+		t.Errorf("Expected ReadyShards 2, got %d", updatedPool.Status.ReadyShards)
+	}
+	if updatedPool.Status.TotalActiveSites != 10 {
+		t.Errorf("Expected TotalActiveSites 10, got %d", updatedPool.Status.TotalActiveSites)
+	}
+	if len(updatedPool.Status.Shards) != 2 {
+		t.Errorf("Expected 2 shard status entries, got %d", len(updatedPool.Status.Shards))
+	}
+}
+

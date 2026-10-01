@@ -1,3 +1,4 @@
+---
 apiVersion: vyogo.tech/v1
 kind: FrappeBenchPool
 metadata:
