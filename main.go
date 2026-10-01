@@ -230,6 +230,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "FrappeBench")
 		os.Exit(1)
 	}
+	if err = (&controllers.FrappeBenchPoolReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("frappebenchpool-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "FrappeBenchPool")
+		os.Exit(1)
+	}
 	maxSiteReconciles := getMaxConcurrentSiteReconciles(mgr)
 	setupLog.Info("FrappeSite controller concurrency", "maxConcurrentReconciles", maxSiteReconciles)
 	if err = (&controllers.FrappeSiteReconciler{
