@@ -621,7 +621,9 @@ if [ -n "$FPM_PACKAGE" ]; then
   # and 500 on every request.
   ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-before.txt || true
   # fpm install extracts to the FPM store, symlinks apps/<app>, and installs on the site.
-  fpm install "$FPM_PACKAGE" --bench-path /home/frappe/frappe-bench --site "$SITE_NAME"
+  PKG_SPEC="${FPM_PACKAGE//@/==}"
+  PKG_SPEC="${PKG_SPEC//:/==}"
+  fpm install "$PKG_SPEC" --bench-path /home/frappe/frappe-bench --site "$SITE_NAME"
   ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-after.txt || true
   NEW_APPS=$(comm -13 /tmp/apps-before.txt /tmp/apps-after.txt 2>/dev/null || true)
   /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-after.txt || true
