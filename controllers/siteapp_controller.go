@@ -579,7 +579,7 @@ if [ -n "$FPM_PACKAGE" ]; then
           echo "$app already on $SITE_NAME."
           continue
         fi
-        bench --site "$SITE_NAME" install-app "$app"
+        bench --site "$SITE_NAME" install-app "$app" --force
       done
       bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
       if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
