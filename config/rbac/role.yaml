@@ -201,6 +201,7 @@ rules:
   - vyogo.tech
   resources:
   - frappebenches
+  - frappebenchpools
   - frappesites
   - frappeworkspaces
   - siteapikeys
@@ -236,6 +237,7 @@ rules:
   - vyogo.tech
   resources:
   - frappebenches/finalizers
+  - frappebenchpools/finalizers
   - frappesites/finalizers
   - frappeworkspaces/finalizers
   - siteapikeys/finalizers
@@ -259,6 +261,7 @@ rules:
   - vyogo.tech
   resources:
   - frappebenches/status
+  - frappebenchpools/status
   - frappesites/status
   - frappeworkspaces/status
   - siteapikeys/status

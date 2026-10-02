@@ -1,0 +1,84 @@
+---
+apiVersion: vyogo.tech/v1
+kind: FrappeBenchPool
+metadata:
+  name: standard-v16-pool
+  namespace: bench-v16
+spec:
+  frappeVersion: "16"
+  shardingPolicy:
+    minShards: 2
+    maxShards: 10
+    maxSitesPerShard: 25
+    watermarkPercent: 80
+    bufferWarmShards: 1
+    shardPrefix: standard-v16
+  template:
+    frappeVersion: "16"
+    imageConfig:
+      repository: ghcr.io/vyogotech/frappe-for-operator
+      tag: version-16-20260827
+    storageSize: 50Gi
+    storageClassName: longhorn-rwx
+    apps:
+      - name: erpnext
+        org: frappe
+        source: fpm
+      - name: hrms
+        org: frappe
+        source: fpm
+      - name: crm
+        org: frappe
+        source: fpm
+      - name: payments
+        org: frappe
+        source: fpm
+      - name: wiki
+        org: frappe
+        source: fpm
+      - name: builder
+        org: frappe
+        source: fpm
+      - name: insights
+        org: frappe
+        source: fpm
+      - name: gameplan
+        org: frappe
+        source: fpm
+      - name: print_designer
+        org: frappe
+        source: fpm
+      - name: drive
+        org: frappe
+        source: fpm
+      - name: lms
+        org: frappe
+        source: fpm
+      - name: webshop
+        org: frappe
+        source: fpm
+    componentAutoscaling:
+      worker-default:
+        enabled: true
+        provider: keda
+        minReplicas: 0
+        maxReplicas: 5
+        keda:
+          trigger: redis
+          targetValue: "5"
+      worker-short:
+        enabled: true
+        provider: keda
+        minReplicas: 0
+        maxReplicas: 5
+        keda:
+          trigger: redis
+          targetValue: "5"
+      worker-long:
+        enabled: true
+        provider: keda
+        minReplicas: 1
+        maxReplicas: 5
+        keda:
+          trigger: redis
+          targetValue: "5"
