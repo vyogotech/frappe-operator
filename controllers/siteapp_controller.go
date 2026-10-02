@@ -595,8 +595,9 @@ if [ -n "$FPM_PACKAGE" ]; then
   echo "Installing $FPM_PACKAGE via FPM (repo: ${FPM_REPO:-none})..."
   # Bench images may not ship the fpm CLI yet; fetch the pinned release if absent.
   if ! command -v fpm >/dev/null 2>&1; then
-    echo "fpm CLI not found in image; fetching ${FPM_VERSION:-v4.6.0}..."
-    curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v4.6.0}/fpm-linux-amd64" && chmod +x /tmp/fpm
+    echo "fpm CLI not found in image; fetching CLI..."
+    ( [ -n "$FPM_REPO" ] && curl -fsSL -o /tmp/fpm "${FPM_REPO%/}/bin/fpm-linux-amd64" 2>/dev/null ) || curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v4.6.0}/fpm-linux-amd64"
+    chmod +x /tmp/fpm
     export PATH="/tmp:$PATH"
   fi
   if [ -n "$FPM_REPO" ]; then
