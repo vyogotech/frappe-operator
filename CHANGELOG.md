@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-10-02
+
+### Added
+- **Dynamic Auto-Sharding with `FrappeBenchPool` CRD**: Introduces `vyogo.tech/v1 FrappeBenchPool` and its reconciler. Dynamically provisions and scales shared bench shards (`standard-v16-001`, `002`, ...) as site capacity approaches configured watermark thresholds (e.g. 80%) or warm standby buffer limits, with strict enforcement of `minShards`, `maxShards`, and in-flight initialization guards.
+
 ### Fixed
-- **Deleting a FrappeSite deletes its SiteApps.** Nothing cascaded: a SiteApp owns only its Jobs and carries no owner reference to its site (`siteRef` may cross namespaces), so a deleted site left its SiteApps behind, `Pending` on `SiteNotFound` and requeued every 30s forever (three days on the hub before anyone noticed). The FrappeSite finalizer now deletes every SiteApp whose `siteRef` resolves to the site, before `bench drop-site`. On the SiteApp side, a site that is terminating or gone means no uninstall Job — the database is about to be dropped (`deletionPolicy: Delete`) or must stay untouched (`Retain`), and the Job would race `bench drop-site` — so the finalizer is simply released; and a SiteApp that already carries its finalizer (it has been reconciled against its site before) deletes itself when the site no longer exists, which also clears the orphans left by earlier versions. A SiteApp applied ahead of its site (GitOps) has no finalizer yet and still waits. The SiteApp-side half of this went out in the 5.2.6 commit without a note; the site-side cascade, the tests and this entry complete it. No new workloads or RBAC (the operator role already deletes `siteapps`), so nothing changes for OpenShift.
+- **Deleting a FrappeSite deletes its SiteApps.** Nothing cascaded: a SiteApp owns only its Jobs and carries no owner reference to its site (`siteRef` may cross namespaces), so a deleted site left its SiteApps behind, `Pending` on `SiteNotFound` and requeued every 30s forever. The FrappeSite finalizer now deletes every SiteApp whose `siteRef` resolves to the site, before `bench drop-site`. On the SiteApp side, a site that is terminating or gone releases its finalizer without running an uninstall Job.
 
 ### Probe
 - `site2` reinstalls the app on the second site and deletes the site while the SiteApp still exists: the SiteApp must disappear with the site, and no uninstall Job may have run against it.
