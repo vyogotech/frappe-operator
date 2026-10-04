@@ -717,9 +717,16 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
 
 	if err == nil {
-		// If Job belongs to an older generation of SiteApp, clean it up so a new Job runs for the updated spec
-		if siteApp.Status.ObservedGeneration < siteApp.Generation && (job.Status.Succeeded > 0 || job.Status.Failed > 0) {
-			log.FromContext(ctx).Info("Cleaning up completed Job from older SiteApp generation", "job", job.Name, "observedGen", siteApp.Status.ObservedGeneration, "currentGen", siteApp.Generation)
+		// Backfill ObservedGeneration for already-Ready resources from older operator versions
+		if siteApp.Status.Phase == "Ready" && siteApp.Status.ObservedGeneration == 0 {
+			siteApp.Status.ObservedGeneration = siteApp.Generation
+			_ = r.updateStatus(ctx, siteApp)
+		}
+
+		// If Job belongs to an older generation of SiteApp and the user requested an upgrade (Generation > ObservedGeneration > 0),
+		// clean up the previous completed Job so a new Job runs for the updated spec.
+		if siteApp.Status.ObservedGeneration > 0 && siteApp.Status.ObservedGeneration < siteApp.Generation && job.Status.Succeeded > 0 {
+			log.FromContext(ctx).Info("Cleaning up completed Job from older SiteApp generation for upgrade", "job", job.Name, "observedGen", siteApp.Status.ObservedGeneration, "currentGen", siteApp.Generation)
 			_ = r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground))
 			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 		}
@@ -842,6 +849,7 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 	}
 
 	if job.Status.Failed > 0 {
+		siteApp.Status.ObservedGeneration = siteApp.Generation
 		return r.failReconciliation(ctx, siteApp, fmt.Sprintf("App installation job %s failed", jobName), "JobFailed")
 	}
 
