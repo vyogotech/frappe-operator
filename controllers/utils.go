@@ -82,23 +82,55 @@ func relocateNamedBackupPath(p string) string {
 //   - done=false, err=nil → the backup is still running; the caller should requeue.
 //   - err!=nil            → the backup failed (or a client error); the caller
 //     should fail the operation rather than mutate an un-backed-up site.
+func sanitizeK8sLabel(val string) string {
+	var sb strings.Builder
+	for _, r := range val {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			sb.WriteRune(r)
+		} else {
+			sb.WriteRune('-')
+		}
+	}
+	s := strings.Trim(sb.String(), "-_.")
+	if len(s) > 63 {
+		s = s[:63]
+	}
+	return s
+}
+
+// ensurePreflightBackup guarantees a completed SiteBackup exists before a
+// mutating operation proceeds. If no backup exists yet, it creates one with
+// rich metadata tracking the app, version transition, and installed apps snapshot.
 //
 // The backup deliberately carries no owner reference: it is a restore point that
 // must outlive the SiteApp/SiteMigration that triggered it.
-func ensurePreflightBackup(ctx context.Context, c client.Client, namespace, siteName, backupName string) (bool, error) {
+func ensurePreflightBackup(ctx context.Context, c client.Client, namespace, siteName, backupName string, extraLabels map[string]string, extraAnnotations map[string]string) (bool, error) {
 	sb := &vyogotechv1.SiteBackup{}
 	err := c.Get(ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, sb)
 	if apierrors.IsNotFound(err) {
 		base := fmt.Sprintf("sites/%s/private/backups/%s", siteName, backupName)
+		labels := map[string]string{
+			"app":                  "frappe",
+			"site":                 siteName,
+			"vyogo.tech/preflight": "true",
+		}
+		for k, v := range extraLabels {
+			if v != "" {
+				labels[k] = v
+			}
+		}
+		annotations := map[string]string{}
+		for k, v := range extraAnnotations {
+			if v != "" {
+				annotations[k] = v
+			}
+		}
 		sb = &vyogotechv1.SiteBackup{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      backupName,
-				Namespace: namespace,
-				Labels: map[string]string{
-					"app":                  "frappe",
-					"site":                 siteName,
-					"vyogo.tech/preflight": "true",
-				},
+				Name:        backupName,
+				Namespace:   namespace,
+				Labels:      labels,
+				Annotations: annotations,
 			},
 			Spec: vyogotechv1.SiteBackupSpec{
 				Site:                   siteName,
@@ -119,6 +151,31 @@ func ensurePreflightBackup(ctx context.Context, c client.Client, namespace, site
 	if err != nil {
 		return false, err
 	}
+
+	// If the backup exists, ensure any new display annotations or trigger labels are backfilled
+	updated := false
+	if sb.Annotations == nil && len(extraAnnotations) > 0 {
+		sb.Annotations = make(map[string]string)
+	}
+	for k, v := range extraAnnotations {
+		if sb.Annotations[k] != v {
+			sb.Annotations[k] = v
+			updated = true
+		}
+	}
+	if sb.Labels == nil && len(extraLabels) > 0 {
+		sb.Labels = make(map[string]string)
+	}
+	for k, v := range extraLabels {
+		if sb.Labels[k] != v {
+			sb.Labels[k] = v
+			updated = true
+		}
+	}
+	if updated {
+		_ = c.Update(ctx, sb)
+	}
+
 	switch sb.Status.Phase {
 	case "Succeeded":
 		return true, nil

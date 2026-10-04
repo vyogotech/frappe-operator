@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -741,7 +742,64 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 		// preflight backup is done, so a corrupt install can always be reverted.
 		if siteApp.Spec.BackupBeforeInstall == nil || *siteApp.Spec.BackupBeforeInstall { // nil = default true
 			backupName := fmt.Sprintf("%s-pre-g%d", siteApp.Name, siteApp.Generation)
-			done, berr := ensurePreflightBackup(ctx, r.Client, siteApp.Namespace, site.Spec.SiteName, backupName)
+
+			backupType := "preflight-app-upgrade"
+			fromVer := siteApp.Status.InstalledVersion
+			if fromVer == "" {
+				backupType = "preflight-app-install"
+			}
+			toVer := siteApp.Spec.FPMPackage
+			if toVer == "" {
+				toVer = siteApp.Spec.GitBranch
+			}
+			appName := siteApp.Spec.AppName
+
+			displayName := fmt.Sprintf("Pre-upgrade snapshot: %s (%s → %s)", appName, fromVer, toVer)
+			if backupType == "preflight-app-install" {
+				displayName = fmt.Sprintf("Pre-install snapshot: %s (%s)", appName, toVer)
+			}
+
+			extraLabels := map[string]string{
+				"vyogo.tech/backup-type": backupType,
+				"vyogo.tech/trigger-app": sanitizeK8sLabel(appName),
+			}
+			if fromVer != "" {
+				extraLabels["vyogo.tech/from-version"] = sanitizeK8sLabel(fromVer)
+			}
+			if toVer != "" {
+				extraLabels["vyogo.tech/to-version"] = sanitizeK8sLabel(toVer)
+			}
+
+			extraAnnotations := map[string]string{
+				"vyogo.tech/display-name": displayName,
+				"vyogo.tech/siteapp-cr":   siteApp.Name,
+				"vyogo.tech/trigger-app":  appName,
+				"vyogo.tech/from-version": fromVer,
+				"vyogo.tech/to-version":   toVer,
+			}
+
+			// Capture snapshot of installed apps on the site
+			appVersions := []map[string]string{}
+			var siteApps vyogotechv1.SiteAppList
+			if err := r.List(ctx, &siteApps, client.InNamespace(siteApp.Namespace), client.MatchingLabels{"vyogo.tech/site-cr": site.Name}); err == nil {
+				for _, sa := range siteApps.Items {
+					v := sa.Status.InstalledVersion
+					if v == "" {
+						v = sa.Spec.FPMPackage
+					}
+					appVersions = append(appVersions, map[string]string{
+						"app":     sa.Spec.AppName,
+						"version": v,
+					})
+				}
+			}
+			if len(appVersions) > 0 {
+				if appsJson, err := json.Marshal(appVersions); err == nil {
+					extraAnnotations["vyogo.tech/installed-apps"] = string(appsJson)
+				}
+			}
+
+			done, berr := ensurePreflightBackup(ctx, r.Client, siteApp.Namespace, site.Spec.SiteName, backupName, extraLabels, extraAnnotations)
 			if berr != nil {
 				return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Pre-install backup failed: %v", berr), "PreBackupFailed")
 			}
