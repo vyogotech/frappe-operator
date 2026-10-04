@@ -28,6 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -656,3 +657,63 @@ func TestSiteAppInstallScriptRebuildsPydepsAtomically(t *testing.T) {
 		t.Fatal("rebuild_pydeps used before it is defined")
 	}
 }
+
+func TestSiteAppReconciler_Reconcile_GenerationUpgradeCleansOldJob(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	siteApp := &vyogotechv1.SiteApp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "app1",
+			Namespace:  "default",
+			Generation: 2, // New spec generation
+		},
+		Spec: vyogotechv1.SiteAppSpec{
+			SiteRef:    &vyogotechv1.NamespacedName{Name: "site1"},
+			AppName:    "wiki",
+			FPMPackage: "frappe/wiki==3.0.1",
+		},
+		Status: vyogotechv1.SiteAppStatus{
+			Phase:              "Ready",
+			ObservedGeneration: 1, // Observed gen 1
+			InstalledVersion:   "frappe/wiki==3.0.0",
+		},
+	}
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
+		Spec: vyogotechv1.FrappeSiteSpec{
+			BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"},
+			SiteName: "site1.example.com",
+		},
+		Status: vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "16.0.0"},
+	}
+	oldJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "app1-app-install", Namespace: "default"},
+		Status:     batchv1.JobStatus{Succeeded: 1},
+	}
+
+	client := fake.NewClientBuilder().WithScheme(scheme).
+		WithRuntimeObjects(siteApp, site, bench, oldJob).WithStatusSubresource(siteApp).Build()
+	r := &SiteAppReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+	ctx := context.Background()
+	res, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "app1", Namespace: "default"}})
+	if err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+	if res.RequeueAfter == 0 {
+		t.Errorf("expected requeue after deleting old completed Job, got %v", res)
+	}
+
+	// Verify old job was deleted
+	checkJob := &batchv1.Job{}
+	if err := client.Get(ctx, types.NamespacedName{Name: "app1-app-install", Namespace: "default"}, checkJob); !apierrors.IsNotFound(err) {
+		t.Errorf("expected old job to be deleted, got err: %v", err)
+	}
+}
+
