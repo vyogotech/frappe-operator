@@ -142,3 +142,88 @@ func TestSiteConfigReconciler_Reconcile_ValidationAndNotReady(t *testing.T) {
 		}
 	})
 }
+
+func TestSiteConfigReconciler_FinalizerAndCleanup(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vyogotechv1.AddToScheme(scheme))
+
+	mMode := true
+	siteConfig := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "config-del",
+			Namespace:  "default",
+			Generation: 1,
+			Finalizers: []string{siteConfigFinalizer},
+		},
+		Spec: vyogotechv1.SiteConfigSpec{
+			SiteRef:         &vyogotechv1.NamespacedName{Name: "site1"},
+			MaintenanceMode: &mMode,
+			CustomConfig:    map[string]string{"foo": "bar"},
+		},
+		Status: vyogotechv1.SiteConfigStatus{
+			Phase:       "Ready",
+			AppliedKeys: []string{"foo", "maintenance_mode"},
+		},
+	}
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeSiteSpec{SiteName: "site1.local", BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"}},
+		Status:     vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
+	}
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(siteConfig, site, bench).WithStatusSubresource(siteConfig, &batchv1.Job{}).Build()
+	r := &SiteConfigReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	ctx := context.Background()
+	key := types.NamespacedName{Name: "config-del", Namespace: "default"}
+
+	// Trigger deletion
+	if err := client.Delete(ctx, siteConfig); err != nil {
+		t.Fatalf("delete siteConfig failed: %v", err)
+	}
+
+	// Reconcile deletion -> creates cleanup Job
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+		t.Fatalf("Reconcile deletion failed: %v", err)
+	}
+
+	cleanupJob := &batchv1.Job{}
+	if err := client.Get(ctx, types.NamespacedName{Name: "config-del-cleanup-1", Namespace: "default"}, cleanupJob); err != nil {
+		t.Fatalf("expected cleanup Job config-del-cleanup-1: %v", err)
+	}
+
+	// Verify env vars on cleanup Job
+	foundKeys := false
+	for _, env := range cleanupJob.Spec.Template.Spec.Containers[0].Env {
+		if env.Name == "CFG_CLEANUP_KEYS" {
+			foundKeys = true
+			if env.Value != "foo,maintenance_mode" {
+				t.Errorf("expected CFG_CLEANUP_KEYS foo,maintenance_mode, got %s", env.Value)
+			}
+		}
+	}
+	if !foundKeys {
+		t.Error("CFG_CLEANUP_KEYS env var not found on cleanup Job container")
+	}
+
+	// Complete the Job
+	cleanupJob.Status.Succeeded = 1
+	if err := client.Status().Update(ctx, cleanupJob); err != nil {
+		t.Fatalf("update cleanup job status: %v", err)
+	}
+
+	// Reconcile again -> removes finalizer
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+		t.Fatalf("Reconcile post-cleanup failed: %v", err)
+	}
+
+	afterDelete := &vyogotechv1.SiteConfig{}
+	err := client.Get(ctx, key, afterDelete)
+	if err == nil && len(afterDelete.Finalizers) != 0 {
+		t.Errorf("expected finalizer to be removed, got %v", afterDelete.Finalizers)
+	}
+}

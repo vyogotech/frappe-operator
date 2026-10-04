@@ -384,7 +384,7 @@ func TestSiteAppReconciler_Reconcile_FPMInstallPath(t *testing.T) {
 	}
 	script := strings.Join(job.Spec.Template.Spec.Containers[0].Command, "\n") +
 		strings.Join(job.Spec.Template.Spec.Containers[0].Args, "\n")
-	if !strings.Contains(script, `fpm install "$FPM_PACKAGE"`) {
+	if !strings.Contains(script, `fpm install "$PKG_SPEC"`) && !strings.Contains(script, `fpm install "$FPM_PACKAGE"`) {
 		t.Error("install Job script must use `fpm install` when FPMPackage is set")
 	}
 	if !strings.Contains(script, `--type "${FPM_REPO_TYPE:-http}"`) {
@@ -616,8 +616,11 @@ func TestSiteAppInstallScriptSharedBenchFastPath(t *testing.T) {
 	if strings.Contains(siteAppInstallScript, `rm -rf "$DEST"; cp -a "$SRC" "$DEST"`) {
 		t.Fatal("destructive relocate still present")
 	}
-	// The fast path must be checked before fpm is fetched or run.
-	if strings.Index(siteAppInstallScript, "Bench already provides $APP_NAME") > strings.Index(siteAppInstallScript, `fpm install "$FPM_PACKAGE"`) {
+	fpmIdx := strings.Index(siteAppInstallScript, `fpm install "$PKG_SPEC"`)
+	if fpmIdx == -1 {
+		fpmIdx = strings.Index(siteAppInstallScript, `fpm install "$FPM_PACKAGE"`)
+	}
+	if strings.Index(siteAppInstallScript, "Bench already provides $APP_NAME") > fpmIdx {
 		t.Fatal("fast path runs after the fpm fetch")
 	}
 }

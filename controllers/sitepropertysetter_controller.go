@@ -29,10 +29,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
+
+const sitePropertySetterFinalizer = "vyogo.tech/sitepropertysetter-finalizer"
 
 // SitePropertySetterReconciler reconciles a SitePropertySetter object
 type SitePropertySetterReconciler struct {
@@ -44,6 +47,7 @@ type SitePropertySetterReconciler struct {
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitepropertysetters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitepropertysetters/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=vyogo.tech,resources=sitepropertysetters/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch
 
 func (r *SitePropertySetterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -70,8 +74,61 @@ func (r *SitePropertySetterReconciler) Reconcile(ctx context.Context, req ctrl.R
 		siteNamespace = propSetter.Namespace
 	}
 
-	site := &vyogotechv1.FrappeSite{}
 	siteKey := types.NamespacedName{Name: propSetter.Spec.SiteRef.Name, Namespace: siteNamespace}
+
+	// Handle Deletion & Finalizer
+	if propSetter.DeletionTimestamp != nil {
+		if controllerutil.ContainsFinalizer(propSetter, sitePropertySetterFinalizer) {
+			docName := fmt.Sprintf("%s-%s-%s", propSetter.Spec.DocType, propSetter.Spec.FieldName, propSetter.Spec.Property)
+			if propSetter.Spec.FieldName == "" {
+				docName = fmt.Sprintf("%s-main-%s", propSetter.Spec.DocType, propSetter.Spec.Property)
+			}
+			logger.Info("Cleaning up SitePropertySetter", "propertySetter", docName, "site", propSetter.Spec.SiteRef.Name)
+			site := &vyogotechv1.FrappeSite{}
+			if err := r.Get(ctx, siteKey, site); err == nil && site.Status.Phase == vyogotechv1.FrappeSitePhaseReady {
+				adminPassword, err := r.getAdminPassword(ctx, site)
+				if err == nil {
+					baseURL := fmt.Sprintf("http://%s.%s.svc.cluster.local", site.Name, site.Namespace)
+					hostHeader := site.Status.ResolvedDomain
+					if site.Spec.BenchRef != nil && site.Spec.BenchRef.Name != "" {
+						baseURL = fmt.Sprintf("http://%s-nginx.%s.svc.cluster.local:8080", site.Spec.BenchRef.Name, site.Namespace)
+					} else if site.Status.ResolvedDomain != "" {
+						baseURL = fmt.Sprintf("http://%s", site.Status.ResolvedDomain)
+					}
+					frappeClient := r.FrappeClient
+					if frappeClient == nil {
+						c := NewFrappeClient(baseURL, "Administrator", adminPassword)
+						c.HostHeader = hostHeader
+						if err := c.Authenticate(ctx); err == nil {
+							frappeClient = c
+						}
+					}
+					if frappeClient != nil {
+						_ = frappeClient.DeleteDoc(ctx, "Property Setter", docName)
+					}
+				}
+			}
+			latest := &vyogotechv1.SitePropertySetter{}
+			if err := r.Get(ctx, req.NamespacedName, latest); err == nil {
+				controllerutil.RemoveFinalizer(latest, sitePropertySetterFinalizer)
+				if err := r.Update(ctx, latest); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer if missing
+	if !controllerutil.ContainsFinalizer(propSetter, sitePropertySetterFinalizer) {
+		patch := client.MergeFrom(propSetter.DeepCopy())
+		controllerutil.AddFinalizer(propSetter, sitePropertySetterFinalizer)
+		if err := r.Patch(ctx, propSetter, patch); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	site := &vyogotechv1.FrappeSite{}
 	if err := r.Get(ctx, siteKey, site); err != nil {
 		propSetter.Status.Phase = "Pending"
 		r.setCondition(propSetter, metav1.Condition{

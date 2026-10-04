@@ -59,6 +59,11 @@ type SiteUserSpec struct {
 	// APIKeySecretRef specifies an optional Secret to store the auto-generated API Key and API Secret.
 	// +optional
 	APIKeySecretRef *corev1.LocalObjectReference `json:"apiKeySecretRef,omitempty"`
+
+	// PasswordSecretRef specifies an optional Secret containing the user's password.
+	// If set, the operator reads the password from the secret and sets it on the user in Frappe.
+	// +optional
+	PasswordSecretRef *corev1.SecretKeySelector `json:"passwordSecretRef,omitempty"`
 }
 
 // SiteUserStatus defines the observed state of SiteUser

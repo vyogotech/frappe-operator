@@ -29,10 +29,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
+
+const siteServerScriptFinalizer = "vyogo.tech/siteserverscript-finalizer"
 
 // SiteServerScriptReconciler reconciles a SiteServerScript object
 type SiteServerScriptReconciler struct {
@@ -44,6 +47,7 @@ type SiteServerScriptReconciler struct {
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=siteserverscripts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=vyogo.tech,resources=siteserverscripts/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=vyogo.tech,resources=siteserverscripts/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch
 
 func (r *SiteServerScriptReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -70,8 +74,57 @@ func (r *SiteServerScriptReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		siteNamespace = serverScript.Namespace
 	}
 
-	site := &vyogotechv1.FrappeSite{}
 	siteKey := types.NamespacedName{Name: serverScript.Spec.SiteRef.Name, Namespace: siteNamespace}
+
+	// Handle Deletion & Finalizer
+	if serverScript.DeletionTimestamp != nil {
+		if controllerutil.ContainsFinalizer(serverScript, siteServerScriptFinalizer) {
+			logger.Info("Cleaning up SiteServerScript", "script", serverScript.Name, "site", serverScript.Spec.SiteRef.Name)
+			site := &vyogotechv1.FrappeSite{}
+			if err := r.Get(ctx, siteKey, site); err == nil && site.Status.Phase == vyogotechv1.FrappeSitePhaseReady {
+				adminPassword, err := r.getAdminPassword(ctx, site)
+				if err == nil {
+					baseURL := fmt.Sprintf("http://%s.%s.svc.cluster.local", site.Name, site.Namespace)
+					hostHeader := site.Status.ResolvedDomain
+					if site.Spec.BenchRef != nil && site.Spec.BenchRef.Name != "" {
+						baseURL = fmt.Sprintf("http://%s-nginx.%s.svc.cluster.local:8080", site.Spec.BenchRef.Name, site.Namespace)
+					} else if site.Status.ResolvedDomain != "" {
+						baseURL = fmt.Sprintf("http://%s", site.Status.ResolvedDomain)
+					}
+					frappeClient := r.FrappeClient
+					if frappeClient == nil {
+						c := NewFrappeClient(baseURL, "Administrator", adminPassword)
+						c.HostHeader = hostHeader
+						if err := c.Authenticate(ctx); err == nil {
+							frappeClient = c
+						}
+					}
+					if frappeClient != nil {
+						_ = frappeClient.DeleteDoc(ctx, "Server Script", serverScript.Name)
+					}
+				}
+			}
+			latest := &vyogotechv1.SiteServerScript{}
+			if err := r.Get(ctx, req.NamespacedName, latest); err == nil {
+				controllerutil.RemoveFinalizer(latest, siteServerScriptFinalizer)
+				if err := r.Update(ctx, latest); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer if missing
+	if !controllerutil.ContainsFinalizer(serverScript, siteServerScriptFinalizer) {
+		patch := client.MergeFrom(serverScript.DeepCopy())
+		controllerutil.AddFinalizer(serverScript, siteServerScriptFinalizer)
+		if err := r.Patch(ctx, serverScript, patch); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	site := &vyogotechv1.FrappeSite{}
 	if err := r.Get(ctx, siteKey, site); err != nil {
 		serverScript.Status.Phase = "Pending"
 		r.setCondition(serverScript, metav1.Condition{
