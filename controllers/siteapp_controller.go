@@ -483,6 +483,7 @@ relocate_fpm_app() {
     echo "$app appeared on the shared volume meanwhile (another install won); using that copy."
     rm -rf "$TMP"
   else
+    rm -rf "$DEST"
     mv "$TMP" "$DEST"
     [ -n "$FPM_PACKAGE" ] && echo "$FPM_PACKAGE" > "$DEST/.fpm_package" 2>/dev/null || true
   fi
@@ -726,7 +727,9 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 
 		// If Job belongs to an older generation of SiteApp and the user requested an upgrade (Generation > ObservedGeneration > 0),
 		// clean up the previous completed Job so a new Job runs for the updated spec.
-		if siteApp.Status.ObservedGeneration > 0 && siteApp.Status.ObservedGeneration < siteApp.Generation && job.Status.Succeeded > 0 {
+		jobGen := job.Labels["vyogo.tech/generation"]
+		currentGenStr := fmt.Sprintf("%d", siteApp.Generation)
+		if siteApp.Status.ObservedGeneration > 0 && siteApp.Status.ObservedGeneration < siteApp.Generation && job.Status.Succeeded > 0 && jobGen != "" && jobGen != currentGenStr {
 			log.FromContext(ctx).Info("Cleaning up completed Job from older SiteApp generation for upgrade", "job", job.Name, "observedGen", siteApp.Status.ObservedGeneration, "currentGen", siteApp.Generation)
 			_ = r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground))
 			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
@@ -903,6 +906,7 @@ func (r *SiteAppReconciler) buildAppJob(ctx context.Context, siteApp *vyogotechv
 			Labels: map[string]string{
 				"app.kubernetes.io/managed-by": "frappe-operator",
 				"vyogo.tech/siteapp":           siteApp.Name,
+				"vyogo.tech/generation":        fmt.Sprintf("%d", siteApp.Generation),
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -913,6 +917,7 @@ func (r *SiteAppReconciler) buildAppJob(ctx context.Context, siteApp *vyogotechv
 					Labels: map[string]string{
 						"app.kubernetes.io/managed-by": "frappe-operator",
 						"vyogo.tech/siteapp":           siteApp.Name,
+						"vyogo.tech/generation":        fmt.Sprintf("%d", siteApp.Generation),
 					},
 				},
 				Spec: corev1.PodSpec{
