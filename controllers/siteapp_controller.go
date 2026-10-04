@@ -476,8 +476,7 @@ relocate_fpm_app() {
   # ever sees a half-copied app and a concurrent first install of the same app
   # on another site simply finds the finished copy. __pycache__ is left out:
   # it is what a live import writes mid-copy, and pods regenerate it.
-  TMP="$DEST.tmp.$$"
-  rm -rf "$TMP"; mkdir -p "$TMP"
+  TMP="$(mktemp -d "/home/frappe/frappe-bench/sites/apps/$app.tmp.XXXXXX")"
   tar --exclude='__pycache__' -C "$SRC" -cf - . | tar -C "$TMP" -xf -
   if [ -d "$DEST/$app" ] && [ -n "$CURRENT_PKG" ] && [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
     echo "$app appeared on the shared volume meanwhile (another install won); using that copy."
@@ -725,12 +724,12 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 			_ = r.updateStatus(ctx, siteApp)
 		}
 
-		// If Job belongs to an older generation of SiteApp and the user requested an upgrade (Generation > ObservedGeneration > 0),
-		// clean up the previous completed Job so a new Job runs for the updated spec.
+		// If Job belongs to an older generation of SiteApp and the user requested an upgrade/rollback/retry,
+		// clean up the previous Job (whether Succeeded or Failed) so a new Job runs for the updated spec.
 		jobGen := job.Labels["vyogo.tech/generation"]
 		currentGenStr := fmt.Sprintf("%d", siteApp.Generation)
-		if siteApp.Status.ObservedGeneration > 0 && siteApp.Status.ObservedGeneration < siteApp.Generation && job.Status.Succeeded > 0 && jobGen != "" && jobGen != currentGenStr {
-			log.FromContext(ctx).Info("Cleaning up completed Job from older SiteApp generation for upgrade", "job", job.Name, "observedGen", siteApp.Status.ObservedGeneration, "currentGen", siteApp.Generation)
+		if (job.Status.Succeeded > 0 || job.Status.Failed > 0) && (jobGen == "" || jobGen != currentGenStr) {
+			log.FromContext(ctx).Info("Cleaning up Job from older SiteApp generation", "job", job.Name, "jobGen", jobGen, "currentGen", siteApp.Generation)
 			_ = r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground))
 			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 		}
