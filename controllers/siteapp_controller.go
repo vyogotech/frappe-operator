@@ -604,6 +604,7 @@ if [ -n "$FPM_PACKAGE" ]; then
       exit 0
     fi
   fi
+fi
   echo "Installing $FPM_PACKAGE via FPM (repo: ${FPM_REPO:-none})..."
   # Bench images may not ship the fpm CLI yet; fetch the pinned release if absent.
   if ! command -v fpm >/dev/null 2>&1; then

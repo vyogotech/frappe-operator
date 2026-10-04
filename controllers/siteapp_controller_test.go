@@ -20,6 +20,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -714,6 +715,15 @@ func TestSiteAppReconciler_Reconcile_GenerationUpgradeCleansOldJob(t *testing.T)
 	checkJob := &batchv1.Job{}
 	if err := client.Get(ctx, types.NamespacedName{Name: "app1-app-install", Namespace: "default"}, checkJob); !apierrors.IsNotFound(err) {
 		t.Errorf("expected old job to be deleted, got err: %v", err)
+	}
+}
+
+func TestSiteAppInstallScript_BashSyntax(t *testing.T) {
+	cmd := exec.Command("bash", "-n")
+	cmd.Stdin = strings.NewReader(siteAppInstallScript)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("siteAppInstallScript has bash syntax errors: %v\nOutput:\n%s", err, string(out))
 	}
 }
 
