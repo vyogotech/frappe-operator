@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-10-05
+
+### Added
+- **Generation-based FPM App Upgrades**: Introduces generation-based upgrade triggering for `SiteApp` CRDs, allowing version upgrades and rollbacks without recreating resources.
+- **Preflight Backups with App & Transition Metadata**: Automatically snapshots the database prior to app upgrades/rollbacks and records app, version transition, and installed apps snapshot.
+- **SiteUser Password Management**: Support for setting and managing passwords with Kubernetes secret references for `SiteUser` resources.
+
+### Fixed
+- **SiteConfig Click Flag Safety**: Terminate option flags with `--` in `bench set-config` to prevent dash-prefixed values (e.g. PEM private keys) from being interpreted as CLI flags.
+- **SiteApp Idempotent Installation**: Added `--force` during site app installation so rerun idempotency is preserved when apps already exist in `apps.txt`.
+- **In-Cluster FPM CLI Bootstrap**: Fetch `fpm` CLI from local in-cluster registry `/bin` if available.
+- **App Relocation & Cleanup**: Atomic `mktemp` app relocation and cleanup of obsolete older upgrade/install jobs.
+
 ## [5.3.0] - 2026-10-02
 
 ### Added
