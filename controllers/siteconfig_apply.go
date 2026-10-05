@@ -98,7 +98,7 @@ func buildConfigPlan(sc *vyogotechv1.SiteConfig, domain string) (cmds []string, 
 				LocalObjectReference: entry.SecretKeyRef.LocalObjectReference, Key: entry.SecretKeyRef.Key,
 			}},
 		})
-		cmds = append(cmds, base+" "+shellQuote(entry.Key)+` "$`+envName+`"`)
+		cmds = append(cmds, base+" -- "+shellQuote(entry.Key)+` "$`+envName+`"`)
 		appliedKeys = append(appliedKeys, entry.Key)
 	}
 
@@ -175,7 +175,146 @@ func buildConfigPlan(sc *vyogotechv1.SiteConfig, domain string) (cmds []string, 
 		appliedKeys = append(appliedKeys, "cloud_storage_settings")
 	}
 
+	// Diff previously applied keys vs new plan: unset any keys removed from the CR spec
+	var removedKeys []string
+	appliedMap := make(map[string]bool, len(appliedKeys))
+	for _, k := range appliedKeys {
+		appliedMap[k] = true
+	}
+	for _, k := range sc.Status.AppliedKeys {
+		if !appliedMap[k] && k != "" {
+			removedKeys = append(removedKeys, k)
+		}
+	}
+	if len(removedKeys) > 0 {
+		sort.Strings(removedKeys)
+		env = append(env,
+			corev1.EnvVar{Name: "CFG_UNSET_DOMAIN", Value: domain},
+			corev1.EnvVar{Name: "CFG_UNSET_KEYS", Value: strings.Join(removedKeys, ",")},
+		)
+		cmds = append(cmds, `python3 -c 'import os,json;`+
+			`d=os.environ["CFG_UNSET_DOMAIN"];`+
+			`keys=[k.strip() for k in os.environ.get("CFG_UNSET_KEYS","").split(",") if k.strip()];`+
+			`p=f"/home/frappe/frappe-bench/sites/{d}/site_config.json";`+
+			`ch=False;`+
+			`if os.path.exists(p):`+
+			`    with open(p,"r") as f: c=json.load(f);`+
+			`    for k in keys:`+
+			`        if k in c:`+
+			`            del c[k]; ch=True;`+
+			`    if ch:`+
+			`        with open(p,"w") as f: json.dump(c,f,indent=1)'`)
+	}
+
 	return cmds, env, appliedKeys
+}
+
+// collectAllKeys returns all keys that this SiteConfig has ever set or specified.
+func collectAllKeys(sc *vyogotechv1.SiteConfig) []string {
+	keySet := make(map[string]bool)
+	for _, k := range sc.Status.AppliedKeys {
+		if k != "" {
+			keySet[k] = true
+		}
+	}
+	for k := range sc.Spec.CustomConfig {
+		if k != "" {
+			keySet[k] = true
+		}
+	}
+	if sc.Spec.MaintenanceMode != nil {
+		keySet["maintenance_mode"] = true
+	}
+	if sc.Spec.MaxFileSize != nil {
+		keySet["max_file_size"] = true
+	}
+	if sc.Spec.EncryptionKeySecretRef != nil && sc.Spec.EncryptionKeySecretRef.Name != "" {
+		keySet["encryption_key"] = true
+	}
+	for _, entry := range sc.Spec.SecretConfig {
+		if entry.Key != "" {
+			keySet[entry.Key] = true
+		}
+	}
+	if sc.Spec.ObjectStorage != nil {
+		keySet["cloud_storage_settings"] = true
+	}
+	res := make([]string, 0, len(keySet))
+	for k := range keySet {
+		res = append(res, k)
+	}
+	sort.Strings(res)
+	return res
+}
+
+// buildCleanupJob assembles a Job to remove applied keys from site_config.json on deletion.
+func buildCleanupJob(sc *vyogotechv1.SiteConfig, bench *vyogotechv1.FrappeBench, domain, benchImage string, keysToRemove []string) *batchv1.Job {
+	if len(keysToRemove) == 0 {
+		return nil
+	}
+
+	sort.Strings(keysToRemove)
+	env := []corev1.EnvVar{
+		{Name: "CFG_CLEANUP_DOMAIN", Value: domain},
+		{Name: "CFG_CLEANUP_KEYS", Value: strings.Join(keysToRemove, ",")},
+	}
+
+	pyScript := `import os,json;` +
+		`d=os.environ["CFG_CLEANUP_DOMAIN"];` +
+		`keys=[k.strip() for k in os.environ.get("CFG_CLEANUP_KEYS","").split(",") if k.strip()];` +
+		`p=f"/home/frappe/frappe-bench/sites/{d}/site_config.json";` +
+		`ch=False;` +
+		`if os.path.exists(p):` +
+		`    with open(p,"r") as f: c=json.load(f);` +
+		`    for k in keys:` +
+		`        if k in c:` +
+		`            del c[k]; ch=True;` +
+		`            print(f"Removed key {k} from site_config.json");` +
+		`    if ch:` +
+		`        with open(p,"w") as f: json.dump(c,f,indent=1);` +
+		`        print("Saved updated site_config.json")`
+
+	script := fmt.Sprintf("set -e\ncd /home/frappe/frappe-bench\npython3 -c '%s'\nbench --site %s clear-cache || true\n", pyScript, shellQuote(domain))
+
+	jobName := jobNameFor(sc.Name, "cleanup", fmt.Sprintf("%d", sc.Generation))
+	pvcName := fmt.Sprintf("%s-sites", bench.Name)
+	backoff := int32(2)
+
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: sc.Namespace,
+			Labels:    map[string]string{"app": "frappe", "siteconfig": sc.Name, "operation": "cleanup"},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: &backoff,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "frappe", "siteconfig": sc.Name, "operation": "cleanup"}},
+				Spec: corev1.PodSpec{
+					RestartPolicy:    corev1.RestartPolicyOnFailure,
+					ImagePullSecrets: benchImagePullSecrets(bench),
+					Containers: []corev1.Container{{
+						Name:            "config-cleaner",
+						Image:           benchImage,
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						Command:         []string{"bash", "-c", script},
+						Env:             append(benchJobEnv(), env...),
+						Resources:       vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindMaintenance),
+						VolumeMounts: []corev1.VolumeMount{
+							{Name: "sites", MountPath: "/home/frappe/frappe-bench/sites", SubPath: "frappe-sites"},
+							{Name: "sites", MountPath: "/home/frappe/frappe-bench/sites/assets", SubPath: "frappe-sites/assets"},
+						},
+					}},
+					Volumes: []corev1.Volume{{
+						Name: "sites",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
+						},
+					}},
+				},
+			},
+		},
+	}
 }
 
 // buildConfigJob assembles the Job that runs the config plan against the site's bench

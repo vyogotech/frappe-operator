@@ -190,6 +190,11 @@ func (c *FrappeClient) EnsureRole(ctx context.Context, roleName string, deskAcce
 
 // EnsureUser creates or updates a Frappe User and assigns roles
 func (c *FrappeClient) EnsureUser(ctx context.Context, email, firstName, lastName, userType string, roles []string, sendPasswordReset bool) error {
+	return c.EnsureUserWithPassword(ctx, email, firstName, lastName, userType, roles, sendPasswordReset, "")
+}
+
+// EnsureUserWithPassword creates or updates a Frappe User, assigns roles, and sets password if provided.
+func (c *FrappeClient) EnsureUserWithPassword(ctx context.Context, email, firstName, lastName, userType string, roles []string, sendPasswordReset bool, password string) error {
 	if c.SID == "" {
 		if err := c.Authenticate(ctx); err != nil {
 			return err
@@ -232,6 +237,9 @@ func (c *FrappeClient) EnsureUser(ctx context.Context, email, firstName, lastNam
 		"user_type":          userType,
 		"roles":              roleObjects,
 		"send_welcome_email": sendWelcomeEmail,
+	}
+	if password != "" {
+		payload["new_password"] = password
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -283,6 +291,78 @@ func (c *FrappeClient) EnsureUser(ctx context.Context, email, firstName, lastNam
 
 	body, _ := io.ReadAll(resp.Body)
 	return fmt.Errorf("failed to check user %s: status %d: %s", email, resp.StatusCode, string(body))
+}
+
+// DeleteDoc deletes a document by DocType and name from Frappe.
+// Returns nil if the document is deleted or already does not exist (404).
+func (c *FrappeClient) DeleteDoc(ctx context.Context, docType, name string) error {
+	if c.SID == "" {
+		if err := c.Authenticate(ctx); err != nil {
+			return err
+		}
+	}
+
+	docURL := fmt.Sprintf("%s/api/resource/%s/%s", c.BaseURL, url.PathEscape(docType), url.PathEscape(name))
+	req, err := c.newRequest(ctx, http.MethodDelete, docURL, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	return fmt.Errorf("failed to delete %s %s: status %d: %s", docType, name, resp.StatusCode, string(body))
+}
+
+// DisableUser sets enabled=0 on a User in Frappe.
+func (c *FrappeClient) DisableUser(ctx context.Context, email string) error {
+	if c.SID == "" {
+		if err := c.Authenticate(ctx); err != nil {
+			return err
+		}
+	}
+
+	userURL := fmt.Sprintf("%s/api/resource/User/%s", c.BaseURL, url.PathEscape(email))
+	payload := map[string]interface{}{
+		"enabled": 0,
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	req, err := c.newRequest(ctx, http.MethodPut, userURL, bytes.NewReader(payloadBytes))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	body, _ := io.ReadAll(resp.Body)
+	return fmt.Errorf("failed to disable user %s: status %d: %s", email, resp.StatusCode, string(body))
+}
+
+// DeleteUser attempts to delete the User document. If deletion is rejected (e.g. user is linked to records), it disables the user.
+func (c *FrappeClient) DeleteUser(ctx context.Context, email string) error {
+	err := c.DeleteDoc(ctx, "User", email)
+	if err == nil {
+		return nil
+	}
+	// Fallback to disabling user so access is revoked even if foreign keys prevent deletion
+	return c.DisableUser(ctx, email)
 }
 
 // GenerateAPIKeys generates an API key and secret for a user

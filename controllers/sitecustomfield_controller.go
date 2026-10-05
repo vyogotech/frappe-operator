@@ -29,10 +29,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
+
+const siteCustomFieldFinalizer = "vyogo.tech/sitecustomfield-finalizer"
 
 // SiteCustomFieldReconciler reconciles a SiteCustomField object
 type SiteCustomFieldReconciler struct {
@@ -44,6 +47,7 @@ type SiteCustomFieldReconciler struct {
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitecustomfields,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitecustomfields/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=vyogo.tech,resources=sitecustomfields/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch
 
 func (r *SiteCustomFieldReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -70,8 +74,58 @@ func (r *SiteCustomFieldReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		siteNamespace = customField.Namespace
 	}
 
-	site := &vyogotechv1.FrappeSite{}
 	siteKey := types.NamespacedName{Name: customField.Spec.SiteRef.Name, Namespace: siteNamespace}
+
+	// Handle Deletion & Finalizer
+	if customField.DeletionTimestamp != nil {
+		if controllerutil.ContainsFinalizer(customField, siteCustomFieldFinalizer) {
+			docName := fmt.Sprintf("%s-%s", customField.Spec.DT, customField.Spec.FieldName)
+			logger.Info("Cleaning up SiteCustomField", "field", docName, "site", customField.Spec.SiteRef.Name)
+			site := &vyogotechv1.FrappeSite{}
+			if err := r.Get(ctx, siteKey, site); err == nil && site.Status.Phase == vyogotechv1.FrappeSitePhaseReady {
+				adminPassword, err := r.getAdminPassword(ctx, site)
+				if err == nil {
+					baseURL := fmt.Sprintf("http://%s.%s.svc.cluster.local", site.Name, site.Namespace)
+					hostHeader := site.Status.ResolvedDomain
+					if site.Spec.BenchRef != nil && site.Spec.BenchRef.Name != "" {
+						baseURL = fmt.Sprintf("http://%s-nginx.%s.svc.cluster.local:8080", site.Spec.BenchRef.Name, site.Namespace)
+					} else if site.Status.ResolvedDomain != "" {
+						baseURL = fmt.Sprintf("http://%s", site.Status.ResolvedDomain)
+					}
+					frappeClient := r.FrappeClient
+					if frappeClient == nil {
+						c := NewFrappeClient(baseURL, "Administrator", adminPassword)
+						c.HostHeader = hostHeader
+						if err := c.Authenticate(ctx); err == nil {
+							frappeClient = c
+						}
+					}
+					if frappeClient != nil {
+						_ = frappeClient.DeleteDoc(ctx, "Custom Field", docName)
+					}
+				}
+			}
+			latest := &vyogotechv1.SiteCustomField{}
+			if err := r.Get(ctx, req.NamespacedName, latest); err == nil {
+				controllerutil.RemoveFinalizer(latest, siteCustomFieldFinalizer)
+				if err := r.Update(ctx, latest); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer if missing
+	if !controllerutil.ContainsFinalizer(customField, siteCustomFieldFinalizer) {
+		patch := client.MergeFrom(customField.DeepCopy())
+		controllerutil.AddFinalizer(customField, siteCustomFieldFinalizer)
+		if err := r.Patch(ctx, customField, patch); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	site := &vyogotechv1.FrappeSite{}
 	if err := r.Get(ctx, siteKey, site); err != nil {
 		customField.Status.Phase = "Pending"
 		r.setCondition(customField, metav1.Condition{

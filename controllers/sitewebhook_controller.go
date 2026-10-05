@@ -29,10 +29,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
+
+const siteWebhookFinalizer = "vyogo.tech/sitewebhook-finalizer"
 
 // SiteWebhookReconciler reconciles a SiteWebhook object
 type SiteWebhookReconciler struct {
@@ -44,6 +47,7 @@ type SiteWebhookReconciler struct {
 
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitewebhooks,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=vyogo.tech,resources=sitewebhooks/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=vyogo.tech,resources=sitewebhooks/finalizers,verbs=update
 //+kubebuilder:rbac:groups=vyogo.tech,resources=frappesites,verbs=get;list;watch
 
 func (r *SiteWebhookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -73,8 +77,57 @@ func (r *SiteWebhookReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		siteNamespace = webhook.Namespace
 	}
 
-	site := &vyogotechv1.FrappeSite{}
 	siteKey := types.NamespacedName{Name: webhook.Spec.SiteRef.Name, Namespace: siteNamespace}
+
+	// Handle Deletion & Finalizer
+	if webhook.DeletionTimestamp != nil {
+		if controllerutil.ContainsFinalizer(webhook, siteWebhookFinalizer) {
+			logger.Info("Cleaning up SiteWebhook", "webhook", webhook.Name, "site", webhook.Spec.SiteRef.Name)
+			site := &vyogotechv1.FrappeSite{}
+			if err := r.Get(ctx, siteKey, site); err == nil && site.Status.Phase == vyogotechv1.FrappeSitePhaseReady {
+				adminPassword, err := r.getAdminPassword(ctx, site)
+				if err == nil {
+					baseURL := fmt.Sprintf("http://%s.%s.svc.cluster.local", site.Name, site.Namespace)
+					hostHeader := site.Status.ResolvedDomain
+					if site.Spec.BenchRef != nil && site.Spec.BenchRef.Name != "" {
+						baseURL = fmt.Sprintf("http://%s-nginx.%s.svc.cluster.local:8080", site.Spec.BenchRef.Name, site.Namespace)
+					} else if site.Status.ResolvedDomain != "" {
+						baseURL = fmt.Sprintf("http://%s", site.Status.ResolvedDomain)
+					}
+					frappeClient := r.FrappeClient
+					if frappeClient == nil {
+						c := NewFrappeClient(baseURL, "Administrator", adminPassword)
+						c.HostHeader = hostHeader
+						if err := c.Authenticate(ctx); err == nil {
+							frappeClient = c
+						}
+					}
+					if frappeClient != nil {
+						_ = frappeClient.DeleteDoc(ctx, "Webhook", webhook.Name)
+					}
+				}
+			}
+			latest := &vyogotechv1.SiteWebhook{}
+			if err := r.Get(ctx, req.NamespacedName, latest); err == nil {
+				controllerutil.RemoveFinalizer(latest, siteWebhookFinalizer)
+				if err := r.Update(ctx, latest); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer if missing
+	if !controllerutil.ContainsFinalizer(webhook, siteWebhookFinalizer) {
+		patch := client.MergeFrom(webhook.DeepCopy())
+		controllerutil.AddFinalizer(webhook, siteWebhookFinalizer)
+		if err := r.Patch(ctx, webhook, patch); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	site := &vyogotechv1.FrappeSite{}
 	if err := r.Get(ctx, siteKey, site); err != nil {
 		webhook.Status.Phase = "Pending"
 		r.setCondition(webhook, metav1.Condition{

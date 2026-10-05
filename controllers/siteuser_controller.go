@@ -37,6 +37,8 @@ import (
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
+const siteUserFinalizer = "vyogo.tech/siteuser-finalizer"
+
 // SiteUserReconciler reconciles a SiteUser object
 type SiteUserReconciler struct {
 	client.Client
@@ -71,9 +73,58 @@ func (r *SiteUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		siteNamespace = siteUser.Namespace
 	}
 
+	siteKey := types.NamespacedName{Name: siteUser.Spec.SiteRef.Name, Namespace: siteNamespace}
+
+	// Handle Deletion & Finalizer
+	if siteUser.DeletionTimestamp != nil {
+		if controllerutil.ContainsFinalizer(siteUser, siteUserFinalizer) {
+			logger.Info("Cleaning up SiteUser", "user", siteUser.Spec.Email, "site", siteUser.Spec.SiteRef.Name)
+			site := &vyogotechv1.FrappeSite{}
+			if err := r.Get(ctx, siteKey, site); err == nil && site.Status.Phase == vyogotechv1.FrappeSitePhaseReady {
+				adminPassword, err := r.getAdminPassword(ctx, site)
+				if err == nil {
+					baseURL := fmt.Sprintf("http://%s.%s.svc.cluster.local", site.Name, site.Namespace)
+					hostHeader := site.Status.ResolvedDomain
+					if site.Spec.BenchRef != nil && site.Spec.BenchRef.Name != "" {
+						baseURL = fmt.Sprintf("http://%s-nginx.%s.svc.cluster.local:8080", site.Spec.BenchRef.Name, site.Namespace)
+					} else if site.Status.ResolvedDomain != "" {
+						baseURL = fmt.Sprintf("http://%s", site.Status.ResolvedDomain)
+					}
+					frappeClient := r.FrappeClient
+					if frappeClient == nil {
+						c := NewFrappeClient(baseURL, "Administrator", adminPassword)
+						c.HostHeader = hostHeader
+						if err := c.Authenticate(ctx); err == nil {
+							frappeClient = c
+						}
+					}
+					if frappeClient != nil {
+						_ = frappeClient.DeleteUser(ctx, siteUser.Spec.Email)
+					}
+				}
+			}
+			latest := &vyogotechv1.SiteUser{}
+			if err := r.Get(ctx, req.NamespacedName, latest); err == nil {
+				controllerutil.RemoveFinalizer(latest, siteUserFinalizer)
+				if err := r.Update(ctx, latest); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer if missing
+	if !controllerutil.ContainsFinalizer(siteUser, siteUserFinalizer) {
+		patch := client.MergeFrom(siteUser.DeepCopy())
+		controllerutil.AddFinalizer(siteUser, siteUserFinalizer)
+		if err := r.Patch(ctx, siteUser, patch); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Fetch referenced FrappeSite
 	site := &vyogotechv1.FrappeSite{}
-	siteKey := types.NamespacedName{Name: siteUser.Spec.SiteRef.Name, Namespace: siteNamespace}
 	if err := r.Get(ctx, siteKey, site); err != nil {
 		siteUser.Status.Phase = "Pending"
 		r.setCondition(siteUser, metav1.Condition{
@@ -139,8 +190,27 @@ func (r *SiteUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
+	// Read optional user password from PasswordSecretRef
+	var userPassword string
+	if siteUser.Spec.PasswordSecretRef != nil && siteUser.Spec.PasswordSecretRef.Name != "" {
+		secKey := siteUser.Spec.PasswordSecretRef.Key
+		if secKey == "" {
+			secKey = "password"
+		}
+		sec := &corev1.Secret{}
+		secName := types.NamespacedName{Name: siteUser.Spec.PasswordSecretRef.Name, Namespace: siteUser.Namespace}
+		if err := r.Get(ctx, secName, sec); err != nil {
+			return r.failReconciliation(ctx, siteUser, fmt.Sprintf("Failed to read password secret %s: %v", siteUser.Spec.PasswordSecretRef.Name, err), "PasswordSecretNotFound")
+		}
+		pwdBytes, ok := sec.Data[secKey]
+		if !ok {
+			return r.failReconciliation(ctx, siteUser, fmt.Sprintf("Key %s not found in password secret %s", secKey, siteUser.Spec.PasswordSecretRef.Name), "PasswordSecretKeyNotFound")
+		}
+		userPassword = string(pwdBytes)
+	}
+
 	// Ensure User exists and roles are assigned
-	err = frappeClient.EnsureUser(ctx, siteUser.Spec.Email, siteUser.Spec.FirstName, siteUser.Spec.LastName, siteUser.Spec.UserType, siteUser.Spec.Roles, siteUser.Spec.SendPasswordReset)
+	err = frappeClient.EnsureUserWithPassword(ctx, siteUser.Spec.Email, siteUser.Spec.FirstName, siteUser.Spec.LastName, siteUser.Spec.UserType, siteUser.Spec.Roles, siteUser.Spec.SendPasswordReset, userPassword)
 	if err != nil {
 		return r.failReconciliation(ctx, siteUser, fmt.Sprintf("Failed to sync user with Frappe: %v", err), "UserSyncFailed")
 	}

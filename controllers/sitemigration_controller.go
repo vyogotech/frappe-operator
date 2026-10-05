@@ -189,7 +189,13 @@ func (r *SiteMigrationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// preflight backup is done, so a corrupt migration can always be reverted.
 		if siteMigration.Spec.BackupBeforeMigrate {
 			backupName := fmt.Sprintf("%s-pre-g%d", siteMigration.Name, siteMigration.Generation)
-			done, berr := ensurePreflightBackup(ctx, r.Client, siteMigration.Namespace, site.Spec.SiteName, backupName)
+			backupLabels := map[string]string{
+				"vyogo.tech/backup-type": "preflight-migration",
+			}
+			backupAnnotations := map[string]string{
+				"vyogo.tech/display-name": fmt.Sprintf("Pre-migration snapshot for %s", siteMigration.Name),
+			}
+			done, berr := ensurePreflightBackup(ctx, r.Client, siteMigration.Namespace, site.Spec.SiteName, backupName, backupLabels, backupAnnotations)
 			if berr != nil {
 				return r.failReconciliation(ctx, siteMigration, fmt.Sprintf("Pre-migration backup failed: %v", berr), "PreBackupFailed")
 			}

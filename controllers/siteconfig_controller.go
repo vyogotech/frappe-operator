@@ -37,6 +37,8 @@ import (
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 )
 
+const siteConfigFinalizer = "vyogo.tech/siteconfig-finalizer"
+
 // SiteConfigReconciler reconciles a SiteConfig object
 type SiteConfigReconciler struct {
 	client.Client
@@ -53,7 +55,7 @@ type SiteConfigReconciler struct {
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SiteConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
 	siteConfig := &vyogotechv1.SiteConfig{}
 	if err := r.Get(ctx, req.NamespacedName, siteConfig); err != nil {
@@ -69,9 +71,98 @@ func (r *SiteConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		siteNamespace = siteConfig.Namespace
 	}
 
+	siteKey := types.NamespacedName{Name: siteConfig.Spec.SiteRef.Name, Namespace: siteNamespace}
+
+	// Handle Deletion & Finalizer
+	if siteConfig.DeletionTimestamp != nil {
+		if controllerutil.ContainsFinalizer(siteConfig, siteConfigFinalizer) {
+			logger.Info("Cleaning up SiteConfig", "name", siteConfig.Name, "site", siteConfig.Spec.SiteRef.Name)
+			site := &vyogotechv1.FrappeSite{}
+			if err := r.Get(ctx, siteKey, site); apierrors.IsNotFound(err) {
+				return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
+			} else if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			keysToRemove := collectAllKeys(siteConfig)
+			if len(keysToRemove) == 0 {
+				return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
+			}
+
+			if site.Spec.BenchRef == nil || site.Spec.BenchRef.Name == "" {
+				return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
+			}
+			bench := &vyogotechv1.FrappeBench{}
+			if err := r.Get(ctx, types.NamespacedName{Name: site.Spec.BenchRef.Name, Namespace: site.Namespace}, bench); err != nil {
+				if apierrors.IsNotFound(err) {
+					return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
+				}
+				return ctrl.Result{}, err
+			}
+
+			benchImage := "docker.io/frappe/erpnext:latest"
+			if bench.Spec.ImageConfig != nil && bench.Spec.ImageConfig.Repository != "" {
+				benchImage = bench.Spec.ImageConfig.Repository
+				if bench.Spec.ImageConfig.Tag != "" {
+					benchImage = fmt.Sprintf("%s:%s", benchImage, bench.Spec.ImageConfig.Tag)
+				}
+			}
+			domain := site.Status.ResolvedDomain
+			if domain == "" {
+				domain = site.Spec.SiteName
+			}
+
+			cleanupJob := buildCleanupJob(siteConfig, bench, domain, benchImage, keysToRemove)
+			if cleanupJob == nil {
+				return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
+			}
+			cleanupJob.Spec.Template.Spec.SecurityContext = PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, bench.Namespace, bench.Spec.Security)
+			for i := range cleanupJob.Spec.Template.Spec.Containers {
+				cleanupJob.Spec.Template.Spec.Containers[i].SecurityContext = ContainerSecurityContextForBench(r.IsOpenShift, bench.Spec.Security)
+			}
+
+			existingJob := &batchv1.Job{}
+			err := r.Get(ctx, types.NamespacedName{Name: cleanupJob.Name, Namespace: cleanupJob.Namespace}, existingJob)
+			if apierrors.IsNotFound(err) {
+				if err := controllerutil.SetControllerReference(siteConfig, cleanupJob, r.Scheme); err != nil {
+					return ctrl.Result{}, err
+				}
+				if err := r.Create(ctx, cleanupJob); err != nil && !apierrors.IsAlreadyExists(err) {
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			} else if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			if existingJob.Status.Succeeded > 0 {
+				logger.Info("SiteConfig cleanup Job succeeded, removing finalizer", "name", siteConfig.Name)
+				return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
+			}
+
+			for _, c := range existingJob.Status.Conditions {
+				if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
+					logger.Error(fmt.Errorf("cleanup job failed"), "SiteConfig cleanup Job failed; removing finalizer to prevent stuck resource", "job", existingJob.Name)
+					return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
+				}
+			}
+
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer if missing
+	if !controllerutil.ContainsFinalizer(siteConfig, siteConfigFinalizer) {
+		patch := client.MergeFrom(siteConfig.DeepCopy())
+		controllerutil.AddFinalizer(siteConfig, siteConfigFinalizer)
+		if err := r.Patch(ctx, siteConfig, patch); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Fetch referenced FrappeSite
 	site := &vyogotechv1.FrappeSite{}
-	siteKey := types.NamespacedName{Name: siteConfig.Spec.SiteRef.Name, Namespace: siteNamespace}
 	if err := r.Get(ctx, siteKey, site); err != nil {
 		siteConfig.Status.Phase = "Pending"
 		r.setCondition(siteConfig, metav1.Condition{
@@ -209,6 +300,18 @@ func (r *SiteConfigReconciler) updateStatus(ctx context.Context, siteConfig *vyo
 	}
 	latest.Status = siteConfig.Status
 	return r.Status().Update(ctx, latest)
+}
+
+func (r *SiteConfigReconciler) removeSiteConfigFinalizer(ctx context.Context, sc *vyogotechv1.SiteConfig) error {
+	latest := &vyogotechv1.SiteConfig{}
+	if err := r.Get(ctx, types.NamespacedName{Name: sc.Name, Namespace: sc.Namespace}, latest); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	if controllerutil.ContainsFinalizer(latest, siteConfigFinalizer) {
+		controllerutil.RemoveFinalizer(latest, siteConfigFinalizer)
+		return r.Update(ctx, latest)
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

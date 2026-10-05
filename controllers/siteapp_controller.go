@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -402,25 +403,31 @@ PY
 # to do against Spec.Apps, moved to where the database is reachable and the truth
 # actually lives.
 if bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}' | grep -qx "$APP_NAME"; then
-  # Already on the site. Still re-run when any app the site lists is missing
-  # from the bench (neither the image's apps/ nor the sites PVC has it): a
-  # dependency that fpm installed but was never relocated (lms -> payments)
-  # leaves every serving pod 500ing with "No module named <dep>", and a re-run
-  # is what restores it.
-  MISSING=""
-  for a in $(bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}'); do
-    [ -d "/home/frappe/frappe-bench/apps/$a" ] || [ -d "/home/frappe/frappe-bench/sites/apps/$a" ] || MISSING="$MISSING $a"
-    # An assets link left pointing into a finished job's scratch dir means
-    # every page of that app 404s its CSS/JS; a re-run relinks it.
-    if [ -L "/home/frappe/frappe-bench/sites/assets/$a" ] && [ ! -e "/home/frappe/frappe-bench/sites/assets/$a" ]; then
-      MISSING="$MISSING $a(assets)"
+  CURRENT_PKG=""
+  [ -f "/home/frappe/frappe-bench/sites/apps/$APP_NAME/.fpm_package" ] && CURRENT_PKG=$(cat "/home/frappe/frappe-bench/sites/apps/$APP_NAME/.fpm_package" 2>/dev/null || true)
+  if [ -z "$FPM_PACKAGE" ] || [ -z "$CURRENT_PKG" ] || [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
+    # Already on the site. Still re-run when any app the site lists is missing
+    # from the bench (neither the image's apps/ nor the sites PVC has it): a
+    # dependency that fpm installed but was never relocated (lms -> payments)
+    # leaves every serving pod 500ing with "No module named <dep>", and a re-run
+    # is what restores it.
+    MISSING=""
+    for a in $(bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}'); do
+      [ -d "/home/frappe/frappe-bench/apps/$a" ] || [ -d "/home/frappe/frappe-bench/sites/apps/$a" ] || MISSING="$MISSING $a"
+      # An assets link left pointing into a finished job's scratch dir means
+      # every page of that app 404s its CSS/JS; a re-run relinks it.
+      if [ -L "/home/frappe/frappe-bench/sites/assets/$a" ] && [ ! -e "/home/frappe/frappe-bench/sites/assets/$a" ]; then
+        MISSING="$MISSING $a(assets)"
+      fi
+    done
+    if [ -z "$MISSING" ]; then
+      echo "App $APP_NAME already installed on $SITE_NAME (verified via list-apps); nothing to do."
+      exit 0
     fi
-  done
-  if [ -z "$MISSING" ]; then
-    echo "App $APP_NAME already installed on $SITE_NAME (verified via list-apps); nothing to do."
-    exit 0
+    echo "App $APP_NAME is on $SITE_NAME but these apps are missing from the bench:$MISSING - re-running the install to restore them."
+  else
+    echo "App $APP_NAME installed package '$CURRENT_PKG' differs from requested '$FPM_PACKAGE'; proceeding with upgrade."
   fi
-  echo "App $APP_NAME is on $SITE_NAME but these apps are missing from the bench:$MISSING - re-running the install to restore them."
 fi
 
 # FPM install path (preferred when the app is a published package). Installs a
@@ -458,7 +465,9 @@ relocate_fpm_app() {
   # and replacing it under them (rm -rf + cp) raced with their imports and
   # left dangling asset links. Upgrading a shared app is a bench-level
   # operation, not a per-site install.
-  if [ -d "$DEST/$app" ]; then
+  CURRENT_PKG=""
+  [ -f "$DEST/.fpm_package" ] && CURRENT_PKG=$(cat "$DEST/.fpm_package" 2>/dev/null || true)
+  if [ -d "$DEST/$app" ] && [ -n "$CURRENT_PKG" ] && [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
     echo "$app is already on the shared volume; keeping that copy (site-level install only)."
     link_durable_app "$app"
     return 0
@@ -468,14 +477,15 @@ relocate_fpm_app() {
   # ever sees a half-copied app and a concurrent first install of the same app
   # on another site simply finds the finished copy. __pycache__ is left out:
   # it is what a live import writes mid-copy, and pods regenerate it.
-  TMP="$DEST.tmp.$$"
-  rm -rf "$TMP"; mkdir -p "$TMP"
+  TMP="$(mktemp -d "/home/frappe/frappe-bench/sites/apps/$app.tmp.XXXXXX")"
   tar --exclude='__pycache__' -C "$SRC" -cf - . | tar -C "$TMP" -xf -
-  if [ -d "$DEST/$app" ]; then
+  if [ -d "$DEST/$app" ] && [ -n "$CURRENT_PKG" ] && [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
     echo "$app appeared on the shared volume meanwhile (another install won); using that copy."
     rm -rf "$TMP"
   else
+    rm -rf "$DEST"
     mv "$TMP" "$DEST"
+    [ -n "$FPM_PACKAGE" ] && echo "$FPM_PACKAGE" > "$DEST/.fpm_package" 2>/dev/null || true
   fi
   link_durable_app "$app"
   # No vendored wheels: fpm resolved the app's Python deps online into this
@@ -559,19 +569,22 @@ if [ -n "$FPM_PACKAGE" ]; then
   # no package fetch, no copy, nothing bench-level. Only an app the bench
   # has never seen goes through fpm below.
   if [ -d "/home/frappe/frappe-bench/sites/apps/$APP_NAME/$APP_NAME" ]; then
-    link_durable_app "$APP_NAME"
-    SHARED_OK=1
-    for dep in $(read_required_apps "$APP_NAME"); do
-      [ "$dep" = "frappe" ] && continue
-      if [ -d "/home/frappe/frappe-bench/sites/apps/$dep/$dep" ]; then
-        link_durable_app "$dep"
-      elif [ ! -d "/home/frappe/frappe-bench/apps/$dep" ]; then
-        echo "Required app $dep is not on this bench yet; resolving through fpm."
-        SHARED_OK=0
-      fi
-    done
-    if [ "$SHARED_OK" = "1" ]; then
-      echo "Bench already provides $APP_NAME from the shared volume; site-level install only."
+    CURRENT_PKG=""
+    [ -f "/home/frappe/frappe-bench/sites/apps/$APP_NAME/.fpm_package" ] && CURRENT_PKG=$(cat "/home/frappe/frappe-bench/sites/apps/$APP_NAME/.fpm_package" 2>/dev/null || true)
+    if [ -z "$FPM_PACKAGE" ] || [ -z "$CURRENT_PKG" ] || [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
+      link_durable_app "$APP_NAME"
+      SHARED_OK=1
+      for dep in $(read_required_apps "$APP_NAME"); do
+        [ "$dep" = "frappe" ] && continue
+        if [ -d "/home/frappe/frappe-bench/sites/apps/$dep/$dep" ]; then
+          link_durable_app "$dep"
+        elif [ ! -d "/home/frappe/frappe-bench/apps/$dep" ]; then
+          echo "Required app $dep is not on this bench yet; resolving through fpm."
+          SHARED_OK=0
+        fi
+      done
+      if [ "$SHARED_OK" = "1" ]; then
+        echo "Bench already provides $APP_NAME from the shared volume; site-level install only."
       INSTALLED=$(bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}')
       for app in $(read_required_apps "$APP_NAME") "$APP_NAME"; do
         [ "$app" = "frappe" ] && continue
@@ -579,7 +592,7 @@ if [ -n "$FPM_PACKAGE" ]; then
           echo "$app already on $SITE_NAME."
           continue
         fi
-        bench --site "$SITE_NAME" install-app "$app"
+        bench --site "$SITE_NAME" install-app "$app" --force
       done
       bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
       if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
@@ -592,11 +605,13 @@ if [ -n "$FPM_PACKAGE" ]; then
       exit 0
     fi
   fi
+fi
   echo "Installing $FPM_PACKAGE via FPM (repo: ${FPM_REPO:-none})..."
   # Bench images may not ship the fpm CLI yet; fetch the pinned release if absent.
   if ! command -v fpm >/dev/null 2>&1; then
-    echo "fpm CLI not found in image; fetching ${FPM_VERSION:-v4.6.0}..."
-    curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v4.6.0}/fpm-linux-amd64" && chmod +x /tmp/fpm
+    echo "fpm CLI not found in image; fetching CLI..."
+    ( [ -n "$FPM_REPO" ] && curl -fsSL -o /tmp/fpm "${FPM_REPO%/}/bin/fpm-linux-amd64" 2>/dev/null ) || curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v4.6.0}/fpm-linux-amd64"
+    chmod +x /tmp/fpm
     export PATH="/tmp:$PATH"
   fi
   if [ -n "$FPM_REPO" ]; then
@@ -621,7 +636,9 @@ if [ -n "$FPM_PACKAGE" ]; then
   # and 500 on every request.
   ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-before.txt || true
   # fpm install extracts to the FPM store, symlinks apps/<app>, and installs on the site.
-  fpm install "$FPM_PACKAGE" --bench-path /home/frappe/frappe-bench --site "$SITE_NAME"
+  PKG_SPEC="${FPM_PACKAGE//@/==}"
+  PKG_SPEC="${PKG_SPEC//:/==}"
+  fpm install "$PKG_SPEC" --bench-path /home/frappe/frappe-bench --site "$SITE_NAME"
   ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-after.txt || true
   NEW_APPS=$(comm -13 /tmp/apps-before.txt /tmp/apps-after.txt 2>/dev/null || true)
   /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-after.txt || true
@@ -701,13 +718,88 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 	job := &batchv1.Job{}
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
 
+	if err == nil {
+		// Backfill ObservedGeneration for already-Ready resources from older operator versions
+		if siteApp.Status.Phase == "Ready" && siteApp.Status.ObservedGeneration == 0 {
+			siteApp.Status.ObservedGeneration = siteApp.Generation
+			_ = r.updateStatus(ctx, siteApp)
+		}
+
+		// If Job belongs to an older generation of SiteApp and the user requested an upgrade/rollback/retry,
+		// clean up the previous Job (whether Succeeded or Failed) so a new Job runs for the updated spec.
+		jobGen := job.Labels["vyogo.tech/generation"]
+		currentGenStr := fmt.Sprintf("%d", siteApp.Generation)
+		if (job.Status.Succeeded > 0 || job.Status.Failed > 0) && (jobGen == "" || jobGen != currentGenStr) {
+			log.FromContext(ctx).Info("Cleaning up Job from older SiteApp generation", "job", job.Name, "jobGen", jobGen, "currentGen", siteApp.Generation)
+			_ = r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground))
+			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+		}
+	}
+
 	if errors.IsNotFound(err) {
 		// Rollback safety: before installing/upgrading the app, take a full backup
 		// and wait for it to succeed. The install job is not created until the
 		// preflight backup is done, so a corrupt install can always be reverted.
 		if siteApp.Spec.BackupBeforeInstall == nil || *siteApp.Spec.BackupBeforeInstall { // nil = default true
 			backupName := fmt.Sprintf("%s-pre-g%d", siteApp.Name, siteApp.Generation)
-			done, berr := ensurePreflightBackup(ctx, r.Client, siteApp.Namespace, site.Spec.SiteName, backupName)
+
+			backupType := "preflight-app-upgrade"
+			fromVer := siteApp.Status.InstalledVersion
+			if fromVer == "" {
+				backupType = "preflight-app-install"
+			}
+			toVer := siteApp.Spec.FPMPackage
+			if toVer == "" {
+				toVer = siteApp.Spec.GitBranch
+			}
+			appName := siteApp.Spec.AppName
+
+			displayName := fmt.Sprintf("Pre-upgrade snapshot: %s (%s → %s)", appName, fromVer, toVer)
+			if backupType == "preflight-app-install" {
+				displayName = fmt.Sprintf("Pre-install snapshot: %s (%s)", appName, toVer)
+			}
+
+			extraLabels := map[string]string{
+				"vyogo.tech/backup-type": backupType,
+				"vyogo.tech/trigger-app": sanitizeK8sLabel(appName),
+			}
+			if fromVer != "" {
+				extraLabels["vyogo.tech/from-version"] = sanitizeK8sLabel(fromVer)
+			}
+			if toVer != "" {
+				extraLabels["vyogo.tech/to-version"] = sanitizeK8sLabel(toVer)
+			}
+
+			extraAnnotations := map[string]string{
+				"vyogo.tech/display-name": displayName,
+				"vyogo.tech/siteapp-cr":   siteApp.Name,
+				"vyogo.tech/trigger-app":  appName,
+				"vyogo.tech/from-version": fromVer,
+				"vyogo.tech/to-version":   toVer,
+			}
+
+			// Capture snapshot of installed apps on the site
+			appVersions := []map[string]string{}
+			var siteApps vyogotechv1.SiteAppList
+			if err := r.List(ctx, &siteApps, client.InNamespace(siteApp.Namespace), client.MatchingLabels{"vyogo.tech/site-cr": site.Name}); err == nil {
+				for _, sa := range siteApps.Items {
+					v := sa.Status.InstalledVersion
+					if v == "" {
+						v = sa.Spec.FPMPackage
+					}
+					appVersions = append(appVersions, map[string]string{
+						"app":     sa.Spec.AppName,
+						"version": v,
+					})
+				}
+			}
+			if len(appVersions) > 0 {
+				if appsJson, err := json.Marshal(appVersions); err == nil {
+					extraAnnotations["vyogo.tech/installed-apps"] = string(appsJson)
+				}
+			}
+
+			done, berr := ensurePreflightBackup(ctx, r.Client, siteApp.Namespace, site.Spec.SiteName, backupName, extraLabels, extraAnnotations)
 			if berr != nil {
 				return r.failReconciliation(ctx, siteApp, fmt.Sprintf("Pre-install backup failed: %v", berr), "PreBackupFailed")
 			}
@@ -802,6 +894,11 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 
 		siteApp.Status.Phase = "Ready"
 		siteApp.Status.ObservedGeneration = siteApp.Generation
+		if siteApp.Spec.FPMPackage != "" {
+			siteApp.Status.InstalledVersion = siteApp.Spec.FPMPackage
+		} else if siteApp.Spec.GitBranch != "" {
+			siteApp.Status.InstalledVersion = siteApp.Spec.GitBranch
+		}
 		r.setCondition(siteApp, metav1.Condition{
 			Type:    "Ready",
 			Status:  metav1.ConditionTrue,
@@ -813,6 +910,7 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 	}
 
 	if job.Status.Failed > 0 {
+		siteApp.Status.ObservedGeneration = siteApp.Generation
 		return r.failReconciliation(ctx, siteApp, fmt.Sprintf("App installation job %s failed", jobName), "JobFailed")
 	}
 
@@ -865,6 +963,7 @@ func (r *SiteAppReconciler) buildAppJob(ctx context.Context, siteApp *vyogotechv
 			Labels: map[string]string{
 				"app.kubernetes.io/managed-by": "frappe-operator",
 				"vyogo.tech/siteapp":           siteApp.Name,
+				"vyogo.tech/generation":        fmt.Sprintf("%d", siteApp.Generation),
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -875,6 +974,7 @@ func (r *SiteAppReconciler) buildAppJob(ctx context.Context, siteApp *vyogotechv
 					Labels: map[string]string{
 						"app.kubernetes.io/managed-by": "frappe-operator",
 						"vyogo.tech/siteapp":           siteApp.Name,
+						"vyogo.tech/generation":        fmt.Sprintf("%d", siteApp.Generation),
 					},
 				},
 				Spec: corev1.PodSpec{
