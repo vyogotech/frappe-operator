@@ -146,7 +146,7 @@ func TestBuildConfigPlanSecretConfig(t *testing.T) {
 		t.Fatalf("CFG_SECRET_1 missing")
 	}
 	joined := strings.Join(cmds, "\n")
-	if !strings.Contains(joined, `set-config 'oidc_service_token' "$CFG_SECRET_0"`) {
+	if !strings.Contains(joined, `set-config -- 'oidc_service_token' "$CFG_SECRET_0"`) {
 		t.Fatalf("expected set-config to read the env var, got:\n%s", joined)
 	}
 	if strings.Contains(joined, "platform-kc") || strings.Contains(joined, "webhook-secret") {

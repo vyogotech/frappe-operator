@@ -98,7 +98,7 @@ func buildConfigPlan(sc *vyogotechv1.SiteConfig, domain string) (cmds []string, 
 				LocalObjectReference: entry.SecretKeyRef.LocalObjectReference, Key: entry.SecretKeyRef.Key,
 			}},
 		})
-		cmds = append(cmds, base+" "+shellQuote(entry.Key)+` "$`+envName+`"`)
+		cmds = append(cmds, base+" -- "+shellQuote(entry.Key)+` "$`+envName+`"`)
 		appliedKeys = append(appliedKeys, entry.Key)
 	}
 
