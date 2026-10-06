@@ -107,6 +107,12 @@ func (r *SiteBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if benchRef == nil {
+		// If the backup was created recently (< 2 minutes), FrappeSite may still
+		// be initializing or not yet in the informer cache. Requeue instead of immediately failing.
+		if time.Since(siteBackup.CreationTimestamp.Time) < 2*time.Minute {
+			logger.Info("FrappeSite not found yet for site; requeuing to wait for site", "site", siteBackup.Spec.Site)
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
 		err := fmt.Errorf("no FrappeSite found for site %s", siteBackup.Spec.Site)
 		logger.Error(err, "cannot proceed with backup")
 		return ctrl.Result{}, r.updateSiteBackupStatus(ctx, siteBackup, "Failed", err.Error(), "")

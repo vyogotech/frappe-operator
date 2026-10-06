@@ -38,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -180,7 +181,12 @@ func ensurePreflightBackup(ctx context.Context, c client.Client, namespace, site
 	case "Succeeded":
 		return true, nil
 	case "Failed":
-		return false, fmt.Errorf("preflight backup %q failed: %s", backupName, sb.Status.Message)
+		// If an existing preflight backup is in Failed state (e.g. from an aborted run or
+		// an orphaned backup from a previous deleted site with the same name), delete it
+		// so a fresh backup can be attempted rather than permanently bricking the install.
+		log.FromContext(ctx).Info("Deleting existing failed preflight backup to allow retry", "backup", backupName)
+		_ = c.Delete(ctx, sb)
+		return false, fmt.Errorf("preflight backup %q had failed; deleted to allow fresh attempt", backupName)
 	default:
 		return false, nil
 	}

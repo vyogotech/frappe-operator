@@ -599,6 +599,7 @@ if [ -n "$FPM_PACKAGE" ]; then
         echo "Running bench migrate (autoMigrate)..."
         bench --site "$SITE_NAME" migrate
       fi
+      bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
       echo "Verifying site health after FPM install..."
       bench --site "$SITE_NAME" execute frappe.get_installed_apps
       echo "FPM install complete for $APP_NAME (shared bench copy)."
@@ -653,6 +654,7 @@ fi
     echo "Running bench migrate (autoMigrate)..."
     bench --site "$SITE_NAME" migrate
   fi
+  bench --site "$SITE_NAME" clear-cache 2>/dev/null || true
   echo "Verifying site health after FPM install..."
   bench --site "$SITE_NAME" execute frappe.get_installed_apps
   echo "FPM install complete for $APP_NAME."
