@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -212,5 +213,50 @@ func TestJobsNeverOverwriteAppsTxtWithTheImageList(t *testing.T) {
 	}
 	if !strings.Contains(appsTxtSyncCmd, "ln -sf sites/apps.txt apps.txt") {
 		t.Fatalf("bench root apps.txt link missing")
+	}
+}
+
+func TestBuildCleanupJob_ScriptSyntax(t *testing.T) {
+	sc := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "sc1", Namespace: "default", Generation: 1},
+		Spec:       vyogotechv1.SiteConfigSpec{SiteRef: &vyogotechv1.NamespacedName{Name: "site1"}},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "default"},
+	}
+
+	job := buildCleanupJob(sc, bench, "site1.example.com", "img:latest", []string{"foo", "bar"})
+	if job == nil {
+		t.Fatal("expected non-nil cleanup job")
+	}
+
+	cmd := job.Spec.Template.Spec.Containers[0].Command
+	if len(cmd) < 3 || cmd[0] != "bash" || cmd[1] != "-c" {
+		t.Fatalf("unexpected container command: %v", cmd)
+	}
+
+	script := cmd[2]
+
+	// 1. Verify bash syntax
+	bashCmd := exec.Command("bash", "-n")
+	bashCmd.Stdin = strings.NewReader(script)
+	if out, err := bashCmd.CombinedOutput(); err != nil {
+		t.Fatalf("cleanup job script has bash syntax errors: %v\nOutput:\n%s", err, string(out))
+	}
+
+	// 2. Extract and verify python script syntax with ast.parse
+	const pyStart = "python3 - <<'EOF'\n"
+	const pyEnd = "\nEOF"
+	startIdx := strings.Index(script, pyStart)
+	endIdx := strings.Index(script, pyEnd)
+	if startIdx == -1 || endIdx == -1 || endIdx <= startIdx {
+		t.Fatalf("failed to locate python heredoc in script:\n%s", script)
+	}
+	pyCode := script[startIdx+len(pyStart) : endIdx]
+
+	pyCmd := exec.Command("python3", "-c", "import ast, sys; ast.parse(sys.stdin.read()); print('OK')")
+	pyCmd.Stdin = strings.NewReader(pyCode)
+	if out, err := pyCmd.CombinedOutput(); err != nil {
+		t.Fatalf("cleanup job Python heredoc has syntax error: %v\nCode:\n%s\nOutput:\n%s", err, pyCode, string(out))
 	}
 }

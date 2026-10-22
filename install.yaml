@@ -5186,6 +5186,12 @@ spec:
                   Domain is the external domain for ingress
                   MUST match siteName (defaults to siteName if not specified)
                 type: string
+              enableScheduler:
+                description: |-
+                  EnableScheduler determines whether background scheduler is enabled for this site.
+                  When true, the operator automatically runs `bench --site <site> enable-scheduler`
+                  during site initialization and reconciliation. When false, the operator disables it.
+                type: boolean
               encryptionKeySecretRef:
                 description: |-
                   EncryptionKeySecretRef references a Secret containing an external encryption_key
@@ -6366,6 +6372,9 @@ spec:
               resolvedDomain:
                 description: ResolvedDomain is the final domain after resolution
                 type: string
+              schedulerEnabled:
+                description: SchedulerEnabled indicates whether the background scheduler is currently enabled on this site.
+                type: boolean
               siteURL:
                 description: SiteURL is the accessible URL
                 type: string
@@ -6679,6 +6688,11 @@ spec:
                 enum:
                 - http
                 - oci
+                type: string
+              fpmVersion:
+                description: |-
+                  FPMVersion specifies the fpm CLI version used to install this app
+                  (e.g. "v4.7.0"). Overrides the operator's default and FPM_CLI_VERSION env.
                 type: string
               gitBranch:
                 description: GitBranch specifies the Git branch or tag to clone (defaults to "main" or "master").
@@ -9542,6 +9556,30 @@ spec:
               lastName:
                 description: LastName specifies the user's last name.
                 type: string
+              passwordSecretRef:
+                description: |-
+                  PasswordSecretRef specifies an optional Secret containing the user's password.
+                  If set, the operator reads the password from the secret and sets it on the user in Frappe.
+                properties:
+                  key:
+                    description: The key of the secret to select from.  Must be a valid secret key.
+                    type: string
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  optional:
+                    description: Specify whether the Secret or its key must be defined
+                    type: boolean
+                required:
+                - key
+                type: object
+                x-kubernetes-map-type: atomic
               roles:
                 description: Roles lists the Frappe roles to assign to this user.
                 items:
@@ -10338,17 +10376,22 @@ rules:
   - siteapikeys/finalizers
   - siteapps/finalizers
   - sitebackups/finalizers
+  - siteclientscripts/finalizers
   - siteconfigs/finalizers
   - sitecrons/finalizers
+  - sitecustomfields/finalizers
   - sitedashboardcharts/finalizers
   - sitedashboards/finalizers
   - sitedomains/finalizers
   - sitejobs/finalizers
   - sitemigrations/finalizers
+  - sitepropertysetters/finalizers
   - sitequotas/finalizers
   - siterestores/finalizers
   - siteroles/finalizers
+  - siteserverscripts/finalizers
   - siteusers/finalizers
+  - sitewebhooks/finalizers
   - siteworkspaces/finalizers
   verbs:
   - update

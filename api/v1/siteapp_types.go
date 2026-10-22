@@ -62,6 +62,11 @@ type SiteAppSpec struct {
 	// +kubebuilder:validation:Enum=http;oci
 	FPMRepoType string `json:"fpmRepoType,omitempty"`
 
+	// FPMVersion specifies the fpm CLI version used to install this app
+	// (e.g. "v4.7.0"). Overrides the operator's default and FPM_CLI_VERSION env.
+	// +optional
+	FPMVersion string `json:"fpmVersion,omitempty"`
+
 	// AutoMigrate determines whether to trigger database migration after app installation. Defaults to true.
 	// +optional
 	// +kubebuilder:default=true

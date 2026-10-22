@@ -96,6 +96,12 @@ type FrappeSiteSpec struct {
 	// +kubebuilder:default=Retain
 	// +optional
 	DeletionPolicy string `json:"deletionPolicy,omitempty"`
+
+	// EnableScheduler determines whether background scheduler is enabled for this site.
+	// When true, the operator automatically runs `bench --site <site> enable-scheduler`
+	// during site initialization and reconciliation. When false, the operator disables it.
+	// +optional
+	EnableScheduler *bool `json:"enableScheduler,omitempty"`
 }
 
 // FrappeSitePhase represents the current phase
@@ -171,6 +177,10 @@ type FrappeSiteStatus struct {
 	// ObservedSiteVersion reflects the frappe.io/site-version annotation value most recently processed
 	// +optional
 	ObservedSiteVersion string `json:"observedSiteVersion,omitempty"`
+
+	// SchedulerEnabled indicates whether the background scheduler is currently enabled on this site.
+	// +optional
+	SchedulerEnabled *bool `json:"schedulerEnabled,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -95,6 +95,11 @@ spec:
                 - http
                 - oci
                 type: string
+              fpmVersion:
+                description: |-
+                  FPMVersion specifies the fpm CLI version used to install this app
+                  (e.g. "v4.7.0"). Overrides the operator's default and FPM_CLI_VERSION env.
+                type: string
               gitBranch:
                 description: GitBranch specifies the Git branch or tag to clone (defaults
                   to "main" or "master").

@@ -99,6 +99,10 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 				logger.Info("Site initialized with frappe framework only")
 			}
 
+			if site.Spec.EnableScheduler != nil {
+				site.Status.SchedulerEnabled = site.Spec.EnableScheduler
+			}
+
 			return true, nil
 		}
 
@@ -212,7 +216,7 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)
 
 	// Build the container
-	container := resources.NewContainerBuilder("site-init", r.getBenchImage(ctx, bench)).
+	builder := resources.NewContainerBuilder("site-init", r.getBenchImage(ctx, bench)).
 		WithImagePullPolicy(r.getImagePullPolicy(bench)).
 		WithCommand("bash", "-c").
 		WithArgs(initScript).
@@ -220,8 +224,16 @@ func (r *FrappeSiteReconciler) ensureSiteInitialized(ctx context.Context, site *
 		WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
 		WithResources(r.getSiteInitResources(bench)).
 		WithVolumeMount("site-secrets", "/tmp/site-secrets").
-		WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
-		Build()
+		WithSecurityContext(r.getContainerSecurityContext(ctx, bench))
+
+	if site.Spec.EnableScheduler != nil {
+		if *site.Spec.EnableScheduler {
+			builder = builder.WithEnv("ENABLE_SCHEDULER", "true")
+		} else {
+			builder = builder.WithEnv("ENABLE_SCHEDULER", "false")
+		}
+	}
+	container := builder.Build()
 	// USER/HOME/PYTHONPATH like every other bench Job (see withBenchJobEnv).
 	container = withBenchJobEnv(container)
 
@@ -541,4 +553,88 @@ func (r *FrappeSiteReconciler) siteInitJobName(ctx context.Context, site *vyogot
 	log.FromContext(ctx).Info("init Job name is taken by another owner; using a site-specific name",
 		"job", name, "owner", job.OwnerReferences[0].Kind+"/"+job.OwnerReferences[0].Name)
 	return fmt.Sprintf("%s-site-init", site.Name)
+}
+
+// ensureSchedulerState ensures the Frappe background scheduler state matches site.Spec.EnableScheduler
+// on an already initialized site. If site.Spec.EnableScheduler is nil or matches site.Status.SchedulerEnabled,
+// this is a no-op.
+func (r *FrappeSiteReconciler) ensureSchedulerState(ctx context.Context, site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench) error {
+	if site.Spec.EnableScheduler == nil {
+		return nil
+	}
+	if site.Status.SchedulerEnabled != nil && *site.Status.SchedulerEnabled == *site.Spec.EnableScheduler {
+		return nil
+	}
+
+	logger := log.FromContext(ctx)
+	desired := *site.Spec.EnableScheduler
+	action := "enable-scheduler"
+	if !desired {
+		action = "disable-scheduler"
+	}
+
+	jobName := fmt.Sprintf("%s-sched-sync", site.Name)
+	existingJob := &batchv1.Job{}
+	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: site.Namespace}, existingJob)
+	if errors.IsNotFound(err) {
+		logger.Info("Creating scheduler sync job", "site", site.Name, "action", action)
+		nodeSelector, affinity, tolerations, extraLabels := applyPodConfig(site.Spec.PodConfig, map[string]string{
+			"app":       "frappe",
+			"site":      site.Name,
+			"operation": "scheduler-sync",
+		})
+
+		cmd := fmt.Sprintf("set -e\ncd /home/frappe/frappe-bench\nbench --site %s %s\n", shellQuote(site.Spec.SiteName), action)
+
+		container := resources.NewContainerBuilder("scheduler-sync", r.getBenchImage(ctx, bench)).
+			WithImagePullPolicy(r.getImagePullPolicy(bench)).
+			WithCommand("bash", "-c", cmd).
+			WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites", "frappe-sites").
+			WithVolumeMountSubPath("sites", "/home/frappe/frappe-bench/sites/assets", "frappe-sites/assets").
+			WithResources(vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindMaintenance)).
+			WithSecurityContext(r.getContainerSecurityContext(ctx, bench)).
+			Build()
+		container = withBenchJobEnv(container)
+
+		syncJob := resources.NewJobBuilder(jobName, site.Namespace).
+			WithLabels(extraLabels).
+			WithExtraPodLabels(extraLabels).
+			WithImagePullSecrets(r.getImagePullSecrets(bench)).
+			WithNodeSelector(nodeSelector).
+			WithAffinity(affinity).
+			WithTolerations(tolerations).
+			WithPodSecurityContext(r.getPodSecurityContext(ctx, bench)).
+			WithContainer(container).
+			WithPVCVolume("sites", fmt.Sprintf("%s-sites", bench.Name)).
+			WithOwner(site, r.Scheme).
+			MustBuild()
+		syncJob.Spec.BackoffLimit = int32Ptr(1)
+
+		if err := r.Create(ctx, syncJob); err != nil {
+			return fmt.Errorf("failed to create scheduler sync job: %w", err)
+		}
+		return fmt.Errorf("scheduler sync job created, waiting for completion")
+	} else if err != nil {
+		return err
+	}
+
+	if existingJob.Status.Succeeded > 0 {
+		logger.Info("Scheduler sync job succeeded", "site", site.Name, "action", action)
+		site.Status.SchedulerEnabled = &desired
+		r.Recorder.Eventf(site, corev1.EventTypeNormal, "SchedulerConfigured", "Frappe scheduler successfully %sd", action)
+		// Clean up completed sync job
+		_ = r.Delete(ctx, existingJob, client.PropagationPolicy(metav1.DeletePropagationBackground))
+		return nil
+	}
+
+	for _, c := range existingJob.Status.Conditions {
+		if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
+			logger.Error(fmt.Errorf("scheduler sync job failed"), "Scheduler sync job failed", "job", existingJob.Name)
+			r.Recorder.Eventf(site, corev1.EventTypeWarning, "SchedulerSyncFailed", "Scheduler sync job %s failed to %s", existingJob.Name, action)
+			_ = r.Delete(ctx, existingJob, client.PropagationPolicy(metav1.DeletePropagationBackground))
+			return fmt.Errorf("scheduler sync job failed")
+		}
+	}
+
+	return fmt.Errorf("scheduler sync job is in progress")
 }

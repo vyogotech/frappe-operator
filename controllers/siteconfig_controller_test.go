@@ -18,11 +18,13 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -225,5 +227,161 @@ func TestSiteConfigReconciler_FinalizerAndCleanup(t *testing.T) {
 	err := client.Get(ctx, key, afterDelete)
 	if err == nil && len(afterDelete.Finalizers) != 0 {
 		t.Errorf("expected finalizer to be removed, got %v", afterDelete.Finalizers)
+	}
+}
+
+func TestSiteConfigReconciler_CleanupSharedKeys(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = vyogotechv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+
+	// sc1 is being deleted; sets "shared_key" and "unique_to_sc1"
+	sc1 := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "sc1",
+			Namespace:  "default",
+			Generation: 1,
+			Finalizers: []string{siteConfigFinalizer},
+		},
+		Spec: vyogotechv1.SiteConfigSpec{
+			SiteRef:      &vyogotechv1.NamespacedName{Name: "site1"},
+			CustomConfig: map[string]string{"shared_key": "val1", "unique_to_sc1": "val2"},
+		},
+		Status: vyogotechv1.SiteConfigStatus{
+			Phase:       "Ready",
+			AppliedKeys: []string{"shared_key", "unique_to_sc1"},
+		},
+	}
+
+	// sc2 is active; also sets "shared_key"
+	sc2 := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "sc2",
+			Namespace:  "default",
+			Generation: 1,
+			Finalizers: []string{siteConfigFinalizer},
+		},
+		Spec: vyogotechv1.SiteConfigSpec{
+			SiteRef:      &vyogotechv1.NamespacedName{Name: "site1"},
+			CustomConfig: map[string]string{"shared_key": "val1_from_sc2"},
+		},
+		Status: vyogotechv1.SiteConfigStatus{
+			Phase:       "Ready",
+			AppliedKeys: []string{"shared_key"},
+		},
+	}
+
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeSiteSpec{SiteName: "site1.local", BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"}},
+		Status:     vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
+	}
+
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(sc1, sc2, site, bench).WithStatusSubresource(sc1, sc2, &batchv1.Job{}).Build()
+	r := &SiteConfigReconciler{Client: client, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	ctx := context.Background()
+
+	// Trigger deletion on sc1
+	if err := client.Delete(ctx, sc1); err != nil {
+		t.Fatalf("delete sc1 failed: %v", err)
+	}
+
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "sc1", Namespace: "default"}}); err != nil {
+		t.Fatalf("Reconcile deletion failed: %v", err)
+	}
+
+	// Verify cleanup Job only removes unique_to_sc1, preserving shared_key
+	cleanupJob := &batchv1.Job{}
+	if err := client.Get(ctx, types.NamespacedName{Name: "sc1-cleanup-1", Namespace: "default"}, cleanupJob); err != nil {
+		t.Fatalf("expected cleanup Job sc1-cleanup-1: %v", err)
+	}
+
+	for _, env := range cleanupJob.Spec.Template.Spec.Containers[0].Env {
+		if env.Name == "CFG_CLEANUP_KEYS" {
+			if env.Value != "unique_to_sc1" {
+				t.Errorf("expected CFG_CLEANUP_KEYS 'unique_to_sc1' without 'shared_key', got %q", env.Value)
+			}
+		}
+	}
+}
+
+func TestSiteConfigReconciler_CleanupJobFailedEvent(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = vyogotechv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+
+	sc := &vyogotechv1.SiteConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "sc-fail",
+			Namespace:  "default",
+			Generation: 1,
+			Finalizers: []string{siteConfigFinalizer},
+		},
+		Spec: vyogotechv1.SiteConfigSpec{
+			SiteRef:      &vyogotechv1.NamespacedName{Name: "site1"},
+			CustomConfig: map[string]string{"key1": "val1"},
+		},
+		Status: vyogotechv1.SiteConfigStatus{
+			Phase:       "Ready",
+			AppliedKeys: []string{"key1"},
+		},
+	}
+
+	site := &vyogotechv1.FrappeSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "site1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeSiteSpec{SiteName: "site1.local", BenchRef: &vyogotechv1.NamespacedName{Name: "bench1"}},
+		Status:     vyogotechv1.FrappeSiteStatus{Phase: vyogotechv1.FrappeSitePhaseReady},
+	}
+	bench := &vyogotechv1.FrappeBench{
+		ObjectMeta: metav1.ObjectMeta{Name: "bench1", Namespace: "default"},
+		Spec:       vyogotechv1.FrappeBenchSpec{FrappeVersion: "15"},
+	}
+
+	fakeRecorder := record.NewFakeRecorder(10)
+	client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(sc, site, bench).WithStatusSubresource(sc, &batchv1.Job{}).Build()
+	r := &SiteConfigReconciler{Client: client, Scheme: scheme, Recorder: fakeRecorder}
+	ctx := context.Background()
+
+	// Delete sc
+	if err := client.Delete(ctx, sc); err != nil {
+		t.Fatalf("delete sc failed: %v", err)
+	}
+
+	// First reconcile creates the job
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "sc-fail", Namespace: "default"}}); err != nil {
+		t.Fatalf("first reconcile failed: %v", err)
+	}
+
+	// Mark job as failed
+	job := &batchv1.Job{}
+	if err := client.Get(ctx, types.NamespacedName{Name: "sc-fail-cleanup-1", Namespace: "default"}, job); err != nil {
+		t.Fatalf("expected job: %v", err)
+	}
+	job.Status.Conditions = []batchv1.JobCondition{
+		{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Reason: "BackoffLimitExceeded"},
+	}
+	if err := client.Status().Update(ctx, job); err != nil {
+		t.Fatalf("failed to update job status: %v", err)
+	}
+
+	// Second reconcile handles failed job, emits events, removes finalizer
+	if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: "sc-fail", Namespace: "default"}}); err != nil {
+		t.Fatalf("second reconcile failed: %v", err)
+	}
+
+	// Verify event was emitted
+	select {
+	case event := <-fakeRecorder.Events:
+		if !strings.Contains(event, "CleanupFailed") {
+			t.Errorf("expected CleanupFailed event, got: %s", event)
+		}
+	default:
+		t.Error("expected at least one event from fakeRecorder")
 	}
 }

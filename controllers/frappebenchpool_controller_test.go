@@ -479,4 +479,3 @@ func TestFrappeBenchPool_StatusUpdate(t *testing.T) {
 		t.Errorf("Expected 2 shard status entries, got %d", len(updatedPool.Status.Shards))
 	}
 }
-

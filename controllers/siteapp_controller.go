@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -42,15 +43,27 @@ import (
 
 const (
 	siteAppFinalizer = "vyogo.tech/siteapp-finalizer"
-	// fpmCLIVersion is the fpm release the install Job fetches when the bench
-	// image does not already ship the CLI. v3.0.0+ resolves the transitive app
-	// dependency tree (cascade install) and rolls back atomically on failure;
-	// v4.6.0+ never re-fetches or replaces an app the bench already has (in
-	// apps/<app>, or listed in sites/apps.txt and importable), which is exactly
-	// the shared-volume layout a pooled bench uses, and withholds a package
-	// whose wheels could not be vendored instead of publishing it dependency-less.
-	fpmCLIVersion = "v4.6.0"
+	// defaultFPMCLIVersion is the fpm release the install Job fetches when the bench
+	// image does not already ship the CLI and neither the SiteApp nor operator env
+	// overrides it. v3.0.0+ resolves the transitive app dependency tree (cascade install)
+	// and rolls back atomically on failure; v4.6.0+ never re-fetches or replaces an app
+	// the bench already has; v4.7.0 fixes TypeScript bundle asset resolution.
+	defaultFPMCLIVersion = "v4.7.0"
 )
+
+// resolveFPMCLIVersion returns the fpm CLI version to use for an installation:
+// 1. SiteApp.spec.fpmVersion if set
+// 2. FPM_CLI_VERSION environment variable on the operator if set
+// 3. defaultFPMCLIVersion (v4.7.0)
+func resolveFPMCLIVersion(siteApp *vyogotechv1.SiteApp) string {
+	if siteApp != nil && siteApp.Spec.FPMVersion != "" {
+		return siteApp.Spec.FPMVersion
+	}
+	if v := os.Getenv("FPM_CLI_VERSION"); v != "" {
+		return v
+	}
+	return defaultFPMCLIVersion
+}
 
 // SiteAppReconciler reconciles a SiteApp object
 type SiteAppReconciler struct {
@@ -611,7 +624,7 @@ fi
   # Bench images may not ship the fpm CLI yet; fetch the pinned release if absent.
   if ! command -v fpm >/dev/null 2>&1; then
     echo "fpm CLI not found in image; fetching CLI..."
-    ( [ -n "$FPM_REPO" ] && curl -fsSL -o /tmp/fpm "${FPM_REPO%/}/bin/fpm-linux-amd64" 2>/dev/null ) || curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v4.6.0}/fpm-linux-amd64"
+    ( [ -n "$FPM_REPO" ] && curl -fsSL -o /tmp/fpm "${FPM_REPO%/}/bin/fpm-linux-amd64" 2>/dev/null ) || curl -fsSL -o /tmp/fpm "https://github.com/vyogotech/fpm/releases/download/${FPM_VERSION:-v4.7.0}/fpm-linux-amd64"
     chmod +x /tmp/fpm
     export PATH="/tmp:$PATH"
   fi
@@ -843,7 +856,7 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 			{Name: "FPM_PACKAGE", Value: siteApp.Spec.FPMPackage},
 			{Name: "FPM_REPO", Value: siteApp.Spec.FPMRepo},
 			{Name: "FPM_REPO_TYPE", Value: siteApp.Spec.FPMRepoType},
-			{Name: "FPM_VERSION", Value: fpmCLIVersion},
+			{Name: "FPM_VERSION", Value: resolveFPMCLIVersion(siteApp)},
 			{Name: "AUTO_MIGRATE", Value: fmt.Sprintf("%t", siteApp.Spec.AutoMigrate == nil || *siteApp.Spec.AutoMigrate)},
 			{Name: "FRAPPE_VERSION", Value: bench.Spec.FrappeVersion},
 			{Name: "USER", Value: "frappe"},

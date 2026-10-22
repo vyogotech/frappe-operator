@@ -72,6 +72,7 @@ REDIS_CACHE_ADDRESS=$(cat /tmp/site-secrets/redis_cache_address 2>/dev/null || e
 REDIS_QUEUE_ADDRESS=$(cat /tmp/site-secrets/redis_queue_address 2>/dev/null || echo "")
 SKIP_INIT=$(cat /tmp/site-secrets/skip_init 2>/dev/null || echo "false")
 ENCRYPTION_KEY=$(cat /tmp/site-secrets/encryption_key 2>/dev/null || echo "")
+ENABLE_SCHEDULER=$(cat /tmp/site-secrets/enable_scheduler 2>/dev/null || echo "${ENABLE_SCHEDULER:-}")
 
 # Sync assets from the image cache to the Persistent Volume BEFORE migration/initialization
 # This guarantees that even if database migration fails, assets are present for the web service
@@ -639,6 +640,15 @@ echo "Site $SITE_NAME created successfully!"
 # Final pass: Ensure site_config.json is up-to-date with domain and Redis configuration
 echo "Finalizing site configuration for domain: $DOMAIN and Redis Cache: $REDIS_CACHE_ADDRESS / Queue: $REDIS_QUEUE_ADDRESS"
 update_site_config_json
+
+# Enable or disable scheduler if requested
+if [ "$ENABLE_SCHEDULER" = "true" ]; then
+    echo "Enabling scheduler for site $SITE_NAME..."
+    bench --site "$SITE_NAME" enable-scheduler || echo "Warning: failed to enable scheduler for $SITE_NAME"
+elif [ "$ENABLE_SCHEDULER" = "false" ]; then
+    echo "Ensuring scheduler is disabled for site $SITE_NAME..."
+    bench --site "$SITE_NAME" disable-scheduler 2>/dev/null || true
+fi
 
 # The bench runs with FRAPPE_SITE_NAME_HEADER=$host, so Frappe resolves a request
 # by looking for sites/<Host>/. When the resolved domain differs from the site
