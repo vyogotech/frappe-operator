@@ -36,13 +36,18 @@ echo "=== 3b. Preloading Frappe app image into Kind ==="
 # a slow/rate-limited pull left the rolled gunicorn stuck ContainerCreating (site 500)
 # and the upgrade init job Pending, so the waits below timed out non-deterministically.
 FRAPPE_IMG="ghcr.io/vyogotech/frappe_base:latest"
-if [ "$CONTAINER_TOOL" == "podman" ]; then
+NODE="${CLUSTER_NAME}-control-plane"
+if $CONTAINER_TOOL exec "$NODE" crictl pull "$FRAPPE_IMG"; then
+    echo "✓ Preloaded $FRAPPE_IMG via crictl"
+elif [ "$CONTAINER_TOOL" == "podman" ]; then
     podman pull "$FRAPPE_IMG"
     podman save -o frappe_base.tar "$FRAPPE_IMG"
     kind load image-archive frappe_base.tar --name $CLUSTER_NAME
+    rm -f frappe_base.tar
 else
     docker pull "$FRAPPE_IMG"
-    kind load docker-image "$FRAPPE_IMG" --name $CLUSTER_NAME
+    docker save "$FRAPPE_IMG" | docker exec -i "$NODE" ctr --namespace=k8s.io images import - || \
+        kind load docker-image "$FRAPPE_IMG" --name $CLUSTER_NAME
 fi
 
 echo "=== 4. Installing Operator via Helm ==="
