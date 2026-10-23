@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-10-23
+
+### Added
+- **Configurable FPM CLI Version in SiteApp (#66)**: Added `spec.fpmVersion` to `SiteApp` CRD allowing per-app override of the `fpm` CLI version. Supports fallback resolution via `SiteApp.spec.fpmVersion`, `FPM_CLI_VERSION` operator environment variable, and defaults to `v4.7.0` (fixing TypeScript `.bundle.ts` Desk asset resolution).
+- **Declarative Scheduler Management in FrappeSite (#63)**: Added `spec.enableScheduler` to `FrappeSite` CRD. Automatically enables or disables background scheduler during initial site provisioning and reconciliation via a lightweight bench sync job, updating `status.schedulerEnabled`.
+
+### Fixed
+- **SiteConfig Deletion Script Python Syntax Error (#65)**: Replaced semicolon-separated compound statements in `buildCleanupJob` with a multi-line Python heredoc (`python3 - <<'EOF' ... EOF`), resolving silent Job failures.
+- **SiteConfig Shared Key Retention (#65)**: Filtered keys to remove on `SiteConfig` deletion so keys still defined by another active `SiteConfig` for the same site are preserved.
+- **SiteConfig Cleanup Failure Observability (#65)**: Emits `CleanupFailed` and `SiteConfigCleanupFailed` warning events on the CR and site if the cleanup Job fails.
+- **Kind E2E Upgrade Multi-Arch Image Preloading**: Updated test scripts to preload multi-arch OCI images (`frappe_base`, `frappe_custom_apps`) directly via `crictl pull` inside Kind nodes with clean fallback to `ctr images import` without `--all-platforms`.
+
+## [5.4.1] - 2026-10-06
+
+### Fixed
+- **Preflight Backup Cleanup & Migration Safety**: Purged failed preflight backups, added concurrent site creation requeue, and ensured cache clearing post-migration.
+
 ## [5.4.0] - 2026-10-05
 
 ### Added
