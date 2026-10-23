@@ -727,3 +727,26 @@ func TestSiteAppInstallScript_BashSyntax(t *testing.T) {
 	}
 }
 
+func TestResolveFPMCLIVersion(t *testing.T) {
+	// 1. Default when nil / empty
+	if v := resolveFPMCLIVersion(nil); v != "v4.7.0" {
+		t.Errorf("expected default v4.7.0, got %q", v)
+	}
+
+	app := &vyogotechv1.SiteApp{}
+	if v := resolveFPMCLIVersion(app); v != "v4.7.0" {
+		t.Errorf("expected default v4.7.0, got %q", v)
+	}
+
+	// 2. Environment variable override
+	t.Setenv("FPM_CLI_VERSION", "v4.8.0")
+	if v := resolveFPMCLIVersion(app); v != "v4.8.0" {
+		t.Errorf("expected env override v4.8.0, got %q", v)
+	}
+
+	// 3. Spec override takes precedence over environment variable
+	app.Spec.FPMVersion = "v4.9.0-custom"
+	if v := resolveFPMCLIVersion(app); v != "v4.9.0-custom" {
+		t.Errorf("expected spec override v4.9.0-custom, got %q", v)
+	}
+}

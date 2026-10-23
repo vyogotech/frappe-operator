@@ -259,22 +259,32 @@ func buildCleanupJob(sc *vyogotechv1.SiteConfig, bench *vyogotechv1.FrappeBench,
 		{Name: "CFG_CLEANUP_KEYS", Value: strings.Join(keysToRemove, ",")},
 	}
 
-	pyScript := `import os,json;` +
-		`d=os.environ["CFG_CLEANUP_DOMAIN"];` +
-		`keys=[k.strip() for k in os.environ.get("CFG_CLEANUP_KEYS","").split(",") if k.strip()];` +
-		`p=f"/home/frappe/frappe-bench/sites/{d}/site_config.json";` +
-		`ch=False;` +
-		`if os.path.exists(p):` +
-		`    with open(p,"r") as f: c=json.load(f);` +
-		`    for k in keys:` +
-		`        if k in c:` +
-		`            del c[k]; ch=True;` +
-		`            print(f"Removed key {k} from site_config.json");` +
-		`    if ch:` +
-		`        with open(p,"w") as f: json.dump(c,f,indent=1);` +
-		`        print("Saved updated site_config.json")`
+	script := fmt.Sprintf(`set -e
+cd /home/frappe/frappe-bench
+python3 - <<'EOF'
+import json, os
 
-	script := fmt.Sprintf("set -e\ncd /home/frappe/frappe-bench\npython3 -c '%s'\nbench --site %s clear-cache || true\n", pyScript, shellQuote(domain))
+domain = os.environ.get("CFG_CLEANUP_DOMAIN", "")
+raw_keys = os.environ.get("CFG_CLEANUP_KEYS", "")
+keys = [k.strip() for k in raw_keys.split(",") if k.strip()]
+path = f"/home/frappe/frappe-bench/sites/{domain}/site_config.json"
+
+if os.path.exists(path):
+    with open(path, "r") as f:
+        config = json.load(f)
+    changed = False
+    for k in keys:
+        if k in config:
+            del config[k]
+            changed = True
+            print(f"Removed key {k} from site_config.json")
+    if changed:
+        with open(path, "w") as f:
+            json.dump(config, f, indent=1)
+        print("Saved updated site_config.json")
+EOF
+bench --site %s clear-cache || true
+`, shellQuote(domain))
 
 	jobName := jobNameFor(sc.Name, "cleanup", fmt.Sprintf("%d", sc.Generation))
 	pvcName := fmt.Sprintf("%s-sites", bench.Name)

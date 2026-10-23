@@ -243,17 +243,22 @@ rules:
   - siteapikeys/finalizers
   - siteapps/finalizers
   - sitebackups/finalizers
+  - siteclientscripts/finalizers
   - siteconfigs/finalizers
   - sitecrons/finalizers
+  - sitecustomfields/finalizers
   - sitedashboardcharts/finalizers
   - sitedashboards/finalizers
   - sitedomains/finalizers
   - sitejobs/finalizers
   - sitemigrations/finalizers
+  - sitepropertysetters/finalizers
   - sitequotas/finalizers
   - siterestores/finalizers
   - siteroles/finalizers
+  - siteserverscripts/finalizers
   - siteusers/finalizers
+  - sitewebhooks/finalizers
   - siteworkspaces/finalizers
   verbs:
   - update

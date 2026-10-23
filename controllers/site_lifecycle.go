@@ -177,6 +177,15 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		scheme = "https"
 	}
 
+	enableScheduler := ""
+	if site.Spec.EnableScheduler != nil {
+		if *site.Spec.EnableScheduler {
+			enableScheduler = "true"
+		} else {
+			enableScheduler = "false"
+		}
+	}
+
 	// Build secret data with all credentials as individual files
 	secretData := map[string][]byte{
 		// The site directory keeps spec.SiteName: every other controller addresses
@@ -194,6 +203,7 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 		"redis_queue_address": []byte(redisQueueAddress),
 		"skip_init":           []byte(strconv.FormatBool(site.Spec.SkipInit)),
 		"is_upgrade":          []byte(isUpgrade),
+		"enable_scheduler":    []byte(enableScheduler),
 	}
 
 	// Add database credentials

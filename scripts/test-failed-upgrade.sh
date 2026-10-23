@@ -34,15 +34,20 @@ echo "=== 3b. Preloading Frappe app images into Kind ==="
 # re-pulling ~2GB from ghcr on every reconcile. Without this, a slow/rate-limited CI
 # pull leaves the upgrade init job Pending (never reaching Failed) and the fallback
 # pods stuck ContainerCreating, so the waits below timed out non-deterministically.
+NODE="${CLUSTER_NAME}-control-plane"
 for FRAPPE_IMG in ghcr.io/vyogotech/frappe_base:latest ghcr.io/vyogotech/frappe_custom_apps:latest; do
-    if [ "$CONTAINER_TOOL" == "podman" ]; then
+    if $CONTAINER_TOOL exec "$NODE" crictl pull "$FRAPPE_IMG"; then
+        echo "✓ Preloaded $FRAPPE_IMG via crictl"
+    elif [ "$CONTAINER_TOOL" == "podman" ]; then
         podman pull "$FRAPPE_IMG"
         TAR="$(echo "$FRAPPE_IMG" | tr '/:' '__').tar"
         podman save -o "$TAR" "$FRAPPE_IMG"
         kind load image-archive "$TAR" --name $CLUSTER_NAME
+        rm -f "$TAR"
     else
         docker pull "$FRAPPE_IMG"
-        kind load docker-image "$FRAPPE_IMG" --name $CLUSTER_NAME
+        docker save "$FRAPPE_IMG" | docker exec -i "$NODE" ctr --namespace=k8s.io images import - || \
+            kind load docker-image "$FRAPPE_IMG" --name $CLUSTER_NAME
     fi
 done
 

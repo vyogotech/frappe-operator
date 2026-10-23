@@ -298,6 +298,12 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	// Ensure scheduler state if specified
+	if err := r.ensureSchedulerState(ctx, site, bench); err != nil {
+		logger.Info("Waiting for scheduler state reconciliation", "site", site.Name, "reason", err.Error())
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
 	// Finalize status
 	site.Status.Phase = vyogotechv1.FrappeSitePhaseReady
 	site.Status.ObservedGeneration = site.Generation

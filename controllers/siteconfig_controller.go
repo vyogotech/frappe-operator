@@ -89,6 +89,40 @@ func (r *SiteConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
 			}
 
+			// Do not remove keys that are still declared by other active SiteConfigs for the same site
+			otherConfigs := &vyogotechv1.SiteConfigList{}
+			if err := r.List(ctx, otherConfigs, client.InNamespace(siteConfig.Namespace)); err == nil {
+				activeKeys := make(map[string]bool)
+				for _, other := range otherConfigs.Items {
+					if other.Name == siteConfig.Name || other.DeletionTimestamp != nil {
+						continue
+					}
+					otherSiteNs := other.Spec.SiteRef.Namespace
+					if otherSiteNs == "" {
+						otherSiteNs = other.Namespace
+					}
+					if other.Spec.SiteRef.Name == siteConfig.Spec.SiteRef.Name && otherSiteNs == siteNamespace {
+						for _, k := range collectAllKeys(&other) {
+							activeKeys[k] = true
+						}
+					}
+				}
+				if len(activeKeys) > 0 {
+					filtered := make([]string, 0, len(keysToRemove))
+					for _, k := range keysToRemove {
+						if !activeKeys[k] {
+							filtered = append(filtered, k)
+						}
+					}
+					keysToRemove = filtered
+				}
+			}
+
+			if len(keysToRemove) == 0 {
+				logger.Info("All keys from deleted SiteConfig are still retained by other SiteConfigs", "name", siteConfig.Name)
+				return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
+			}
+
 			if site.Spec.BenchRef == nil || site.Spec.BenchRef.Name == "" {
 				return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
 			}
@@ -143,6 +177,8 @@ func (r *SiteConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			for _, c := range existingJob.Status.Conditions {
 				if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
 					logger.Error(fmt.Errorf("cleanup job failed"), "SiteConfig cleanup Job failed; removing finalizer to prevent stuck resource", "job", existingJob.Name)
+					r.Recorder.Eventf(siteConfig, corev1.EventTypeWarning, "CleanupFailed", "Cleanup Job %s failed: keys %v may remain in site_config.json", existingJob.Name, keysToRemove)
+					r.Recorder.Eventf(site, corev1.EventTypeWarning, "SiteConfigCleanupFailed", "Cleanup Job %s for SiteConfig %s failed: keys %v may remain in site_config.json", existingJob.Name, siteConfig.Name, keysToRemove)
 					return ctrl.Result{}, r.removeSiteConfigFinalizer(ctx, siteConfig)
 				}
 			}

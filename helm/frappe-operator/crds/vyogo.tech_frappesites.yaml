@@ -232,6 +232,12 @@ spec:
                   Domain is the external domain for ingress
                   MUST match siteName (defaults to siteName if not specified)
                 type: string
+              enableScheduler:
+                description: |-
+                  EnableScheduler determines whether background scheduler is enabled for this site.
+                  When true, the operator automatically runs `bench --site <site> enable-scheduler`
+                  during site initialization and reconciliation. When false, the operator disables it.
+                type: boolean
               encryptionKeySecretRef:
                 description: |-
                   EncryptionKeySecretRef references a Secret containing an external encryption_key
@@ -1471,6 +1477,10 @@ spec:
               resolvedDomain:
                 description: ResolvedDomain is the final domain after resolution
                 type: string
+              schedulerEnabled:
+                description: SchedulerEnabled indicates whether the background scheduler
+                  is currently enabled on this site.
+                type: boolean
               siteURL:
                 description: SiteURL is the accessible URL
                 type: string
