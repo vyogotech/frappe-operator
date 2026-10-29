@@ -1266,3 +1266,29 @@ func TestMicroservice_ForeignCronJobIsNotTakenOver(t *testing.T) {
 	}
 	expectCondition(t, f.ms(), vyogotechv1.MicroserviceConditionScheduled, metav1.ConditionFalse, "NameConflict")
 }
+
+// A child update can race the cache (e.g. the Deployment controller just
+// wrote the Deployment). That conflict is routine: requeue quietly instead of
+// returning an error, which controller-runtime logs as "Reconciler error".
+func TestMicroservice_ChildUpdateConflictRequeuesWithoutError(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{})
+	f.reconcile() // create everything
+
+	f.r.Client = interceptor.NewClient(f.client.(client.WithWatch), interceptor.Funcs{
+		Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+			if _, ok := obj.(*appsv1.Deployment); ok {
+				return apierrors.NewConflict(appsv1.Resource("deployments"), obj.GetName(), nil)
+			}
+			return c.Update(ctx, obj, opts...)
+		},
+	})
+	f.updateMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Image.Tag = "2.0.0" })
+
+	res, err := f.r.Reconcile(f.ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: msName, Namespace: msNS}})
+	if err != nil {
+		t.Fatalf("a conflict must not surface as a reconcile error: %v", err)
+	}
+	if res.RequeueAfter == 0 {
+		t.Fatal("a conflict must requeue")
+	}
+}

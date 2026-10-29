@@ -65,8 +65,9 @@ const (
 	microservicePortName      = "http"
 	microserviceHealthPath    = "/health"
 
-	microservicePendingRequeue = 30 * time.Second
-	microserviceResync         = 5 * time.Minute
+	microservicePendingRequeue  = 30 * time.Second
+	microserviceConflictRequeue = time.Second
+	microserviceResync          = 5 * time.Minute
 )
 
 // FrappeMicroserviceReconciler reconciles a FrappeMicroservice object.
@@ -106,6 +107,12 @@ func (r *FrappeMicroserviceReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	base := ms.DeepCopy()
 	result, err := r.reconcileMicroservice(ctx, ms)
+	if apierrors.IsConflict(err) {
+		// A child write raced the cache (e.g. the Deployment controller just
+		// updated the Deployment). Routine: retry shortly, without logging an
+		// error or persisting a half-computed status.
+		return ctrl.Result{RequeueAfter: microserviceConflictRequeue}, nil
+	}
 	if err != nil {
 		return ctrl.Result{}, err
 	}
