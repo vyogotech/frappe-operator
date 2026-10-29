@@ -114,10 +114,10 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		siteVersion = site.Annotations["frappe.io/site-version"]
 	}
 
-	if site.DeletionTimestamp == nil &&
-		site.Status.Phase == vyogotechv1.FrappeSitePhaseReady &&
-		site.Generation == site.Status.ObservedGeneration &&
-		siteVersion == site.Status.ObservedSiteVersion {
+	if siteReadyAndUnchanged(site, siteVersion) {
+		if needsDatabaseInfoBackfill(site) {
+			return r.backfillDatabaseInfo(ctx, site)
+		}
 		logger.V(1).Info("Site is Ready and spec/version unchanged, skipping reconciliation")
 		return ctrl.Result{}, nil
 	}
@@ -267,7 +267,7 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	dbInfo, _ := dbProvider.EnsureDatabase(ctx, site)
 	dbCreds, _ := dbProvider.GetCredentials(ctx, site)
-	site.Status.DatabaseName = dbInfo.Name
+	recordDatabaseInfo(site, dbInfo, dbConfig.Provider)
 	site.Status.DatabaseCredentialsSecret = dbCreds.SecretName
 
 	// Initialize Site
@@ -286,8 +286,8 @@ func (r *FrappeSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// External Access (Ingress/Route)
-	if site.Spec.Ingress == nil || site.Spec.Ingress.Enabled == nil || *site.Spec.Ingress.Enabled {
-		if r.IsOpenShift && (site.Spec.RouteConfig == nil || site.Spec.RouteConfig.Enabled == nil || *site.Spec.RouteConfig.Enabled) {
+	if siteIngressEnabled(site) {
+		if siteUsesRoute(r.IsOpenShift, site) {
 			if err := r.ensureRoute(ctx, site, bench, domain); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -403,4 +403,37 @@ func (r *FrappeSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Owns(&networkingv1.Ingress{}).
 		Complete(r)
+}
+
+// backfillDatabaseInfo records the database connection fields on a Ready site
+// whose status predates them, without running the rest of provisioning (init
+// job, ingress, scheduler). EnsureDatabase is idempotent and is what the full
+// reconcile calls on every pass anyway.
+func (r *FrappeSiteReconciler) backfillDatabaseInfo(ctx context.Context, site *vyogotechv1.FrappeSite) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	if site.Spec.BenchRef == nil {
+		return ctrl.Result{}, nil
+	}
+	bench := &vyogotechv1.FrappeBench{}
+	benchKey := types.NamespacedName{Name: site.Spec.BenchRef.Name, Namespace: site.Spec.BenchRef.Namespace}
+	if benchKey.Namespace == "" {
+		benchKey.Namespace = site.Namespace
+	}
+	if err := r.Get(ctx, benchKey, bench); err != nil {
+		logger.Info("Cannot backfill database info: bench not found", "bench", benchKey.Name, "error", err.Error())
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+	dbConfig := r.resolveDBConfig(site, bench)
+	dbProvider, err := database.NewProvider(dbConfig, r.Client, r.Scheme)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to create database provider: %w", err)
+	}
+	dbInfo, err := dbProvider.EnsureDatabase(ctx, site)
+	if err != nil {
+		logger.Info("Cannot backfill database info yet", "error", err.Error())
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+	recordDatabaseInfo(site, dbInfo, dbConfig.Provider)
+	logger.Info("Backfilled database connection info", "host", site.Status.DatabaseHost, "provider", site.Status.DatabaseProvider)
+	return ctrl.Result{}, r.updateStatus(ctx, site)
 }

@@ -202,6 +202,7 @@ rules:
   resources:
   - frappebenches
   - frappebenchpools
+  - frappemicroservices
   - frappesites
   - frappeworkspaces
   - siteapikeys
@@ -238,6 +239,7 @@ rules:
   resources:
   - frappebenches/finalizers
   - frappebenchpools/finalizers
+  - frappemicroservices/finalizers
   - frappesites/finalizers
   - frappeworkspaces/finalizers
   - siteapikeys/finalizers
@@ -267,6 +269,7 @@ rules:
   resources:
   - frappebenches/status
   - frappebenchpools/status
+  - frappemicroservices/status
   - frappesites/status
   - frappeworkspaces/status
   - siteapikeys/status

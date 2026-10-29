@@ -18,6 +18,7 @@ package controllers
 
 import (
 	vyogotechv1 "github.com/vyogotech/frappe-operator/api/v1"
+	"github.com/vyogotech/frappe-operator/controllers/database"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -39,4 +40,37 @@ func (r *FrappeSiteReconciler) getImagePullPolicy(bench *vyogotechv1.FrappeBench
 		return bench.Spec.ImageConfig.PullPolicy
 	}
 	return corev1.PullPolicy("") // Leave empty so Kubernetes defaults apply
+}
+
+// recordDatabaseInfo copies the database connection details into the site
+// status. Dependants such as FrappeMicroservice read them from there instead of
+// calling Provider.EnsureDatabase, which has side effects.
+func recordDatabaseInfo(site *vyogotechv1.FrappeSite, info *database.DatabaseInfo, configuredProvider string) {
+	if info == nil {
+		return
+	}
+	site.Status.DatabaseName = info.Name
+	site.Status.DatabaseHost = info.Host
+	site.Status.DatabasePort = info.Port
+	site.Status.DatabaseProvider = info.Provider
+	if site.Status.DatabaseProvider == "" {
+		site.Status.DatabaseProvider = configuredProvider
+	}
+}
+
+// siteReadyAndUnchanged reports whether a site is Ready and nothing that
+// drives provisioning (spec generation, site-version annotation) has changed,
+// so the full reconcile can be skipped.
+func siteReadyAndUnchanged(site *vyogotechv1.FrappeSite, siteVersion string) bool {
+	return site.DeletionTimestamp == nil &&
+		site.Status.Phase == vyogotechv1.FrappeSitePhaseReady &&
+		site.Generation == site.Status.ObservedGeneration &&
+		siteVersion == site.Status.ObservedSiteVersion
+}
+
+// needsDatabaseInfoBackfill reports whether a site's status predates the
+// database connection fields. Sites made Ready by an older operator never pass
+// through provisioning again, so their connection info is backfilled once.
+func needsDatabaseInfoBackfill(site *vyogotechv1.FrappeSite) bool {
+	return site.Status.DatabaseProvider == ""
 }

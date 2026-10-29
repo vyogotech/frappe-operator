@@ -13,7 +13,7 @@ not usable here: "*" would also match /finalizers, and handing edit users
 finalizer writes is not something an aggregated role should do.
 */}}
 {{- $crds := list
-  "frappebenches" "frappesites" "frappeworkspaces" "siteapikeys" "siteapps"
+  "frappebenches" "frappemicroservices" "frappesites" "frappeworkspaces" "siteapikeys" "siteapps"
   "sitebackups" "siteclientscripts" "siteconfigs" "sitecrons" "sitecustomfields"
   "sitedashboardcharts" "sitedashboards" "sitedomains" "sitejobs" "sitemigrations"
   "sitepropertysetters" "sitequotas" "siterestores" "siteroles" "siteserverscripts"

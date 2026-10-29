@@ -318,6 +318,11 @@ status:
   
   # Name of the actual database created
   databaseName: string
+
+  # In-cluster database host, port and resolved provider (used by FrappeMicroservice)
+  databaseHost: string
+  databasePort: string
+  databaseProvider: string
   
   # Secret containing site-specific DB credentials
   databaseCredentialsSecret: string
@@ -467,6 +472,47 @@ ingress:
 ```
 
 ---
+
+## <i data-lucide="boxes"></i> FrappeMicroservice
+
+Runs a frappe-microservice-lib service bound to a `FrappeSite` in the same
+namespace: a site binding Secret, a Deployment, a ClusterIP Service and, when
+`spec.routing.paths` is set, an Ingress (or OpenShift Routes) on the site's
+domain. Short name `fms`. See the [Frappe Microservices guide](FRAPPE_MICROSERVICE.md)
+for the binding contract, routing behaviour and validation rules.
+
+### Spec
+
+```yaml
+spec:
+  siteRef:
+    name: string            # required, immutable, same namespace
+  image:
+    repository: string      # required
+    tag: string             # default "latest"
+    pullPolicy: string
+    pullSecrets: [{name: string}]
+  port: int32               # default 8000, 1-65535
+  routing:
+    paths: [string]         # 1-16 path prefixes; omit for in-cluster only
+  replicas: int32           # default 1, minimum 0
+  resources:
+    requests: {}
+    limits: {}
+  env: [EnvVar]             # FRAPPE_SITE, CENTRAL_SITE_URL, PORT, DB_* rejected
+```
+
+### Status
+
+```yaml
+status:
+  phase: Pending | Ready | Failed
+  readyReplicas: int32
+  serviceURL: string
+  externalURLs: [string]
+  observedGeneration: int64
+  conditions: []            # SiteReady, Available, Routed
+```
 
 ## SiteUser
 

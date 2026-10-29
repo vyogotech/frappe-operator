@@ -132,6 +132,21 @@ type FrappeSiteStatus struct {
 	// +optional
 	DatabaseName string `json:"databaseName,omitempty"`
 
+	// DatabaseHost is the host the site's database is reachable at in-cluster.
+	// Recorded so dependants (e.g. FrappeMicroservice) can bind to the site
+	// without re-running database provisioning.
+	// +optional
+	DatabaseHost string `json:"databaseHost,omitempty"`
+
+	// DatabasePort is the port of the site's database.
+	// +optional
+	DatabasePort string `json:"databasePort,omitempty"`
+
+	// DatabaseProvider is the resolved database provider (mariadb, postgres,
+	// sqlite or the external type).
+	// +optional
+	DatabaseProvider string `json:"databaseProvider,omitempty"`
+
 	// DatabaseCredentialsSecret is the name of the Secret with site-specific DB credentials
 	// +optional
 	DatabaseCredentialsSecret string `json:"databaseCredentialsSecret,omitempty"`

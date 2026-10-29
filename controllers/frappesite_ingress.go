@@ -38,7 +38,7 @@ func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotec
 	logger := log.FromContext(ctx)
 
 	// Check if Ingress is disabled
-	if site.Spec.Ingress != nil && site.Spec.Ingress.Enabled != nil && !*site.Spec.Ingress.Enabled {
+	if !siteIngressEnabled(site) {
 		logger.Info("Ingress creation disabled by user", "site", site.Name)
 		return nil
 	}
@@ -58,13 +58,7 @@ func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotec
 
 	logger.Info("Creating Ingress", "ingress", ingressName, "domain", domain)
 
-	// Determine ingress class
-	ingressClassName := "nginx" // Default
-	if site.Spec.IngressClassName != "" {
-		ingressClassName = site.Spec.IngressClassName
-	} else if site.Spec.Ingress != nil && site.Spec.Ingress.ClassName != "" {
-		ingressClassName = site.Spec.Ingress.ClassName
-	}
+	ingressClassName := siteIngressClassName(site)
 
 	// Validate IngressClass existence (optional/warning)
 	// (Skipping for brevity in this refactored version, but keeping logic if needed)
@@ -96,11 +90,7 @@ func (r *FrappeSiteReconciler) ensureIngress(ctx context.Context, site *vyogotec
 		WithOwner(site, r.Scheme)
 
 	if tls {
-		tlsSecretName := site.Spec.TLS.SecretName
-		if tlsSecretName == "" {
-			tlsSecretName = fmt.Sprintf("%s-tls", site.Name)
-		}
-		builder.WithTLS([]string{domain}, tlsSecretName)
+		builder.WithTLS([]string{domain}, siteTLSSecretName(site))
 
 		issuer := site.Spec.TLS.Issuer
 		if issuer == "" {
@@ -162,21 +152,8 @@ func (r *FrappeSiteReconciler) ensureRoute(ctx context.Context, site *vyogotechv
 
 	nginxSvcName := fmt.Sprintf("%s-nginx", bench.Name)
 
-	routeHost := domain
-	if site.Spec.RouteConfig != nil && site.Spec.RouteConfig.Host != "" {
-		routeHost = site.Spec.RouteConfig.Host
-	}
-
-	// Determine TLS termination
-	tlsTermination := routev1.TLSTerminationEdge
-	if site.Spec.RouteConfig != nil && site.Spec.RouteConfig.TLSTermination != "" {
-		switch site.Spec.RouteConfig.TLSTermination {
-		case "passthrough":
-			tlsTermination = routev1.TLSTerminationPassthrough
-		case "reencrypt":
-			tlsTermination = routev1.TLSTerminationReencrypt
-		}
-	}
+	routeHost := siteRouteHost(site, domain)
+	tlsTermination := siteRouteTermination(site)
 
 	route = &routev1.Route{
 		ObjectMeta: metav1.ObjectMeta{

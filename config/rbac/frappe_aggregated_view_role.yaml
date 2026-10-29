@@ -18,6 +18,7 @@ rules:
   - vyogo.tech
   resources:
   - frappebenches
+  - frappemicroservices
   - frappesites
   - frappeworkspaces
   - siteapikeys
@@ -49,6 +50,7 @@ rules:
   - vyogo.tech
   resources:
   - frappebenches/status
+  - frappemicroservices/status
   - frappesites/status
   - frappeworkspaces/status
   - siteapikeys/status

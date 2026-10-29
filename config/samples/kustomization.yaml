@@ -13,4 +13,5 @@ resources:
 - v1_sitedashboardchart.yaml
 - v1_sitedashboard.yaml
 - v1_sitejob.yaml
+- v1_frappemicroservice.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

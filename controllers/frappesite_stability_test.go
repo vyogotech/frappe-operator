@@ -154,6 +154,34 @@ var _ = Describe("FrappeSite Reconciliation Stability", func() {
 			Expect(err).To(HaveOccurred()) // Job should not exist
 		})
 
+		It("backfills database connection info on a Ready site from an older operator without re-provisioning", func() {
+			// Given: a Ready site whose status has no database connection fields
+			site.Status.Phase = vyogotechv1.FrappeSitePhaseReady
+			site.Status.ObservedGeneration = site.Generation
+			Expect(site.Status.DatabaseProvider).To(BeEmpty())
+			Expect(fakeClient.Create(ctx, site)).To(Succeed())
+
+			// When: Reconcile is called
+			req := ctrl.Request{NamespacedName: types.NamespacedName{Name: site.Name, Namespace: site.Namespace}}
+			result, err := reconciler.Reconcile(ctx, req)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
+
+			// Then: the connection info is recorded and the site stays Ready
+			updatedSite := &vyogotechv1.FrappeSite{}
+			Expect(fakeClient.Get(ctx, req.NamespacedName, updatedSite)).To(Succeed())
+			Expect(updatedSite.Status.Phase).To(Equal(vyogotechv1.FrappeSitePhaseReady))
+			Expect(updatedSite.Status.DatabaseProvider).To(Equal("mariadb"))
+			Expect(updatedSite.Status.DatabaseHost).NotTo(BeEmpty())
+			Expect(updatedSite.Status.DatabasePort).NotTo(BeEmpty())
+			Expect(updatedSite.Status.DatabaseName).NotTo(BeEmpty())
+
+			// And: no init job is created
+			job := &batchv1.Job{}
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: site.Name + "-init", Namespace: site.Namespace}, job)
+			Expect(err).To(HaveOccurred())
+		})
+
 		It("should re-reconcile a Ready site when spec changes (Generation mismatch)", func() {
 			// Given: A site that is Ready but has a spec change (Generation > ObservedGeneration)
 			site.Generation = 2

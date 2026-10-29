@@ -45,6 +45,7 @@ Frappe Operator brings cloud-native Kubernetes orchestration to Frappe deploymen
 ### <i data-lucide="activity"></i> Day-2 Operations & Reference
 - **[Operations Guide](operations.md)** - Site provisioning, updates, and maintenance
 - **[Site App Installation](SITE_APP_INSTALLATION.md)** - Declarative per-site app installation
+- **[Frappe Microservices](FRAPPE_MICROSERVICE.md)** - Run frappe-microservice-lib services bound to a site, with optional path routing on its domain
 - **[API Reference](api-reference.md)** - Complete CRD specification
 - **[Examples](examples.md)** - Ready-to-use production manifests
 - **[Troubleshooting Guide](troubleshooting.md)** - Common issues, diagnostics, and debugging
