@@ -505,6 +505,19 @@ spec:
     replicas: int32         # default 1, minimum 0
     routing:
       paths: [string]       # 1-16 path prefixes; omit for in-cluster only
+    autoscaling:            # optional; the autoscaler then owns the replica count
+      minReplicas: int32    # default 1; 0 only with keda
+      maxReplicas: int32    # required
+      targetCPUUtilizationPercentage: int32      # needs resources.requests.cpu
+      targetMemoryUtilizationPercentage: int32   # needs resources.requests.memory
+      keda:                 # instead of CPU/memory targets
+        pollingInterval: int32
+        cooldownPeriod: int32
+        triggers:           # at least one
+        - type: string      # e.g. redis
+          name: string
+          metadata: {string: string}
+          authenticationRef: string   # TriggerAuthentication name
 
   job:                      # type: Job or CronJob
     backoffLimit: int32
@@ -529,12 +542,13 @@ status:
   readyReplicas: int32      # Deployment
   serviceURL: string        # Deployment
   externalURLs: [string]    # Deployment with routing
+  autoscaling: {currentReplicas: int32, desiredReplicas: int32}   # Deployment with autoscaling
   jobName: string           # Job
   lastScheduleTime: time    # CronJob
   lastSuccessfulTime: time  # CronJob
   activeJobs: int32         # CronJob
   observedGeneration: int64
-  conditions: []            # SiteReady; Available, Routed; Complete; Scheduled
+  conditions: []            # SiteReady; Available, Routed, AutoscalingReady; Complete; Scheduled
 ```
 
 ## SiteUser

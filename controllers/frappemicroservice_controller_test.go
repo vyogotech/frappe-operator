@@ -23,6 +23,7 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -127,7 +128,7 @@ func newMSFixture(t *testing.T, o msFixtureOpts) *msFixture {
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(objs...).
-		WithStatusSubresource(&vyogotechv1.FrappeMicroservice{}, &vyogotechv1.FrappeSite{}, &appsv1.Deployment{}, &networkingv1.Ingress{}, &routev1.Route{}, &batchv1.Job{}, &batchv1.CronJob{}).
+		WithStatusSubresource(&vyogotechv1.FrappeMicroservice{}, &vyogotechv1.FrappeSite{}, &appsv1.Deployment{}, &networkingv1.Ingress{}, &routev1.Route{}, &batchv1.Job{}, &batchv1.CronJob{}, &autoscalingv2.HorizontalPodAutoscaler{}).
 		WithIndex(&vyogotechv1.FrappeMicroservice{}, microserviceSiteRefIndex, indexMicroserviceBySiteRef).
 		Build()
 

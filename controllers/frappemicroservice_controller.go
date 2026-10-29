@@ -27,6 +27,7 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -88,6 +89,8 @@ type FrappeMicroserviceReconciler struct {
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=batch,resources=jobs;cronjobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=keda.sh,resources=scaledobjects,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=route.openshift.io,resources=routes/custom-host,verbs=create;update;patch
@@ -258,7 +261,12 @@ func (r *FrappeMicroserviceReconciler) reconcileDeploymentWorkload(ctx context.C
 	}
 	setAvailableCondition(ms, dep)
 
-	// 5. External routing.
+	// 5. Autoscaling.
+	if err := r.reconcileAutoscaling(ctx, ms, dep); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// 6. External routing.
 	if err := r.reconcileRouting(ctx, ms, site); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -366,8 +374,16 @@ func (r *FrappeMicroserviceReconciler) mutateDeployment(ctx context.Context, ms 
 	if dep.Spec.Selector == nil {
 		dep.Spec.Selector = &metav1.LabelSelector{MatchLabels: microserviceSelector(ms)}
 	}
-	replicas := microserviceReplicas(ms)
-	dep.Spec.Replicas = &replicas
+	if as := microserviceAutoscaling(ms); as != nil {
+		// The autoscaler owns the count: seed it on creation only.
+		if dep.Spec.Replicas == nil {
+			min := autoscalingMinReplicas(as)
+			dep.Spec.Replicas = &min
+		}
+	} else {
+		replicas := microserviceReplicas(ms)
+		dep.Spec.Replicas = &replicas
+	}
 	dep.Spec.Template.Labels = mergeLabels(dep.Spec.Template.Labels, labels)
 	if dep.Spec.Template.Annotations == nil {
 		dep.Spec.Template.Annotations = map[string]string{}
@@ -445,6 +461,9 @@ func microserviceServiceURL(ms *vyogotechv1.FrappeMicroservice) string {
 
 func setAvailableCondition(ms *vyogotechv1.FrappeMicroservice, dep *appsv1.Deployment) {
 	desired := microserviceReplicas(ms)
+	if microserviceAutoscaling(ms) != nil {
+		desired = deploymentDesired(dep)
+	}
 	ready := dep.Status.ReadyReplicas
 	ms.Status.ReadyReplicas = ready
 	cond := metav1.Condition{Type: vyogotechv1.MicroserviceConditionAvailable, ObservedGeneration: ms.Generation}
@@ -838,6 +857,7 @@ func (r *FrappeMicroserviceReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Owns(&networkingv1.Ingress{}).
 		Owns(&batchv1.Job{}).
 		Owns(&batchv1.CronJob{}).
+		Owns(&autoscalingv2.HorizontalPodAutoscaler{}).
 		Watches(&vyogotechv1.FrappeSite{}, handler.EnqueueRequestsFromMapFunc(r.requestsForSite)).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.requestsForSecret))
 	if r.IsOpenShift {

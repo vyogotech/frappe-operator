@@ -5087,6 +5087,100 @@ spec:
               deployment:
                 description: Deployment settings. Only valid when type is Deployment.
                 properties:
+                  autoscaling:
+                    description: |-
+                      Autoscaling lets a HorizontalPodAutoscaler (CPU or memory) or a KEDA
+                      ScaledObject (event-driven), both owned by the operator, scale the
+                      Deployment. The operator then sets the Deployment's replicas only when it
+                      creates it, so it and the autoscaler never fight over the count.
+                    properties:
+                      keda:
+                        description: |-
+                          Keda scales the Deployment with a KEDA ScaledObject instead of a
+                          HorizontalPodAutoscaler. Needs KEDA installed in the cluster.
+                        properties:
+                          cooldownPeriod:
+                            description: |-
+                              CooldownPeriod in seconds to wait after the last active trigger before
+                              scaling back to minReplicas. KEDA defaults to 300.
+                            format: int32
+                            minimum: 0
+                            type: integer
+                          pollingInterval:
+                            description: PollingInterval in seconds between trigger checks. KEDA defaults to 30.
+                            format: int32
+                            minimum: 1
+                            type: integer
+                          triggers:
+                            description: Triggers decide the replica count, e.g. a redis list length.
+                            items:
+                              description: MicroserviceKEDATrigger is one KEDA scaler.
+                              properties:
+                                authenticationRef:
+                                  description: |-
+                                    AuthenticationRef names a KEDA TriggerAuthentication in this namespace
+                                    that supplies the scaler's credentials.
+                                  type: string
+                                metadata:
+                                  additionalProperties:
+                                    type: string
+                                  description: Metadata is the scaler configuration, passed to KEDA as is.
+                                  type: object
+                                name:
+                                  description: Name of the trigger, unique within the ScaledObject. Optional.
+                                  type: string
+                                type:
+                                  description: Type of the KEDA scaler, e.g. redis, cpu, prometheus.
+                                  minLength: 1
+                                  type: string
+                              required:
+                              - type
+                              type: object
+                            maxItems: 16
+                            minItems: 1
+                            type: array
+                        required:
+                        - triggers
+                        type: object
+                      maxReplicas:
+                        description: MaxReplicas is the upper bound.
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      minReplicas:
+                        description: MinReplicas is the lower bound. Defaults to 1.
+                        format: int32
+                        minimum: 0
+                        type: integer
+                      targetCPUUtilizationPercentage:
+                        description: |-
+                          TargetCPUUtilizationPercentage is the average CPU utilization, relative
+                          to resources.requests.cpu, the HorizontalPodAutoscaler aims for.
+                        format: int32
+                        maximum: 1000
+                        minimum: 1
+                        type: integer
+                      targetMemoryUtilizationPercentage:
+                        description: |-
+                          TargetMemoryUtilizationPercentage is the average memory utilization,
+                          relative to resources.requests.memory, the HorizontalPodAutoscaler aims
+                          for.
+                        format: int32
+                        maximum: 1000
+                        minimum: 1
+                        type: integer
+                    required:
+                    - maxReplicas
+                    type: object
+                    x-kubernetes-validations:
+                    - message: minReplicas must not exceed maxReplicas
+                      rule: '!has(self.minReplicas) || self.minReplicas <= self.maxReplicas'
+                    - message: minReplicas must be at least 1 unless keda is set (only KEDA can scale to zero)
+                      rule: has(self.keda) || !has(self.minReplicas) || self.minReplicas >= 1
+                    - message: set a CPU or memory utilization target, or keda with at least one trigger
+                      rule: 'has(self.keda) ? size(self.keda.triggers) > 0 : (has(self.targetCPUUtilizationPercentage) || has(self.targetMemoryUtilizationPercentage))'
+                    - message: keda cannot be combined with CPU or memory targets; use a cpu or memory KEDA trigger instead
+                      rule: '!has(self.keda) || (!has(self.targetCPUUtilizationPercentage) && !has(self.targetMemoryUtilizationPercentage))'
                   port:
                     default: 8000
                     description: |-
@@ -5098,7 +5192,9 @@ spec:
                     type: integer
                   replicas:
                     default: 1
-                    description: Replicas of the Deployment.
+                    description: |-
+                      Replicas of the Deployment. With autoscaling set, the autoscaler owns the
+                      replica count and this value applies only once autoscaling is removed.
                     format: int32
                     minimum: 0
                     type: integer
@@ -5403,6 +5499,10 @@ spec:
             - siteRef
             type: object
             x-kubernetes-validations:
+            - message: targetCPUUtilizationPercentage requires resources.requests.cpu
+              rule: '!has(self.deployment) || !has(self.deployment.autoscaling) || !has(self.deployment.autoscaling.targetCPUUtilizationPercentage) || (has(self.resources) && has(self.resources.requests) && ''cpu'' in self.resources.requests)'
+            - message: targetMemoryUtilizationPercentage requires resources.requests.memory
+              rule: '!has(self.deployment) || !has(self.deployment.autoscaling) || !has(self.deployment.autoscaling.targetMemoryUtilizationPercentage) || (has(self.resources) && has(self.resources.requests) && ''memory'' in self.resources.requests)'
             - message: deployment is only valid when type is Deployment
               rule: self.type == 'Deployment' || !has(self.deployment)
             - message: job is only valid when type is Job or CronJob
@@ -5418,6 +5518,23 @@ spec:
                 description: ActiveJobs is the number of running Jobs started by the CronJob.
                 format: int32
                 type: integer
+              autoscaling:
+                description: |-
+                  Autoscaling reports the replica counts while spec.deployment.autoscaling
+                  is set (type Deployment).
+                properties:
+                  currentReplicas:
+                    description: CurrentReplicas is the number of pods the Deployment runs now.
+                    format: int32
+                    type: integer
+                  desiredReplicas:
+                    description: DesiredReplicas is the count the autoscaler asks for.
+                    format: int32
+                    type: integer
+                required:
+                - currentReplicas
+                - desiredReplicas
+                type: object
               conditions:
                 description: |-
                   Conditions: SiteReady always; Available and Routed (Deployment);

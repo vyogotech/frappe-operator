@@ -76,7 +76,8 @@ type MicroserviceDeploymentSpec struct {
 	// +optional
 	Port int32 `json:"port,omitempty"`
 
-	// Replicas of the Deployment.
+	// Replicas of the Deployment. With autoscaling set, the autoscaler owns the
+	// replica count and this value applies only once autoscaling is removed.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	// +optional
@@ -86,6 +87,90 @@ type MicroserviceDeploymentSpec struct {
 	// microservice is only reachable in-cluster through its ClusterIP Service.
 	// +optional
 	Routing *MicroserviceRouting `json:"routing,omitempty"`
+
+	// Autoscaling lets a HorizontalPodAutoscaler (CPU or memory) or a KEDA
+	// ScaledObject (event-driven), both owned by the operator, scale the
+	// Deployment. The operator then sets the Deployment's replicas only when it
+	// creates it, so it and the autoscaler never fight over the count.
+	// +optional
+	Autoscaling *MicroserviceAutoscaling `json:"autoscaling,omitempty"`
+}
+
+// MicroserviceAutoscaling configures horizontal autoscaling of a Deployment
+// microservice. Set CPU and/or memory targets for a HorizontalPodAutoscaler, or
+// keda for a KEDA ScaledObject.
+// +kubebuilder:validation:XValidation:rule="!has(self.minReplicas) || self.minReplicas <= self.maxReplicas",message="minReplicas must not exceed maxReplicas"
+// +kubebuilder:validation:XValidation:rule="has(self.keda) || !has(self.minReplicas) || self.minReplicas >= 1",message="minReplicas must be at least 1 unless keda is set (only KEDA can scale to zero)"
+// +kubebuilder:validation:XValidation:rule="has(self.keda) ? size(self.keda.triggers) > 0 : (has(self.targetCPUUtilizationPercentage) || has(self.targetMemoryUtilizationPercentage))",message="set a CPU or memory utilization target, or keda with at least one trigger"
+// +kubebuilder:validation:XValidation:rule="!has(self.keda) || (!has(self.targetCPUUtilizationPercentage) && !has(self.targetMemoryUtilizationPercentage))",message="keda cannot be combined with CPU or memory targets; use a cpu or memory KEDA trigger instead"
+type MicroserviceAutoscaling struct {
+	// MinReplicas is the lower bound. Defaults to 1.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+
+	// MaxReplicas is the upper bound.
+	// +kubebuilder:validation:Minimum=1
+	MaxReplicas int32 `json:"maxReplicas"`
+
+	// TargetCPUUtilizationPercentage is the average CPU utilization, relative
+	// to resources.requests.cpu, the HorizontalPodAutoscaler aims for.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=1000
+	// +optional
+	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty"`
+
+	// TargetMemoryUtilizationPercentage is the average memory utilization,
+	// relative to resources.requests.memory, the HorizontalPodAutoscaler aims
+	// for.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=1000
+	// +optional
+	TargetMemoryUtilizationPercentage *int32 `json:"targetMemoryUtilizationPercentage,omitempty"`
+
+	// Keda scales the Deployment with a KEDA ScaledObject instead of a
+	// HorizontalPodAutoscaler. Needs KEDA installed in the cluster.
+	// +optional
+	Keda *MicroserviceKEDA `json:"keda,omitempty"`
+}
+
+// MicroserviceKEDA configures the KEDA ScaledObject.
+type MicroserviceKEDA struct {
+	// PollingInterval in seconds between trigger checks. KEDA defaults to 30.
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	PollingInterval *int32 `json:"pollingInterval,omitempty"`
+
+	// CooldownPeriod in seconds to wait after the last active trigger before
+	// scaling back to minReplicas. KEDA defaults to 300.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	CooldownPeriod *int32 `json:"cooldownPeriod,omitempty"`
+
+	// Triggers decide the replica count, e.g. a redis list length.
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=16
+	Triggers []MicroserviceKEDATrigger `json:"triggers"`
+}
+
+// MicroserviceKEDATrigger is one KEDA scaler.
+type MicroserviceKEDATrigger struct {
+	// Type of the KEDA scaler, e.g. redis, cpu, prometheus.
+	// +kubebuilder:validation:MinLength=1
+	Type string `json:"type"`
+
+	// Name of the trigger, unique within the ScaledObject. Optional.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Metadata is the scaler configuration, passed to KEDA as is.
+	// +optional
+	Metadata map[string]string `json:"metadata,omitempty"`
+
+	// AuthenticationRef names a KEDA TriggerAuthentication in this namespace
+	// that supplies the scaler's credentials.
+	// +optional
+	AuthenticationRef string `json:"authenticationRef,omitempty"`
 }
 
 // MicroserviceJobSpec holds the run settings of type Job, and of every Job a
@@ -148,6 +233,8 @@ type MicroserviceCronJobSpec struct {
 }
 
 // FrappeMicroserviceSpec defines the desired state of FrappeMicroservice.
+// +kubebuilder:validation:XValidation:rule="!has(self.deployment) || !has(self.deployment.autoscaling) || !has(self.deployment.autoscaling.targetCPUUtilizationPercentage) || (has(self.resources) && has(self.resources.requests) && 'cpu' in self.resources.requests)",message="targetCPUUtilizationPercentage requires resources.requests.cpu"
+// +kubebuilder:validation:XValidation:rule="!has(self.deployment) || !has(self.deployment.autoscaling) || !has(self.deployment.autoscaling.targetMemoryUtilizationPercentage) || (has(self.resources) && has(self.resources.requests) && 'memory' in self.resources.requests)",message="targetMemoryUtilizationPercentage requires resources.requests.memory"
 // +kubebuilder:validation:XValidation:rule="self.type == 'Deployment' || !has(self.deployment)",message="deployment is only valid when type is Deployment"
 // +kubebuilder:validation:XValidation:rule="self.type != 'Deployment' || !has(self.job)",message="job is only valid when type is Job or CronJob"
 // +kubebuilder:validation:XValidation:rule="(self.type == 'CronJob') == has(self.cronJob)",message="cronJob is required when type is CronJob, and only valid then"
@@ -233,7 +320,20 @@ const (
 	// MicroserviceConditionScheduled (type CronJob): True once the CronJob
 	// exists; reason Suspended when it is paused.
 	MicroserviceConditionScheduled = "Scheduled"
+	// MicroserviceConditionAutoscalingReady: only set when
+	// spec.deployment.autoscaling is present. True once the HorizontalPodAutoscaler
+	// or ScaledObject exists and is active; False with reason KEDANotInstalled
+	// when keda is requested but the cluster has no KEDA CRDs.
+	MicroserviceConditionAutoscalingReady = "AutoscalingReady"
 )
+
+// MicroserviceAutoscalingStatus is the observed state of the autoscaler.
+type MicroserviceAutoscalingStatus struct {
+	// CurrentReplicas is the number of pods the Deployment runs now.
+	CurrentReplicas int32 `json:"currentReplicas"`
+	// DesiredReplicas is the count the autoscaler asks for.
+	DesiredReplicas int32 `json:"desiredReplicas"`
+}
 
 // FrappeMicroserviceStatus defines the observed state of FrappeMicroservice.
 type FrappeMicroserviceStatus struct {
@@ -269,6 +369,11 @@ type FrappeMicroserviceStatus struct {
 	// ActiveJobs is the number of running Jobs started by the CronJob.
 	// +optional
 	ActiveJobs int32 `json:"activeJobs,omitempty"`
+
+	// Autoscaling reports the replica counts while spec.deployment.autoscaling
+	// is set (type Deployment).
+	// +optional
+	Autoscaling *MicroserviceAutoscalingStatus `json:"autoscaling,omitempty"`
 
 	// ObservedGeneration is the generation last reconciled.
 	// +optional

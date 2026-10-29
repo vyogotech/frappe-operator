@@ -155,8 +155,9 @@ Shared by every type:
 | Field | Description |
 |---|---|
 | `port` | Port the container listens on and the Service exposes. Default `8000`, range 1–65535. Passed to the container as `PORT`. |
-| `replicas` | Default `1`, minimum `0`. |
+| `replicas` | Default `1`, minimum `0`. With `autoscaling` set it is only used once autoscaling is removed. |
 | `routing.paths` | Path prefixes on the site's domain. When omitted, no Ingress or Route is created. |
+| `autoscaling` | Scales the Deployment with a HorizontalPodAutoscaler or a KEDA ScaledObject. See [Autoscaling](#autoscaling). |
 
 `job`, valid with `type: Job` and `type: CronJob` (applies to every run):
 
@@ -176,6 +177,69 @@ Shared by every type:
 | `suspend` | Pauses future runs. |
 | `startingDeadlineSeconds` | Skip a missed run after this long. |
 | `successfulJobsHistoryLimit`, `failedJobsHistoryLimit` | How many finished Jobs to keep. |
+
+## Autoscaling
+
+`deployment.autoscaling` makes the operator create and own an autoscaler that
+targets the generated Deployment. Both kinds carry an owner reference, so they
+are deleted with the microservice.
+
+CPU or memory, through a `HorizontalPodAutoscaler`:
+
+```yaml
+spec:
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+  deployment:
+    replicas: 2                  # used on removal of autoscaling
+    autoscaling:
+      minReplicas: 2             # default 1
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80   # optional
+```
+
+Event-driven, through a KEDA `ScaledObject` (KEDA must be installed):
+
+```yaml
+spec:
+  deployment:
+    autoscaling:
+      minReplicas: 0             # KEDA can scale to zero
+      maxReplicas: 20
+      keda:
+        pollingInterval: 15
+        cooldownPeriod: 120
+        triggers:
+          - type: redis
+            metadata:
+              address: redis-queue:6379
+              listName: rq:queue:default
+              listLength: "50"
+            authenticationRef: redis-auth   # optional TriggerAuthentication
+```
+
+Behaviour:
+
+- The operator sets the Deployment's `replicas` only when it creates the
+  Deployment (to `minReplicas`) and never writes it again, so the autoscaler
+  owns the count. Every other spec change still applies.
+- `Available` compares ready replicas with the count the autoscaler chose, not
+  with `deployment.replicas`.
+- Removing `autoscaling` deletes the HPA or ScaledObject and returns the
+  Deployment to `deployment.replicas`. Switching between HPA and KEDA deletes
+  the other kind.
+- An HPA or ScaledObject with the microservice's name that the operator does
+  not own is left untouched and reported as `AutoscalingReady=False`,
+  `NameConflict`.
+- If `keda` is set and the KEDA CRDs are missing, the microservice still
+  reconciles and `AutoscalingReady` is `False` with reason `KEDANotInstalled`.
+  The Deployment stays at the count it has.
+- HPAs need a metrics API (metrics-server). Without it `AutoscalingReady` is
+  `False` with the HPA's own reason, such as `FailedGetResourceMetric`.
+- The operator does not watch ScaledObjects, so a manual edit to one is
+  corrected at the next periodic resync (about every 5 minutes) or the next
+  change to the microservice.
 
 ## Site binding Secret
 
@@ -274,6 +338,11 @@ operator's admission webhooks are off. They only look at the object being saved.
 - `deployment` is only valid for `Deployment`, `job` only for `Job` and
   `CronJob`, and `cronJob` is required exactly when the type is `CronJob`.
 - `Job` and `CronJob` require a `command`.
+- `autoscaling`: `minReplicas` is at most `maxReplicas`, and at least 1 unless
+  `keda` is set. It needs a CPU or memory target, or `keda` with at least one
+  trigger, and `keda` cannot be combined with CPU or memory targets (use a
+  `cpu` or `memory` KEDA trigger). A CPU or memory target needs the matching
+  `resources.requests`.
 - A `Deployment` name is at most 63 characters, because it names the Service.
   A `CronJob` name is at most 52 characters, because Kubernetes appends a
   suffix to each run. `Job` names can be longer; the operator shortens the Job
@@ -299,6 +368,7 @@ orders-nightly-sync   acme-site   CronJob      Ready                            
 |---|---|
 | `phase` | `Deployment`: `Ready` when `SiteReady` and `Available` are true and, if routed, `Routed` is true; `Pending` otherwise. `Job`: `Pending`, `Running`, `Succeeded` or `Failed`. `CronJob`: `Ready` once the CronJob exists. Any type: `Failed` when the site cannot be supported. |
 | `readyReplicas` | From the Deployment. |
+| `autoscaling` | `currentReplicas` and `desiredReplicas` while `deployment.autoscaling` is set. |
 | `serviceURL` | In-cluster URL, `Deployment` only. |
 | `externalURLs` | One per routed path. |
 | `jobName` | The Job of the current run, `Job` only. |
@@ -312,6 +382,7 @@ Conditions:
 | `SiteReady` | all | The site is Ready and the binding Secret is in sync. | `SiteNotFound`, `SiteNotReady`, `DatabaseInfoUnavailable`, `CredentialsUnavailable`, `UnsupportedDatabase` |
 | `Available` | Deployment | Ready replicas reach `replicas` (or `replicas: 0`). | `ReplicasNotReady`, `NameConflict` |
 | `Routed` | Deployment | Kubernetes: the Ingress has a load balancer address. OpenShift: every Route is admitted. Only present when routing is set. | `IngressPending`, `RoutePending`, `RouteNotAdmitted`, `SiteIngressDisabled`, `PassthroughUnsupported`, `NameConflict` |
+| `AutoscalingReady` | Deployment | The HPA or ScaledObject exists and is active. Only present when `autoscaling` is set. | `KEDANotInstalled`, `NameConflict`, the HPA's `ScalingActive` reason (for example `FailedGetResourceMetric`), `ScaledObjectNotReady` |
 | `Complete` | Job | The run succeeded. | `Running`, `Failed`, `NameConflict` |
 | `Scheduled` | CronJob | The CronJob exists. Reason `Suspended` when paused. | `NameConflict` |
 
@@ -324,5 +395,6 @@ loses to another Ingress can still show `Routed=True`.
 - SQLite sites are not supported (`UnsupportedDatabase`).
 - The microservice uses the site's own database user, so it has the same
   database access as the monolith.
-- Autoscaling, serverless (scale-to-zero) workloads and separate microservice
-  databases are not supported yet.
+- Serverless workloads and separate microservice databases are not supported
+  yet. Scale-to-zero is available only through KEDA.
+- Autoscaling does not apply to `Job` and `CronJob` (no parallelism setting).
