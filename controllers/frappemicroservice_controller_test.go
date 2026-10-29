@@ -366,7 +366,7 @@ func TestMicroservice_InternalOnly(t *testing.T) {
 	if pod.SecurityContext == nil || pod.SecurityContext.RunAsNonRoot == nil || !*pod.SecurityContext.RunAsNonRoot {
 		t.Errorf("pod must run as non-root: %+v", pod.SecurityContext)
 	}
-	if dep.Spec.Template.Annotations[bindingHashAnnotation] == "" {
+	if dep.Spec.Template.Annotations[bindingVersionAnnotation] == "" {
 		t.Error("pod template must carry the binding hash")
 	}
 	sel := dep.Spec.Selector.MatchLabels
@@ -501,7 +501,7 @@ func TestMicroservice_CredentialRotationRollsDeployment(t *testing.T) {
 	f.reconcile()
 	dep := &appsv1.Deployment{}
 	f.mustGet(msName, dep)
-	before := dep.Spec.Template.Annotations[bindingHashAnnotation]
+	before := dep.Spec.Template.Annotations[bindingVersionAnnotation]
 
 	src := &corev1.Secret{}
 	f.mustGet("acme-db-password", src)
@@ -517,7 +517,7 @@ func TestMicroservice_CredentialRotationRollsDeployment(t *testing.T) {
 		t.Fatalf("binding not re-synced: DB_PASSWORD = %q", secret.Data["DB_PASSWORD"])
 	}
 	f.mustGet(msName, dep)
-	if after := dep.Spec.Template.Annotations[bindingHashAnnotation]; after == before {
+	if after := dep.Spec.Template.Annotations[bindingVersionAnnotation]; after == before {
 		t.Fatal("binding hash must change so the Deployment rolls")
 	}
 }
@@ -1180,7 +1180,7 @@ func TestMicroservice_CronJob(t *testing.T) {
 	if pod.RestartPolicy != corev1.RestartPolicyNever || strings.Join(pod.Containers[0].Command, " ") != "python -m orders.backfill" {
 		t.Errorf("pod = %s %v", pod.RestartPolicy, pod.Containers[0].Command)
 	}
-	if js.Template.Annotations[bindingHashAnnotation] == "" {
+	if js.Template.Annotations[bindingVersionAnnotation] == "" {
 		t.Error("the job template carries the binding hash so future runs see rotated credentials")
 	}
 	if f.get(msName, &appsv1.Deployment{}) || f.get(msName, &corev1.Service{}) || len(f.jobs()) != 0 {
@@ -1237,7 +1237,7 @@ func TestMicroservice_CronJobPicksUpRotatedCredentials(t *testing.T) {
 	f.reconcile()
 	cj := &batchv1.CronJob{}
 	f.mustGet(msName, cj)
-	before := cj.Spec.JobTemplate.Spec.Template.Annotations[bindingHashAnnotation]
+	before := cj.Spec.JobTemplate.Spec.Template.Annotations[bindingVersionAnnotation]
 
 	src := &corev1.Secret{}
 	f.mustGet("acme-db-password", src)
@@ -1247,7 +1247,7 @@ func TestMicroservice_CronJobPicksUpRotatedCredentials(t *testing.T) {
 	}
 	f.reconcile()
 	f.mustGet(msName, cj)
-	if cj.Spec.JobTemplate.Spec.Template.Annotations[bindingHashAnnotation] == before {
+	if cj.Spec.JobTemplate.Spec.Template.Annotations[bindingVersionAnnotation] == before {
 		t.Fatal("the job template must change when the binding changes")
 	}
 }
@@ -1290,5 +1290,20 @@ func TestMicroservice_ChildUpdateConflictRequeuesWithoutError(t *testing.T) {
 	}
 	if res.RequeueAfter == 0 {
 		t.Fatal("a conflict must requeue")
+	}
+}
+
+// The pod template must not carry anything derived from the database
+// credentials: it follows the binding Secret's resourceVersion, which changes
+// when the Secret changes and reveals nothing about its contents.
+func TestMicroservice_RolloutMarkerIsNotDerivedFromCredentials(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{})
+	f.reconcile()
+	secret := &corev1.Secret{}
+	f.mustGet(msName+"-site", secret)
+	dep := &appsv1.Deployment{}
+	f.mustGet(msName, dep)
+	if got := dep.Spec.Template.Annotations[bindingVersionAnnotation]; got != secret.ResourceVersion {
+		t.Fatalf("marker = %q, want the binding Secret's resourceVersion %q", got, secret.ResourceVersion)
 	}
 }

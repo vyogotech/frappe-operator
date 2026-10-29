@@ -21,7 +21,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -55,9 +54,10 @@ const (
 	// microserviceLabel is set on every object a FrappeMicroservice owns and is
 	// the Deployment/Service selector.
 	microserviceLabel = "vyogo.tech/microservice"
-	// bindingHashAnnotation on the pod template changes whenever the site
-	// binding Secret changes, so credential rotation rolls the Deployment.
-	bindingHashAnnotation = "vyogo.tech/site-binding-hash"
+	// bindingVersionAnnotation on the pod template holds the binding Secret's
+	// resourceVersion, so a changed binding (e.g. rotated credentials) rolls the
+	// Deployment. It is deliberately not a hash of the Secret's contents.
+	bindingVersionAnnotation = "vyogo.tech/site-binding-version"
 	// microserviceSiteRefIndex indexes FrappeMicroservices by spec.siteRef.name.
 	microserviceSiteRefIndex = "spec.siteRef.name"
 
@@ -215,24 +215,24 @@ func (r *FrappeMicroserviceReconciler) reconcileMicroservice(ctx context.Context
 		ObservedGeneration: ms.Generation,
 	})
 
-	hash := bindingHash(binding)
+	version := secret.ResourceVersion
 	switch microserviceType(ms) {
 	case vyogotechv1.MicroserviceTypeJob:
 		return r.reconcileJob(ctx, ms)
 	case vyogotechv1.MicroserviceTypeCronJob:
-		return r.reconcileCronJob(ctx, ms, hash)
+		return r.reconcileCronJob(ctx, ms, version)
 	default:
-		return r.reconcileDeploymentWorkload(ctx, ms, site, hash)
+		return r.reconcileDeploymentWorkload(ctx, ms, site, version)
 	}
 }
 
 // reconcileDeploymentWorkload handles type Deployment: Deployment, Service and
 // optional routing.
-func (r *FrappeMicroserviceReconciler) reconcileDeploymentWorkload(ctx context.Context, ms *vyogotechv1.FrappeMicroservice, site *vyogotechv1.FrappeSite, hash string) (ctrl.Result, error) {
+func (r *FrappeMicroserviceReconciler) reconcileDeploymentWorkload(ctx context.Context, ms *vyogotechv1.FrappeMicroservice, site *vyogotechv1.FrappeSite, version string) (ctrl.Result, error) {
 	// 3. Deployment.
 	dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: ms.Name, Namespace: ms.Namespace}}
 	conflict, err := r.createOrUpdateOwned(ctx, ms, dep, func() error {
-		r.mutateDeployment(ctx, ms, dep, hash)
+		r.mutateDeployment(ctx, ms, dep, version)
 		return nil
 	})
 	if err != nil {
@@ -304,22 +304,6 @@ func microserviceBindingData(ms *vyogotechv1.FrappeMicroservice, site *vyogotech
 	return out
 }
 
-func bindingHash(data map[string][]byte) string {
-	keys := make([]string, 0, len(data))
-	for k := range data {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	h := sha256.New()
-	for _, k := range keys {
-		h.Write([]byte(k))
-		h.Write([]byte{0})
-		h.Write(data[k])
-		h.Write([]byte{0})
-	}
-	return hex.EncodeToString(h.Sum(nil))[:16]
-}
-
 // --- workload ------------------------------------------------------------------
 
 func microserviceType(ms *vyogotechv1.FrappeMicroservice) vyogotechv1.MicroserviceType {
@@ -375,7 +359,7 @@ func microserviceImage(ms *vyogotechv1.FrappeMicroservice) string {
 	return fmt.Sprintf("%s:%s", ms.Spec.Image.Repository, tag)
 }
 
-func (r *FrappeMicroserviceReconciler) mutateDeployment(ctx context.Context, ms *vyogotechv1.FrappeMicroservice, dep *appsv1.Deployment, hash string) {
+func (r *FrappeMicroserviceReconciler) mutateDeployment(ctx context.Context, ms *vyogotechv1.FrappeMicroservice, dep *appsv1.Deployment, version string) {
 	labels := microserviceLabels(ms)
 	dep.Labels = mergeLabels(dep.Labels, labels)
 	// The selector is immutable; only set it on creation.
@@ -388,7 +372,7 @@ func (r *FrappeMicroserviceReconciler) mutateDeployment(ctx context.Context, ms 
 	if dep.Spec.Template.Annotations == nil {
 		dep.Spec.Template.Annotations = map[string]string{}
 	}
-	dep.Spec.Template.Annotations[bindingHashAnnotation] = hash
+	dep.Spec.Template.Annotations[bindingVersionAnnotation] = version
 
 	r.mutatePodSpec(ctx, ms, &dep.Spec.Template.Spec, true)
 }

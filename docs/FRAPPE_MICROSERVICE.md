@@ -192,7 +192,7 @@ edit it; it is rewritten on every reconcile.
 | `DB_USER`, `DB_PASSWORD` | The site's database user, read through the site's database provider. |
 
 When the site's database password changes, the operator rewrites the Secret.
-For a Deployment it also changes the `vyogo.tech/site-binding-hash` annotation
+For a Deployment it also changes the `vyogo.tech/site-binding-version` annotation
 on the pod template, so the Deployment rolls. A CronJob gets the same annotation
 on its job template, so the next run uses the new credentials. A Job that has
 already been created is not re-run. The operator also resyncs every five

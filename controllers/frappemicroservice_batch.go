@@ -193,7 +193,7 @@ func (r *FrappeMicroserviceReconciler) pruneJobs(ctx context.Context, ms *vyogot
 }
 
 // reconcileCronJob handles type CronJob.
-func (r *FrappeMicroserviceReconciler) reconcileCronJob(ctx context.Context, ms *vyogotechv1.FrappeMicroservice, hash string) (ctrl.Result, error) {
+func (r *FrappeMicroserviceReconciler) reconcileCronJob(ctx context.Context, ms *vyogotechv1.FrappeMicroservice, version string) (ctrl.Result, error) {
 	spec := ms.Spec.CronJob
 	if spec == nil {
 		// Rejected by CEL; guard against objects created before validation.
@@ -214,9 +214,9 @@ func (r *FrappeMicroserviceReconciler) reconcileCronJob(ctx context.Context, ms 
 		cj.Spec.SuccessfulJobsHistoryLimit = spec.SuccessfulJobsHistoryLimit
 		cj.Spec.FailedJobsHistoryLimit = spec.FailedJobsHistoryLimit
 		cj.Spec.JobTemplate.Labels = microserviceLabels(ms)
-		// The binding hash lives on the job template, so every run after a
+		// The binding version lives on the job template, so every run after a
 		// credential rotation is started from the updated template.
-		cj.Spec.JobTemplate.Spec = r.microserviceJobSpec(ctx, ms, map[string]string{bindingHashAnnotation: hash})
+		cj.Spec.JobTemplate.Spec = r.microserviceJobSpec(ctx, ms, map[string]string{bindingVersionAnnotation: version})
 		return nil
 	})
 	if err != nil {
