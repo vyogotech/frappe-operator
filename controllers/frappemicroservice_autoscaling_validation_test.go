@@ -172,6 +172,41 @@ var _ = Describe("FrappeMicroservice autoscaling validation", func() {
 		expectRejected(ms, "targetMemoryUtilizationPercentage requires resources.requests.memory")
 	})
 
+	It("rejects a cpu KEDA trigger without resources.requests.cpu", func() {
+		expectRejected(newMS(autoscaling(&vyogotechv1.MicroserviceAutoscaling{
+			MaxReplicas: 3,
+			Keda: &vyogotechv1.MicroserviceKEDA{Triggers: []vyogotechv1.MicroserviceKEDATrigger{{
+				Type: "cpu", MetricType: "Utilization", Metadata: map[string]string{"value": "50"},
+			}}},
+		})), "a cpu keda trigger requires resources.requests.cpu")
+	})
+
+	It("accepts a cpu KEDA trigger with resources.requests.cpu", func() {
+		ms := newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+			ms.Spec.Resources = requests("100m", "")
+			autoscaling(&vyogotechv1.MicroserviceAutoscaling{
+				MinReplicas: int32Ptr(1), MaxReplicas: 3,
+				Keda: &vyogotechv1.MicroserviceKEDA{Triggers: []vyogotechv1.MicroserviceKEDATrigger{{
+					Type: "cpu", MetricType: "Utilization", Metadata: map[string]string{"value": "50"},
+				}}},
+			})(ms)
+		})
+		Expect(k8sClient.Create(ctx, ms)).To(Succeed())
+	})
+
+	It("rejects a memory KEDA trigger without resources.requests.memory", func() {
+		ms := newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+			ms.Spec.Resources = requests("100m", "")
+			autoscaling(&vyogotechv1.MicroserviceAutoscaling{
+				MaxReplicas: 3,
+				Keda: &vyogotechv1.MicroserviceKEDA{Triggers: []vyogotechv1.MicroserviceKEDATrigger{{
+					Type: "memory", MetricType: "Utilization", Metadata: map[string]string{"value": "50"},
+				}}},
+			})(ms)
+		})
+		expectRejected(ms, "a memory keda trigger requires resources.requests.memory")
+	})
+
 	It("rejects maxReplicas below 1", func() {
 		ms := newMS(func(ms *vyogotechv1.FrappeMicroservice) {
 			ms.Spec.Resources = requests("200m", "")

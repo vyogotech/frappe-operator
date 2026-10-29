@@ -218,6 +218,14 @@ func (r *FrappeMicroserviceReconciler) reconcileScaledObject(ctx context.Context
 		ms.Status.Autoscaling = &vyogotechv1.MicroserviceAutoscalingStatus{CurrentReplicas: dep.Status.Replicas, DesiredReplicas: deploymentDesired(dep)}
 		return nil
 	}
+	if apierrors.IsInvalid(err) || apierrors.IsForbidden(err) || apierrors.IsBadRequest(err) {
+		// KEDA's admission webhook (or RBAC) refused the ScaledObject. Retrying
+		// at once cannot help; tell the user why and look again at the next resync.
+		r.setAutoscalingCondition(ms, metav1.ConditionFalse, "ScaledObjectRejected", err.Error())
+		r.Recorder.Event(ms, corev1.EventTypeWarning, "ScaledObjectRejected", err.Error())
+		ms.Status.Autoscaling = &vyogotechv1.MicroserviceAutoscalingStatus{CurrentReplicas: dep.Status.Replicas, DesiredReplicas: deploymentDesired(dep)}
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -250,6 +258,9 @@ func kedaTriggers(triggers []vyogotechv1.MicroserviceKEDATrigger) []interface{} 
 		trigger := map[string]interface{}{"type": t.Type}
 		if t.Name != "" {
 			trigger["name"] = t.Name
+		}
+		if t.MetricType != "" {
+			trigger["metricType"] = t.MetricType
 		}
 		md := make(map[string]interface{}, len(t.Metadata))
 		for k, v := range t.Metadata {

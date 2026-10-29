@@ -163,6 +163,12 @@ type MicroserviceKEDATrigger struct {
 	// +optional
 	Name string `json:"name,omitempty"`
 
+	// MetricType is how KEDA compares the metric with its target. Needed by
+	// the cpu and memory scalers.
+	// +kubebuilder:validation:Enum=Utilization;Value;AverageValue
+	// +optional
+	MetricType string `json:"metricType,omitempty"`
+
 	// Metadata is the scaler configuration, passed to KEDA as is.
 	// +optional
 	Metadata map[string]string `json:"metadata,omitempty"`
@@ -234,6 +240,8 @@ type MicroserviceCronJobSpec struct {
 
 // FrappeMicroserviceSpec defines the desired state of FrappeMicroservice.
 // +kubebuilder:validation:XValidation:rule="!has(self.deployment) || !has(self.deployment.autoscaling) || !has(self.deployment.autoscaling.targetCPUUtilizationPercentage) || (has(self.resources) && has(self.resources.requests) && 'cpu' in self.resources.requests)",message="targetCPUUtilizationPercentage requires resources.requests.cpu"
+// +kubebuilder:validation:XValidation:rule="!has(self.deployment) || !has(self.deployment.autoscaling) || !has(self.deployment.autoscaling.keda) || self.deployment.autoscaling.keda.triggers.all(t, t.type != 'cpu' || (has(self.resources) && has(self.resources.requests) && 'cpu' in self.resources.requests))",message="a cpu keda trigger requires resources.requests.cpu"
+// +kubebuilder:validation:XValidation:rule="!has(self.deployment) || !has(self.deployment.autoscaling) || !has(self.deployment.autoscaling.keda) || self.deployment.autoscaling.keda.triggers.all(t, t.type != 'memory' || (has(self.resources) && has(self.resources.requests) && 'memory' in self.resources.requests))",message="a memory keda trigger requires resources.requests.memory"
 // +kubebuilder:validation:XValidation:rule="!has(self.deployment) || !has(self.deployment.autoscaling) || !has(self.deployment.autoscaling.targetMemoryUtilizationPercentage) || (has(self.resources) && has(self.resources.requests) && 'memory' in self.resources.requests)",message="targetMemoryUtilizationPercentage requires resources.requests.memory"
 // +kubebuilder:validation:XValidation:rule="self.type == 'Deployment' || !has(self.deployment)",message="deployment is only valid when type is Deployment"
 // +kubebuilder:validation:XValidation:rule="self.type != 'Deployment' || !has(self.job)",message="job is only valid when type is Job or CronJob"

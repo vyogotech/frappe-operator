@@ -18,11 +18,14 @@ package controllers
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -344,6 +347,21 @@ func TestMicroservice_KEDA_AuthenticationRefAndTriggerName(t *testing.T) {
 	}
 }
 
+func TestMicroservice_KEDA_TriggerMetricType(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: func(ms *vyogotechv1.FrappeMicroservice) {
+		withKEDA(1, 5)(ms)
+		tr := &ms.Spec.Deployment.Autoscaling.Keda.Triggers[0]
+		tr.Type, tr.MetricType, tr.Metadata = "cpu", "Utilization", map[string]string{"value": "50"}
+	}})
+	f.reconcile()
+	so, _ := f.scaledObject()
+	triggers, _, _ := unstructured.NestedSlice(so.Object, "spec", "triggers")
+	trig := triggers[0].(map[string]interface{})
+	if trig["metricType"] != "Utilization" {
+		t.Errorf("trigger = %v, want metricType Utilization", trig)
+	}
+}
+
 func TestMicroservice_KEDA_NotInstalledReportsConditionWithoutFailing(t *testing.T) {
 	f := newMSFixture(t, msFixtureOpts{ms: withKEDA(1, 20)})
 	f.r.Client = interceptor.NewClient(f.client.(client.WithWatch), interceptor.Funcs{
@@ -368,6 +386,28 @@ func TestMicroservice_KEDA_NotInstalledReportsConditionWithoutFailing(t *testing
 	f.mustGet(msName, dep)
 	if *dep.Spec.Replicas != 1 {
 		t.Errorf("deployment still runs at minReplicas, got %d", *dep.Spec.Replicas)
+	}
+}
+
+func TestMicroservice_KEDA_RejectedScaledObjectIsReportedNotRetriedHot(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: withKEDA(1, 20)})
+	f.r.Client = interceptor.NewClient(f.client.(client.WithWatch), interceptor.Funcs{
+		Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+			if u, ok := obj.(*unstructured.Unstructured); ok && u.GroupVersionKind().Group == "keda.sh" {
+				return apierrors.NewForbidden(schema.GroupResource{Group: "keda.sh", Resource: "scaledobjects"}, u.GetName(),
+					errors.New("the scaledobject has a cpu trigger but the container microservice doesn't have the cpu request defined"))
+			}
+			return c.Create(ctx, obj, opts...)
+		},
+	})
+	res := f.reconcile() // must not return an error
+
+	c := condition(f.ms(), vyogotechv1.MicroserviceConditionAutoscalingReady)
+	if c == nil || c.Status != metav1.ConditionFalse || c.Reason != "ScaledObjectRejected" || !strings.Contains(c.Message, "cpu request") {
+		t.Fatalf("condition = %+v", c)
+	}
+	if res.RequeueAfter < microservicePendingRequeue {
+		t.Errorf("requeue = %s, want a slow retry", res.RequeueAfter)
 	}
 }
 

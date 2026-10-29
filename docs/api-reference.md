@@ -516,6 +516,7 @@ spec:
         triggers:           # at least one
         - type: string      # e.g. redis
           name: string
+          metricType: Utilization | Value | AverageValue   # cpu and memory scalers
           metadata: {string: string}
           authenticationRef: string   # TriggerAuthentication name
 

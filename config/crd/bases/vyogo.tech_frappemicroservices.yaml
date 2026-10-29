@@ -166,6 +166,15 @@ spec:
                                   description: Metadata is the scaler configuration,
                                     passed to KEDA as is.
                                   type: object
+                                metricType:
+                                  description: |-
+                                    MetricType is how KEDA compares the metric with its target. Needed by
+                                    the cpu and memory scalers.
+                                  enum:
+                                  - Utilization
+                                  - Value
+                                  - AverageValue
+                                  type: string
                                 name:
                                   description: Name of the trigger, unique within
                                     the ScaledObject. Optional.
@@ -572,6 +581,16 @@ spec:
                 !has(self.deployment.autoscaling.targetCPUUtilizationPercentage) ||
                 (has(self.resources) && has(self.resources.requests) && ''cpu'' in
                 self.resources.requests)'
+            - message: a cpu keda trigger requires resources.requests.cpu
+              rule: '!has(self.deployment) || !has(self.deployment.autoscaling) ||
+                !has(self.deployment.autoscaling.keda) || self.deployment.autoscaling.keda.triggers.all(t,
+                t.type != ''cpu'' || (has(self.resources) && has(self.resources.requests)
+                && ''cpu'' in self.resources.requests))'
+            - message: a memory keda trigger requires resources.requests.memory
+              rule: '!has(self.deployment) || !has(self.deployment.autoscaling) ||
+                !has(self.deployment.autoscaling.keda) || self.deployment.autoscaling.keda.triggers.all(t,
+                t.type != ''memory'' || (has(self.resources) && has(self.resources.requests)
+                && ''memory'' in self.resources.requests))'
             - message: targetMemoryUtilizationPercentage requires resources.requests.memory
               rule: '!has(self.deployment) || !has(self.deployment.autoscaling) ||
                 !has(self.deployment.autoscaling.targetMemoryUtilizationPercentage)

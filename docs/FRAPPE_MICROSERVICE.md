@@ -219,6 +219,11 @@ spec:
             authenticationRef: redis-auth   # optional TriggerAuthentication
 ```
 
+A `cpu` or `memory` trigger needs the matching `resources.requests` (checked on
+the CRD, and by KEDA's own webhook), and `metricType` (`Utilization`, `Value` or
+`AverageValue`) next to its `metadata.value`. KEDA cannot scale a `cpu` or
+`memory` trigger to zero.
+
 Behaviour:
 
 - The operator sets the Deployment's `replicas` only when it creates the
@@ -235,6 +240,10 @@ Behaviour:
 - If `keda` is set and the KEDA CRDs are missing, the microservice still
   reconciles and `AutoscalingReady` is `False` with reason `KEDANotInstalled`.
   The Deployment stays at the count it has.
+- If KEDA's admission webhook refuses the ScaledObject (for example a `cpu`
+  trigger on a container without a CPU request), `AutoscalingReady` is `False`
+  with reason `ScaledObjectRejected` and KEDA's message. The operator retries
+  at the next resync or when the microservice changes.
 - HPAs need a metrics API (metrics-server). Without it `AutoscalingReady` is
   `False` with the HPA's own reason, such as `FailedGetResourceMetric`.
 - The operator does not watch ScaledObjects, so a manual edit to one is
@@ -382,7 +391,7 @@ Conditions:
 | `SiteReady` | all | The site is Ready and the binding Secret is in sync. | `SiteNotFound`, `SiteNotReady`, `DatabaseInfoUnavailable`, `CredentialsUnavailable`, `UnsupportedDatabase` |
 | `Available` | Deployment | Ready replicas reach `replicas` (or `replicas: 0`). | `ReplicasNotReady`, `NameConflict` |
 | `Routed` | Deployment | Kubernetes: the Ingress has a load balancer address. OpenShift: every Route is admitted. Only present when routing is set. | `IngressPending`, `RoutePending`, `RouteNotAdmitted`, `SiteIngressDisabled`, `PassthroughUnsupported`, `NameConflict` |
-| `AutoscalingReady` | Deployment | The HPA or ScaledObject exists and is active. Only present when `autoscaling` is set. | `KEDANotInstalled`, `NameConflict`, the HPA's `ScalingActive` reason (for example `FailedGetResourceMetric`), `ScaledObjectNotReady` |
+| `AutoscalingReady` | Deployment | The HPA or ScaledObject exists and is active. Only present when `autoscaling` is set. | `KEDANotInstalled`, `ScaledObjectRejected`, `NameConflict`, the HPA's `ScalingActive` reason (for example `FailedGetResourceMetric`), `ScaledObjectNotReady` |
 | `Complete` | Job | The run succeeded. | `Running`, `Failed`, `NameConflict` |
 | `Scheduled` | CronJob | The CronJob exists. Reason `Suspended` when paused. | `NameConflict` |
 
