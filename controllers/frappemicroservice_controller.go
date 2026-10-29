@@ -28,6 +28,7 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -85,6 +86,7 @@ type FrappeMicroserviceReconciler struct {
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=batch,resources=jobs;cronjobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=route.openshift.io,resources=routes/custom-host,verbs=create;update;patch
@@ -109,7 +111,10 @@ func (r *FrappeMicroserviceReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	ms.Status.ObservedGeneration = ms.Generation
-	ms.Status.ServiceURL = microserviceServiceURL(ms)
+	ms.Status.ServiceURL = ""
+	if microserviceType(ms) == vyogotechv1.MicroserviceTypeDeployment {
+		ms.Status.ServiceURL = microserviceServiceURL(ms)
+	}
 	if ms.Status.Phase != vyogotechv1.FrappeMicroservicePhaseFailed {
 		ms.Status.Phase = microservicePhase(ms)
 	}
@@ -203,10 +208,24 @@ func (r *FrappeMicroserviceReconciler) reconcileMicroservice(ctx context.Context
 		ObservedGeneration: ms.Generation,
 	})
 
+	hash := bindingHash(binding)
+	switch microserviceType(ms) {
+	case vyogotechv1.MicroserviceTypeJob:
+		return r.reconcileJob(ctx, ms)
+	case vyogotechv1.MicroserviceTypeCronJob:
+		return r.reconcileCronJob(ctx, ms, hash)
+	default:
+		return r.reconcileDeploymentWorkload(ctx, ms, site, hash)
+	}
+}
+
+// reconcileDeploymentWorkload handles type Deployment: Deployment, Service and
+// optional routing.
+func (r *FrappeMicroserviceReconciler) reconcileDeploymentWorkload(ctx context.Context, ms *vyogotechv1.FrappeMicroservice, site *vyogotechv1.FrappeSite, hash string) (ctrl.Result, error) {
 	// 3. Deployment.
 	dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: ms.Name, Namespace: ms.Namespace}}
-	conflict, err = r.createOrUpdateOwned(ctx, ms, dep, func() error {
-		r.mutateDeployment(ctx, ms, dep, bindingHash(binding))
+	conflict, err := r.createOrUpdateOwned(ctx, ms, dep, func() error {
+		r.mutateDeployment(ctx, ms, dep, hash)
 		return nil
 	})
 	if err != nil {
@@ -261,13 +280,15 @@ func microserviceBindingData(ms *vyogotechv1.FrappeMicroservice, site *vyogotech
 	data := map[string]string{
 		"FRAPPE_SITE":      site.Spec.SiteName,
 		"CENTRAL_SITE_URL": fmt.Sprintf("http://%s-nginx.%s.svc.cluster.local:8080", bench.Name, bench.Namespace),
-		"PORT":             strconv.Itoa(int(microservicePort(ms))),
 		"DB_TYPE":          dbType,
 		"DB_HOST":          site.Status.DatabaseHost,
 		"DB_PORT":          site.Status.DatabasePort,
 		"DB_NAME":          site.Status.DatabaseName,
 		"DB_USER":          creds.Username,
 		"DB_PASSWORD":      creds.Password,
+	}
+	if microserviceType(ms) == vyogotechv1.MicroserviceTypeDeployment {
+		data["PORT"] = strconv.Itoa(int(microservicePort(ms)))
 	}
 	out := make(map[string][]byte, len(data))
 	for k, v := range data {
@@ -294,18 +315,25 @@ func bindingHash(data map[string][]byte) string {
 
 // --- workload ------------------------------------------------------------------
 
+func microserviceType(ms *vyogotechv1.FrappeMicroservice) vyogotechv1.MicroserviceType {
+	if ms.Spec.Type == "" {
+		return vyogotechv1.MicroserviceTypeDeployment
+	}
+	return ms.Spec.Type
+}
+
 func microservicePort(ms *vyogotechv1.FrappeMicroservice) int32 {
-	if ms.Spec.Port == 0 {
+	if ms.Spec.Deployment == nil || ms.Spec.Deployment.Port == 0 {
 		return 8000
 	}
-	return ms.Spec.Port
+	return ms.Spec.Deployment.Port
 }
 
 func microserviceReplicas(ms *vyogotechv1.FrappeMicroservice) int32 {
-	if ms.Spec.Replicas == nil {
+	if ms.Spec.Deployment == nil || ms.Spec.Deployment.Replicas == nil {
 		return 1
 	}
-	return *ms.Spec.Replicas
+	return *ms.Spec.Deployment.Replicas
 }
 
 func microserviceSelector(ms *vyogotechv1.FrappeMicroservice) map[string]string {
@@ -355,44 +383,57 @@ func (r *FrappeMicroserviceReconciler) mutateDeployment(ctx context.Context, ms 
 	}
 	dep.Spec.Template.Annotations[bindingHashAnnotation] = hash
 
+	r.mutatePodSpec(ctx, ms, &dep.Spec.Template.Spec, true)
+}
+
+// mutatePodSpec sets the pod spec shared by every workload type. A
+// long-running pod (Deployment) gets the HTTP port and /health probes; a batch
+// pod (Job, CronJob) runs to completion and is never restarted in place.
+func (r *FrappeMicroserviceReconciler) mutatePodSpec(ctx context.Context, ms *vyogotechv1.FrappeMicroservice, pod *corev1.PodSpec, longRunning bool) {
 	var res corev1.ResourceRequirements
 	if ms.Spec.Resources != nil {
 		res.Requests = ms.Spec.Resources.Requests
 		res.Limits = ms.Spec.Resources.Limits
 	}
-	probe := func(initialDelay, period int32) *corev1.Probe {
-		return &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{
-				Path: microserviceHealthPath,
-				Port: intstr.FromString(microservicePortName),
-			}},
-			InitialDelaySeconds: initialDelay,
-			PeriodSeconds:       period,
-			TimeoutSeconds:      5,
-			FailureThreshold:    3,
-		}
-	}
-
-	dep.Spec.Template.Spec.ImagePullSecrets = ms.Spec.Image.PullSecrets
-	dep.Spec.Template.Spec.SecurityContext = PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, ms.Namespace, nil)
-	dep.Spec.Template.Spec.Containers = []corev1.Container{{
+	c := corev1.Container{
 		Name:            microserviceContainerName,
 		Image:           microserviceImage(ms),
 		ImagePullPolicy: ms.Spec.Image.PullPolicy,
-		Ports: []corev1.ContainerPort{{
-			Name:          microservicePortName,
-			ContainerPort: microservicePort(ms),
-			Protocol:      corev1.ProtocolTCP,
-		}},
+		Command:         ms.Spec.Command,
+		Args:            ms.Spec.Args,
 		EnvFrom: []corev1.EnvFromSource{{
 			SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: microserviceBindingSecretName(ms)}},
 		}},
 		Env:             ms.Spec.Env,
 		Resources:       res,
-		LivenessProbe:   probe(15, 20),
-		ReadinessProbe:  probe(5, 10),
 		SecurityContext: ContainerSecurityContextForBench(r.IsOpenShift, nil),
-	}}
+	}
+	if longRunning {
+		probe := func(initialDelay, period int32) *corev1.Probe {
+			return &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{
+					Path: microserviceHealthPath,
+					Port: intstr.FromString(microservicePortName),
+				}},
+				InitialDelaySeconds: initialDelay,
+				PeriodSeconds:       period,
+				TimeoutSeconds:      5,
+				FailureThreshold:    3,
+			}
+		}
+		c.Ports = []corev1.ContainerPort{{
+			Name:          microservicePortName,
+			ContainerPort: microservicePort(ms),
+			Protocol:      corev1.ProtocolTCP,
+		}}
+		c.LivenessProbe = probe(15, 20)
+		c.ReadinessProbe = probe(5, 10)
+	} else {
+		pod.RestartPolicy = corev1.RestartPolicyNever
+	}
+	pod.ImagePullSecrets = ms.Spec.Image.PullSecrets
+	pod.SecurityContext = PodSecurityContextForBench(ctx, r.Client, r.IsOpenShift, ms.Namespace, nil)
+	pod.Containers = []corev1.Container{c}
 }
 
 func mutateMicroserviceService(ms *vyogotechv1.FrappeMicroservice, svc *corev1.Service) {
@@ -439,10 +480,10 @@ func microserviceRouteName(ms *vyogotechv1.FrappeMicroservice, path string) stri
 }
 
 func microserviceRoutingPaths(ms *vyogotechv1.FrappeMicroservice) []string {
-	if ms.Spec.Routing == nil {
+	if ms.Spec.Deployment == nil || ms.Spec.Deployment.Routing == nil {
 		return nil
 	}
-	return ms.Spec.Routing.Paths
+	return ms.Spec.Deployment.Routing.Paths
 }
 
 func (r *FrappeMicroserviceReconciler) reconcileRouting(ctx context.Context, ms *vyogotechv1.FrappeMicroservice, site *vyogotechv1.FrappeSite) error {
@@ -690,8 +731,31 @@ func (r *FrappeMicroserviceReconciler) nameConflict(ms *vyogotechv1.FrappeMicros
 	r.Recorder.Event(ms, corev1.EventTypeWarning, "NameConflict", msg)
 }
 
-// microservicePhase derives Ready/Pending from the conditions.
+// microservicePhase derives the phase from the conditions of the workload type.
 func microservicePhase(ms *vyogotechv1.FrappeMicroservice) vyogotechv1.FrappeMicroservicePhase {
+	if !meta.IsStatusConditionTrue(ms.Status.Conditions, vyogotechv1.MicroserviceConditionSiteReady) {
+		return vyogotechv1.FrappeMicroservicePhasePending
+	}
+	switch microserviceType(ms) {
+	case vyogotechv1.MicroserviceTypeJob:
+		c := meta.FindStatusCondition(ms.Status.Conditions, vyogotechv1.MicroserviceConditionComplete)
+		switch {
+		case c == nil:
+			return vyogotechv1.FrappeMicroservicePhasePending
+		case c.Status == metav1.ConditionTrue:
+			return vyogotechv1.FrappeMicroservicePhaseSucceeded
+		case c.Reason == "Failed":
+			return vyogotechv1.FrappeMicroservicePhaseFailed
+		case c.Reason == "Running":
+			return vyogotechv1.FrappeMicroservicePhaseRunning
+		}
+		return vyogotechv1.FrappeMicroservicePhasePending
+	case vyogotechv1.MicroserviceTypeCronJob:
+		if meta.IsStatusConditionTrue(ms.Status.Conditions, vyogotechv1.MicroserviceConditionScheduled) {
+			return vyogotechv1.FrappeMicroservicePhaseReady
+		}
+		return vyogotechv1.FrappeMicroservicePhasePending
+	}
 	if !meta.IsStatusConditionTrue(ms.Status.Conditions, vyogotechv1.MicroserviceConditionSiteReady) ||
 		!meta.IsStatusConditionTrue(ms.Status.Conditions, vyogotechv1.MicroserviceConditionAvailable) {
 		return vyogotechv1.FrappeMicroservicePhasePending
@@ -781,6 +845,8 @@ func (r *FrappeMicroserviceReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&networkingv1.Ingress{}).
+		Owns(&batchv1.Job{}).
+		Owns(&batchv1.CronJob{}).
 		Watches(&vyogotechv1.FrappeSite{}, handler.EnqueueRequestsFromMapFunc(r.requestsForSite)).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.requestsForSecret))
 	if r.IsOpenShift {

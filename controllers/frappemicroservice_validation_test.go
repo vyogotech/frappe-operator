@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -62,8 +63,18 @@ var _ = Describe("FrappeMicroservice CRD validation", func() {
 
 	withPaths := func(paths ...string) func(ms *vyogotechv1.FrappeMicroservice) {
 		return func(ms *vyogotechv1.FrappeMicroservice) {
-			ms.Spec.Routing = &vyogotechv1.MicroserviceRouting{Paths: paths}
+			ms.Spec.Deployment = &vyogotechv1.MicroserviceDeploymentSpec{Routing: &vyogotechv1.MicroserviceRouting{Paths: paths}}
 		}
+	}
+
+	asJob := func(ms *vyogotechv1.FrappeMicroservice) {
+		ms.Spec.Type = vyogotechv1.MicroserviceTypeJob
+		ms.Spec.Command = []string{"python", "-m", "task"}
+	}
+	asCronJob := func(ms *vyogotechv1.FrappeMicroservice) {
+		ms.Spec.Type = vyogotechv1.MicroserviceTypeCronJob
+		ms.Spec.Command = []string{"python", "-m", "task"}
+		ms.Spec.CronJob = &vyogotechv1.MicroserviceCronJobSpec{Schedule: "0 2 * * *"}
 	}
 
 	expectRejected := func(ms *vyogotechv1.FrappeMicroservice, msgFragment string) {
@@ -72,16 +83,28 @@ var _ = Describe("FrappeMicroservice CRD validation", func() {
 		Expect(err.Error()).To(ContainSubstring(msgFragment))
 	}
 
-	It("accepts a minimal spec and applies defaults", func() {
+	It("accepts a minimal spec and defaults the type to Deployment", func() {
 		ms := newMS(nil)
 		Expect(k8sClient.Create(ctx, ms)).To(Succeed())
 
 		got := &vyogotechv1.FrappeMicroservice{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: ms.Name, Namespace: ms.Namespace}, got)).To(Succeed())
-		Expect(got.Spec.Port).To(Equal(int32(8000)))
-		Expect(got.Spec.Replicas).NotTo(BeNil())
-		Expect(*got.Spec.Replicas).To(Equal(int32(1)))
-		Expect(got.Spec.Routing).To(BeNil())
+		Expect(got.Spec.Type).To(Equal(vyogotechv1.MicroserviceTypeDeployment))
+		Expect(got.Spec.Deployment).To(BeNil())
+	})
+
+	It("defaults port and replicas inside the deployment block", func() {
+		ms := newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+			ms.Spec.Deployment = &vyogotechv1.MicroserviceDeploymentSpec{}
+		})
+		Expect(k8sClient.Create(ctx, ms)).To(Succeed())
+
+		got := &vyogotechv1.FrappeMicroservice{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: ms.Name, Namespace: ms.Namespace}, got)).To(Succeed())
+		Expect(got.Spec.Deployment.Port).To(Equal(int32(8000)))
+		Expect(got.Spec.Deployment.Replicas).NotTo(BeNil())
+		Expect(*got.Spec.Deployment.Replicas).To(Equal(int32(1)))
+		Expect(got.Spec.Deployment.Routing).To(BeNil())
 	})
 
 	It("accepts valid routing paths", func() {
@@ -98,17 +121,23 @@ var _ = Describe("FrappeMicroservice CRD validation", func() {
 	})
 
 	It("rejects an out-of-range port", func() {
-		expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Port = 70000 }), "spec.port")
+		expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+			ms.Spec.Deployment = &vyogotechv1.MicroserviceDeploymentSpec{Port: 70000}
+		}), "spec.deployment.port")
 	})
 
 	It("rejects negative replicas", func() {
 		r := int32(-1)
-		expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Replicas = &r }), "spec.replicas")
+		expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+			ms.Spec.Deployment = &vyogotechv1.MicroserviceDeploymentSpec{Replicas: &r}
+		}), "spec.deployment.replicas")
 	})
 
 	It("accepts zero replicas", func() {
 		r := int32(0)
-		Expect(k8sClient.Create(ctx, newMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Replicas = &r }))).To(Succeed())
+		Expect(k8sClient.Create(ctx, newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+			ms.Spec.Deployment = &vyogotechv1.MicroserviceDeploymentSpec{Replicas: &r}
+		}))).To(Succeed())
 	})
 
 	DescribeTable("rejects malformed paths",
@@ -158,7 +187,7 @@ var _ = Describe("FrappeMicroservice CRD validation", func() {
 	})
 
 	It("rejects an empty paths list when routing is set", func() {
-		expectRejected(newMS(withPaths()), "spec.routing.paths")
+		expectRejected(newMS(withPaths()), "spec.deployment.routing.paths")
 	})
 
 	DescribeTable("rejects env vars that would override binding keys",
@@ -178,6 +207,111 @@ var _ = Describe("FrappeMicroservice CRD validation", func() {
 		Expect(k8sClient.Create(ctx, newMS(func(ms *vyogotechv1.FrappeMicroservice) {
 			ms.Spec.Env = []corev1.EnvVar{{Name: "LOG_LEVEL", Value: "INFO"}, {Name: "REDIS_CACHE_HOST", Value: "redis"}}
 		}))).To(Succeed())
+	})
+
+	Describe("workload type", func() {
+		It("accepts a Job with a command and run settings", func() {
+			Expect(k8sClient.Create(ctx, newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				asJob(ms)
+				ms.Spec.Job = &vyogotechv1.MicroserviceJobSpec{BackoffLimit: int32Ptr(2), ActiveDeadlineSeconds: int64Ptr(600)}
+			}))).To(Succeed())
+		})
+
+		It("accepts a CronJob and defaults concurrencyPolicy to Forbid", func() {
+			ms := newMS(asCronJob)
+			Expect(k8sClient.Create(ctx, ms)).To(Succeed())
+			got := &vyogotechv1.FrappeMicroservice{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: ms.Name, Namespace: ms.Namespace}, got)).To(Succeed())
+			Expect(string(got.Spec.CronJob.ConcurrencyPolicy)).To(Equal("Forbid"))
+		})
+
+		It("rejects an unknown type", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Type = "Serverless" }), "spec.type")
+		})
+
+		It("requires a command for a Job", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				asJob(ms)
+				ms.Spec.Command = nil
+			}), "command is required")
+		})
+
+		It("requires a command for a CronJob", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				asCronJob(ms)
+				ms.Spec.Command = nil
+			}), "command is required")
+		})
+
+		It("rejects the deployment block on a Job", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				asJob(ms)
+				ms.Spec.Deployment = &vyogotechv1.MicroserviceDeploymentSpec{}
+			}), "deployment is only valid")
+		})
+
+		It("rejects the job block on a Deployment", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				ms.Spec.Job = &vyogotechv1.MicroserviceJobSpec{}
+			}), "job is only valid")
+		})
+
+		It("requires the cronJob block for a CronJob", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				asCronJob(ms)
+				ms.Spec.CronJob = nil
+			}), "cronJob is required")
+		})
+
+		It("rejects the cronJob block on a Job", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				asJob(ms)
+				ms.Spec.CronJob = &vyogotechv1.MicroserviceCronJobSpec{Schedule: "* * * * *"}
+			}), "cronJob is required")
+		})
+
+		It("requires a schedule", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				asCronJob(ms)
+				ms.Spec.CronJob.Schedule = ""
+			}), "spec.cronJob.schedule")
+		})
+
+		It("rejects an unknown concurrencyPolicy", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				asCronJob(ms)
+				ms.Spec.CronJob.ConcurrencyPolicy = "Sometimes"
+			}), "spec.cronJob.concurrencyPolicy")
+		})
+
+		It("limits CronJob names to 52 characters", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				asCronJob(ms)
+				ms.Name = "c" + strings.Repeat("x", 52)
+			}), "52 characters")
+		})
+
+		It("limits Deployment names to 63 characters", func() {
+			expectRejected(newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				ms.Name = "d" + strings.Repeat("x", 63)
+			}), "63 characters")
+		})
+
+		It("allows long Job names", func() {
+			Expect(k8sClient.Create(ctx, newMS(func(ms *vyogotechv1.FrappeMicroservice) {
+				asJob(ms)
+				ms.Name = "j" + strings.Repeat("x", 80)
+			}))).To(Succeed())
+		})
+
+		It("forbids changing the type after creation", func() {
+			ms := newMS(nil)
+			Expect(k8sClient.Create(ctx, ms)).To(Succeed())
+			asJob(ms)
+			err := k8sClient.Update(ctx, ms)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("type is immutable"))
+		})
 	})
 
 	It("forbids changing siteRef after creation", func() {

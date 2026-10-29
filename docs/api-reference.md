@@ -475,11 +475,11 @@ ingress:
 
 ## <i data-lucide="boxes"></i> FrappeMicroservice
 
-Runs a frappe-microservice-lib service bound to a `FrappeSite` in the same
-namespace: a site binding Secret, a Deployment, a ClusterIP Service and, when
-`spec.routing.paths` is set, an Ingress (or OpenShift Routes) on the site's
-domain. Short name `fms`. See the [Frappe Microservices guide](FRAPPE_MICROSERVICE.md)
-for the binding contract, routing behaviour and validation rules.
+Runs a frappe-microservice-lib image bound to a `FrappeSite` in the same
+namespace through a generated site binding Secret, as a Deployment (with a
+ClusterIP Service and optional path routing on the site's domain), a Job or a
+CronJob. Short name `fms`. See the [Frappe Microservices guide](FRAPPE_MICROSERVICE.md)
+for the binding contract, workload behaviour and validation rules.
 
 ### Spec
 
@@ -492,26 +492,49 @@ spec:
     tag: string             # default "latest"
     pullPolicy: string
     pullSecrets: [{name: string}]
-  port: int32               # default 8000, 1-65535
-  routing:
-    paths: [string]         # 1-16 path prefixes; omit for in-cluster only
-  replicas: int32           # default 1, minimum 0
+  type: Deployment | Job | CronJob   # default Deployment, immutable
+  command: [string]         # required for Job and CronJob
+  args: [string]
   resources:
     requests: {}
     limits: {}
   env: [EnvVar]             # FRAPPE_SITE, CENTRAL_SITE_URL, PORT, DB_* rejected
+
+  deployment:               # type: Deployment only
+    port: int32             # default 8000, 1-65535
+    replicas: int32         # default 1, minimum 0
+    routing:
+      paths: [string]       # 1-16 path prefixes; omit for in-cluster only
+
+  job:                      # type: Job or CronJob
+    backoffLimit: int32
+    activeDeadlineSeconds: int64
+    ttlSecondsAfterFinished: int32
+
+  cronJob:                  # required for type: CronJob
+    schedule: string        # required
+    timeZone: string
+    concurrencyPolicy: Allow | Forbid | Replace   # default Forbid
+    suspend: bool
+    startingDeadlineSeconds: int64
+    successfulJobsHistoryLimit: int32
+    failedJobsHistoryLimit: int32
 ```
 
 ### Status
 
 ```yaml
 status:
-  phase: Pending | Ready | Failed
-  readyReplicas: int32
-  serviceURL: string
-  externalURLs: [string]
+  phase: Pending | Ready | Running | Succeeded | Failed
+  readyReplicas: int32      # Deployment
+  serviceURL: string        # Deployment
+  externalURLs: [string]    # Deployment with routing
+  jobName: string           # Job
+  lastScheduleTime: time    # CronJob
+  lastSuccessfulTime: time  # CronJob
+  activeJobs: int32         # CronJob
   observedGeneration: int64
-  conditions: []            # SiteReady, Available, Routed
+  conditions: []            # SiteReady; Available, Routed; Complete; Scheduled
 ```
 
 ## SiteUser

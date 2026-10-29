@@ -5,12 +5,14 @@ A `FrappeMicroservice` runs a service built on
 next to an existing `FrappeSite`. The library handles authentication, tenant
 isolation and DocType logic. The operator does the Kubernetes wiring:
 
-1. **Binds** the service to the site with a generated Secret holding the site
+1. **Binds** the image to the site with a generated Secret holding the site
    name, the central-site URL and the site's database credentials.
-2. **Runs** it as a Deployment.
-3. **Exposes** it in-cluster through a ClusterIP Service. This always happens.
-4. **Routes** path prefixes on the site's domain to it, through an Ingress (or
-   OpenShift Routes). This only happens when `spec.routing.paths` is set.
+2. **Runs** it as one of three workload types, set by `spec.type`:
+   - `Deployment` (the default): a long-running HTTP service with a ClusterIP
+     Service, and path routing on the site's domain when
+     `spec.deployment.routing.paths` is set.
+   - `Job`: a one-time task, run once per spec change.
+   - `CronJob`: a scheduled task.
 
 There is no API gateway and no change to `site_config.json`.
 
@@ -54,12 +56,13 @@ spec:
     tag: "1.0.0"
     pullSecrets:
       - name: regcred
-  port: 8000
-  replicas: 2
-  routing:
-    paths:
-      - /orders
-      - /api/v1/orders
+  deployment:
+    port: 8000
+    replicas: 2
+    routing:
+      paths:
+        - /orders
+        - /api/v1/orders
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits:   { cpu: 500m, memory: 512Mi }
@@ -86,17 +89,93 @@ site.
 
 ---
 
+## One-time task
+
+```yaml
+apiVersion: vyogo.tech/v1
+kind: FrappeMicroservice
+metadata:
+  name: orders-backfill
+  namespace: tenant-acme
+spec:
+  type: Job
+  siteRef:
+    name: acme-site
+  image:
+    repository: ghcr.io/myorg/orders-service
+    tag: "1.0.0"
+  command: ["python", "-m", "orders.backfill"]
+  args: ["--since", "2026-01-01"]
+  job:
+    backoffLimit: 2
+    activeDeadlineSeconds: 3600
+    ttlSecondsAfterFinished: 86400
+```
+
+## Scheduled task
+
+```yaml
+apiVersion: vyogo.tech/v1
+kind: FrappeMicroservice
+metadata:
+  name: orders-nightly-sync
+  namespace: tenant-acme
+spec:
+  type: CronJob
+  siteRef:
+    name: acme-site
+  image:
+    repository: ghcr.io/myorg/orders-service
+    tag: "1.0.0"
+  command: ["python", "-m", "orders.nightly_sync"]
+  cronJob:
+    schedule: "0 2 * * *"
+    timeZone: Australia/Sydney
+  job:
+    activeDeadlineSeconds: 1800
+```
+
+---
+
 ## Spec
+
+Shared by every type:
 
 | Field | Required | Description |
 |---|---|---|
 | `siteRef.name` | yes | `FrappeSite` in the same namespace. Immutable. |
 | `image` | yes | `repository` (required), `tag` (default `latest`), `pullPolicy`, `pullSecrets`. |
-| `port` | no | Port the container listens on and the Service exposes. Default `8000`, range 1–65535. Passed to the container as `PORT`. |
-| `routing.paths` | no | Path prefixes on the site's domain. When omitted, no Ingress or Route is created. |
-| `replicas` | no | Default `1`, minimum `0`. |
+| `type` | no | `Deployment` (default), `Job` or `CronJob`. Immutable. |
+| `command`, `args` | `command` is required for `Job` and `CronJob` | Override the image entrypoint. The library's default entrypoint starts a server that never exits, so batch types must set a command. |
 | `resources` | no | `requests` and `limits` for the container. |
 | `env` | no | Extra environment variables. Binding keys are rejected. |
+
+`deployment`, only valid with `type: Deployment`:
+
+| Field | Description |
+|---|---|
+| `port` | Port the container listens on and the Service exposes. Default `8000`, range 1–65535. Passed to the container as `PORT`. |
+| `replicas` | Default `1`, minimum `0`. |
+| `routing.paths` | Path prefixes on the site's domain. When omitted, no Ingress or Route is created. |
+
+`job`, valid with `type: Job` and `type: CronJob` (applies to every run):
+
+| Field | Description |
+|---|---|
+| `backoffLimit` | Retries before a run is marked failed. Kubernetes defaults it to 6. |
+| `activeDeadlineSeconds` | Maximum duration of a run. |
+| `ttlSecondsAfterFinished` | Lets Kubernetes delete a finished Job. |
+
+`cronJob`, required with `type: CronJob`:
+
+| Field | Description |
+|---|---|
+| `schedule` | Cron schedule, required. |
+| `timeZone` | For example `Australia/Sydney`. |
+| `concurrencyPolicy` | `Allow`, `Forbid` (default) or `Replace`. |
+| `suspend` | Pauses future runs. |
+| `startingDeadlineSeconds` | Skip a missed run after this long. |
+| `successfulJobsHistoryLimit`, `failedJobsHistoryLimit` | How many finished Jobs to keep. |
 
 ## Site binding Secret
 
@@ -107,14 +186,17 @@ edit it; it is rewritten on every reconcile.
 |---|---|
 | `FRAPPE_SITE` | The site's `spec.siteName`. |
 | `CENTRAL_SITE_URL` | `http://<bench>-nginx.<namespace>.svc.cluster.local:8080`. The library sends `FRAPPE_SITE` as the `Host` header, which is how the bench picks the site, so session checks stay inside the cluster. |
-| `PORT` | `spec.port`. The library binds Gunicorn to it. |
+| `PORT` | `spec.deployment.port`, for `type: Deployment` only. The library binds Gunicorn to it. |
 | `DB_TYPE` | `mariadb` or `postgres`. |
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | The site's database, as recorded in the site's status. |
 | `DB_USER`, `DB_PASSWORD` | The site's database user, read through the site's database provider. |
 
-When the site's database password changes, the operator rewrites the Secret
-and changes the `vyogo.tech/site-binding-hash` annotation on the pod template,
-so the Deployment rolls. It also resyncs every five minutes.
+When the site's database password changes, the operator rewrites the Secret.
+For a Deployment it also changes the `vyogo.tech/site-binding-hash` annotation
+on the pod template, so the Deployment rolls. A CronJob gets the same annotation
+on its job template, so the next run uses the new credentials. A Job that has
+already been created is not re-run. The operator also resyncs every five
+minutes.
 
 Anything else the library reads, such as `REDIS_CACHE_HOST`,
 `REDIS_QUEUE_HOST`, `ALLOW_CORS` or `LOG_LEVEL`, goes in `spec.env`.
@@ -124,13 +206,33 @@ Anything else the library reads, such as `REDIS_CACHE_HOST`,
 - One container named `microservice`, with the restricted security context the
   operator uses for bench pods.
 - Liveness and readiness probes on `GET /health`.
-- A ClusterIP Service named `<name>` on `spec.port`.
+- A ClusterIP Service named `<name>` on `spec.deployment.port`.
 
-If a Secret, Deployment, Service, Ingress or Route with the operator's chosen
-name already exists and is not owned by this CR, the operator leaves it alone
-and reports a `NameConflict` condition.
+## Job
+
+- The operator creates one Job named `<name>-<hash>`, where the hash covers the
+  image, command, args, env, resources and `job` settings. Changing any of them
+  starts a new run and deletes the Job of the previous spec, stopping it if it
+  is still running.
+- An unchanged spec never runs twice. If `ttlSecondsAfterFinished` removes the
+  finished Job, the operator keeps the recorded result and does not recreate
+  it.
+- Pods use `restartPolicy: Never`, no ports and no probes. Retries are governed
+  by `backoffLimit`; the operator does not retry a failed run.
+
+## CronJob
+
+- One CronJob named `<name>`. The `cronJob` and `job` settings map onto it
+  directly; `concurrencyPolicy` defaults to `Forbid`.
+- Every run gets the binding Secret and the same pod settings as a Job.
+
+If a Secret, Deployment, Service, Ingress, Route, Job or CronJob with the
+operator's chosen name already exists and is not owned by this CR, the operator
+leaves it alone and reports a `NameConflict` condition.
 
 ## Routing
+
+Routing is only available for `type: Deployment`.
 
 **Kubernetes.** One Ingress `<name>-ingress` with:
 
@@ -168,6 +270,14 @@ operator's admission webhooks are off. They only look at the object being saved.
   is a parent of one of them, such as `/api`, is rejected too.
 - `env` may not set `FRAPPE_SITE`, `CENTRAL_SITE_URL`, `PORT` or any `DB_*`
   key.
+- `type` and `siteRef` are immutable.
+- `deployment` is only valid for `Deployment`, `job` only for `Job` and
+  `CronJob`, and `cronJob` is required exactly when the type is `CronJob`.
+- `Job` and `CronJob` require a `command`.
+- A `Deployment` name is at most 63 characters, because it names the Service.
+  A `CronJob` name is at most 52 characters, because Kubernetes appends a
+  suffix to each run. `Job` names can be longer; the operator shortens the Job
+  it creates.
 
 **Path conflicts between microservices are not checked.** Two
 `FrappeMicroservice`s claiming the same path on one site are resolved by the
@@ -179,26 +289,31 @@ and that shows up in `Routed`.
 
 ```
 $ kubectl get fms -n tenant-acme
-NAME            SITE        PHASE   READY   SERVICE URL                                        AGE
-orders          acme-site   Ready   2       http://orders.tenant-acme.svc.cluster.local:8000   5m
-pdf-generator   acme-site   Ready   1       http://pdf-generator.tenant-acme.svc.cluster.local:8000   5m
+NAME                  SITE        TYPE         PHASE       READY   SERVICE URL                                        AGE
+orders                acme-site   Deployment   Ready       2       http://orders.tenant-acme.svc.cluster.local:8000   5m
+orders-backfill       acme-site   Job          Succeeded                                                              5m
+orders-nightly-sync   acme-site   CronJob      Ready                                                                  5m
 ```
 
 | Field | Meaning |
 |---|---|
-| `phase` | `Ready` when `SiteReady` and `Available` are true and, if routed, `Routed` is true. `Pending` otherwise. `Failed` when the site cannot be supported. |
+| `phase` | `Deployment`: `Ready` when `SiteReady` and `Available` are true and, if routed, `Routed` is true; `Pending` otherwise. `Job`: `Pending`, `Running`, `Succeeded` or `Failed`. `CronJob`: `Ready` once the CronJob exists. Any type: `Failed` when the site cannot be supported. |
 | `readyReplicas` | From the Deployment. |
-| `serviceURL` | In-cluster URL. |
+| `serviceURL` | In-cluster URL, `Deployment` only. |
 | `externalURLs` | One per routed path. |
+| `jobName` | The Job of the current run, `Job` only. |
+| `lastScheduleTime`, `lastSuccessfulTime`, `activeJobs` | From the CronJob. |
 | `observedGeneration` | Generation last reconciled. |
 
 Conditions:
 
-| Type | True when | Common reasons when False |
-|---|---|---|
-| `SiteReady` | The site is Ready and the binding Secret is in sync. | `SiteNotFound`, `SiteNotReady`, `DatabaseInfoUnavailable`, `CredentialsUnavailable`, `UnsupportedDatabase` |
-| `Available` | Ready replicas reach `replicas` (or `replicas: 0`). | `ReplicasNotReady`, `NameConflict` |
-| `Routed` | Kubernetes: the Ingress has a load balancer address. OpenShift: every Route is admitted. Only present when `routing` is set. | `IngressPending`, `RoutePending`, `RouteNotAdmitted`, `SiteIngressDisabled`, `PassthroughUnsupported`, `NameConflict` |
+| Type | Types | True when | Common reasons when False |
+|---|---|---|---|
+| `SiteReady` | all | The site is Ready and the binding Secret is in sync. | `SiteNotFound`, `SiteNotReady`, `DatabaseInfoUnavailable`, `CredentialsUnavailable`, `UnsupportedDatabase` |
+| `Available` | Deployment | Ready replicas reach `replicas` (or `replicas: 0`). | `ReplicasNotReady`, `NameConflict` |
+| `Routed` | Deployment | Kubernetes: the Ingress has a load balancer address. OpenShift: every Route is admitted. Only present when routing is set. | `IngressPending`, `RoutePending`, `RouteNotAdmitted`, `SiteIngressDisabled`, `PassthroughUnsupported`, `NameConflict` |
+| `Complete` | Job | The run succeeded. | `Running`, `Failed`, `NameConflict` |
+| `Scheduled` | CronJob | The CronJob exists. Reason `Suspended` when paused. | `NameConflict` |
 
 On Kubernetes, Ingress status does not report path conflicts, so a path that
 loses to another Ingress can still show `Routed=True`.
@@ -209,4 +324,5 @@ loses to another Ingress can still show `Routed=True`.
 - SQLite sites are not supported (`UnsupportedDatabase`).
 - The microservice uses the site's own database user, so it has the same
   database access as the monolith.
-- Autoscaling and separate microservice databases are not supported yet.
+- Autoscaling, serverless (scale-to-zero) workloads and separate microservice
+  databases are not supported yet.

@@ -4985,6 +4985,9 @@ spec:
     - jsonPath: .spec.siteRef.name
       name: Site
       type: string
+    - jsonPath: .spec.type
+      name: Type
+      type: string
     - jsonPath: .status.phase
       name: Phase
       type: string
@@ -5001,10 +5004,10 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          FrappeMicroservice runs a frappe-microservice-lib image next to an existing
-          FrappeSite: a site binding Secret, a Deployment, a ClusterIP Service and,
-          when spec.routing is set, an Ingress (or OpenShift Routes) on the site's
-          domain.
+          FrappeMicroservice runs a frappe-microservice-lib image bound to an existing
+          FrappeSite through a generated site binding Secret, as a Deployment (with a
+          ClusterIP Service and optional routing on the site's domain), a Job or a
+          CronJob.
         properties:
           apiVersion:
             description: |-
@@ -5026,6 +5029,112 @@ spec:
           spec:
             description: FrappeMicroserviceSpec defines the desired state of FrappeMicroservice.
             properties:
+              args:
+                description: Args passed to the command.
+                items:
+                  type: string
+                type: array
+              command:
+                description: |-
+                  Command overrides the image entrypoint. Required for Job and CronJob,
+                  because the library's default entrypoint starts a long-running server.
+                items:
+                  type: string
+                type: array
+              cronJob:
+                description: CronJob schedule. Required when type is CronJob.
+                properties:
+                  concurrencyPolicy:
+                    default: Forbid
+                    description: ConcurrencyPolicy for overlapping runs.
+                    enum:
+                    - Allow
+                    - Forbid
+                    - Replace
+                    type: string
+                  failedJobsHistoryLimit:
+                    description: FailedJobsHistoryLimit is how many finished failed Jobs to keep.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  schedule:
+                    description: Schedule in cron format, e.g. "0 2 * * *".
+                    minLength: 1
+                    type: string
+                  startingDeadlineSeconds:
+                    description: |-
+                      StartingDeadlineSeconds after a missed schedule, beyond which the run is
+                      skipped.
+                    format: int64
+                    minimum: 0
+                    type: integer
+                  successfulJobsHistoryLimit:
+                    description: SuccessfulJobsHistoryLimit is how many finished successful Jobs to keep.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  suspend:
+                    description: Suspend pauses future runs.
+                    type: boolean
+                  timeZone:
+                    description: |-
+                      TimeZone for the schedule, e.g. "Australia/Sydney". Defaults to the
+                      kube-controller-manager's time zone.
+                    type: string
+                required:
+                - schedule
+                type: object
+              deployment:
+                description: Deployment settings. Only valid when type is Deployment.
+                properties:
+                  port:
+                    default: 8000
+                    description: |-
+                      Port the container listens on and the Service exposes. The operator passes
+                      it to the container as PORT.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                  replicas:
+                    default: 1
+                    description: Replicas of the Deployment.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  routing:
+                    description: |-
+                      Routing exposes path prefixes on the site's domain. When omitted, the
+                      microservice is only reachable in-cluster through its ClusterIP Service.
+                    properties:
+                      paths:
+                        description: |-
+                          Paths are URL path prefixes on the site's domain that are routed to this
+                          microservice instead of the monolith. Matching uses Ingress `Prefix`
+                          semantics: `/orders` matches `/orders` and `/orders/...`, not
+                          `/orders-report`.
+
+                          Validation only looks at this object. Two microservices claiming the same
+                          path on one site are not detected by the operator; the ingress controller
+                          (or an API gateway in front of it) decides which one wins.
+                        items:
+                          maxLength: 256
+                          type: string
+                        maxItems: 16
+                        minItems: 1
+                        type: array
+                        x-kubernetes-list-type: set
+                        x-kubernetes-validations:
+                        - message: each path must be an absolute path made of non-empty segments of [A-Za-z0-9._~%-], with no trailing slash; '/' is not allowed
+                          rule: self.all(p, p.matches('^(/[A-Za-z0-9._~%-]+)+$'))
+                        - message: paths must not contain dot segments ('.' or '..')
+                          rule: self.all(p, !p.matches('/[.][.]?(/|$)'))
+                        - message: 'paths must not overlap reserved monolith routes: /api/method/login, /login, /app, /assets, /files, /private, /socket.io'
+                          rule: self.all(p, !['/api/method/login', '/login', '/app', '/assets', '/files', '/private', '/socket.io'].exists(r, p == r || p.startsWith(r + '/') || r.startsWith(p + '/')))
+                    required:
+                    - paths
+                    type: object
+                type: object
               env:
                 description: |-
                   Env adds environment variables to the container. Operator-managed binding
@@ -5218,21 +5327,29 @@ spec:
                 x-kubernetes-validations:
                 - message: image.repository is required
                   rule: has(self.repository) && self.repository != ''
-              port:
-                default: 8000
-                description: |-
-                  Port the container listens on and the Service exposes. The operator passes
-                  it to the container as PORT.
-                format: int32
-                maximum: 65535
-                minimum: 1
-                type: integer
-              replicas:
-                default: 1
-                description: Replicas of the microservice Deployment.
-                format: int32
-                minimum: 0
-                type: integer
+              job:
+                description: Job run settings. Valid when type is Job or CronJob.
+                properties:
+                  activeDeadlineSeconds:
+                    description: ActiveDeadlineSeconds bounds how long a run may take.
+                    format: int64
+                    minimum: 1
+                    type: integer
+                  backoffLimit:
+                    description: |-
+                      BackoffLimit is the number of retries before a run is marked failed.
+                      Kubernetes defaults it to 6.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  ttlSecondsAfterFinished:
+                    description: |-
+                      TTLSecondsAfterFinished lets Kubernetes delete a finished Job. The
+                      operator remembers the run in status and does not start it again.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                type: object
               resources:
                 description: Resources for the microservice container.
                 properties:
@@ -5255,38 +5372,6 @@ spec:
                     description: Requests describes the minimum amount of compute resources required
                     type: object
                 type: object
-              routing:
-                description: |-
-                  Routing exposes path prefixes on the site's domain. When omitted, the
-                  microservice is only reachable in-cluster through its ClusterIP Service.
-                properties:
-                  paths:
-                    description: |-
-                      Paths are URL path prefixes on the site's domain that are routed to this
-                      microservice instead of the monolith. Matching uses Ingress `Prefix`
-                      semantics: `/orders` matches `/orders` and `/orders/...`, not
-                      `/orders-report`.
-
-                      Validation only looks at this object. Two microservices claiming the same
-                      path on one site are not detected by the operator; the ingress controller
-                      (or an API gateway in front of it) decides which one wins.
-                    items:
-                      maxLength: 256
-                      type: string
-                    maxItems: 16
-                    minItems: 1
-                    type: array
-                    x-kubernetes-list-type: set
-                    x-kubernetes-validations:
-                    - message: each path must be an absolute path made of non-empty segments of [A-Za-z0-9._~%-], with no trailing slash; '/' is not allowed
-                      rule: self.all(p, p.matches('^(/[A-Za-z0-9._~%-]+)+$'))
-                    - message: paths must not contain dot segments ('.' or '..')
-                      rule: self.all(p, !p.matches('/[.][.]?(/|$)'))
-                    - message: 'paths must not overlap reserved monolith routes: /api/method/login, /login, /app, /assets, /files, /private, /socket.io'
-                      rule: self.all(p, !['/api/method/login', '/login', '/app', '/assets', '/files', '/private', '/socket.io'].exists(r, p == r || p.startsWith(r + '/') || r.startsWith(p + '/')))
-                required:
-                - paths
-                type: object
               siteRef:
                 description: |-
                   SiteRef is the FrappeSite (in this namespace) the microservice binds to.
@@ -5302,15 +5387,41 @@ spec:
                 x-kubernetes-validations:
                 - message: siteRef is immutable
                   rule: self == oldSelf
+              type:
+                default: Deployment
+                description: Type of workload. Immutable.
+                enum:
+                - Deployment
+                - Job
+                - CronJob
+                type: string
+                x-kubernetes-validations:
+                - message: type is immutable
+                  rule: self == oldSelf
             required:
             - image
             - siteRef
             type: object
+            x-kubernetes-validations:
+            - message: deployment is only valid when type is Deployment
+              rule: self.type == 'Deployment' || !has(self.deployment)
+            - message: job is only valid when type is Job or CronJob
+              rule: self.type != 'Deployment' || !has(self.job)
+            - message: cronJob is required when type is CronJob, and only valid then
+              rule: (self.type == 'CronJob') == has(self.cronJob)
+            - message: command is required when type is Job or CronJob
+              rule: self.type == 'Deployment' || (has(self.command) && size(self.command) > 0)
           status:
             description: FrappeMicroserviceStatus defines the observed state of FrappeMicroservice.
             properties:
+              activeJobs:
+                description: ActiveJobs is the number of running Jobs started by the CronJob.
+                format: int32
+                type: integer
               conditions:
-                description: 'Conditions: SiteReady, Available, Routed.'
+                description: |-
+                  Conditions: SiteReady always; Available and Routed (Deployment);
+                  Complete (Job); Scheduled (CronJob).
                 items:
                   description: Condition contains details for one aspect of the current state of this API Resource.
                   properties:
@@ -5370,6 +5481,17 @@ spec:
                 items:
                   type: string
                 type: array
+              jobName:
+                description: JobName is the Job of the current run (type Job).
+                type: string
+              lastScheduleTime:
+                description: LastScheduleTime of the CronJob (type CronJob).
+                format: date-time
+                type: string
+              lastSuccessfulTime:
+                description: LastSuccessfulTime of the CronJob (type CronJob).
+                format: date-time
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the generation last reconciled.
                 format: int64
@@ -5381,17 +5503,24 @@ spec:
                 enum:
                 - Pending
                 - Ready
+                - Running
+                - Succeeded
                 - Failed
                 type: string
               readyReplicas:
-                description: ReadyReplicas reported by the Deployment.
+                description: ReadyReplicas reported by the Deployment (type Deployment).
                 format: int32
                 type: integer
               serviceURL:
-                description: ServiceURL is the in-cluster URL of the microservice.
+                description: ServiceURL is the in-cluster URL of the microservice (type Deployment).
                 type: string
             type: object
         type: object
+        x-kubernetes-validations:
+        - message: a Deployment microservice name must be at most 63 characters (it names the Service)
+          rule: self.spec.type != 'Deployment' || size(self.metadata.name) <= 63
+        - message: a CronJob microservice name must be at most 52 characters
+          rule: self.spec.type != 'CronJob' || size(self.metadata.name) <= 52
     served: true
     storage: true
     subresources:

@@ -23,6 +23,7 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -104,10 +105,9 @@ func newMSFixture(t *testing.T, o msFixtureOpts) *msFixture {
 	ms := &vyogotechv1.FrappeMicroservice{
 		ObjectMeta: metav1.ObjectMeta{Name: msName, Namespace: msNS, Generation: 1},
 		Spec: vyogotechv1.FrappeMicroserviceSpec{
-			SiteRef:  vyogotechv1.LocalSiteReference{Name: msSite},
-			Image:    vyogotechv1.ImageConfig{Repository: "ghcr.io/acme/orders", Tag: "1.0.0"},
-			Port:     8000,
-			Replicas: int32Ptr(1),
+			SiteRef:    vyogotechv1.LocalSiteReference{Name: msSite},
+			Image:      vyogotechv1.ImageConfig{Repository: "ghcr.io/acme/orders", Tag: "1.0.0"},
+			Deployment: &vyogotechv1.MicroserviceDeploymentSpec{Port: 8000, Replicas: int32Ptr(1)},
 		},
 	}
 	if o.ms != nil {
@@ -127,7 +127,7 @@ func newMSFixture(t *testing.T, o msFixtureOpts) *msFixture {
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(objs...).
-		WithStatusSubresource(&vyogotechv1.FrappeMicroservice{}, &vyogotechv1.FrappeSite{}, &appsv1.Deployment{}, &networkingv1.Ingress{}, &routev1.Route{}).
+		WithStatusSubresource(&vyogotechv1.FrappeMicroservice{}, &vyogotechv1.FrappeSite{}, &appsv1.Deployment{}, &networkingv1.Ingress{}, &routev1.Route{}, &batchv1.Job{}, &batchv1.CronJob{}).
 		WithIndex(&vyogotechv1.FrappeMicroservice{}, microserviceSiteRefIndex, indexMicroserviceBySiteRef).
 		Build()
 
@@ -287,7 +287,7 @@ func TestMicroservice_SQLiteSiteIsUnsupported(t *testing.T) {
 
 func TestMicroservice_InternalOnly(t *testing.T) {
 	f := newMSFixture(t, msFixtureOpts{ms: func(ms *vyogotechv1.FrappeMicroservice) {
-		ms.Spec.Replicas = int32Ptr(2)
+		ms.Spec.Deployment.Replicas = int32Ptr(2)
 		ms.Spec.Image.PullSecrets = []corev1.LocalObjectReference{{Name: "regcred"}}
 		ms.Spec.Image.PullPolicy = corev1.PullAlways
 		ms.Spec.Env = []corev1.EnvVar{{Name: "LOG_LEVEL", Value: "INFO"}}
@@ -437,7 +437,7 @@ func TestMicroservice_ReadyOnceDeploymentIsReady(t *testing.T) {
 }
 
 func TestMicroservice_ZeroReplicasIsAvailable(t *testing.T) {
-	f := newMSFixture(t, msFixtureOpts{ms: func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Replicas = int32Ptr(0) }})
+	f := newMSFixture(t, msFixtureOpts{ms: func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Deployment.Replicas = int32Ptr(0) }})
 	f.reconcile()
 	ms := f.ms()
 	expectCondition(t, ms, vyogotechv1.MicroserviceConditionAvailable, metav1.ConditionTrue, "ScaledToZero")
@@ -447,7 +447,7 @@ func TestMicroservice_ZeroReplicasIsAvailable(t *testing.T) {
 }
 
 func TestMicroservice_PortFlowsToContainerServiceAndBinding(t *testing.T) {
-	f := newMSFixture(t, msFixtureOpts{ms: func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Port = 9090 }})
+	f := newMSFixture(t, msFixtureOpts{ms: func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Deployment.Port = 9090 }})
 	f.reconcile()
 	secret := &corev1.Secret{}
 	f.mustGet(msName+"-site", secret)
@@ -540,7 +540,7 @@ func TestMicroservice_SpecChangesUpdateDeployment(t *testing.T) {
 	f.reconcile()
 	f.updateMS(func(ms *vyogotechv1.FrappeMicroservice) {
 		ms.Spec.Image.Tag = "2.0.0"
-		ms.Spec.Replicas = int32Ptr(3)
+		ms.Spec.Deployment.Replicas = int32Ptr(3)
 	})
 	f.reconcile()
 	dep := &appsv1.Deployment{}
@@ -574,7 +574,7 @@ func TestMicroservice_NameConflictIsNotTakenOver(t *testing.T) {
 
 func withPaths(paths ...string) func(*vyogotechv1.FrappeMicroservice) {
 	return func(ms *vyogotechv1.FrappeMicroservice) {
-		ms.Spec.Routing = &vyogotechv1.MicroserviceRouting{Paths: paths}
+		ms.Spec.Deployment.Routing = &vyogotechv1.MicroserviceRouting{Paths: paths}
 	}
 }
 
@@ -678,7 +678,7 @@ func TestMicroservice_RemovingRoutingPrunesIngress(t *testing.T) {
 	f.reconcile()
 	f.mustGet(msName+"-ingress", &networkingv1.Ingress{})
 
-	f.updateMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Routing = nil })
+	f.updateMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Deployment.Routing = nil })
 	f.reconcile()
 	if f.get(msName+"-ingress", &networkingv1.Ingress{}) {
 		t.Fatal("Ingress must be deleted when routing is removed")
@@ -820,7 +820,7 @@ func TestMicroservice_OpenShiftRoutes(t *testing.T) {
 	}
 
 	// Removing routing deletes every Route.
-	f.updateMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Routing = nil })
+	f.updateMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Deployment.Routing = nil })
 	f.reconcile()
 	if n := len(f.routes()); n != 0 {
 		t.Fatalf("routes after removing routing = %d", n)
@@ -909,4 +909,360 @@ func TestMicroservice_StatusWriteToleratesStaleResourceVersion(t *testing.T) {
 	if f.ms().Status.ServiceURL == "" {
 		t.Fatal("status was not written")
 	}
+}
+
+// --- command / args ------------------------------------------------------------
+
+func TestMicroservice_CommandAndArgsFlowIntoTheDeployment(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: func(ms *vyogotechv1.FrappeMicroservice) {
+		ms.Spec.Command = []string{"python", "-m", "orders"}
+		ms.Spec.Args = []string{"--workers", "2"}
+	}})
+	f.reconcile()
+	dep := &appsv1.Deployment{}
+	f.mustGet(msName, dep)
+	c := dep.Spec.Template.Spec.Containers[0]
+	if strings.Join(c.Command, " ") != "python -m orders" || strings.Join(c.Args, " ") != "--workers 2" {
+		t.Fatalf("command/args = %v %v", c.Command, c.Args)
+	}
+}
+
+// --- Job ---------------------------------------------------------------------
+
+func asJob(mutate ...func(*vyogotechv1.FrappeMicroservice)) func(*vyogotechv1.FrappeMicroservice) {
+	return func(ms *vyogotechv1.FrappeMicroservice) {
+		ms.Spec.Type = vyogotechv1.MicroserviceTypeJob
+		ms.Spec.Deployment = nil
+		ms.Spec.Command = []string{"python", "-m", "orders.backfill"}
+		ms.Spec.Args = []string{"--since", "2026-01-01"}
+		ms.Spec.Job = &vyogotechv1.MicroserviceJobSpec{
+			BackoffLimit:            int32Ptr(2),
+			ActiveDeadlineSeconds:   int64Ptr(600),
+			TTLSecondsAfterFinished: int32Ptr(3600),
+		}
+		for _, m := range mutate {
+			m(ms)
+		}
+	}
+}
+
+func (f *msFixture) jobs() []batchv1.Job {
+	f.t.Helper()
+	list := &batchv1.JobList{}
+	if err := f.client.List(f.ctx, list, client.InNamespace(msNS), client.MatchingLabels{microserviceLabel: msName}); err != nil {
+		f.t.Fatal(err)
+	}
+	return list.Items
+}
+
+func (f *msFixture) onlyJob() *batchv1.Job {
+	f.t.Helper()
+	jobs := f.jobs()
+	if len(jobs) != 1 {
+		f.t.Fatalf("expected exactly one Job, got %d", len(jobs))
+	}
+	return &jobs[0]
+}
+
+func (f *msFixture) setJobStatus(job *batchv1.Job, status batchv1.JobStatus) {
+	f.t.Helper()
+	job.Status = status
+	if err := f.client.Status().Update(f.ctx, job); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+func TestMicroservice_JobRunsOnce(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: asJob()})
+	f.reconcile()
+
+	job := f.onlyJob()
+	expectControlledByMS(t, job)
+	if !strings.HasPrefix(job.Name, msName+"-") || len(job.Name) > 63 {
+		t.Errorf("job name = %q", job.Name)
+	}
+	if *job.Spec.BackoffLimit != 2 || *job.Spec.ActiveDeadlineSeconds != 600 || *job.Spec.TTLSecondsAfterFinished != 3600 {
+		t.Errorf("run settings = backoff %v deadline %v ttl %v", *job.Spec.BackoffLimit, *job.Spec.ActiveDeadlineSeconds, *job.Spec.TTLSecondsAfterFinished)
+	}
+	pod := job.Spec.Template.Spec
+	if pod.RestartPolicy != corev1.RestartPolicyNever {
+		t.Errorf("restartPolicy = %s", pod.RestartPolicy)
+	}
+	c := pod.Containers[0]
+	if strings.Join(c.Command, " ") != "python -m orders.backfill" || strings.Join(c.Args, " ") != "--since 2026-01-01" {
+		t.Errorf("command/args = %v %v", c.Command, c.Args)
+	}
+	if len(c.EnvFrom) != 1 || c.EnvFrom[0].SecretRef.Name != msName+"-site" {
+		t.Errorf("envFrom = %+v", c.EnvFrom)
+	}
+	if len(c.Ports) != 0 || c.LivenessProbe != nil || c.ReadinessProbe != nil {
+		t.Error("a Job container has no ports or probes")
+	}
+	if c.SecurityContext == nil || pod.SecurityContext == nil {
+		t.Error("Job pods use the restricted security context")
+	}
+
+	// No long-running objects.
+	if f.get(msName, &appsv1.Deployment{}) || f.get(msName, &corev1.Service{}) {
+		t.Fatal("a Job creates no Deployment or Service")
+	}
+	secret := &corev1.Secret{}
+	f.mustGet(msName+"-site", secret)
+	if _, ok := secret.Data["PORT"]; ok {
+		t.Error("PORT is only bound for Deployments")
+	}
+
+	ms := f.ms()
+	if ms.Status.Phase != vyogotechv1.FrappeMicroservicePhaseRunning {
+		t.Fatalf("phase = %s", ms.Status.Phase)
+	}
+	if ms.Status.JobName != job.Name {
+		t.Errorf("status.jobName = %q, want %q", ms.Status.JobName, job.Name)
+	}
+	if ms.Status.ServiceURL != "" {
+		t.Errorf("serviceURL = %q for a Job", ms.Status.ServiceURL)
+	}
+	expectCondition(t, ms, vyogotechv1.MicroserviceConditionComplete, metav1.ConditionFalse, "Running")
+
+	// A second reconcile does not start another run.
+	f.reconcile()
+	if f.onlyJob().Name != job.Name {
+		t.Fatal("the same spec must not create another Job")
+	}
+
+	f.setJobStatus(job, batchv1.JobStatus{Succeeded: 1, Conditions: []batchv1.JobCondition{{Type: batchv1.JobComplete, Status: corev1.ConditionTrue}}})
+	f.reconcile()
+	ms = f.ms()
+	if ms.Status.Phase != vyogotechv1.FrappeMicroservicePhaseSucceeded {
+		t.Fatalf("phase = %s", ms.Status.Phase)
+	}
+	expectCondition(t, ms, vyogotechv1.MicroserviceConditionComplete, metav1.ConditionTrue, "Succeeded")
+}
+
+func TestMicroservice_FailedJob(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: asJob()})
+	f.reconcile()
+	f.setJobStatus(f.onlyJob(), batchv1.JobStatus{Failed: 3, Conditions: []batchv1.JobCondition{{
+		Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Reason: "BackoffLimitExceeded", Message: "Job has reached the specified backoff limit",
+	}}})
+	f.reconcile()
+	ms := f.ms()
+	if ms.Status.Phase != vyogotechv1.FrappeMicroservicePhaseFailed {
+		t.Fatalf("phase = %s", ms.Status.Phase)
+	}
+	expectCondition(t, ms, vyogotechv1.MicroserviceConditionComplete, metav1.ConditionFalse, "Failed")
+	if c := condition(ms, vyogotechv1.MicroserviceConditionComplete); !strings.Contains(c.Message, "BackoffLimitExceeded") {
+		t.Errorf("message should carry the Job's reason: %q", c.Message)
+	}
+	// A failed run is not retried by the operator; the Job's backoffLimit governs retries.
+	f.reconcile()
+	if n := len(f.jobs()); n != 1 {
+		t.Fatalf("jobs = %d", n)
+	}
+}
+
+func TestMicroservice_JobSpecChangeStartsANewRun(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: asJob()})
+	f.reconcile()
+	first := f.onlyJob().Name
+
+	f.updateMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.Image.Tag = "1.0.1" })
+	f.reconcile()
+	second := f.onlyJob()
+	if second.Name == first {
+		t.Fatal("a spec change must start a new Job")
+	}
+	if second.Spec.Template.Spec.Containers[0].Image != "ghcr.io/acme/orders:1.0.1" {
+		t.Errorf("image = %s", second.Spec.Template.Spec.Containers[0].Image)
+	}
+	ms := f.ms()
+	if ms.Status.JobName != second.Name || ms.Status.Phase != vyogotechv1.FrappeMicroservicePhaseRunning {
+		t.Errorf("status = %s %s", ms.Status.JobName, ms.Status.Phase)
+	}
+}
+
+func TestMicroservice_CredentialRotationDoesNotRerunAJob(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: asJob()})
+	f.reconcile()
+	first := f.onlyJob().Name
+
+	src := &corev1.Secret{}
+	f.mustGet("acme-db-password", src)
+	src.Data["password"] = []byte("rotated")
+	if err := f.client.Update(f.ctx, src); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile()
+
+	if f.onlyJob().Name != first {
+		t.Fatal("a one-time Job must not re-run because credentials rotated")
+	}
+	secret := &corev1.Secret{}
+	f.mustGet(msName+"-site", secret)
+	if string(secret.Data["DB_PASSWORD"]) != "rotated" {
+		t.Fatal("the binding is still re-synced")
+	}
+}
+
+func TestMicroservice_FinishedJobRemovedByTTLIsNotRecreated(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: asJob()})
+	f.reconcile()
+	job := f.onlyJob()
+	f.setJobStatus(job, batchv1.JobStatus{Succeeded: 1, Conditions: []batchv1.JobCondition{{Type: batchv1.JobComplete, Status: corev1.ConditionTrue}}})
+	f.reconcile()
+
+	// ttlSecondsAfterFinished: the Job controller deletes the finished Job.
+	if err := f.client.Delete(f.ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile()
+	if n := len(f.jobs()); n != 0 {
+		t.Fatalf("a finished run must not be recreated after TTL cleanup; jobs = %d", n)
+	}
+	if ms := f.ms(); ms.Status.Phase != vyogotechv1.FrappeMicroservicePhaseSucceeded {
+		t.Fatalf("phase = %s", ms.Status.Phase)
+	}
+}
+
+func TestMicroservice_LongJobNamesAreTruncated(t *testing.T) {
+	long := strings.Repeat("j", 80)
+	f := newMSFixture(t, msFixtureOpts{ms: asJob()})
+	ms := &vyogotechv1.FrappeMicroservice{}
+	f.mustGet(msName, ms)
+	if name := microserviceJobName(&vyogotechv1.FrappeMicroservice{ObjectMeta: metav1.ObjectMeta{Name: long}, Spec: ms.Spec}); len(name) > 63 {
+		t.Fatalf("job name %q is %d characters", name, len(name))
+	}
+}
+
+// --- CronJob -------------------------------------------------------------------
+
+func asCronJob(mutate ...func(*vyogotechv1.FrappeMicroservice)) func(*vyogotechv1.FrappeMicroservice) {
+	return func(ms *vyogotechv1.FrappeMicroservice) {
+		asJob()(ms)
+		ms.Spec.Type = vyogotechv1.MicroserviceTypeCronJob
+		tz := "Australia/Sydney"
+		ms.Spec.CronJob = &vyogotechv1.MicroserviceCronJobSpec{
+			Schedule:                   "0 2 * * *",
+			TimeZone:                   &tz,
+			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
+			SuccessfulJobsHistoryLimit: int32Ptr(2),
+			FailedJobsHistoryLimit:     int32Ptr(1),
+			StartingDeadlineSeconds:    int64Ptr(300),
+		}
+		for _, m := range mutate {
+			m(ms)
+		}
+	}
+}
+
+func TestMicroservice_CronJob(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: asCronJob()})
+	f.reconcile()
+
+	cj := &batchv1.CronJob{}
+	f.mustGet(msName, cj)
+	expectControlledByMS(t, cj)
+	s := cj.Spec
+	if s.Schedule != "0 2 * * *" || s.TimeZone == nil || *s.TimeZone != "Australia/Sydney" || s.ConcurrencyPolicy != batchv1.ForbidConcurrent {
+		t.Errorf("schedule settings = %q %v %s", s.Schedule, s.TimeZone, s.ConcurrencyPolicy)
+	}
+	if *s.SuccessfulJobsHistoryLimit != 2 || *s.FailedJobsHistoryLimit != 1 || *s.StartingDeadlineSeconds != 300 {
+		t.Errorf("history/deadline = %v %v %v", *s.SuccessfulJobsHistoryLimit, *s.FailedJobsHistoryLimit, *s.StartingDeadlineSeconds)
+	}
+	if s.Suspend == nil || *s.Suspend {
+		t.Errorf("suspend = %v", s.Suspend)
+	}
+	js := s.JobTemplate.Spec
+	if *js.BackoffLimit != 2 || *js.ActiveDeadlineSeconds != 600 || *js.TTLSecondsAfterFinished != 3600 {
+		t.Error("run settings must be applied to every scheduled Job")
+	}
+	pod := js.Template.Spec
+	if pod.RestartPolicy != corev1.RestartPolicyNever || strings.Join(pod.Containers[0].Command, " ") != "python -m orders.backfill" {
+		t.Errorf("pod = %s %v", pod.RestartPolicy, pod.Containers[0].Command)
+	}
+	if js.Template.Annotations[bindingHashAnnotation] == "" {
+		t.Error("the job template carries the binding hash so future runs see rotated credentials")
+	}
+	if f.get(msName, &appsv1.Deployment{}) || f.get(msName, &corev1.Service{}) || len(f.jobs()) != 0 {
+		t.Fatal("a CronJob creates no Deployment, Service or immediate Job")
+	}
+
+	ms := f.ms()
+	if ms.Status.Phase != vyogotechv1.FrappeMicroservicePhaseReady {
+		t.Fatalf("phase = %s; conditions %+v", ms.Status.Phase, ms.Status.Conditions)
+	}
+	expectCondition(t, ms, vyogotechv1.MicroserviceConditionScheduled, metav1.ConditionTrue, "Scheduled")
+
+	last := metav1.NewTime(metav1.Now().Rfc3339Copy().Time)
+	cj.Status.LastScheduleTime = &last
+	cj.Status.LastSuccessfulTime = &last
+	cj.Status.Active = []corev1.ObjectReference{{Name: msName + "-29000000"}}
+	if err := f.client.Status().Update(f.ctx, cj); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile()
+	ms = f.ms()
+	if ms.Status.LastScheduleTime == nil || !ms.Status.LastScheduleTime.Equal(&last) ||
+		ms.Status.LastSuccessfulTime == nil || ms.Status.ActiveJobs != 1 {
+		t.Errorf("cron status = %v %v %d", ms.Status.LastScheduleTime, ms.Status.LastSuccessfulTime, ms.Status.ActiveJobs)
+	}
+}
+
+func TestMicroservice_CronJobDefaultsAndSuspend(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: asCronJob(func(ms *vyogotechv1.FrappeMicroservice) {
+		ms.Spec.CronJob = &vyogotechv1.MicroserviceCronJobSpec{Schedule: "*/5 * * * *"}
+	})})
+	f.reconcile()
+	cj := &batchv1.CronJob{}
+	f.mustGet(msName, cj)
+	if cj.Spec.ConcurrencyPolicy != batchv1.ForbidConcurrent {
+		t.Errorf("concurrencyPolicy defaults to Forbid, got %s", cj.Spec.ConcurrencyPolicy)
+	}
+
+	f.updateMS(func(ms *vyogotechv1.FrappeMicroservice) { ms.Spec.CronJob.Suspend = boolPtr(true) })
+	f.reconcile()
+	f.mustGet(msName, cj)
+	if cj.Spec.Suspend == nil || !*cj.Spec.Suspend {
+		t.Fatal("suspend must be applied")
+	}
+	ms := f.ms()
+	expectCondition(t, ms, vyogotechv1.MicroserviceConditionScheduled, metav1.ConditionTrue, "Suspended")
+	if ms.Status.Phase != vyogotechv1.FrappeMicroservicePhaseReady {
+		t.Errorf("phase = %s", ms.Status.Phase)
+	}
+}
+
+func TestMicroservice_CronJobPicksUpRotatedCredentials(t *testing.T) {
+	f := newMSFixture(t, msFixtureOpts{ms: asCronJob()})
+	f.reconcile()
+	cj := &batchv1.CronJob{}
+	f.mustGet(msName, cj)
+	before := cj.Spec.JobTemplate.Spec.Template.Annotations[bindingHashAnnotation]
+
+	src := &corev1.Secret{}
+	f.mustGet("acme-db-password", src)
+	src.Data["password"] = []byte("rotated")
+	if err := f.client.Update(f.ctx, src); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile()
+	f.mustGet(msName, cj)
+	if cj.Spec.JobTemplate.Spec.Template.Annotations[bindingHashAnnotation] == before {
+		t.Fatal("the job template must change when the binding changes")
+	}
+}
+
+func TestMicroservice_ForeignCronJobIsNotTakenOver(t *testing.T) {
+	foreign := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{Name: msName, Namespace: msNS},
+		Spec:       batchv1.CronJobSpec{Schedule: "1 1 1 1 1"},
+	}
+	f := newMSFixture(t, msFixtureOpts{ms: asCronJob(), extra: []client.Object{foreign}})
+	f.reconcile()
+	cj := &batchv1.CronJob{}
+	f.mustGet(msName, cj)
+	if cj.Spec.Schedule != "1 1 1 1 1" || metav1.GetControllerOf(cj) != nil {
+		t.Fatal("a CronJob this CR does not own must be left untouched")
+	}
+	expectCondition(t, f.ms(), vyogotechv1.MicroserviceConditionScheduled, metav1.ConditionFalse, "NameConflict")
 }
