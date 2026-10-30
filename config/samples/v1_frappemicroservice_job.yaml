@@ -1,0 +1,25 @@
+# One-time task: runs to completion once per spec change, with the same site
+# binding (FRAPPE_SITE, CENTRAL_SITE_URL, DB_*) as a long-running service.
+# Editing the image, command, args, env, resources or job settings starts a
+# new run. Credential rotation does not.
+apiVersion: vyogo.tech/v1
+kind: FrappeMicroservice
+metadata:
+  name: orders-backfill
+  labels:
+    app.kubernetes.io/name: frappemicroservice
+    app.kubernetes.io/instance: orders-backfill
+    app.kubernetes.io/part-of: frappe-operator
+spec:
+  type: Job
+  siteRef:
+    name: frappesite-sample
+  image:
+    repository: ghcr.io/myorg/orders-service
+    tag: "1.0.0"
+  command: ["python", "-m", "orders.backfill"]
+  args: ["--since", "2026-01-01"]
+  job:
+    backoffLimit: 2
+    activeDeadlineSeconds: 3600
+    ttlSecondsAfterFinished: 86400

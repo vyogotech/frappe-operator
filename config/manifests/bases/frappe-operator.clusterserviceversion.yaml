@@ -56,6 +56,11 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: Runs a frappe-microservice-lib service bound to a FrappeSite, with an in-cluster Service and optional path routing on the site's domain.
+      displayName: Frappe Microservice
+      kind: FrappeMicroservice
+      name: frappemicroservices.vyogo.tech
+      version: v1
     - description: Manages Frappe site API keys and secrets for programmatic access.
       displayName: Site API Key
       kind: SiteAPIKey

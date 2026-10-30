@@ -1433,8 +1433,22 @@ spec:
                 description: DatabaseCredentialsSecret is the name of the Secret with
                   site-specific DB credentials
                 type: string
+              databaseHost:
+                description: |-
+                  DatabaseHost is the host the site's database is reachable at in-cluster.
+                  Recorded so dependants (e.g. FrappeMicroservice) can bind to the site
+                  without re-running database provisioning.
+                type: string
               databaseName:
                 description: DatabaseName is the actual database name created
+                type: string
+              databasePort:
+                description: DatabasePort is the port of the site's database.
+                type: string
+              databaseProvider:
+                description: |-
+                  DatabaseProvider is the resolved database provider (mariadb, postgres,
+                  sqlite or the external type).
                 type: string
               databaseReady:
                 description: DatabaseReady indicates if the database is provisioned

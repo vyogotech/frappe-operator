@@ -1,0 +1,17 @@
+# Internal-only microservice: binding Secret, Deployment and a ClusterIP
+# Service reachable at http://pdf-generator.<namespace>.svc.cluster.local:8000.
+# Must live in the same namespace as the FrappeSite it binds to.
+apiVersion: vyogo.tech/v1
+kind: FrappeMicroservice
+metadata:
+  name: pdf-generator
+  labels:
+    app.kubernetes.io/name: frappemicroservice
+    app.kubernetes.io/instance: pdf-generator
+    app.kubernetes.io/part-of: frappe-operator
+spec:
+  siteRef:
+    name: frappesite-sample
+  image:
+    repository: ghcr.io/myorg/pdf-service
+    tag: "1.0.0"

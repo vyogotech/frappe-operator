@@ -507,6 +507,10 @@ func TestFrappeSiteReconciler_Reconcile_ReadySkipReconcile(t *testing.T) {
 		Status: vyogotechv1.FrappeSiteStatus{
 			Phase:              vyogotechv1.FrappeSitePhaseReady,
 			ObservedGeneration: 1,
+			// A site made Ready by this operator version has its database
+			// connection info recorded; without it the reconcile backfills once.
+			DatabaseProvider: "mariadb",
+			DatabaseHost:     "mariadb",
 		},
 	}
 	site.SetFinalizers([]string{frappeSiteFinalizer})

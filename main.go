@@ -307,6 +307,16 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SiteCron")
 		os.Exit(1)
 	}
+	if err = (&controllers.FrappeMicroserviceReconciler{
+		Client:       mgr.GetClient(),
+		Scheme:       mgr.GetScheme(),
+		Recorder:     mgr.GetEventRecorderFor("frappemicroservice-controller"),
+		IsOpenShift:  isOpenShift,
+		EnforceHTTPS: enforceHTTPS,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "FrappeMicroservice")
+		os.Exit(1)
+	}
 	if err = (&controllers.SiteAPIKeyReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),

@@ -13,6 +13,7 @@ resources:
 - bases/vyogo.tech_sitejobs.yaml
 - bases/vyogo.tech_sitebackups.yaml
 - bases/vyogo.tech_siterestores.yaml
+- bases/vyogo.tech_frappemicroservices.yaml
 - bases/vyogo.tech_siteapikeys.yaml
 - bases/vyogo.tech_siteapps.yaml
 - bases/vyogo.tech_siteclientscripts.yaml

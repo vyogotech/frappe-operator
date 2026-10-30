@@ -330,6 +330,13 @@ func (r *FrappeSiteReconciler) ensureInitSecrets(ctx context.Context, site *vyog
 
 // resolveDBConfig merges site-specific database configuration with bench-level defaults
 func (r *FrappeSiteReconciler) resolveDBConfig(site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench) vyogotechv1.DatabaseConfig {
+	return resolveSiteDBConfig(site, bench)
+}
+
+// resolveSiteDBConfig merges site-specific database configuration with
+// bench-level defaults. Shared by every controller that needs the site's
+// database provider.
+func resolveSiteDBConfig(site *vyogotechv1.FrappeSite, bench *vyogotechv1.FrappeBench) vyogotechv1.DatabaseConfig {
 	config := site.Spec.DBConfig
 
 	if bench.Spec.DBConfig == nil {

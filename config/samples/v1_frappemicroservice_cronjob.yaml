@@ -1,0 +1,27 @@
+# Scheduled task with the site binding. Every run starts from the current
+# binding, so rotated credentials apply from the next run.
+apiVersion: vyogo.tech/v1
+kind: FrappeMicroservice
+metadata:
+  name: orders-nightly-sync
+  labels:
+    app.kubernetes.io/name: frappemicroservice
+    app.kubernetes.io/instance: orders-nightly-sync
+    app.kubernetes.io/part-of: frappe-operator
+spec:
+  type: CronJob
+  siteRef:
+    name: frappesite-sample
+  image:
+    repository: ghcr.io/myorg/orders-service
+    tag: "1.0.0"
+  command: ["python", "-m", "orders.nightly_sync"]
+  cronJob:
+    schedule: "0 2 * * *"
+    timeZone: Australia/Sydney
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 1
+  job:
+    backoffLimit: 1
+    activeDeadlineSeconds: 1800

@@ -1,0 +1,47 @@
+# CPU-based autoscaling through an operator-owned HorizontalPodAutoscaler.
+apiVersion: vyogo.tech/v1
+kind: FrappeMicroservice
+metadata:
+  name: orders
+spec:
+  siteRef:
+    name: frappesite-sample
+  image:
+    repository: ghcr.io/myorg/orders-service
+    tag: "1.0.0"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  deployment:
+    replicas: 2
+    autoscaling:
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+---
+# Queue-driven autoscaling through a KEDA ScaledObject (needs KEDA).
+apiVersion: vyogo.tech/v1
+kind: FrappeMicroservice
+metadata:
+  name: orders-worker
+spec:
+  siteRef:
+    name: frappesite-sample
+  image:
+    repository: ghcr.io/myorg/orders-service
+    tag: "1.0.0"
+  command: ["frappe-ms", "worker"]
+  deployment:
+    autoscaling:
+      minReplicas: 1
+      maxReplicas: 20
+      keda:
+        pollingInterval: 15
+        cooldownPeriod: 120
+        triggers:
+          - type: redis
+            metadata:
+              address: redis-queue:6379
+              listName: rq:queue:default
+              listLength: "50"

@@ -318,6 +318,11 @@ status:
   
   # Name of the actual database created
   databaseName: string
+
+  # In-cluster database host, port and resolved provider (used by FrappeMicroservice)
+  databaseHost: string
+  databasePort: string
+  databaseProvider: string
   
   # Secret containing site-specific DB credentials
   databaseCredentialsSecret: string
@@ -467,6 +472,85 @@ ingress:
 ```
 
 ---
+
+## <i data-lucide="boxes"></i> FrappeMicroservice
+
+Runs a frappe-microservice-lib image bound to a `FrappeSite` in the same
+namespace through a generated site binding Secret, as a Deployment (with a
+ClusterIP Service and optional path routing on the site's domain), a Job or a
+CronJob. Short name `fms`. See the [Frappe Microservices guide](FRAPPE_MICROSERVICE.md)
+for the binding contract, workload behaviour and validation rules.
+
+### Spec
+
+```yaml
+spec:
+  siteRef:
+    name: string            # required, immutable, same namespace
+  image:
+    repository: string      # required
+    tag: string             # default "latest"
+    pullPolicy: string
+    pullSecrets: [{name: string}]
+  type: Deployment | Job | CronJob   # default Deployment, immutable
+  command: [string]         # required for Job and CronJob
+  args: [string]
+  resources:
+    requests: {}
+    limits: {}
+  env: [EnvVar]             # FRAPPE_SITE, CENTRAL_SITE_URL, PORT, DB_* rejected
+
+  deployment:               # type: Deployment only
+    port: int32             # default 8000, 1-65535
+    replicas: int32         # default 1, minimum 0
+    routing:
+      paths: [string]       # 1-16 path prefixes; omit for in-cluster only
+    autoscaling:            # optional; the autoscaler then owns the replica count
+      minReplicas: int32    # default 1; 0 only with keda
+      maxReplicas: int32    # required
+      targetCPUUtilizationPercentage: int32      # needs resources.requests.cpu
+      targetMemoryUtilizationPercentage: int32   # needs resources.requests.memory
+      keda:                 # instead of CPU/memory targets
+        pollingInterval: int32
+        cooldownPeriod: int32
+        triggers:           # at least one
+        - type: string      # e.g. redis
+          name: string
+          metricType: Utilization | Value | AverageValue   # cpu and memory scalers
+          metadata: {string: string}
+          authenticationRef: string   # TriggerAuthentication name
+
+  job:                      # type: Job or CronJob
+    backoffLimit: int32
+    activeDeadlineSeconds: int64
+    ttlSecondsAfterFinished: int32
+
+  cronJob:                  # required for type: CronJob
+    schedule: string        # required
+    timeZone: string
+    concurrencyPolicy: Allow | Forbid | Replace   # default Forbid
+    suspend: bool
+    startingDeadlineSeconds: int64
+    successfulJobsHistoryLimit: int32
+    failedJobsHistoryLimit: int32
+```
+
+### Status
+
+```yaml
+status:
+  phase: Pending | Ready | Running | Succeeded | Failed
+  readyReplicas: int32      # Deployment
+  serviceURL: string        # Deployment
+  externalURLs: [string]    # Deployment with routing
+  autoscaling: {currentReplicas: int32, desiredReplicas: int32}   # Deployment with autoscaling
+  jobName: string           # Job
+  lastScheduleTime: time    # CronJob
+  lastSuccessfulTime: time  # CronJob
+  activeJobs: int32         # CronJob
+  observedGeneration: int64
+  conditions: []            # SiteReady; Available, Routed, AutoscalingReady; Complete; Scheduled
+```
 
 ## SiteUser
 

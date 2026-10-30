@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **FrappeMicroservice CRD (#67)**: Runs a frappe-microservice-lib image bound to a `FrappeSite` in the same namespace. The operator generates a site binding Secret (`FRAPPE_SITE`, `CENTRAL_SITE_URL`, `PORT`, `DB_*`), a Deployment and a ClusterIP Service, and, when `spec.routing.paths` is set, an Ingress on the site's domain (one Route per path on OpenShift) that reuses the site's host, IngressClass and TLS Secret without a second cert-manager certificate. Credential rotation re-syncs the Secret and rolls the Deployment. Paths, reserved monolith prefixes and binding-key env names are validated with CEL. Cross-CR path conflicts are left to the ingress controller or a gateway; on OpenShift they surface in the `Routed` condition. `spec.type` runs the same binding as a `Deployment` (default), a one-time `Job` (one run per spec change, never re-run for credential rotation or after TTL cleanup) or a `CronJob`.
+- **FrappeMicroservice autoscaling (#69)**: `spec.deployment.autoscaling` makes the operator own a `HorizontalPodAutoscaler` (CPU and memory utilization targets) or a KEDA `ScaledObject` (`keda.triggers`, scale to zero allowed) for a Deployment microservice. The operator sets `replicas` only when it creates the Deployment, so the autoscaler and the operator no longer fight over the count; removing `autoscaling` deletes the autoscaler and returns to `deployment.replicas`. CEL rules cover bounds, required metrics and the matching `resources.requests`. Without the KEDA CRDs the microservice still reconciles and reports `AutoscalingReady=False`, reason `KEDANotInstalled`. New `status.autoscaling` and `AutoscalingReady` condition.
+- **FrappeSite database connection status**: `status.databaseHost`, `status.databasePort` and `status.databaseProvider` are recorded during provisioning. Ready sites from earlier versions get them backfilled once, without re-running provisioning.
+
 ## [5.5.0] - 2026-10-23
 
 ### Added
