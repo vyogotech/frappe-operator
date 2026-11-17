@@ -36,6 +36,10 @@ plugins:
   - jekyll-sitemap
   - jekyll-seo-tag
 
+# Do not let Jekyll overwrite gh-pages/helm-repo/index.yaml with stale static files
+exclude:
+  - helm-repo
+
 # Markdown
 markdown: kramdown
 kramdown:
