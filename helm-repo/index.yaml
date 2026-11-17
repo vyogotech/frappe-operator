@@ -24,8 +24,86 @@ entries:
         - url: https://artifacthub.io/packages/helm/cert-manager/cert-manager
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
+    appVersion: v5.5.2
+    created: "2026-11-17T20:18:54.653900253Z"
+    dependencies:
+    - condition: mariadb-operator.enabled
+      name: mariadb-operator
+      repository: https://mariadb-operator.github.io/mariadb-operator
+      tags:
+      - database
+      version: 0.34.0
+    - condition: keda.enabled
+      name: keda
+      repository: https://kedacore.github.io/charts
+      tags:
+      - autoscaling
+      version: 2.16.1
+    - condition: ingress-nginx.enabled
+      name: ingress-nginx
+      repository: https://kubernetes.github.io/ingress-nginx
+      tags:
+      - networking
+      version: 4.15.1
+    - condition: cert-manager.enabled
+      name: cert-manager
+      repository: https://charts.jetstack.io
+      tags:
+      - networking
+      version: v1.21.2
+    - alias: openebs-nfs
+      condition: openebs-nfs.enabled
+      name: nfs-provisioner
+      repository: https://openebs-archive.github.io/dynamic-nfs-provisioner
+      tags:
+      - storage
+      version: 0.11.0
+    description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
+    digest: f0ab3fb38de65c2e495f10de74eea48b2553ce3018157498d408b3201a1a203c
+    home: https://github.com/vyogotech/frappe-operator
+    icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/release/docs/assets/icon.png
+    keywords:
+    - frappe
+    - erpnext
+    - kubernetes
+    - operator
+    - saas
+    maintainers:
+    - email: support@vyogo.tech
+      name: Vyogo Technologies
+      url: https://vyogo.tech
+    name: frappe-operator
+    sources:
+    - https://github.com/vyogotech/frappe-operator
+    type: application
+    urls:
+    - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-5.5.2.tgz
+    version: 5.5.2
+  - annotations:
+      artifacthub.io/category: database
+      artifacthub.io/changes: |
+        - kind: added
+          description: MariaDB Operator integration for secure database provisioning
+        - kind: added
+          description: Auto-generated passwords for admin and database credentials
+        - kind: added
+          description: Per-site database isolation with dedicated users
+        - kind: added
+          description: Production-ready dual Redis architecture (cache + queue)
+        - kind: added
+          description: Multi-platform support (ARM64/AMD64)
+        - kind: security
+          description: Zero hardcoded credentials - all secrets auto-generated
+      artifacthub.io/license: Elastic-2.0
+      artifacthub.io/operator: "true"
+      artifacthub.io/operatorCapabilities: Full Lifecycle
+      artifacthub.io/prerelease: "false"
+      artifacthub.io/recommendations: |
+        - url: https://artifacthub.io/packages/helm/cert-manager/cert-manager
+        - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
+    apiVersion: v2
     appVersion: 5.5.1
-    created: "2026-10-30T02:13:42.95114614Z"
+    created: "2026-11-17T20:18:54.635069508Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -75,6 +153,242 @@ entries:
           description: Multi-platform support (ARM64/AMD64)
         - kind: security
           description: Zero hardcoded credentials - all secrets auto-generated
+      artifacthub.io/license: Elastic-2.0
+      artifacthub.io/operator: "true"
+      artifacthub.io/operatorCapabilities: Full Lifecycle
+      artifacthub.io/prerelease: "false"
+      artifacthub.io/recommendations: |
+        - url: https://artifacthub.io/packages/helm/cert-manager/cert-manager
+        - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
+    apiVersion: v2
+    appVersion: 5.5.0
+    created: "2026-11-17T20:18:54.625308219Z"
+    dependencies:
+    - condition: mariadb-operator.enabled
+      name: mariadb-operator
+      repository: https://mariadb-operator.github.io/mariadb-operator
+      tags:
+      - database
+      version: 0.34.0
+    - condition: keda.enabled
+      name: keda
+      repository: https://kedacore.github.io/charts
+      tags:
+      - autoscaling
+      version: 2.16.1
+    description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
+    digest: c686f404fe4cfcdb5479b0a3313f9e0c944d6e19c184e17ae36e25cf49673d13
+    home: https://github.com/vyogotech/frappe-operator
+    icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/release/docs/assets/icon.png
+    keywords:
+    - frappe
+    - erpnext
+    - kubernetes
+    - operator
+    - saas
+    maintainers:
+    - email: support@vyogo.tech
+      name: Vyogo Technologies
+      url: https://vyogo.tech
+    name: frappe-operator
+    sources:
+    - https://github.com/vyogotech/frappe-operator
+    type: application
+    urls:
+    - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-5.5.0.tgz
+    version: 5.5.0
+  - annotations:
+      artifacthub.io/category: database
+      artifacthub.io/changes: |
+        - kind: added
+          description: MariaDB Operator integration for secure database provisioning
+        - kind: added
+          description: Auto-generated passwords for admin and database credentials
+        - kind: added
+          description: Per-site database isolation with dedicated users
+        - kind: added
+          description: Production-ready dual Redis architecture (cache + queue)
+        - kind: added
+          description: Multi-platform support (ARM64/AMD64)
+        - kind: security
+          description: Zero hardcoded credentials - all secrets auto-generated
+      artifacthub.io/license: Elastic-2.0
+      artifacthub.io/operator: "true"
+      artifacthub.io/operatorCapabilities: Full Lifecycle
+      artifacthub.io/prerelease: "false"
+      artifacthub.io/recommendations: |
+        - url: https://artifacthub.io/packages/helm/cert-manager/cert-manager
+        - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
+    apiVersion: v2
+    appVersion: 5.4.0
+    created: "2026-11-17T20:18:54.615103013Z"
+    dependencies:
+    - condition: mariadb-operator.enabled
+      name: mariadb-operator
+      repository: https://mariadb-operator.github.io/mariadb-operator
+      tags:
+      - database
+      version: 0.34.0
+    - condition: keda.enabled
+      name: keda
+      repository: https://kedacore.github.io/charts
+      tags:
+      - autoscaling
+      version: 2.16.1
+    description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
+    digest: f0824b5e8066fb455600842d133d3fc458e1885a7728b3aa80597d9da18a19b9
+    home: https://github.com/vyogotech/frappe-operator
+    icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/release/docs/assets/icon.png
+    keywords:
+    - frappe
+    - erpnext
+    - kubernetes
+    - operator
+    - saas
+    maintainers:
+    - email: support@vyogo.tech
+      name: Vyogo Technologies
+      url: https://vyogo.tech
+    name: frappe-operator
+    sources:
+    - https://github.com/vyogotech/frappe-operator
+    type: application
+    urls:
+    - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-5.4.0.tgz
+    version: 5.4.0
+  - annotations:
+      artifacthub.io/category: database
+      artifacthub.io/changes: |
+        - kind: added
+          description: MariaDB Operator integration for secure database provisioning
+        - kind: added
+          description: Auto-generated passwords for admin and database credentials
+        - kind: added
+          description: Per-site database isolation with dedicated users
+        - kind: added
+          description: Production-ready dual Redis architecture (cache + queue)
+        - kind: added
+          description: Multi-platform support (ARM64/AMD64)
+        - kind: security
+          description: Zero hardcoded credentials - all secrets auto-generated
+      artifacthub.io/license: Elastic-2.0
+      artifacthub.io/operator: "true"
+      artifacthub.io/operatorCapabilities: Full Lifecycle
+      artifacthub.io/prerelease: "false"
+      artifacthub.io/recommendations: |
+        - url: https://artifacthub.io/packages/helm/cert-manager/cert-manager
+        - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
+    apiVersion: v2
+    appVersion: 5.3.0
+    created: "2026-11-17T20:18:54.605549873Z"
+    dependencies:
+    - condition: mariadb-operator.enabled
+      name: mariadb-operator
+      repository: https://mariadb-operator.github.io/mariadb-operator
+      tags:
+      - database
+      version: 0.34.0
+    - condition: keda.enabled
+      name: keda
+      repository: https://kedacore.github.io/charts
+      tags:
+      - autoscaling
+      version: 2.16.1
+    description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
+    digest: 789b079ffffe2117c964ca1e77ddec746b7421a0897cf1a260433de123efa1cd
+    home: https://github.com/vyogotech/frappe-operator
+    icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/release/docs/assets/icon.png
+    keywords:
+    - frappe
+    - erpnext
+    - kubernetes
+    - operator
+    - saas
+    maintainers:
+    - email: support@vyogo.tech
+      name: Vyogo Technologies
+      url: https://vyogo.tech
+    name: frappe-operator
+    sources:
+    - https://github.com/vyogotech/frappe-operator
+    type: application
+    urls:
+    - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-5.3.0.tgz
+    version: 5.3.0
+  - annotations:
+      artifacthub.io/category: database
+      artifacthub.io/changes: |
+        - kind: added
+          description: MariaDB Operator integration for secure database provisioning
+        - kind: added
+          description: Auto-generated passwords for admin and database credentials
+        - kind: added
+          description: Per-site database isolation with dedicated users
+        - kind: added
+          description: Production-ready dual Redis architecture (cache + queue)
+        - kind: added
+          description: Multi-platform support (ARM64/AMD64)
+        - kind: security
+          description: Zero hardcoded credentials - all secrets auto-generated
+      artifacthub.io/license: Elastic-2.0
+      artifacthub.io/operator: "true"
+      artifacthub.io/operatorCapabilities: Full Lifecycle
+      artifacthub.io/prerelease: "false"
+      artifacthub.io/recommendations: |
+        - url: https://artifacthub.io/packages/helm/cert-manager/cert-manager
+        - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
+    apiVersion: v2
+    appVersion: 5.2.6
+    created: "2026-11-17T20:18:54.595948637Z"
+    dependencies:
+    - condition: mariadb-operator.enabled
+      name: mariadb-operator
+      repository: https://mariadb-operator.github.io/mariadb-operator
+      tags:
+      - database
+      version: 0.34.0
+    - condition: keda.enabled
+      name: keda
+      repository: https://kedacore.github.io/charts
+      tags:
+      - autoscaling
+      version: 2.16.1
+    description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
+    digest: 9586f503e6df253f554888018f651ebf80390fe383748d1109d3e20546c6ec1b
+    home: https://github.com/vyogotech/frappe-operator
+    icon: https://raw.githubusercontent.com/vyogotech/frappe-operator/release/docs/assets/icon.png
+    keywords:
+    - frappe
+    - erpnext
+    - kubernetes
+    - operator
+    - saas
+    maintainers:
+    - email: support@vyogo.tech
+      name: Vyogo Technologies
+      url: https://vyogo.tech
+    name: frappe-operator
+    sources:
+    - https://github.com/vyogotech/frappe-operator
+    type: application
+    urls:
+    - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-5.2.6.tgz
+    version: 5.2.6
+  - annotations:
+      artifacthub.io/category: database
+      artifacthub.io/changes: |
+        - kind: added
+          description: MariaDB Operator integration for secure database provisioning
+        - kind: added
+          description: Auto-generated passwords for admin and database credentials
+        - kind: added
+          description: Per-site database isolation with dedicated users
+        - kind: added
+          description: Production-ready dual Redis architecture (cache + queue)
+        - kind: added
+          description: Multi-platform support (ARM64/AMD64)
+        - kind: security
+          description: Zero hardcoded credentials - all secrets auto-generated
       artifacthub.io/license: Apache-2.0
       artifacthub.io/operator: "true"
       artifacthub.io/operatorCapabilities: Full Lifecycle
@@ -84,7 +398,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 3.2.1
-    created: "2026-10-30T02:13:42.938542871Z"
+    created: "2026-11-17T20:18:54.586318593Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -143,7 +457,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 3.2.0
-    created: "2026-10-30T02:13:42.927168965Z"
+    created: "2026-11-17T20:18:54.577130464Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -202,7 +516,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 3.1.0
-    created: "2026-10-30T02:13:42.915201698Z"
+    created: "2026-11-17T20:18:54.56794451Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -261,7 +575,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 3.0.0
-    created: "2026-10-30T02:13:42.902686334Z"
+    created: "2026-11-17T20:18:54.558487395Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -320,7 +634,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 2.6.4
-    created: "2026-10-30T02:13:42.889758706Z"
+    created: "2026-11-17T20:18:54.54843333Z"
     description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
     digest: b0eabdaf2aaeecc65d06231654e00c46070125b4bbbd6074b272dffb5a429124
     home: https://github.com/vyogotech/frappe-operator
@@ -366,7 +680,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: 2.6.3
-    created: "2026-10-30T02:13:42.885448836Z"
+    created: "2026-11-17T20:18:54.545122898Z"
     description: A Kubernetes operator for managing Frappe Framework and ERPNext deployments
     digest: 058919e87ac557e204e343c78f5f62f21d9a5d90dce75849ff6e87c8403bc3be
     home: https://github.com/vyogotech/frappe-operator
@@ -412,7 +726,7 @@ entries:
         - url: https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx
     apiVersion: v2
     appVersion: v2.5.0
-    created: "2026-10-30T02:13:42.961646573Z"
+    created: "2026-11-17T20:18:54.66216217Z"
     dependencies:
     - condition: mariadb-operator.enabled
       name: mariadb-operator
@@ -447,4 +761,4 @@ entries:
     urls:
     - https://vyogotech.github.io/frappe-operator/helm-repo/frappe-operator-v2.5.0.tgz
     version: v2.5.0
-generated: "2026-10-30T02:13:42.879891133Z"
+generated: "2026-11-17T20:18:54.541083877Z"
