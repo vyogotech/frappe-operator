@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.2] - 2026-11-18
+
+### Added
+- **Bundled Subcharts for One-Click Installs (`ingress-nginx`, `cert-manager`, `openebs-nfs`)**: Restored the conditional Helm subcharts from PR #62 (`v5.2.7`) onto the v5.5 release line, auto-wiring `ingressControllerService`/`ingressControllerNamespace` in the operator ConfigMap when `ingress-nginx.enabled: true` and creating the `nfs-rwx-storage` ReadWriteMany StorageClass when `openebs-nfs.enabled: true`.
+- **POSIX `install.sh` & Helm Repository Indexing**: Unified `install.sh` across POSIX `/bin/sh` environments and fixed `publish-helm-chart.yml` / `docs/_config.yml` so Jekyll builds never overwrite published chart versions in `gh-pages:helm-repo/index.yaml`.
+
 ## [5.5.1] - 2026-10-30
 
 ### Added
