@@ -88,7 +88,7 @@ Frappe Operator is a Kubernetes operator that automates the lifecycle management
 
 ```bash
 # One-command installation
-curl -fsSL https://raw.githubusercontent.com/vyogotech/frappe-operator/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/vyogotech/frappe-operator/release/install.sh | sh
 ```
 
 ### Manual Installation

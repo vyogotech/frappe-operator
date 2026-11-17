@@ -52,9 +52,6 @@
 <loc>https://vyogotech.github.io/frappe-operator/getting-started.html</loc>
 </url>
 <url>
-<loc>https://vyogotech.github.io/frappe-operator/helm-repo/SETUP.html</loc>
-</url>
-<url>
 <loc>https://vyogotech.github.io/frappe-operator/monitoring.html</loc>
 </url>
 <url>
@@ -68,8 +65,5 @@
 </url>
 <url>
 <loc>https://vyogotech.github.io/frappe-operator/upgrade-guide.html</loc>
-</url>
-<url>
-<loc>https://vyogotech.github.io/frappe-operator/helm-repo/</loc>
 </url>
 </urlset>
