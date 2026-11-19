@@ -374,6 +374,90 @@ spec:
     - hrms
 ```
 
+## SiteApp: Forcing a Reinstall
+
+A `SiteApp` installs one app on one site after the site exists, preferably from
+a prebuilt FPM package (`spec.fpmPackage`). Its install Job is idempotent: when
+`bench list-apps` already shows the app and the copy on the sites volume
+(`sites/apps/<app>`) either carries no `.fpm_package` marker or carries the
+requested one, the Job exits with "already installed ... nothing to do".
+
+That is wrong for one case: a copy of the app that no fpm install put on the
+volume (copied by hand, restored from elsewhere) has no marker, so it is never
+replaced. Because `sites/apps` comes before the image's `apps/` on the pods'
+`PYTHONPATH`, that copy shadows the version the bench image ships, and
+migrations run against the stale code.
+
+Set the `vyogo.tech/force-install` annotation to replace it:
+
+```yaml
+apiVersion: vyogo.tech/v1
+kind: SiteApp
+metadata:
+  name: my-site-wiki
+  namespace: default
+  annotations:
+    # Any non-empty string. Change the value to force again.
+    vyogo.tech/force-install: "2026-11-20T10:00:00Z"
+spec:
+  siteRef:
+    name: my-site
+  appName: wiki
+  fpmPackage: frappe/wiki==3.0.1
+  fpmRepo: ghcr.io/vyogotech/fpm
+  fpmRepoType: oci
+```
+
+or on an existing SiteApp:
+
+```bash
+kubectl annotate siteapp my-site-wiki --overwrite \
+  vyogo.tech/force-install="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+What happens:
+
+1. A pre-install backup is taken (unless `backupBeforeInstall: false`), named
+   `<siteapp>-pre-g<generation>-f<hash of the token>`.
+2. The install Job runs with `FORCE_INSTALL=1`. It skips the "already
+   installed" check and the shared-bench fast path, runs
+   `fpm install --overwrite`, replaces `sites/apps/<app>` with the package
+   named in `spec.fpmPackage` and writes the `.fpm_package` marker.
+3. `bench migrate` runs as usual (`autoMigrate`), and the bench's gunicorn,
+   worker and scheduler pods are rolled so they load the new code.
+4. `status.forceInstallToken` records the value, and the `ForceInstall`
+   condition turns `True`.
+
+**The value is a one-shot token.** A forced reinstall runs once per distinct
+value: the operator compares the annotation with `status.forceInstallToken` and
+does nothing while they are equal, so leaving the annotation in place (in Git,
+for example) does not reinstall on every reconcile. To force again, or to retry
+a forced Job that failed, set a new value. Removing the annotation does nothing.
+
+Things to know:
+
+- **`spec.fpmPackage` is required.** On a SiteApp that installs from
+  `gitRepo`, or names no source, the annotation is ignored: nothing is
+  reinstalled and the `ForceInstall` condition reports `False` with reason
+  `FPMPackageRequired`.
+- **A bench holds one copy of an app.** Every site on the bench serves from
+  `sites/apps/<app>`, so replacing it changes the code under all of them, while
+  only the SiteApp's own site is migrated. On a shared bench, migrate the other
+  sites that use the app as well.
+- **Only the named app is replaced.** Apps it requires are installed if they
+  are missing, never overwritten.
+- **fpm v4.6.0 or newer** is needed (`fpm install --overwrite`). The operator's
+  default is newer; a bench image that ships an older `fpm`, or an older
+  `spec.fpmVersion`, makes the forced Job fail with a message saying so, and
+  leaves the volume untouched.
+- **The app is in the image too.** The forced path still ends with the fpm
+  package in `sites/apps/<app>`, which is what the pods import.
+- **Upgrade the CRDs with the operator.** `status.forceInstallToken` is a new
+  status field; Helm does not upgrade CRDs on `helm upgrade`.
+- **Deleting a SiteApp uninstalls the app** from the site
+  (`bench uninstall-app --force`). To reinstall, use the annotation; do not
+  delete and re-create the SiteApp.
+
 ## Best Practices
 
 1. **Validate bench apps first**: Before creating a site, check the bench status to see which apps are available.
