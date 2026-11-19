@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -49,7 +51,35 @@ const (
 	// and rolls back atomically on failure; v4.6.0+ never re-fetches or replaces an app
 	// the bench already has; v4.7.0 fixes TypeScript bundle asset resolution.
 	defaultFPMCLIVersion = "v4.7.0"
+
+	// forceInstallAnnotation, set on a SiteApp, makes the install Job replace the
+	// copy of the app on the sites volume with spec.fpmPackage even though the
+	// site already lists the app. Its VALUE is a one-shot token (a timestamp, a
+	// ticket id, any non-empty string): the install runs once per distinct value
+	// and the honoured value is recorded in status.forceInstallToken. The same
+	// key is stamped on the install Job to say which token that Job ran for.
+	forceInstallAnnotation = "vyogo.tech/force-install"
 )
+
+// pendingForceInstallToken returns the force-install token this SiteApp still
+// has to honour, or "" when there is none: no annotation, an empty value, a
+// value a completed install already honoured, or a SiteApp without
+// spec.fpmPackage (replacing the app needs a package to replace it with; a git
+// or image-provided app is left exactly as it is).
+func pendingForceInstallToken(siteApp *vyogotechv1.SiteApp) string {
+	token := siteApp.Annotations[forceInstallAnnotation]
+	if token == "" || siteApp.Spec.FPMPackage == "" || token == siteApp.Status.ForceInstallToken {
+		return ""
+	}
+	return token
+}
+
+// forceInstallSuffix is a short, stable, name- and label-safe stand-in for a
+// force-install token, which is free text.
+func forceInstallSuffix(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])[:8]
+}
 
 // resolveFPMCLIVersion returns the fpm CLI version to use for an installation:
 // 1. SiteApp.spec.fpmVersion if set
@@ -276,7 +306,30 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// its own work for the current spec. Whether the app is *actually* on the
 	// site is decided from real state (bench list-apps) inside the install job,
 	// where the database is reachable — never from Spec.Apps here.
-	if siteApp.Status.Phase == "Ready" && siteApp.Status.ObservedGeneration == siteApp.Generation {
+	//
+	// The one exception is a force-install token that has not been honoured yet
+	// (see forceInstallAnnotation): an annotation does not bump the generation,
+	// so it is compared against status.forceInstallToken instead.
+	forceToken := pendingForceInstallToken(siteApp)
+	if requested := siteApp.Annotations[forceInstallAnnotation]; requested != "" && siteApp.Spec.FPMPackage == "" {
+		// Safer than guessing: without a package there is nothing to replace the
+		// app with, so the annotation is ignored and the SiteApp behaves as if it
+		// were not set. Reported once per token, through the condition.
+		msg := fmt.Sprintf("%s=%q ignored: a forced reinstall needs spec.fpmPackage", forceInstallAnnotation, requested)
+		if meta.SetStatusCondition(&siteApp.Status.Conditions, metav1.Condition{
+			Type:               "ForceInstall",
+			Status:             metav1.ConditionFalse,
+			Reason:             "FPMPackageRequired",
+			Message:            msg,
+			ObservedGeneration: siteApp.Generation,
+		}) {
+			log.FromContext(ctx).Info("Ignoring force-install annotation: spec.fpmPackage is not set",
+				"siteApp", siteApp.Name, "app", siteApp.Spec.AppName, "token", requested)
+			r.Recorder.Event(siteApp, corev1.EventTypeWarning, "ForceInstallIgnored", msg)
+			_ = r.updateStatus(ctx, siteApp)
+		}
+	}
+	if siteApp.Status.Phase == "Ready" && siteApp.Status.ObservedGeneration == siteApp.Generation && forceToken == "" {
 		return ctrl.Result{}, nil
 	}
 
@@ -289,6 +342,9 @@ func (r *SiteAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		siteApp.Status.Phase = "Ready"
 		siteApp.Status.ObservedGeneration = siteApp.Generation
+		if forceToken != "" {
+			siteApp.Status.ForceInstallToken = forceToken
+		}
 		r.setCondition(siteApp, metav1.Condition{
 			Type:    "Ready",
 			Status:  metav1.ConditionTrue,
@@ -408,6 +464,24 @@ if m:
 PY
 }
 
+# Forced reinstall: the SiteApp carries a vyogo.tech/force-install token that no
+# install has honoured yet. The copy of the app on the sites volume is then
+# replaced by FPM_PACKAGE even though the site already lists the app - the
+# repair for a copy that no fpm install put there (no .fpm_package marker, e.g.
+# copied by hand), which shadows the app the bench image ships because
+# sites/apps comes first on the serving pods' PYTHONPATH. Only an fpm package
+# can be forced; the controller sets FORCE_INSTALL only alongside FPM_PACKAGE
+# and it is checked again here.
+FORCE=0
+if [ "${FORCE_INSTALL:-}" = "1" ]; then
+  if [ -n "$FPM_PACKAGE" ]; then
+    FORCE=1
+    echo "Forced reinstall requested: skipping the already-installed checks; sites/apps/$APP_NAME will be replaced by $FPM_PACKAGE."
+  else
+    echo "FORCE_INSTALL is set but there is no FPM package to install; ignoring it."
+  fi
+fi
+
 # 0) Real-state idempotency (authoritative). Decide from what is ACTUALLY
 # installed on the site — tabInstalled Application, read via list-apps — never
 # from the site's desired Spec.Apps. If the app is genuinely present there is
@@ -415,7 +489,7 @@ PY
 # we fall through and install it for real. This is the check the controller used
 # to do against Spec.Apps, moved to where the database is reachable and the truth
 # actually lives.
-if bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}' | grep -qx "$APP_NAME"; then
+if [ "$FORCE" != "1" ] && bench --site "$SITE_NAME" list-apps 2>/dev/null | awk '{print $1}' | grep -qx "$APP_NAME"; then
   CURRENT_PKG=""
   [ -f "/home/frappe/frappe-bench/sites/apps/$APP_NAME/.fpm_package" ] && CURRENT_PKG=$(cat "/home/frappe/frappe-bench/sites/apps/$APP_NAME/.fpm_package" 2>/dev/null || true)
   if [ -z "$FPM_PACKAGE" ] || [ -z "$CURRENT_PKG" ] || [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
@@ -480,7 +554,12 @@ relocate_fpm_app() {
   # operation, not a per-site install.
   CURRENT_PKG=""
   [ -f "$DEST/.fpm_package" ] && CURRENT_PKG=$(cat "$DEST/.fpm_package" 2>/dev/null || true)
-  if [ -d "$DEST/$app" ] && [ -n "$CURRENT_PKG" ] && [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
+  # A forced reinstall replaces the requested app whatever its marker says (the
+  # marker can match while the files do not). Apps fpm pulled in alongside it
+  # are never forced.
+  REPLACE=0
+  [ "$FORCE" = "1" ] && [ "$app" = "$APP_NAME" ] && REPLACE=1
+  if [ "$REPLACE" != "1" ] && [ -d "$DEST/$app" ] && [ -n "$CURRENT_PKG" ] && [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
     echo "$app is already on the shared volume; keeping that copy (site-level install only)."
     link_durable_app "$app"
     return 0
@@ -492,9 +571,19 @@ relocate_fpm_app() {
   # it is what a live import writes mid-copy, and pods regenerate it.
   TMP="$(mktemp -d "/home/frappe/frappe-bench/sites/apps/$app.tmp.XXXXXX")"
   tar --exclude='__pycache__' -C "$SRC" -cf - . | tar -C "$TMP" -xf -
-  if [ -d "$DEST/$app" ] && [ -n "$CURRENT_PKG" ] && [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
+  if [ "$REPLACE" != "1" ] && [ -d "$DEST/$app" ] && [ -n "$CURRENT_PKG" ] && [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
     echo "$app appeared on the shared volume meanwhile (another install won); using that copy."
     rm -rf "$TMP"
+  elif [ "$REPLACE" = "1" ] && [ -e "$DEST" ]; then
+    # The copy being replaced may not be ours to delete (copied in by hand as
+    # another user). Rename it aside first - that needs only the parent dir -
+    # so a failed delete can never leave a half-removed app in place. The
+    # leading dot keeps the leftover off sys.path (sitecustomize skips it).
+    OLD="/home/frappe/frappe-bench/sites/apps/.$app.replaced.$$"
+    mv "$DEST" "$OLD"
+    mv "$TMP" "$DEST"
+    rm -rf "$OLD" 2>/dev/null || echo "warning: could not remove the replaced copy at $OLD; remove it by hand."
+    [ -n "$FPM_PACKAGE" ] && echo "$FPM_PACKAGE" > "$DEST/.fpm_package" 2>/dev/null || true
   else
     rm -rf "$DEST"
     mv "$TMP" "$DEST"
@@ -584,7 +673,8 @@ if [ -n "$FPM_PACKAGE" ]; then
   if [ -d "/home/frappe/frappe-bench/sites/apps/$APP_NAME/$APP_NAME" ]; then
     CURRENT_PKG=""
     [ -f "/home/frappe/frappe-bench/sites/apps/$APP_NAME/.fpm_package" ] && CURRENT_PKG=$(cat "/home/frappe/frappe-bench/sites/apps/$APP_NAME/.fpm_package" 2>/dev/null || true)
-    if [ -z "$FPM_PACKAGE" ] || [ -z "$CURRENT_PKG" ] || [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; then
+    # Not on a forced reinstall: the copy on the volume is the one being replaced.
+    if [ "$FORCE" != "1" ] && { [ -z "$FPM_PACKAGE" ] || [ -z "$CURRENT_PKG" ] || [ "$CURRENT_PKG" = "$FPM_PACKAGE" ]; }; then
       link_durable_app "$APP_NAME"
       SHARED_OK=1
       for dep in $(read_required_apps "$APP_NAME"); do
@@ -652,7 +742,29 @@ fi
   # fpm install extracts to the FPM store, symlinks apps/<app>, and installs on the site.
   PKG_SPEC="${FPM_PACKAGE//@/==}"
   PKG_SPEC="${PKG_SPEC//:/==}"
-  fpm install "$PKG_SPEC" --bench-path /home/frappe/frappe-bench --site "$SITE_NAME"
+  # fpm keeps an app the bench already has - in the image's apps/ or importable
+  # from the sites volume - and fetches nothing. A forced reinstall needs the
+  # package fetched and apps/<app> pointed at it, which is what --overwrite does
+  # (fpm v4.6.0+). Only the requested app is overwritten; its required apps stay.
+  FPM_INSTALL_FLAGS=""
+  if [ "$FORCE" = "1" ]; then
+    if ! fpm install --help 2>&1 | grep -q -- '--overwrite'; then
+      echo "error: a forced reinstall needs fpm v4.6.0 or newer (fpm install --overwrite); this bench has $(fpm --version 2>/dev/null || echo an older fpm)."
+      exit 1
+    fi
+    FPM_INSTALL_FLAGS="--overwrite"
+  fi
+  fpm install "$PKG_SPEC" --bench-path /home/frappe/frappe-bench --site "$SITE_NAME" $FPM_INSTALL_FLAGS
+  if [ "$FORCE" = "1" ]; then
+    # Relocating copies whatever apps/<app> resolves to. If that is still the
+    # image's own directory, or the copy on the volume, the forced run would
+    # stamp the wrong code with the package marker - fail instead.
+    FORCED_TARGET=$(readlink -f "/home/frappe/frappe-bench/apps/$APP_NAME" 2>/dev/null || true)
+    if [ ! -L "/home/frappe/frappe-bench/apps/$APP_NAME" ] || [ ! -d "$FORCED_TARGET/$APP_NAME" ] || [ "$FORCED_TARGET" = "/home/frappe/frappe-bench/sites/apps/$APP_NAME" ]; then
+      echo "error: fpm did not replace apps/$APP_NAME with $FPM_PACKAGE (it resolves to '${FORCED_TARGET:-nothing}'); leaving sites/apps/$APP_NAME untouched."
+      exit 1
+    fi
+  fi
   ls -1 /home/frappe/frappe-bench/apps 2>/dev/null | sort > /tmp/apps-after.txt || true
   NEW_APPS=$(comm -13 /tmp/apps-before.txt /tmp/apps-after.txt 2>/dev/null || true)
   /home/frappe/frappe-bench/env/bin/pip freeze --exclude-editable 2>/dev/null | sort > /tmp/pip-after.txt || true
@@ -732,6 +844,7 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 	jobName := jobNameFor(siteApp.Name, "app-install")
 	job := &batchv1.Job{}
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: siteApp.Namespace}, job)
+	forceToken := pendingForceInstallToken(siteApp)
 
 	if err == nil {
 		// Backfill ObservedGeneration for already-Ready resources from older operator versions
@@ -749,6 +862,16 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 			_ = r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground))
 			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 		}
+
+		// Same generation, but a force-install token this Job did not run for: the
+		// Job name is fixed per SiteApp, so the finished Job has to go before the
+		// forced one can be created. A Job that is still running is left to finish
+		// first; the token stays pending and is picked up on the next pass.
+		if forceToken != "" && (job.Status.Succeeded > 0 || job.Status.Failed > 0) && job.Annotations[forceInstallAnnotation] != forceToken {
+			log.FromContext(ctx).Info("Cleaning up finished Job to run a forced reinstall", "job", job.Name, "token", forceToken)
+			_ = r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground))
+			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+		}
 	}
 
 	if errors.IsNotFound(err) {
@@ -757,6 +880,11 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 		// preflight backup is done, so a corrupt install can always be reverted.
 		if siteApp.Spec.BackupBeforeInstall == nil || *siteApp.Spec.BackupBeforeInstall { // nil = default true
 			backupName := fmt.Sprintf("%s-pre-g%d", siteApp.Name, siteApp.Generation)
+			if forceToken != "" {
+				// A forced reinstall happens within one generation, whose backup
+				// already exists; it gets a rollback point of its own.
+				backupName = fmt.Sprintf("%s-f%s", backupName, forceInstallSuffix(forceToken))
+			}
 
 			backupType := "preflight-app-upgrade"
 			fromVer := siteApp.Status.InstalledVersion
@@ -874,7 +1002,18 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 			)
 		}
 
+		if forceToken != "" {
+			// Only present on a forced run, so every other install Job is built
+			// exactly as before.
+			env = append(env, corev1.EnvVar{Name: "FORCE_INSTALL", Value: "1"})
+		}
+
 		newJob := r.buildAppJob(ctx, siteApp, bench, jobName, "app-installer", image, pvcName, script, env, vyogotechv1.ResolveJobResources(bench, vyogotechv1.JobKindAppInstall), int32(1), nil)
+		if forceToken != "" {
+			// The token is free text, so it is an annotation, not a label.
+			newJob.Annotations = map[string]string{forceInstallAnnotation: forceToken}
+			log.FromContext(ctx).Info("Creating forced reinstall Job", "job", jobName, "app", siteApp.Spec.AppName, "package", siteApp.Spec.FPMPackage, "token", forceToken)
+		}
 
 		// The install job is owned by the SiteApp so it is garbage-collected with
 		// it. (The uninstall job cannot be — see reconcileAppUninstallJob.)
@@ -905,10 +1044,28 @@ func (r *SiteAppReconciler) reconcileAppInstallJob(ctx context.Context, siteApp 
 			benchNamespace = site.Namespace
 		}
 		reloadValue := fmt.Sprintf("gen-%d", siteApp.Generation)
+		// The token the Job ran for, not the annotation's current value: if the
+		// annotation changed while the Job was running, the new value is still
+		// pending and gets its own Job on the next pass.
+		honouredToken := job.Annotations[forceInstallAnnotation]
+		if honouredToken != "" {
+			// A forced reinstall replaced the app's code within the same
+			// generation, so the serving pods need a roll of their own.
+			reloadValue = fmt.Sprintf("%s-force-%s", reloadValue, forceInstallSuffix(honouredToken))
+		}
 		r.reloadBenchServingPods(ctx, benchName, benchNamespace, siteApp.Spec.AppName, reloadValue)
 
 		siteApp.Status.Phase = "Ready"
 		siteApp.Status.ObservedGeneration = siteApp.Generation
+		if honouredToken != "" {
+			siteApp.Status.ForceInstallToken = honouredToken
+			r.setCondition(siteApp, metav1.Condition{
+				Type:    "ForceInstall",
+				Status:  metav1.ConditionTrue,
+				Reason:  "Reinstalled",
+				Message: fmt.Sprintf("%s=%q honoured: %s reinstalled from %s", forceInstallAnnotation, honouredToken, siteApp.Spec.AppName, siteApp.Spec.FPMPackage),
+			})
+		}
 		if siteApp.Spec.FPMPackage != "" {
 			siteApp.Status.InstalledVersion = siteApp.Spec.FPMPackage
 		} else if siteApp.Spec.GitBranch != "" {

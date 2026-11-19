@@ -97,6 +97,13 @@ type SiteAppStatus struct {
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// ForceInstallToken is the last value of the "vyogo.tech/force-install"
+	// annotation that a completed install Job honoured. A forced reinstall runs
+	// only while the annotation holds a value different from this one, so a
+	// token is acted on once.
+	// +optional
+	ForceInstallToken string `json:"forceInstallToken,omitempty"`
+
 	// Conditions represent the latest available observations of the SiteApp's state.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

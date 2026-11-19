@@ -185,6 +185,13 @@ spec:
                   - type
                   type: object
                 type: array
+              forceInstallToken:
+                description: |-
+                  ForceInstallToken is the last value of the "vyogo.tech/force-install"
+                  annotation that a completed install Job honoured. A forced reinstall runs
+                  only while the annotation holds a value different from this one, so a
+                  token is acted on once.
+                type: string
               installedVersion:
                 description: InstalledVersion stores the version or commit of the
                   installed app.

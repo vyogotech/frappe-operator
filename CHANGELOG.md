@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Forced SiteApp reinstall (`vyogo.tech/force-install` annotation)**: A copy of an app on the sites volume that no fpm install put there (no `.fpm_package` marker) shadows the version in the bench image, and the install Job left it alone as "already installed". Setting the annotation on a `SiteApp` with `spec.fpmPackage` makes the Job skip that check, run `fpm install --overwrite` (fpm v4.6.0+), replace `sites/apps/<app>` with the requested package, write the marker and migrate. The annotation's value is a one-shot token: a forced reinstall runs once per distinct value, recorded in the new `status.forceInstallToken`. Ignored, with a `ForceInstall=False` condition, on SiteApps without `spec.fpmPackage`. Requires the updated `SiteApp` CRD. See [Forcing a Reinstall](docs/SITE_APP_INSTALLATION.md#siteapp-forcing-a-reinstall).
+
 ## [5.5.2] - 2026-11-18
 
 ### Added
